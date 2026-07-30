@@ -1,0 +1,25 @@
+ea4bc82a6ad023ab7ee23ee620429895
+::res://::1785393047
+banniere_v1.png::CompressedTexture2D/CompressedTexture2D::5566449677772075958::1785340078::1785340468::1::::<><><>0<>0<>ede7bfd2d1afd0ef1f14a76b7ba96c41<>res://.godot/imported/banniere_v1.png-37fcf3037aecac8ff204cdb88171c554.ctex::
+main1.gd::GDScript/GDScript::395964637124563751::1784869061::0::1::::<>Node3D<><>0<>0<><>::
+main2.gd::GDScript/GDScript::6395803967593353603::1784869522::0::1::::<>Node3D<><>0<>0<><>::
+main3.gd::GDScript/GDScript::9131401882279022250::1784870666::0::1::::<>Node3D<><>0<>0<><>::
+main4.gd::GDScript/GDScript::5262614687868174100::1784871315::0::1::::<>Node3D<><>0<>0<><>::
+main5.gd::GDScript/GDScript::3862388709871533245::1785314061::0::1::::<>Node3D<><>0<>0<><>::
+main.gd::GDScript/GDScript::2109331409907730309::1785315089::0::1::::<>Node3D<><>0<>0<><>::
+main.tscn::PackedScene/PackedScene::23196577071885840::1784874557::0::1::::<><><>0<>0<><>::uid://5b1m6pgea4cn::::res://main.gd
+pp_lv_3.png::CompressedTexture2D/CompressedTexture2D::6893416878073382207::1785393029::1785393047::1::::<><><>0<>0<>a2ee3d1df13a0cf0b15a1cb262b54f97<>res://.godot/imported/pp_lv_3.png-a7a7cfabb447383561d6efc05b943a4f.ctex::
+::res://glb/::1785338053
+perso_voxel 1.glb::PackedScene/PackedScene::6928580638740684398::1785307716::1785330163::1::::<><><>0<>0<>6c09620da74575ed35bddd902ef7d535<>res://.godot/imported/perso_voxel 1.glb-ce3d946ec0bf96cb9c96972e37b6e2c7.scn::
+perso_voxel 2.glb::PackedScene/PackedScene::4814000180741964774::1785326879::1785330163::1::::<><><>0<>0<>113c3a24254976c766a244a5e4094971<>res://.godot/imported/perso_voxel 2.glb-eaba186aba25f55c08c707a3e59a5d7b.scn::
+perso_voxel.glb::PackedScene/PackedScene::6899209908230005054::1785330056::1785330164::1::::<><><>0<>0<>1ef8f707caa0af2fe687460a04023da6<>res://.godot/imported/perso_voxel.glb-9cef59b3dd68d1a5ff21e9e7a7bd0414.scn::
+::res://paint devellopement/::1785330163
+perso 2.0.jpg::CompressedTexture2D/CompressedTexture2D::4630150374441790016::1785254169::1785330163::1::::<><><>0<>0<>5a1d0ea471c611b9eb0cfb38f3e816a2<>res://.godot/imported/perso 2.0.jpg-4a72dbe850dfe372270e64e2da7349cc.ctex::
+perso 3.0.jpg::CompressedTexture2D/CompressedTexture2D::2981248465872121289::1785254534::1785330163::1::::<><><>0<>0<>cd56cdb30d3c9d1c5902ec21103f9fff<>res://.godot/imported/perso 3.0.jpg-690a576c9388e27defa0b3c263d65242.ctex::
+perso 4.0.jpg::CompressedTexture2D/CompressedTexture2D::4054566650119304882::1785255337::1785330163::1::::<><><>0<>0<>b3a75b793f13c6c0da8fad214489586c<>res://.godot/imported/perso 4.0.jpg-ceb97fbc0d031fbc096c23bd49229f90.ctex::
+perso 5.0.jpg::CompressedTexture2D/CompressedTexture2D::2097874100126182468::1785255647::1785330163::1::::<><><>0<>0<>79a0ead790faec0e23668a274a4ca19a<>res://.godot/imported/perso 5.0.jpg-8695f7985fe2f2866c43957bd38d9806.ctex::
+perso 6.0.jpg::CompressedTexture2D/CompressedTexture2D::8517160414764810010::1785304806::1785330163::1::::<><><>0<>0<>47f946195869bf37fd0ada59a6177aec<>res://.godot/imported/perso 6.0.jpg-26eb293070582e27898dafb35bcab606.ctex::
+perso 7.0.jpg::CompressedTexture2D/CompressedTexture2D::9004802533761460913::1785306960::1785330163::1::::<><><>0<>0<>d2874c264ae7f684ba360e79bfd67ffa<>res://.godot/imported/perso 7.0.jpg-6ed1494f41cbbfae1ccd17f365817473.ctex::
+perso 8.0.jpg::CompressedTexture2D/CompressedTexture2D::2231711747132317845::1785307986::1785330163::1::::<><><>0<>0<>6381b2c7de076269c94a648cbb9b341d<>res://.godot/imported/perso 8.0.jpg-089f4581f49c95f7c6231b85cf05ed56.ctex::
+perso 9.0.jpg::CompressedTexture2D/CompressedTexture2D::7800798012711266265::1785320683::1785330163::1::::<><><>0<>0<>2df61888a40b5ec43cb2fa13c21e55dd<>res://.godot/imported/perso 9.0.jpg-1af033c8343281d03f66830f4e0a2e3c.ctex::
+::res://tools/::1784868311
