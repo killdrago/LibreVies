@@ -173,20 +173,29 @@ def download_godot(cb, done):
 
 def preload(path, cb, done):
     try:
-        cb(5, "Nettoyage du cache Godot...")
         godot_cache = os.path.join(GAME_DIR, ".godot")
-        if os.path.isdir(godot_cache):
-            shutil.rmtree(godot_cache, ignore_errors=True); time.sleep(0.5)
-        cb(10, "Import des assets (peut prendre 1-2 min)...")
-        p = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        p.wait(timeout=120)
-        if not os.path.isdir(godot_cache):
-            cb(70, "Deuxieme tentative d'import...")
-            p2 = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            p2.wait(timeout=120)
-        cb(90, "Finalisation..."); time.sleep(1)
+        cache_exists = os.path.isdir(godot_cache)
+
+        if not cache_exists:
+            # Premier lancement : import complet nécessaire
+            cb(10, "Premier import des assets (2-3 min)...")
+            p = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p.wait(timeout=180)
+            # Vérifier que le cache a été créé
+            if not os.path.isdir(godot_cache):
+                cb(70, "Deuxieme tentative...")
+                p2 = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p2.wait(timeout=180)
+        else:
+            # Cache existe : juste vérifier rapidement
+            cb(50, "Verification du cache...")
+            p = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p.wait(timeout=30)
+
+        cb(90, "Finalisation..."); time.sleep(0.5)
         cb(100, "Pret !"); done(True)
     except Exception as e:
         cb(100, f"Pret ({e})"); done(True)
