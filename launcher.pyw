@@ -128,7 +128,7 @@ def restart_launcher():
         subprocess.Popen([sys.executable])
     else:
         subprocess.Popen([sys.executable] + sys.argv)
-    os._exit(0)
+    sys.exit(0)
 
 
 # ============================================================
