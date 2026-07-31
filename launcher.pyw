@@ -123,16 +123,30 @@ def apply_updates(modified, remote_cfg, progress_cb):
 
 
 def restart_launcher():
-    """Ferme le launcher actuel et en ouvre un nouveau (1 seul processus)."""
-    if getattr(sys, 'frozen', False):
-        subprocess.Popen([sys.executable])
-    else:
-        subprocess.Popen([sys.executable] + sys.argv)
-    # Forcer la fermeture après un délai pour laisser le temps au nouveau de démarrer
-    def force_exit():
-        time.sleep(1)
-        os._exit(0)
-    threading.Thread(target=force_exit, daemon=True).start()
+    """Ferme le launcher et le relance via un script batch (évite les conflits PyInstaller)."""
+    exe = sys.executable if getattr(sys, 'frozen', False) else sys.executable
+    args = [] if getattr(sys, 'frozen', False) else sys.argv
+    pid = os.getpid()
+
+    # Créer un script batch temporaire
+    bat_path = os.path.join(GAME_DIR, "_restart.bat")
+    with open(bat_path, 'w', encoding='utf-8') as f:
+        f.write(f"""@echo off
+:wait
+tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
+if not errorlevel 1 (
+    timeout /t 1 /nobreak >nul
+    goto wait
+)
+start "" "{exe}" {" ".join(f'"{a}"' for a in args)}
+del /f /q "%~f0"
+""")
+
+    # Lancer le batch et quitter
+    subprocess.Popen(["cmd", "/c", "start", "", bat_path],
+                     cwd=GAME_DIR,
+                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    os._exit(0)
 
 
 # ============================================================
