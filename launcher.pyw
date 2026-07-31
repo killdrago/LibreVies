@@ -3,7 +3,6 @@ LibreVies — Launcher avec auto-update intégré
 Double-clique sur launcher.pyw ou LibreVies.exe pour lancer.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox
 import subprocess, threading, os, sys, time, zipfile
 import urllib.request, hashlib, json, shutil
 
@@ -15,7 +14,7 @@ GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.4.1-stable
 BANNER = os.path.join(GAME_DIR, "banniere_v1.png")
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "2.3.0"
+LAUNCHER_VERSION = "2.4.0"
 GAME_VERSION = "0.2.0"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
@@ -84,6 +83,9 @@ def check_for_updates(progress_cb):
     remote_files = remote_cfg.get("files", {})
     modified = []
     for fname, info in remote_files.items():
+        # Ne pas mettre a jour le launcher lui-meme (evite la boucle)
+        if fname == "launcher.pyw":
+            continue
         local_h = file_hash(os.path.join(GAME_DIR, fname))
         if local_h is None:
             action = "NOUVEAU"
@@ -120,33 +122,6 @@ def apply_updates(modified, remote_cfg, progress_cb):
         time.sleep(0.05)
     save_local_config(remote_cfg)
     return downloaded, errors
-
-
-def restart_launcher():
-    """Ferme le launcher et le relance via un script batch (évite les conflits PyInstaller)."""
-    exe = sys.executable if getattr(sys, 'frozen', False) else sys.executable
-    args = [] if getattr(sys, 'frozen', False) else sys.argv
-    pid = os.getpid()
-
-    # Créer un script batch temporaire
-    bat_path = os.path.join(GAME_DIR, "_restart.bat")
-    with open(bat_path, 'w', encoding='utf-8') as f:
-        f.write(f"""@echo off
-:wait
-tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
-if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
-    goto wait
-)
-start "" "{exe}" {" ".join(f'"{a}"' for a in args)}
-del /f /q "%~f0"
-""")
-
-    # Lancer le batch et quitter
-    subprocess.Popen(["cmd", "/c", "start", "", bat_path],
-                     cwd=GAME_DIR,
-                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-    os._exit(0)
 
 
 # ============================================================
@@ -427,7 +402,6 @@ class App(tk.Tk):
         mdp = self.reg_mdp.get().strip()
         if not email or not pseudo or not mdp:
             return
-        # TODO: envoyer au serveur
 
     # ============================================================
     # CLASSEMENT — rotation auto
@@ -484,7 +458,7 @@ class App(tk.Tk):
         self.after(0, lambda: self._upd_bar(p, t))
 
     # ============================================================
-    # MISE A JOUR AUTO
+    # MISE A JOUR AUTO (sans redémarrage)
     # ============================================================
 
     def start_update(self):
@@ -500,16 +474,16 @@ class App(tk.Tk):
         if not modified:
             self.after(0, lambda: self._upd_bar(100, "A jour !"))
             time.sleep(0.5); self.after(0, self._check_godot); return
-        # Mise a jour automatique (sans confirmation)
+        # Mise a jour automatique en arrière-plan
         self.after(0, lambda: self._upd_bar(10, f"Mise a jour de {len(modified)} fichier(s)..."))
         downloaded, errors = apply_updates(modified, result["remote_cfg"], self.upd)
         if errors:
             self.after(0, lambda: self._upd_bar(100, f"{downloaded} OK, {len(errors)} erreur(s)"))
-            time.sleep(2); self.after(0, self._check_godot); return
-        # Ferme le launcher et le relance (1 seul processus)
-        self.after(0, lambda: self._upd_bar(100, f"{downloaded} fichiers mis a jour ! Redemarrage..."))
-        time.sleep(1.5)
-        restart_launcher()
+        else:
+            self.after(0, lambda: self._upd_bar(100, f"{downloaded} fichiers mis a jour !"))
+        time.sleep(1)
+        # Pas de redémarrage — on lance directement Godot
+        self.after(0, self._check_godot)
 
     # ============================================================
     # GODOT
