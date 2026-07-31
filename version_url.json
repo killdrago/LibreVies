@@ -1,5 +1,5 @@
 {
-  "launcher_version": "2.1.0",
+  "launcher_version": "2.2.0",
   "game_version": "0.2.0",
   "notes": "Auto-update int\u00e9gr\u00e9 avec visualisation des fichiers",
   "game_url": "https://github.com/killdrago/LibreVies/tree/main",
@@ -18,12 +18,12 @@
       "size": 5211
     },
     "launcher.pyw": {
-      "hash": "dcd4af0a07c1c4097883922e3fed07d0",
-      "size": 36053
+      "hash": "db638e33823b7d84835b243c5f6a11eb",
+      "size": 35919
     },
     "build_launcher.bat": {
-      "hash": "c9e93f37435daa360c4d9579e1cc5633",
-      "size": 1000
+      "hash": "ad04ef2ac8af46f6f2faf6b595121531",
+      "size": 1322
     },
     "banniere_v1.png": {
       "hash": "0e1afc3ce846fe7e7700c2d4ea3ac51d",
