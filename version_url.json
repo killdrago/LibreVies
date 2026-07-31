@@ -6,7 +6,7 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/main",
   "files": {
     "main.gd": {
-      "hash": "7aa18129af7c8d01ff2905fdd591b048",
+      "hash": "c681635dc03ef7ca84ca20697822fd23",
       "size": 28983
     },
     "main.tscn": {
@@ -18,11 +18,11 @@
       "size": 5211
     },
     "launcher.pyw": {
-      "hash": "b913f6121be929cbc9c2c3cdd9839ab2",
-      "size": 24321
+      "hash": "fc7a0c56df2f4915810174b82cb38934",
+      "size": 24790
     },
     "build_launcher.bat": {
-      "hash": "c315bad41e24e7193f01047754f5cab3",
+      "hash": "ad04ef2ac8af46f6f2faf6b595121531",
       "size": 1374
     },
     "banniere_v1.png": {
@@ -54,15 +54,15 @@
       "size": 9835
     },
     "glb/generer_tout.py": {
-      "hash": "c7905209017e439fb98011e1d74a939b",
+      "hash": "d5647422d96a638ea52525948e7b48d1",
       "size": 12720
     },
     "glb/viewer_perso.py": {
-      "hash": "92e607df3fd4e7c7f3b148bfb711ab7b",
+      "hash": "a2fde4e3c1849d23678959f8eb5a84e5",
       "size": 5264
     },
     "glb/_viewer.html": {
-      "hash": "ed0c9150f2c7214370f1f9077d185a7f",
+      "hash": "7714b73b94cb015a535c78a327e2db52",
       "size": 4020
     }
   }
