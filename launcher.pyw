@@ -37,10 +37,16 @@ NEWS = [
 # OUTILS
 # ============================================================
 
-def file_hash(path):
+TEXT_EXTS = ('.gd', '.tscn', '.godot', '.pyw', '.py', '.bat', '.json',
+             '.cfg', '.txt', '.md', '.html', '.css', '.js', '.csv')
+
+def file_hash(path, normalize=False):
     try:
         with open(path, 'rb') as f:
-            return hashlib.md5(f.read()).hexdigest()
+            data = f.read()
+        if normalize:
+            data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+        return hashlib.md5(data).hexdigest()
     except:
         return None
 
@@ -86,7 +92,8 @@ def check_for_updates(progress_cb):
         # Ne pas mettre a jour le launcher lui-meme (evite la boucle)
         if fname == "launcher.pyw":
             continue
-        local_h = file_hash(os.path.join(GAME_DIR, fname))
+        is_text = fname.lower().endswith(TEXT_EXTS)
+        local_h = file_hash(os.path.join(GAME_DIR, fname), normalize=is_text)
         if local_h is None:
             action = "NOUVEAU"
         elif local_h != info["hash"]:
@@ -117,8 +124,9 @@ def apply_updates(modified, remote_cfg, progress_cb):
             if os.path.exists(local_path):
                 os.remove(local_path)
             os.rename(tmp, local_path)
-            # Vérifier que le hash correspond
-            actual_hash = file_hash(local_path)
+            # Vérifier que le hash correspond (normaliser les line endings pour les fichiers texte)
+            is_text = fname.lower().endswith(TEXT_EXTS)
+            actual_hash = file_hash(local_path, normalize=is_text)
             if actual_hash == expected_hash:
                 downloaded += 1
             else:
