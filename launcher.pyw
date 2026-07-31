@@ -128,7 +128,11 @@ def restart_launcher():
         subprocess.Popen([sys.executable])
     else:
         subprocess.Popen([sys.executable] + sys.argv)
-    sys.exit(0)
+    # Forcer la fermeture après un délai pour laisser le temps au nouveau de démarrer
+    def force_exit():
+        time.sleep(1)
+        os._exit(0)
+    threading.Thread(target=force_exit, daemon=True).start()
 
 
 # ============================================================
