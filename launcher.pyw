@@ -101,7 +101,7 @@ def check_for_updates(progress_cb):
 def apply_updates(modified, remote_cfg, progress_cb):
     raw_url = remote_cfg.get("raw_url", "")
     errors = []; downloaded = 0; total = len(modified)
-    for i, (fname, _, _, _) in enumerate(modified):
+    for i, (fname, _, expected_hash, _) in enumerate(modified):
         pct = int(20 + (i / total) * 70)
         progress_cb(pct, f"Telechargement ({i+1}/{total}): {fname}")
         try:
@@ -110,17 +110,25 @@ def apply_updates(modified, remote_cfg, progress_cb):
             req = urllib.request.Request(get_remote_url(fname, raw_url),
                                          headers={"User-Agent": f"LibreVies/{LAUNCHER_VERSION}"})
             resp = urllib.request.urlopen(req, timeout=30)
+            data = resp.read()
             tmp = local_path + ".tmp"
             with open(tmp, 'wb') as f:
-                f.write(resp.read())
+                f.write(data)
             if os.path.exists(local_path):
                 os.remove(local_path)
             os.rename(tmp, local_path)
-            downloaded += 1
+            # Vérifier que le hash correspond
+            actual_hash = file_hash(local_path)
+            if actual_hash == expected_hash:
+                downloaded += 1
+            else:
+                errors.append(f"{fname}: hash ne correspond pas apres telechargement")
         except Exception as e:
             errors.append(f"{fname}: {e}")
         time.sleep(0.05)
-    save_local_config(remote_cfg)
+    # Sauvegarder la config seulement si au moins 1 fichier OK
+    if downloaded > 0:
+        save_local_config(remote_cfg)
     return downloaded, errors
 
 
@@ -478,7 +486,8 @@ class App(tk.Tk):
         self.after(0, lambda: self._upd_bar(10, f"Mise a jour de {len(modified)} fichier(s)..."))
         downloaded, errors = apply_updates(modified, result["remote_cfg"], self.upd)
         if errors:
-            self.after(0, lambda: self._upd_bar(100, f"{downloaded} OK, {len(errors)} erreur(s)"))
+            err_msg = errors[0][:60]
+            self.after(0, lambda: self._upd_bar(100, f"Erreur: {err_msg}"))
         else:
             self.after(0, lambda: self._upd_bar(100, f"{downloaded} fichiers mis a jour !"))
         time.sleep(1)
