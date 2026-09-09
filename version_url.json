@@ -2,12 +2,12 @@
   "launcher_version": "2.4.0",
   "game_version": "0.2.0",
   "notes": "Auto-update int\u00e9gr\u00e9 avec visualisation des fichiers",
-  "game_url": "https://github.com/killdrago/LibreVies/tree/main",
-  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/main",
+  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0866b-librevies",
+  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0866b-librevies",
   "files": {
     "main.gd": {
-      "hash": "c681635dc03ef7ca84ca20697822fd23",
-      "size": 28983
+      "hash": "16dd389d7fd5bbb9ea3ad5e3eb095117",
+      "size": 31008
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -64,6 +64,10 @@
     "glb/_viewer.html": {
       "hash": "7714b73b94cb015a535c78a327e2db52",
       "size": 4020
+    },
+    "resumer.txt": {
+      "hash": "96df931ad065a53e74dccedd1f43b8be",
+      "size": 1432
     }
   }
 }
