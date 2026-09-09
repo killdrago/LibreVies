@@ -1,1 +1,32 @@
-	
+Migration PrimitiveMesh / Low-Poly — LibreVies
+=====================================================
+Date : 2026-09-09
+Branche : arena/01a0866b-librevies
+
+Changement lourd et gros : migration complète du projet Godot 4 (main.gd) des primitives CSG (CSGBox3D, CSGCylinder3D, CSGSphere3D) vers des MeshInstance3D avec PrimitiveMesh low-poly.
+
+Mesh types intégrés et actifs :
+- BoxMesh (subdivide = 0)
+- SphereMesh (radial_segments = 8, rings = 4)
+- CylinderMesh (radial_segments = 8, rings = 4)
+- PrismMesh (subdivide = 0)
+- CapsuleMesh (radial_segments = 8, rings = 4)
+
+Réglages low-poly appliqués sur toutes les primitives :
+- Subdivision = 0 (arêtes vives, style géométrique)
+- Segments radiaux = 8, anneaux = 4 (sphères, cylindres, capsules)
+
+Modifications dans main.gd :
+- Remplacement des fonctions _make_box, _make_cyl, _make_sphere
+- Ajout des fonctions _make_prism et _make_capsule
+- Utilisation active de CapsuleMesh sur le premier arbre (p[0] == [-4,4])
+- Utilisation active de PrismMesh dans la décoration de la fontaine et pour les toits en pente (V) des bâtiments (remplace les 3 couches plates)
+- Tous les bâtiments, routes, objets, ennemis et PNJ sont maintenant en PrimitiveMesh low-poly
+
+Références visuelles utilisées :
+- image/librevie_personnage.png
+- image/librevie_ville_depart.png
+- image/fond basique.png
+- image/1er image develloppement.png
+
+Résumé rédigé pour une éventuelle autre IA.

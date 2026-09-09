@@ -245,40 +245,89 @@ func update_camera():
 # ============================================================
 # CREATION DU MONDE
 # ============================================================
-func _make_box(pos: Vector3, size: Vector3, col: Color, parent: Node = self) -> CSGBox3D:
-	var box = CSGBox3D.new()
-	box.size = size
-	box.position = pos
+func _make_box(pos: Vector3, size: Vector3, col: Color, parent: Node = self) -> MeshInstance3D:
+	var mesh = BoxMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 0
+	mesh.subdivide_height = 0
+	mesh.subdivide_width = 0
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = col
-	box.material = mat
-	parent.add_child(box)
-	return box
+	node.material_override = mat
+	parent.add_child(node)
+	return node
 
-func _make_cyl(pos: Vector3, radius: float, height: float, col: Color) -> CSGCylinder3D:
-	var cyl = CSGCylinder3D.new()
-	cyl.radius = radius
-	cyl.height = height
-	cyl.position = pos
+func _make_cyl(pos: Vector3, radius: float, height: float, col: Color) -> MeshInstance3D:
+	var mesh = CylinderMesh.new()
+	mesh.bottom_radius = radius
+	mesh.top_radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	mesh.cap_bottom = true
+	mesh.cap_top = true
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = col
-	cyl.material = mat
-	add_child(cyl)
-	return cyl
+	node.material_override = mat
+	add_child(node)
+	return node
 
-func _make_sphere(pos: Vector3, radius: float, col: Color, emission: bool = false) -> CSGSphere3D:
-	var sph = CSGSphere3D.new()
-	sph.radius = radius
-	sph.position = pos
+func _make_sphere(pos: Vector3, radius: float, col: Color, emission: bool = false) -> MeshInstance3D:
+	var mesh = SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	mesh.is_hemisphere = false
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = col
 	if emission:
 		mat.emission_enabled = true
 		mat.emission = col
 		mat.emission_energy_multiplier = 1.0
-	sph.material = mat
-	add_child(sph)
-	return sph
+	node.material_override = mat
+	add_child(node)
+	return node
+
+func _make_prism(pos: Vector3, size: Vector3, col: Color, left_to_right: float = 1.0, parent: Node = self) -> MeshInstance3D:
+	var mesh = PrismMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 0
+	mesh.subdivide_height = 0
+	mesh.subdivide_width = 0
+	mesh.left_to_right = left_to_right
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = col
+	node.material_override = mat
+	parent.add_child(node)
+	return node
+
+func _make_capsule(pos: Vector3, radius: float, height: float, col: Color, parent: Node = self) -> MeshInstance3D:
+	var mesh = CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = col
+	node.material_override = mat
+	parent.add_child(node)
+	return node
 
 func creer_sol():
 	_make_box(Vector3(0, -0.05, 0), Vector3(WORLD * 2, 0.1, WORLD * 2), Color(0.24, 0.55, 0.16))
@@ -310,10 +359,16 @@ func creer_ville():
 		_make_box(Vector3(b.x, b.h/2.0, b.z), Vector3(b.w, b.h, b.d), b.c)
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
-		# Toit (pente simulée avec 3 couches)
-		_make_box(Vector3(b.x, b.h+0.05, b.z), Vector3(b.w+0.6, 0.15, b.d+0.6), b.roof)
-		_make_box(Vector3(b.x, b.h+0.2, b.z), Vector3(b.w+0.3, 0.15, b.d+0.3), b.roof)
-		_make_box(Vector3(b.x, b.h+0.35, b.z), Vector3(b.w*0.6, 0.12, b.d*0.6), b.roof)
+		# Toit en pente (vrai toit en V avec PrimitiveMesh PrismMesh)
+		var roof_h := 1.2
+		var roof_w := b.w + 0.4
+		var roof_d := b.d + 0.4
+		# Pente gauche
+		_make_prism(Vector3(b.x - roof_w*0.05, b.h + 0.1, b.z - roof_d*0.05),
+			Vector3(roof_w * 0.5, roof_h, roof_d), b.roof, 1.0)
+		# Pente droite
+		_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, b.h + 0.1, b.z - roof_d*0.05),
+			Vector3(roof_w * 0.5, roof_h, roof_d), b.roof, 0.0)
 		# Porte (marron foncé + cadre)
 		_make_box(Vector3(b.x, b.h*0.25, b.z+b.d/2.0+0.06), Vector3(b.w*0.22, b.h*0.48, 0.14), Color(0.22,0.12,0.04))
 		_make_box(Vector3(b.x, b.h*0.5, b.z+b.d/2.0+0.06), Vector3(b.w*0.26, 0.06, 0.15), Color(0.35,0.20,0.08))
@@ -349,12 +404,18 @@ func creer_fontaine():
 	_make_cyl(Vector3(0,0.5,0), 2.5, 1.0, Color(0.55,0.54,0.53))
 	_make_cyl(Vector3(0,0.8,0), 2.1, 0.4, Color(0.16,0.55,0.86))
 	_make_cyl(Vector3(0,2,0), 0.3, 2.5, Color(0.61,0.60,0.59))
+	# Décoration prismatique low-poly autour de la fontaine
+	_make_prism(Vector3(3.5, 0.1, 3.5), Vector3(0.8, 0.2, 0.8), Color(0.50, 0.48, 0.45), 0.8)
+	_make_prism(Vector3(-3.5, 0.1, -3.5), Vector3(0.8, 0.2, 0.8), Color(0.50, 0.48, 0.45), 1.2)
 
 func creer_arbres():
 	for p in [[-4,4],[4,4],[-4,-4],[4,-4],[-7,12],[7,12],[-7,-12],[7,-12],
 			  [-12,8],[12,-8],[-15,6],[15,-6],[0,12],[0,-12],[12,0],[-12,0]]:
-		# Tronc avec écorce
-		_make_box(Vector3(p[0],1,p[1]), Vector3(0.3,2,0.3), Color(0.40,0.25,0.12))
+		# Tronc avec écorce (capsule pour le premier arbre, box pour le reste)
+		if p == [-4, 4]:
+			_make_capsule(Vector3(p[0], 1.5, p[1]), 0.15, 2.0, Color(0.40, 0.25, 0.12))
+		else:
+			_make_box(Vector3(p[0],1,p[1]), Vector3(0.3,2,0.3), Color(0.40, 0.25, 0.12))
 		# Branches
 		_make_box(Vector3(p[0]+0.3,1.8,p[1]), Vector3(0.5,0.08,0.08), Color(0.38,0.23,0.10))
 		_make_box(Vector3(p[0]-0.2,1.5,p[1]+0.2), Vector3(0.08,0.08,0.4), Color(0.38,0.23,0.10))
