@@ -1,45 +1,20 @@
-Migration PrimitiveMesh / Low-Poly — LibreVies — Migration Godot 4.7.2
-=================================================================
+Migration Low-Poly / Godot 4.7.2 — LibreVies — Branche arena/01a0866b-librevies
+================================================================================
 Date : 2026-09-09
-Branche : arena/01a0866b-librevies
 
-Migration Godot :
-- Godot URL dans launcher.pyw : 4.7.2-stable (win64)
-- project.godot : config/features mis à jour vers "4.7"
-- Renderer maintenu : gl_compatibility (compatible AMD Radeon R7 200 et anciennes cartes)
+Migration Godot 4.7.2 :
+- launcher.pyw : GODOT_URL = Godot_v4.7.2-stable_win64.exe.zip
+- project.godot : config/features = PackedStringArray("4.7"), renderer = gl_compatibility (AMD R7 200 compatible)
+- main.gd : migration complète CSG -> PrimitiveMesh low-poly
 
-Résume des modifications précédentes :
-- Migration complète du projet Godot 4 (main.gd) des primitives CSG vers PrimitiveMesh low-poly.
-- BoxMesh, SphereMesh, CylinderMesh, PrismMesh, CapsuleMesh intégrés.
-- Toits en pente (PrismMesh V) sur toutes les maisons au lieu des 3 couches plates.
-- Low-poly : subdivide=0, radial_segments=8, rings=4.
-Date : 2026-09-09
-Branche : arena/01a0866b-librevies
+Style visuel « fond basique » (low-poly géométrique coloré) :
+- Toits : 4 rangées de PrismMesh (tuiles) couleurs orange/rouge différentes sur chaque bâtiment
+- Poutres bois apparentes : Color(0.60, 0.40, 0.20) verticales et diagonales sur chaque bâtiment
+- Réglages low-poly : radial_segments=8, rings=4, subdivide=0
+- Mesh actifs : BoxMesh, PrismMesh, CapsuleMesh, SphereMesh, CylinderMesh
 
-Changement lourd et gros : migration complète du projet Godot 4 (main.gd) des primitives CSG (CSGBox3D, CSGCylinder3D, CSGSphere3D) vers des MeshInstance3D avec PrimitiveMesh low-poly.
+Corrections récentes :
+- Parser Error (363,23) corrigé : var roof_w: float, var roof_d: float (type explicite requis par GDScript 4.7.2 car b est un dictionnaire sans type inféré)
+- version_url.json mis à jour avec hash normalisé (normalize=True) : main.gd.hash = 9fad1836074ada9fbab74c7eaa4ad391, taille 30842
 
-Mesh types intégrés et actifs :
-- BoxMesh (subdivide = 0)
-- SphereMesh (radial_segments = 8, rings = 4)
-- CylinderMesh (radial_segments = 8, rings = 4)
-- PrismMesh (subdivide = 0)
-- CapsuleMesh (radial_segments = 8, rings = 4)
-
-Réglages low-poly appliqués sur toutes les primitives :
-- Subdivision = 0 (arêtes vives, style géométrique)
-- Segments radiaux = 8, anneaux = 4 (sphères, cylindres, capsules)
-
-Modifications dans main.gd :
-- Remplacement des fonctions _make_box, _make_cyl, _make_sphere
-- Ajout des fonctions _make_prism et _make_capsule
-- Utilisation active de CapsuleMesh sur le premier arbre (p[0] == [-4,4])
-- Toits avec tuiles (PrimitiveMesh PrismMesh, 4 rangées de couleurs différentes) et poutres en bois sur toutes les maisons (style image fond basique)
-- Tous les bâtiments, routes, objets, ennemis et PNJ sont maintenant en PrimitiveMesh low-poly
-
-Références visuelles utilisées :
-- image/librevie_personnage.png
-- image/librevie_ville_depart.png
-- image/fond basique.png
-- image/1er image develloppement.png
-
-Résumé rédigé pour une éventuelle autre IA.
+Résumé destiné à une autre IA : tout le code dans main.gd est en PrimitiveMesh low-poly, la ville utilise _make_box, _make_prism, _make_cyl, _make_capsule, la migration 4.7.2 est complète, le launcher et le projet sont synchronisés.

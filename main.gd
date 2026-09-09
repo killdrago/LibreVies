@@ -360,8 +360,8 @@ func creer_ville():
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit avec tuiles (style image fond basique)
-		var roof_w := b.w + 0.4
-		var roof_d := b.d + 0.4
+		var roof_w: float = b.w + 0.4
+		var roof_d: float = b.d + 0.4
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 4
 		for i in range(rows):
