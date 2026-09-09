@@ -359,16 +359,20 @@ func creer_ville():
 		_make_box(Vector3(b.x, b.h/2.0, b.z), Vector3(b.w, b.h, b.d), b.c)
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
-		# Toit en pente (vrai toit en V avec PrimitiveMesh PrismMesh)
-		var roof_h := 1.2
-		var roof_w: float = b.w + 0.4
-		var roof_d: float = b.d + 0.4
-		# Pente gauche
-		_make_prism(Vector3(b.x - roof_w*0.05, b.h + 0.1, b.z - roof_d*0.05),
-			Vector3(roof_w * 0.5, roof_h, roof_d), b.roof, 1.0)
-		# Pente droite
-		_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, b.h + 0.1, b.z - roof_d*0.05),
-			Vector3(roof_w * 0.5, roof_h, roof_d), b.roof, 0.0)
+		# Toit avec tuiles (style image fond basique)
+		var roof_w := b.w + 0.4
+		var roof_d := b.d + 0.4
+		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
+		var rows := 4
+		for i in range(rows):
+			var y_offset := b.h + 0.1 + (i * 0.15)
+			var col := tile_colors[i % len(tile_colors)]
+			# Pente gauche (tuiles)
+			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+				Vector3(roof_w * 0.5, 0.12, roof_d), col, 1.0)
+			# Pente droite (tuiles)
+			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+				Vector3(roof_w * 0.5, 0.12, roof_d), col, 0.0)
 		# Porte (marron foncé + cadre)
 		_make_box(Vector3(b.x, b.h*0.25, b.z+b.d/2.0+0.06), Vector3(b.w*0.22, b.h*0.48, 0.14), Color(0.22,0.12,0.04))
 		_make_box(Vector3(b.x, b.h*0.5, b.z+b.d/2.0+0.06), Vector3(b.w*0.26, 0.06, 0.15), Color(0.35,0.20,0.08))
@@ -389,6 +393,16 @@ func creer_ville():
 			# Poteaux auvent
 			_make_box(Vector3(b.x-b.w/2.0+0.1, b.h*0.22, b.z+b.d/2.0+1.7), Vector3(0.1, b.h*0.4, 0.1), Color(0.40,0.25,0.10))
 			_make_box(Vector3(b.x+b.w/2.0-0.1, b.h*0.22, b.z+b.d/2.0+1.7), Vector3(0.1, b.h*0.4, 0.1), Color(0.40,0.25,0.10))
+		# Poutres apparentes en bois (style fond basique)
+		var wood_col := Color(0.60, 0.40, 0.20)
+		for px in [-0.4, 0.4]:
+			# Poutre verticale
+			_make_box(Vector3(b.x + px*2.0, b.h*0.35, b.z + b.d/2.0 + 0.1), Vector3(0.12, b.h*0.35, 0.1), wood_col)
+		# Poutres diagonales (charpente)
+		for side in [-1, 1]:
+			for h_offset in [0.15, 0.55]:
+				_make_box(Vector3(b.x + side*1.5, b.h*h_offset, b.z + b.d/2.0 + 0.1), Vector3(0.08, 0.3, 0.08), wood_col)
+
 		# Cheminée pour maisons
 		if b.n == "Maison":
 			_make_box(Vector3(b.x+b.w*0.3, b.h+0.6, b.z+b.d*0.3), Vector3(0.4, 0.6, 0.4), Color(0.60,0.30,0.15))

@@ -33,7 +33,7 @@ Modifications dans main.gd :
 - Remplacement des fonctions _make_box, _make_cyl, _make_sphere
 - Ajout des fonctions _make_prism et _make_capsule
 - Utilisation active de CapsuleMesh sur le premier arbre (p[0] == [-4,4])
-- Utilisation active de PrismMesh dans la décoration de la fontaine et pour les toits en pente (V) des bâtiments (remplace les 3 couches plates)
+- Toits avec tuiles (PrimitiveMesh PrismMesh, 4 rangées de couleurs différentes) et poutres en bois sur toutes les maisons (style image fond basique)
 - Tous les bâtiments, routes, objets, ennemis et PNJ sont maintenant en PrimitiveMesh low-poly
 
 Références visuelles utilisées :
