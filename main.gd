@@ -361,8 +361,8 @@ func creer_ville():
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit en pente (vrai toit en V avec PrimitiveMesh PrismMesh)
 		var roof_h := 1.2
-		var roof_w := b.w + 0.4
-		var roof_d := b.d + 0.4
+		var roof_w: float = b.w + 0.4
+		var roof_d: float = b.d + 0.4
 		# Pente gauche
 		_make_prism(Vector3(b.x - roof_w*0.05, b.h + 0.1, b.z - roof_d*0.05),
 			Vector3(roof_w * 0.5, roof_h, roof_d), b.roof, 1.0)
