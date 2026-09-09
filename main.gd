@@ -365,8 +365,8 @@ func creer_ville():
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 4
 		for i in range(rows):
-			var y_offset := b.h + 0.1 + (i * 0.15)
-			var col := tile_colors[i % len(tile_colors)]
+			var y_offset: float = b.h + 0.1 + (i * 0.15)
+			var col: Color = tile_colors[i % len(tile_colors)]
 			# Pente gauche (tuiles)
 			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.12, roof_d), col, 1.0)

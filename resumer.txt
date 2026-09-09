@@ -14,7 +14,7 @@ Style visuel « fond basique » (low-poly géométrique coloré) :
 - Mesh actifs : BoxMesh, PrismMesh, CapsuleMesh, SphereMesh, CylinderMesh
 
 Corrections récentes :
-- Parser Error (363,23) corrigé : var roof_w: float, var roof_d: float (type explicite requis par GDScript 4.7.2 car b est un dictionnaire sans type inféré)
+- Parser Error corrigé : var roof_w: float, roof_d: float, y_offset: float, col: Color (lignes 363, 368) — GDScript 4.7.2 requiert annotations explicites pour variables locales issues de dictionnaires
 - version_url.json mis à jour avec hash normalisé (normalize=True) : main.gd.hash = 9fad1836074ada9fbab74c7eaa4ad391, taille brute 31698 (normalisée 30842)
 - Répertoire .godot (godot/) supprimé pour éviter tout cache corrompu du script
 
