@@ -15,6 +15,7 @@ Style visuel « fond basique » (low-poly géométrique coloré) :
 
 Corrections récentes :
 - Parser Error (363,23) corrigé : var roof_w: float, var roof_d: float (type explicite requis par GDScript 4.7.2 car b est un dictionnaire sans type inféré)
-- version_url.json mis à jour avec hash normalisé (normalize=True) : main.gd.hash = 9fad1836074ada9fbab74c7eaa4ad391, taille 30842
+- version_url.json mis à jour avec hash normalisé (normalize=True) : main.gd.hash = 9fad1836074ada9fbab74c7eaa4ad391, taille brute 31698 (normalisée 30842)
+- Répertoire .godot (godot/) supprimé pour éviter tout cache corrompu du script
 
 Résumé destiné à une autre IA : tout le code dans main.gd est en PrimitiveMesh low-poly, la ville utilise _make_box, _make_prism, _make_cyl, _make_capsule, la migration 4.7.2 est complète, le launcher et le projet sont synchronisés.
