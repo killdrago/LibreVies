@@ -8,7 +8,8 @@ Migration Godot 4.7.2 :
 - main.gd : migration complète CSG -> PrimitiveMesh low-poly
 
 Style visuel « fond basique » (low-poly géométrique coloré) :
-- Toits : 4 rangées de PrismMesh (tuiles) couleurs orange/rouge différentes sur chaque bâtiment
+- Tuiles améliorées : espacement vertical augmenté (0.35), hauteur prisme 0.18, rangée centrale orange surépaisseur
+- Poutres améliorées : texture bois (wood_texture.png) via StandardMaterial3D, placement aux 4 coins + diagonales sur toit + horizontales sous toit
 - Poutres bois apparentes : Color(0.60, 0.40, 0.20) verticales et diagonales sur chaque bâtiment
 - Réglages low-poly : radial_segments=8, rings=4, subdivide=0
 - Mesh actifs : BoxMesh, PrismMesh, CapsuleMesh, SphereMesh, CylinderMesh

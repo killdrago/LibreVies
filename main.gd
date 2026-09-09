@@ -245,7 +245,48 @@ func update_camera():
 # ============================================================
 # CREATION DU MONDE
 # ============================================================
-func _make_box(pos: Vector3, size: Vector3, col: Color, parent: Node = self) -> MeshInstance3D:
+func _make_wood_box(pos: Vector3, size: Vector3, parent: Node = self) -> MeshInstance3D:
+	var mesh = BoxMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 0
+	mesh.subdivide_height = 0
+	mesh.subdivide_width = 0
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	var tex = load("res://wood_texture.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.roughness = 0.9
+		mat.metallic = 0.05
+	else:
+		mat.albedo_color = Color(0.60, 0.40, 0.20)
+	node.material_override = mat
+	parent.add_child(node)
+	return node
+
+func _make_wood_prism(pos: Vector3, size: Vector3, left_to_right: float = 1.0, parent: Node = self) -> MeshInstance3D:
+	var mesh = PrismMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 0
+	mesh.subdivide_height = 0
+	mesh.subdivide_width = 0
+	mesh.left_to_right = left_to_right
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	var tex = load("res://wood_texture.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.roughness = 0.9
+		mat.metallic = 0.05
+	else:
+		mat.albedo_color = Color(0.60, 0.40, 0.20)
+	node.material_override = mat
+	parent.add_child(node)
+	return node
 	var mesh = BoxMesh.new()
 	mesh.size = size
 	mesh.subdivide_depth = 0
@@ -359,20 +400,24 @@ func creer_ville():
 		_make_box(Vector3(b.x, b.h/2.0, b.z), Vector3(b.w, b.h, b.d), b.c)
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
-		# Toit avec tuiles (style image fond basique)
-		var roof_w: float = b.w + 0.4
-		var roof_d: float = b.d + 0.4
+		# Toit avec tuiles (style image fond basique) — rangées espacées et visibles
+		var roof_w: float = b.w + 0.6
+		var roof_d: float = b.d + 0.6
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 4
 		for i in range(rows):
-			var y_offset: float = b.h + 0.1 + (i * 0.15)
+			var y_offset: float = b.h + 0.05 + (i * 0.35)
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Pente gauche (tuiles)
+			# Pente gauche (tuiles) — légère inclinaison plus marquée
 			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
-				Vector3(roof_w * 0.5, 0.12, roof_d), col, 1.0)
+				Vector3(roof_w * 0.5, 0.18, roof_d), col, 1.0)
 			# Pente droite (tuiles)
 			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, y_offset, b.z - roof_d*0.05),
-				Vector3(roof_w * 0.5, 0.12, roof_d), col, 0.0)
+				Vector3(roof_w * 0.5, 0.18, roof_d), col, 0.0)
+			# Rangée centrale en surépaisseur pour effet "tuile visible" entre pentes
+			if i == 1 or i == 2:
+				_make_prism(Vector3(b.x, y_offset + 0.05, b.z),
+					Vector3(roof_w * 0.25, 0.08, roof_d * 0.9), Color(0.95, 0.45, 0.15), 0.5)
 		# Porte (marron foncé + cadre)
 		_make_box(Vector3(b.x, b.h*0.25, b.z+b.d/2.0+0.06), Vector3(b.w*0.22, b.h*0.48, 0.14), Color(0.22,0.12,0.04))
 		_make_box(Vector3(b.x, b.h*0.5, b.z+b.d/2.0+0.06), Vector3(b.w*0.26, 0.06, 0.15), Color(0.35,0.20,0.08))
@@ -393,15 +438,20 @@ func creer_ville():
 			# Poteaux auvent
 			_make_box(Vector3(b.x-b.w/2.0+0.1, b.h*0.22, b.z+b.d/2.0+1.7), Vector3(0.1, b.h*0.4, 0.1), Color(0.40,0.25,0.10))
 			_make_box(Vector3(b.x+b.w/2.0-0.1, b.h*0.22, b.z+b.d/2.0+1.7), Vector3(0.1, b.h*0.4, 0.1), Color(0.40,0.25,0.10))
-		# Poutres apparentes en bois (style fond basique)
-		var wood_col := Color(0.60, 0.40, 0.20)
-		for px in [-0.4, 0.4]:
-			# Poutre verticale
-			_make_box(Vector3(b.x + px*2.0, b.h*0.35, b.z + b.d/2.0 + 0.1), Vector3(0.12, b.h*0.35, 0.1), wood_col)
-		# Poutres diagonales (charpente)
+		# Poutres apparentes en bois (style fond basique) — coins et charpente sur toit
+		# Verticales aux 4 coins du bâtiment
+		for cx in [-b.w/2 - 0.1, b.w/2 + 0.1]:
+			for cz in [-b.d/2 - 0.1, b.d/2 + 0.1]:
+				_make_wood_box(Vector3(b.x + cx, b.h*0.35, b.z + cz), Vector3(0.14, b.h*0.35, 0.14))
+		# Poutres diagonales (charpente) sur le toit — 2 par côté
 		for side in [-1, 1]:
-			for h_offset in [0.15, 0.55]:
-				_make_box(Vector3(b.x + side*1.5, b.h*h_offset, b.z + b.d/2.0 + 0.1), Vector3(0.08, 0.3, 0.08), wood_col)
+			for dy in [0.3, 0.7]:
+				var h_off: float = b.h + 0.2 + dy * 0.2
+				var z_off: float = b.z + side * (b.d/2 - 0.1)
+				_make_wood_box(Vector3(b.x + side*1.2, h_off, z_off), Vector3(0.1, 0.35, 0.1))
+		# Poutres horizontales sous le toit (style charpente visible)
+		_make_wood_box(Vector3(b.x, b.h + 0.05, b.z - b.d/2 - 0.05), Vector3(b.w + 0.2, 0.1, 0.1))
+		_make_wood_box(Vector3(b.x, b.h + 0.05, b.z + b.d/2 + 0.05), Vector3(b.w + 0.2, 0.1, 0.1))
 
 		# Cheminée pour maisons
 		if b.n == "Maison":
