@@ -10,7 +10,7 @@ if getattr(sys, 'frozen', False):
     GAME_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
-GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip"
+GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip"
 BANNER = os.path.join(GAME_DIR, "banniere_v1.png")
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 

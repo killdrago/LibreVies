@@ -1,5 +1,18 @@
-Migration PrimitiveMesh / Low-Poly — LibreVies
-=====================================================
+Migration PrimitiveMesh / Low-Poly — LibreVies — Migration Godot 4.7.2
+=================================================================
+Date : 2026-09-09
+Branche : arena/01a0866b-librevies
+
+Migration Godot :
+- Godot URL dans launcher.pyw : 4.7.2-stable (win64)
+- project.godot : config/features mis à jour vers "4.7"
+- Renderer maintenu : gl_compatibility (compatible AMD Radeon R7 200 et anciennes cartes)
+
+Résume des modifications précédentes :
+- Migration complète du projet Godot 4 (main.gd) des primitives CSG vers PrimitiveMesh low-poly.
+- BoxMesh, SphereMesh, CylinderMesh, PrismMesh, CapsuleMesh intégrés.
+- Toits en pente (PrismMesh V) sur toutes les maisons au lieu des 3 couches plates.
+- Low-poly : subdivide=0, radial_segments=8, rings=4.
 Date : 2026-09-09
 Branche : arena/01a0866b-librevies
 
