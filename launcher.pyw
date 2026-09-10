@@ -487,11 +487,69 @@ class App(tk.Tk):
     # ============================================================
 
     def start_update(self):
-        self.upd(2, "Verification des mises a jour...")
+        self.upd(2, "Verification des mises a jour du launcher...")
         threading.Thread(target=self._run_update, daemon=True).start()
 
+    def _restart_launcher(self):
+        # Redémarre le launcher (même exécutable / script) et quitte le processus actuel
+        try:
+            exe = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
+            # Si c'est un .py, relancer avec python ; sinon relancer directement
+            cmd = [exe] if sys.executable == exe else [sys.executable, exe]
+            # Si le script est lancé directement par pythonw
+            if not getattr(sys, 'frozen', False) and 'python' not in sys.executable.lower():
+                cmd = [sys.executable, sys.argv[0]]
+            subprocess.Popen(cmd, cwd=GAME_DIR)
+        except Exception:
+            pass
+        # Quitter le processus actuel après un court délai pour laisser le nouveau démarrer
+        threading.Thread(target=lambda: (time.sleep(0.5), sys.exit(0)), daemon=True).start()
+
     def _run_update(self):
+        # 1) Télécharger version_url.json distant et comparer au local
+        local_cfg_raw = open(CONFIG_PATH, 'rb').read() if os.path.exists(CONFIG_PATH) else b''
+        remote_cfg_raw = b''
+        try:
+            local_cfg = load_local_config()
+            raw_url = local_cfg.get("raw_url", "")
+            if raw_url:
+                self.upd(10, "Telechargement version_url.json...")
+                url = get_remote_url("version_url.json", raw_url)
+                req = urllib.request.Request(url, headers={"User-Agent": f"LibreVies/{LAUNCHER_VERSION}"})
+                resp = urllib.request.urlopen(req, timeout=15)
+                remote_cfg_raw = resp.read()
+        except Exception as e:
+            # Si pas de connexion, continuer avec le local
+            pass
+
+        # Comparer le contenu brut (normalisé) du JSON
+        def normalize_json(data: bytes) -> bytes:
+            return data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+
+        local_norm = normalize_json(local_cfg_raw)
+        remote_norm = normalize_json(remote_cfg_raw)
+
+        if remote_cfg_raw and remote_norm != local_norm:
+            # Le JSON distant est different → remplacer et redémarrer le launcher
+            self.upd(20, "Nouveau version_url.json detecté, mise à jour du launcher...")
+            with open(CONFIG_PATH, 'wb') as f:
+                f.write(remote_cfg_raw)
+            self.upd(50, "Launcher mis à jour, redémarrage...")
+            time.sleep(1.5)
+            self.after(0, self._restart_launcher)
+            return
+
+        # 2) Vérification normale des mises à jour des fichiers
         result = check_for_updates(self.upd)
+        if result.get("remote_cfg") is not None:
+            # Sauvegarder le remote_cfg (même s'il est identique au local) pour s'assurer
+            # que le fichier local reste synchronisé avec le distant
+            try:
+                with open(CONFIG_PATH, 'w') as f:
+                    json.dump(result["remote_cfg"], f, indent=2)
+            except Exception:
+                pass
+
         if result["error"]:
             self.after(0, lambda: self._upd_bar(100, f"Erreur: {result['error']}"))
             time.sleep(1); self.after(0, self._check_godot); return
@@ -501,7 +559,7 @@ class App(tk.Tk):
             time.sleep(0.5); self.after(0, self._check_godot); return
         # Mise a jour automatique en arrière-plan
         self.after(0, lambda: self._upd_bar(10, f"Mise a jour de {len(modified)} fichier(s)..."))
-        downloaded, errors = apply_updates(modified, result["remote_cfg"], self.upd)
+        downloaded, errors = apply_updates(modified, result.get("remote_cfg", {}), self.upd)
         if errors:
             err_msg = errors[0][:60]
             self.after(0, lambda: self._upd_bar(100, f"Erreur: {err_msg}"))
