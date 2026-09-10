@@ -72,6 +72,24 @@ def get_remote_url(fname, raw_url):
 # MISE A JOUR
 # ============================================================
 
+def scan_local_files():
+    """Scanne le répertoire du jeu et retourne la liste des fichiers avec leur hash."""
+    files_info = {}
+    for root, dirs, files in os.walk(GAME_DIR):
+        # Ignorer certains répertoires
+        dirs[:] = [d for d in dirs if d not in ['.git', '.arena', '.cache', '__pycache__', 'node_modules']]
+        for fname in files:
+            # Ignorer le launcher lui-même et les fichiers temporaires
+            if fname == 'launcher.pyw' or fname.endswith('.tmp'):
+                continue
+            local_path = os.path.join(root, fname)
+            rel_path = os.path.relpath(local_path, GAME_DIR)
+            is_text = fname.lower().endswith(TEXT_EXTS)
+            h = file_hash(local_path, normalize=is_text)
+            if h is not None:
+                files_info[rel_path] = {"hash": h, "size": os.path.getsize(local_path)}
+    return files_info
+
 def check_for_updates(progress_cb):
     local_cfg = load_local_config()
     raw_url = local_cfg.get("raw_url", "")
@@ -525,6 +543,26 @@ class App(tk.Tk):
         except Exception as e:
             # Si pas de connexion, continuer avec le local
             pass
+
+        # 1) Scanner le répertoire local et s'assurer que tous les fichiers sont dans le JSON distant
+        local_scanned = scan_local_files()
+        if remote_cfg_raw:
+            remote_cfg = json.loads(remote_cfg_raw.decode())
+            remote_files = remote_cfg.get("files", {})
+            # Ajouter les fichiers locaux manquants dans le JSON distant
+            added = False
+            for fname, info in local_scanned.items():
+                if fname not in remote_files:
+                    remote_files[fname] = info
+                    added = True
+            if added:
+                # Sauvegarder le JSON mis à jour localement ET mettre à jour le local_cfg_raw
+                with open(CONFIG_PATH, 'w') as f:
+                    json.dump(remote_cfg, f, indent=2)
+                    f.write('\n')
+                # Et réécrire le remote_cfg_raw ET le local_cfg_raw
+                remote_cfg_raw = json.dumps(remote_cfg, indent=2).encode() + b'\n'
+                local_cfg_raw = remote_cfg_raw
 
         # Comparer le contenu brut (normalisé) du JSON
         def normalize_json(data: bytes) -> bytes:

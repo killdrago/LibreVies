@@ -18,8 +18,8 @@
       "size": 5211
     },
     "launcher.pyw": {
-      "hash": "4ecfd75092942c54e0df2fd83a95cf0e",
-      "size": 25164
+      "hash": "90fe57995159f9f3f9b6f42327e32f2e",
+      "size": 29817
     },
     "build_launcher.bat": {
       "hash": "ad04ef2ac8af46f6f2faf6b595121531",
@@ -68,6 +68,10 @@
     "resumer.txt": {
       "hash": "96df931ad065a53e74dccedd1f43b8be",
       "size": 1432
+    },
+    "wood_texture.png": {
+      "hash": "b0ccd8951902e603c974eb1c0c0cbc5d",
+      "size": 1389240
     }
   },
   "main.gd.hash": "3ffd30cdf2e15ace6331861d6242bd97",
