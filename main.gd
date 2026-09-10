@@ -77,6 +77,20 @@ func _ready():
 	creer_objets()
 	creer_hud()
 
+	# Entourage de sélection pour le mode édition
+	selection_outline = MeshInstance3D.new()
+	selection_outline.visible = false
+	var outline_mesh = BoxMesh.new()
+	outline_mesh.size = Vector3(2, 0.2, 2)
+	selection_outline.mesh = outline_mesh
+	var outline_mat = StandardMaterial3D.new()
+	outline_mat.albedo_color = Color(1, 1, 0, 0.3)
+	outline_mat.emission_enabled = true
+	outline_mat.emission = Color(1, 1, 0, 0.6)
+	outline_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	selection_outline.material_override = outline_mat
+	add_child(selection_outline)
+
 	# Regen timer
 	var timer = Timer.new()
 	timer.wait_time = 3.0
@@ -99,7 +113,28 @@ func _process(delta):
 
 	# --- ÉDITION MODE ---
 	if edition_active:
-		if selected_node and selected_node != null:
+		if selected_node and selected_node != null and selected_node.index >= 0:
+			# Mettre à jour l'entourage chaque frame selon le bâtiment sélectionné
+			if selected_node.type == "batiment":
+				var b_sel = batiments[selected_node.index]
+				if selection_outline and is_instance_valid(selection_outline):
+					selection_outline.visible = true
+					selection_outline.position = Vector3(b_sel.x, 0.1, b_sel.z)
+					selection_outline.mesh.size = Vector3(b_sel.w, 0.2, b_sel.d)
+		else:
+			# Cacher l'entourage si rien n'est sélectionné
+			if selection_outline and is_instance_valid(selection_outline):
+				selection_outline.visible = false
+
+		if selected_node and selected_node != null and selected_node.index >= 0:
+			# Mettre à jour l'entourage chaque frame selon le bâtiment sélectionné
+			if selected_node.type == "batiment":
+				var b_sel = batiments[selected_node.index]
+				if selection_outline and is_instance_valid(selection_outline):
+					selection_outline.visible = true
+					selection_outline.position = Vector3(b_sel.x, 0.1, b_sel.z)
+					selection_outline.mesh.size = Vector3(b_sel.w, 0.2, b_sel.d)
+			# Mouvement clavier
 			var cam_basis: Basis = camera.global_transform.basis
 			var forward: Vector3 = -cam_basis.z
 			forward.y = 0
@@ -114,7 +149,15 @@ func _process(delta):
 			if Input.is_action_pressed("move_forward") or Input.is_action_pressed("move_back"):
 				offset_3d.z += (-1.0 if Input.is_action_pressed("move_forward") else 1.0) * delta * 2
 			if offset_3d != Vector3.ZERO:
-				selected_node.position += offset_3d
+				if selected_node.type == "batiment" and selected_node.index >= 0:
+					var b = batiments[selected_node.index]
+					b.x += offset_3d.x
+					b.z += offset_3d.z
+				# Mettre à jour l'entourage
+				if selection_outline and is_instance_valid(selection_outline):
+					selection_outline.visible = true
+					selection_outline.position = Vector3(b.x, 0.1, b.z)
+					selection_outline.mesh.size = Vector3(b.w, 0.2, b.d)
 
 	# --- MOUVEMENT ---
 	var move := Vector3.ZERO
@@ -226,19 +269,25 @@ func _input(event):
 
 					if closest_elem.index >= 0:
 						selected_node = closest_elem
-						# Décoller visuellement l'élément sélectionné (le déplacer vers le haut)
+						# Entourage de sélection
 						if closest_elem.type == "batiment":
-							var b = batiments[closest_elem.index]
-							# On déplace le bâtiment vers le haut pour montrer la sélection
-							# (le déplacement réel se fait avec le drag)
+							var b_sel = batiments[closest_elem.index]
+							if selection_outline and is_instance_valid(selection_outline):
+								selection_outline.visible = true
+								selection_outline.position = Vector3(b_sel.x, 0.1, b_sel.z)
+								selection_outline.mesh.size = Vector3(b_sel.w, 0.2, b_sel.d)
 					else:
 						selected_node = null
+						if selection_outline and is_instance_valid(selection_outline):
+							selection_outline.visible = false
 				else:
 					# Fin du drag : arrêter et sauvegarder
 					if selected_node:
 						# Remettre la position d'origine si nécessaire
 						save_edition()
 					selected_node = null
+					if selection_outline and is_instance_valid(selection_outline):
+						selection_outline.visible = false
 
 		if event is InputEventMouseMotion:
 			if selected_node and selected_node.index >= 0:
@@ -247,6 +296,11 @@ func _input(event):
 					var b = batiments[selected_node.index]
 					b.x += event.relative.x * 0.02
 					b.z -= event.relative.y * 0.02
+					# Mettre à jour l'entourage
+					if selection_outline and is_instance_valid(selection_outline):
+						selection_outline.visible = true
+						selection_outline.position = Vector3(b.x, 0.1, b.z)
+						selection_outline.mesh.size = Vector3(b.w, 0.2, b.d)
 	else:
 		# Mode normal : la molette et le clic droit fonctionnent toujours
 		if event.button_index == MOUSE_BUTTON_RIGHT:
@@ -953,7 +1007,8 @@ func _toggle_inventory():
 # === PANEL ÉDITION ===
 var edit_panel: PanelContainer
 var edition_active := false
-var selected_node: MeshInstance3D = null
+var selected_node: Dictionary = null
+var selection_outline: MeshInstance3D = null
 var edit_offset: Vector3 = Vector3.ZERO
 
 func _toggle_edition():
