@@ -606,6 +606,14 @@ func creer_hud():
 	var canvas = CanvasLayer.new()
 	add_child(canvas)
 
+	# === BOUTON ÉDITER ===
+	var edit_btn = Button.new()
+	edit_btn.text = "Éditer"
+	edit_btn.position = Vector2(1180, 640)
+	edit_btn.size = Vector2(80, 30)
+	edit_btn.pressed.connect(_toggle_edition)
+	canvas.add_child(edit_btn)
+
 	# === BOUTON OPTIONS ===
 	var opt_btn = Button.new()
 	opt_btn.text = "Options"
@@ -909,6 +917,79 @@ func _toggle_inventory():
 	if inv_panel:
 		inv_panel.visible = not inv_panel.visible
 		inv_open = inv_panel.visible
+
+# === PANEL ÉDITION ===
+var edit_panel: PanelContainer
+
+func _toggle_edition():
+	if not edit_panel:
+		edit_panel = PanelContainer.new()
+		edit_panel.position = Vector2(440, 250)
+		edit_panel.size = Vector2(400, 200)
+		edit_panel.visible = true
+		var edit_style = StyleBoxFlat.new()
+		edit_style.bg_color = Color(0.1, 0.1, 0.1, 0.9)
+		edit_style.corner_radius_top_left = 10
+		edit_style.corner_radius_top_right = 10
+		edit_style.corner_radius_bottom_left = 10
+		edit_style.corner_radius_bottom_right = 10
+		edit_style.border_width_bottom = 2
+		edit_style.border_width_top = 2
+		edit_style.border_width_left = 2
+		edit_style.border_width_right = 2
+		edit_style.border_color = Color(0.5, 0.8, 1.0)
+		edit_panel.add_theme_stylebox_override("panel", edit_style)
+		canvas.add_child(edit_panel)
+
+		var edit_vbox = VBoxContainer.new()
+		edit_vbox.position = Vector2(20, 20)
+		edit_vbox.size = Vector2(360, 160)
+		edit_panel.add_child(edit_vbox)
+
+		var edit_title = Label.new()
+		edit_title.text = "ÉDITION (BDD/bdd.json)"
+		edit_title.add_theme_font_size_override("font_size", 18)
+		edit_title.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))
+		edit_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		edit_vbox.add_child(edit_title)
+
+		var edit_spacer = Control.new()
+		edit_spacer.custom_minimum_size = Vector2(0, 15)
+		edit_vbox.add_child(edit_spacer)
+
+		var edit_info = Label.new()
+		edit_info.text = "Arbres, fontaine, routes, lampadaires,\nbâtiments (fenêtres, portes, toits)\nenregistrés dans BDD/bdd.json"
+		edit_info.add_theme_font_size_override("font_size", 12)
+		edit_info.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		edit_vbox.add_child(edit_info)
+
+		var edit_spacer2 = Control.new()
+		edit_spacer2.custom_minimum_size = Vector2(0, 20)
+		edit_vbox.add_child(edit_spacer2)
+
+		var edit_close = Button.new()
+		edit_close.text = "Fermer [E]"
+		edit_close.size = Vector2(100, 30)
+		edit_close.pressed.connect(_toggle_edition)
+		edit_vbox.add_child(edit_close)
+	else:
+		edit_panel.visible = not edit_panel.visible
+
+func save_edition():
+	var bdd_path = "res://BDD/bdd.json"
+	var edit_path = "res://edition/edit.json"
+	var file_read = FileAccess.open(bdd_path, FileAccess.READ)
+	if file_read:
+		var content = file_read.get_as_text()
+		file_read.close()
+		var file_write = FileAccess.open(edit_path, FileAccess.WRITE)
+		if file_write:
+			file_write.store_string(content)
+			file_write.close()
+
+func _notification(what):
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		save_edition()
 
 func save_config():
 	var cfg = ConfigFile.new()
