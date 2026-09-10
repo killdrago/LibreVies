@@ -97,8 +97,26 @@ func _process(delta):
 	if player_dead:
 		return
 
+	# --- ÉDITION MODE ---
+	if edition_active:
+		if selected_node and selected_node != null:
+			var cam_basis: Basis = camera.global_transform.basis
+			var forward: Vector3 = -cam_basis.z
+			forward.y = 0
+			forward = forward.normalized()
+			var right: Vector3 = cam_basis.x
+			right.y = 0
+			right = right.normalized()
+			var mouse_pos := get_viewport().get_mouse_position()
+			var offset_3d := Vector3(0, 0, 0)
+			if Input.is_action_pressed("move_right") or Input.is_action_pressed("move_left"):
+				offset_3d.x += (1.0 if Input.is_action_pressed("move_right") else -1.0) * delta * 2
+			if Input.is_action_pressed("move_forward") or Input.is_action_pressed("move_back"):
+				offset_3d.z += (-1.0 if Input.is_action_pressed("move_forward") else 1.0) * delta * 2
+			if offset_3d != Vector3.ZERO:
+				selected_node.position += offset_3d
+
 	# --- MOUVEMENT ---
-	var move := Vector3.ZERO
 	var speed: float = RUN if Input.is_action_pressed("sprint") else SPD
 
 	if Input.is_action_pressed("move_forward"): move.z -= 1
@@ -179,8 +197,29 @@ func _process(delta):
 # ============================================================
 func _input(event):
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			cam_drag = event.pressed
+		if edition_active:
+			if event.pressed:
+				# Mode édition : clic gauche pour sélectionner/déplacer un bâtiment
+				var mouse_pos := get_viewport().get_mouse_position()
+				# Trouver le bâtiment le plus proche du curseur
+				var closest_b := null
+				var closest_dist := 99999.0
+				for b in batiments:
+					var d := mouse_pos.distance_to(Vector2(b.x, b.z))
+					if d < closest_dist and d < 60:
+						closest_dist = d
+						closest_b = b
+				if closest_b:
+					# Sélectionner et déplacer
+					selected_node = null
+					# Mettre à jour la position du bâtiment
+					closest_b.x += (mouse_pos.x - get_viewport().size.x / 2) * 0.02
+					closest_b.z -= (mouse_pos.y - get_viewport().size.y / 2) * 0.02
+					# Sauvegarder dans BDD
+					save_edition()
+		else:
+			if event.button_index == MOUSE_BUTTON_RIGHT:
+				cam_drag = event.pressed
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			cam_dist = max(3.0, cam_dist - 0.5)
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -921,9 +960,17 @@ func _toggle_inventory():
 
 # === PANEL ÉDITION ===
 var edit_panel: PanelContainer
+var edition_active := false
+var selected_node: MeshInstance3D = null
+var edit_offset: Vector3 = Vector3.ZERO
 
 func _toggle_edition():
-	if not edit_panel:
+	edition_active = not edition_active
+	if edit_panel and edit_panel.visible:
+		edit_panel.visible = false
+	elif edit_panel:
+		edit_panel.visible = true
+	else:
 		edit_panel = PanelContainer.new()
 		edit_panel.position = Vector2(440, 250)
 		edit_panel.size = Vector2(400, 200)
@@ -947,7 +994,7 @@ func _toggle_edition():
 		edit_panel.add_child(edit_vbox)
 
 		var edit_title = Label.new()
-		edit_title.text = "ÉDITION (bdd/bdd.json)"
+		edit_title.text = "ÉDITION ACTIF (bdd/bdd.json)"
 		edit_title.add_theme_font_size_override("font_size", 18)
 		edit_title.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))
 		edit_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -958,7 +1005,7 @@ func _toggle_edition():
 		edit_vbox.add_child(edit_spacer)
 
 		var edit_info = Label.new()
-		edit_info.text = "Arbres, fontaine, routes, lampadaires,\nbâtiments (fenêtres, portes, toits)\nenregistrés dans bdd/bdd.json"
+		edit_info.text = "Cliquez sur un élément pour le déplacer.\nReclic Éditer pour arrêter et enregistrer."
 		edit_info.add_theme_font_size_override("font_size", 12)
 		edit_info.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 		edit_vbox.add_child(edit_info)
@@ -968,12 +1015,10 @@ func _toggle_edition():
 		edit_vbox.add_child(edit_spacer2)
 
 		var edit_close = Button.new()
-		edit_close.text = "Fermer [E]"
+		edit_close.text = "Arrêter [E]"
 		edit_close.size = Vector2(100, 30)
 		edit_close.pressed.connect(_toggle_edition)
 		edit_vbox.add_child(edit_close)
-	else:
-		edit_panel.visible = not edit_panel.visible
 
 func save_edition():
 	var bdd_path = "res://bdd/bdd.json"
