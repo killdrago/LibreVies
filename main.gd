@@ -948,7 +948,7 @@ func _toggle_edition():
 		edit_panel.add_child(edit_vbox)
 
 		var edit_title = Label.new()
-		edit_title.text = "ÉDITION (BDD/bdd.json)"
+		edit_title.text = "ÉDITION (bdd/bdd.json)"
 		edit_title.add_theme_font_size_override("font_size", 18)
 		edit_title.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))
 		edit_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -959,7 +959,7 @@ func _toggle_edition():
 		edit_vbox.add_child(edit_spacer)
 
 		var edit_info = Label.new()
-		edit_info.text = "Arbres, fontaine, routes, lampadaires,\nbâtiments (fenêtres, portes, toits)\nenregistrés dans BDD/bdd.json"
+		edit_info.text = "Arbres, fontaine, routes, lampadaires,\nbâtiments (fenêtres, portes, toits)\nenregistrés dans bdd/bdd.json"
 		edit_info.add_theme_font_size_override("font_size", 12)
 		edit_info.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 		edit_vbox.add_child(edit_info)
@@ -977,7 +977,7 @@ func _toggle_edition():
 		edit_panel.visible = not edit_panel.visible
 
 func save_edition():
-	var bdd_path = "res://BDD/bdd.json"
+	var bdd_path = "res://bdd/bdd.json"
 	var edit_path = "res://edition/edit.json"
 	var file_read = FileAccess.open(bdd_path, FileAccess.READ)
 	if file_read:
