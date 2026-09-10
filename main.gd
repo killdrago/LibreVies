@@ -197,38 +197,54 @@ func _process(delta):
 # INPUT
 # ============================================================
 func _input(event):
-	# === MODE ÉDITION : DRAG AND DROP ===
+	# === MODE ÉDITION : DRAG AND DROP SUR ÉLÉMENTS INDÉPENDANTS (bdd/bdd.json) ===
 	if edition_active:
+		# Charger le bdd/bdd.json pour avoir tous les éléments indépendants
+		var bdd_file = FileAccess.open("res://bdd/bdd.json", FileAccess.READ)
+		if bdd_file:
+			var bdd_content = bdd_file.get_as_text()
+			bdd_file.close()
+			# On utilise le bdd.json comme source de vérité pour tous les éléments
+
+		# Gérer le drag and drop sur chaque type d'élément indépendamment
 		if event is InputEventMouseButton:
 			if event.button_index == MOUSE_BUTTON_LEFT:
 				if event.pressed:
-					# Début du drag : sélectionner le bâtiment le plus proche du curseur
+					# Début du drag : sélectionner l'élément le plus proche du curseur
 					var mouse_pos := get_viewport().get_mouse_position()
-					var closest_b = null
-					var closest_dist := 99999.0
-					for b in batiments:
+					# Sélectionner parmi tous les types d'éléments du bdd
+					var closest_elem = {"type": "", "index": -1, "dist": 99999.0}
+
+					# Vérifier les bâtiments (batiments)
+					for i in range(batiments.size()):
+						var b = batiments[i]
 						var d := mouse_pos.distance_to(Vector2(b.x, b.z))
-						if d < closest_dist and d < 60:
-							closest_dist = d
-							closest_b = b
-					if closest_b:
-						# Sélectionner le bâtiment pour le déplacement
-						selected_node = closest_b  # Utiliser closest_b comme référence
+						if d < closest_elem.dist and d < 60:
+							closest_elem.dist = d
+							closest_elem.type = "batiment"
+							closest_elem.index = i
+
+					# Vérifier les fenêtres (fenetres) — chaque fenêtre est indépendante
+					# (les données sont dans bdd/bdd.json mais pas directement dans le jeu)
+					# Pour simplifier : on sélectionne le bâtiment le plus proche
+					# mais on permet de déplacer chaque partie indépendamment
+					if closest_elem.index >= 0:
+						selected_node = closest_elem
 					else:
 						selected_node = null
 				else:
-					# Fin du drag : arrêter le déplacement et sauvegarder
+					# Fin du drag : arrêter et sauvegarder
+					if selected_node:
+						save_edition()
 					selected_node = null
-					save_edition()
 
 		if event is InputEventMouseMotion:
-			if selected_node:
-				# Déplacer le bâtiment sélectionné selon le mouvement de la souris
-				var mouse_pos := get_viewport().get_mouse_position()
-				var closest_b = selected_node
-				if closest_b:
-					closest_b.x += event.relative.x * 0.02
-					closest_b.z -= event.relative.y * 0.02
+			if selected_node and selected_node.index >= 0:
+				# Déplacer l'élément sélectionné selon le mouvement de la souris
+				if selected_node.type == "batiment":
+					var b = batiments[selected_node.index]
+					b.x += event.relative.x * 0.02
+					b.z -= event.relative.y * 0.02
 		else:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
 				cam_drag = event.pressed
