@@ -49,6 +49,7 @@ var vue_label: Label
 var inv_panel: PanelContainer
 var inv_open := false
 var pv_bar: ProgressBar
+var canvas: CanvasLayer
 
 var enemies := []
 var cailloux_items := []
@@ -603,7 +604,7 @@ var options_panel: PanelContainer
 var invert_check: CheckBox
 
 func creer_hud():
-	var canvas = CanvasLayer.new()
+	canvas = CanvasLayer.new()
 	add_child(canvas)
 
 	# === BOUTON ÉDITER ===
