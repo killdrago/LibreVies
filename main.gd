@@ -404,15 +404,15 @@ func creer_ville():
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit avec tuiles (style image fond basique) — rangées espacées et visibles
-		var roof_w: float = b.w + 1.0
-		var roof_d: float = b.d + 1.0
+		var roof_w: float = b.w + 0.35
+		var roof_d: float = b.d + 0.35
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 1
 		for i in range(rows):
-			var y_offset: float = b.h + 0.15
+			var y_offset: float = b.h + 0.08
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Toit arrondi, centré, double hauteur : décalé vers gauche largeur fenêtre
-			var window_shift: float = -b.w * 0.22
+			# Toit arrondi, centré : décalé 5px gauche
+			var window_shift: float = -0.05
 			_make_prism(Vector3(b.x - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.56, roof_d), col, 1.0)
 			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
