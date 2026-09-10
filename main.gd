@@ -407,15 +407,15 @@ func creer_ville():
 		var roof_w: float = b.w + 0.3
 		var roof_d: float = b.d + 0.3
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
-		var rows := 2
+		var rows := 1
 		for i in range(rows):
-			var y_offset: float = b.h + 0.02 + (i * 0.2)
+			var y_offset: float = b.h + 0.02
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Pente gauche (tuiles) — arrondi avec subdivide=2
-			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+			# Toit arrondi et centré : décalé vers la gauche d'une largeur de fenêtre
+			var window_shift: float = b.w * 0.22
+			_make_prism(Vector3(b.x - roof_w*0.05 - window_shift, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.18, roof_d), col, 1.0)
-			# Pente droite (tuiles)
-			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05 - window_shift, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.18, roof_d), col, 0.0)
 		# Porte (marron foncé + cadre)
 		_make_box(Vector3(b.x, b.h*0.25, b.z+b.d/2.0+0.06), Vector3(b.w*0.22, b.h*0.48, 0.14), Color(0.22,0.12,0.04))
