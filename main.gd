@@ -197,27 +197,38 @@ func _process(delta):
 # INPUT
 # ============================================================
 func _input(event):
-	if event is InputEventMouseButton:
-		if edition_active:
-			if event.pressed:
-				# Mode édition : clic gauche pour sélectionner/déplacer un bâtiment
-				var mouse_pos := get_viewport().get_mouse_position()
-				# Trouver le bâtiment le plus proche du curseur
-				var closest_b = null
-				var closest_dist := 99999.0
-				for b in batiments:
-					var d := mouse_pos.distance_to(Vector2(b.x, b.z))
-					if d < closest_dist and d < 60:
-						closest_dist = d
-						closest_b = b
-				if closest_b:
-					# Sélectionner et déplacer
+	# === MODE ÉDITION : DRAG AND DROP ===
+	if edition_active:
+		if event is InputEventMouseButton:
+			if event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					# Début du drag : sélectionner le bâtiment le plus proche du curseur
+					var mouse_pos := get_viewport().get_mouse_position()
+					var closest_b = null
+					var closest_dist := 99999.0
+					for b in batiments:
+						var d := mouse_pos.distance_to(Vector2(b.x, b.z))
+						if d < closest_dist and d < 60:
+							closest_dist = d
+							closest_b = b
+					if closest_b:
+						# Sélectionner le bâtiment pour le déplacement
+						selected_node = closest_b  # Utiliser closest_b comme référence
+					else:
+						selected_node = null
+				else:
+					# Fin du drag : arrêter le déplacement et sauvegarder
 					selected_node = null
-					# Mettre à jour la position du bâtiment
-					closest_b.x += (mouse_pos.x - get_viewport().size.x / 2) * 0.02
-					closest_b.z -= (mouse_pos.y - get_viewport().size.y / 2) * 0.02
-					# Sauvegarder dans BDD
 					save_edition()
+
+		if event is InputEventMouseMotion:
+			if selected_node:
+				# Déplacer le bâtiment sélectionné selon le mouvement de la souris
+				var mouse_pos := get_viewport().get_mouse_position()
+				var closest_b = selected_node
+				if closest_b:
+					closest_b.x += event.relative.x * 0.02
+					closest_b.z -= event.relative.y * 0.02
 		else:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
 				cam_drag = event.pressed
