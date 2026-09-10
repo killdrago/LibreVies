@@ -153,11 +153,11 @@ func _process(delta):
 					var b = batiments[selected_node.index]
 					b.x += offset_3d.x
 					b.z += offset_3d.z
-				# Mettre à jour l'entourage
-				if selection_outline and is_instance_valid(selection_outline):
-					selection_outline.visible = true
-					selection_outline.position = Vector3(b.x, 0.1, b.z)
-					selection_outline.mesh.size = Vector3(b.w, 0.2, b.d)
+					# Mettre à jour l'entourage
+					if selection_outline and is_instance_valid(selection_outline):
+						selection_outline.visible = true
+						selection_outline.position = Vector3(b.x, 0.1, b.z)
+						selection_outline.mesh.size = Vector3(b.w, 0.2, b.d)
 
 	# --- MOUVEMENT ---
 	var move := Vector3.ZERO
