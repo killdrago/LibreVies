@@ -248,8 +248,9 @@ func _input(event):
 					b.x += event.relative.x * 0.02
 					b.z -= event.relative.y * 0.02
 		else:
-			if event.button_index == MOUSE_BUTTON_RIGHT:
-				cam_drag = event.pressed
+		# Mode normal : la molette fonctionne toujours (zoom)
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			cam_drag = event.pressed
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			cam_dist = max(3.0, cam_dist - 0.5)
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
