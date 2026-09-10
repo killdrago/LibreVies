@@ -404,12 +404,12 @@ func creer_ville():
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit avec tuiles (style image fond basique) — rangées espacées et visibles
-		var roof_w: float = b.w + 0.6
-		var roof_d: float = b.d + 0.6
+		var roof_w: float = b.w + 0.3
+		var roof_d: float = b.d + 0.3
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 2
 		for i in range(rows):
-			var y_offset: float = b.h + 0.05 + (i * 0.35)
+			var y_offset: float = b.h + 0.02 + (i * 0.2)
 			var col: Color = tile_colors[i % len(tile_colors)]
 			# Pente gauche (tuiles) — arrondi avec subdivide=2
 			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
