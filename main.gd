@@ -1008,7 +1008,7 @@ func _toggle_inventory():
 # === PANEL ÉDITION ===
 var edit_panel: PanelContainer
 var edition_active := false
-var selected_node: Dictionary = null
+var selected_node: Dictionary ?= null
 var selection_outline: MeshInstance3D = null
 var edit_offset: Vector3 = Vector3.ZERO
 
