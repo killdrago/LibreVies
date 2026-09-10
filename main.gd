@@ -245,48 +245,7 @@ func update_camera():
 # ============================================================
 # CREATION DU MONDE
 # ============================================================
-func _make_wood_box(pos: Vector3, size: Vector3, parent: Node = self) -> MeshInstance3D:
-	var mesh = BoxMesh.new()
-	mesh.size = size
-	mesh.subdivide_depth = 0
-	mesh.subdivide_height = 0
-	mesh.subdivide_width = 0
-	var node = MeshInstance3D.new()
-	node.mesh = mesh
-	node.position = pos
-	var mat = StandardMaterial3D.new()
-	var tex = load("res://wood_texture.png") as Texture2D
-	if tex:
-		mat.albedo_texture = tex
-		mat.roughness = 0.9
-		mat.metallic = 0.05
-	else:
-		mat.albedo_color = Color(0.60, 0.40, 0.20)
-	node.material_override = mat
-	parent.add_child(node)
-	return node
-
-func _make_wood_prism(pos: Vector3, size: Vector3, left_to_right: float = 1.0, parent: Node = self) -> MeshInstance3D:
-	var mesh = PrismMesh.new()
-	mesh.size = size
-	mesh.subdivide_depth = 0
-	mesh.subdivide_height = 0
-	mesh.subdivide_width = 0
-	mesh.left_to_right = left_to_right
-	var node = MeshInstance3D.new()
-	node.mesh = mesh
-	node.position = pos
-	var mat = StandardMaterial3D.new()
-	var tex = load("res://wood_texture.png") as Texture2D
-	if tex:
-		mat.albedo_texture = tex
-		mat.roughness = 0.9
-		mat.metallic = 0.05
-	else:
-		mat.albedo_color = Color(0.60, 0.40, 0.20)
-	node.material_override = mat
-	parent.add_child(node)
-	return node
+func _make_box(pos: Vector3, size: Vector3, col: Color, parent: Node = self) -> MeshInstance3D:
 	var mesh = BoxMesh.new()
 	mesh.size = size
 	mesh.subdivide_depth = 0
@@ -367,6 +326,49 @@ func _make_capsule(pos: Vector3, radius: float, height: float, col: Color, paren
 	node.position = pos
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = col
+	node.material_override = mat
+	parent.add_child(node)
+	return node
+
+func _make_wood_box(pos: Vector3, size: Vector3, parent: Node = self) -> MeshInstance3D:
+	var mesh = BoxMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 0
+	mesh.subdivide_height = 0
+	mesh.subdivide_width = 0
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	var tex = load("res://wood_texture.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.roughness = 0.9
+		mat.metallic = 0.05
+	else:
+		mat.albedo_color = Color(0.60, 0.40, 0.20)
+	node.material_override = mat
+	parent.add_child(node)
+	return node
+
+func _make_wood_prism(pos: Vector3, size: Vector3, left_to_right: float = 1.0, parent: Node = self) -> MeshInstance3D:
+	var mesh = PrismMesh.new()
+	mesh.size = size
+	mesh.subdivide_depth = 2
+	mesh.subdivide_height = 2
+	mesh.subdivide_width = 2
+	mesh.left_to_right = left_to_right
+	var node = MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = pos
+	var mat = StandardMaterial3D.new()
+	var tex = load("res://wood_texture.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.roughness = 0.9
+		mat.metallic = 0.05
+	else:
+		mat.albedo_color = Color(0.60, 0.40, 0.20)
 	node.material_override = mat
 	parent.add_child(node)
 	return node
