@@ -203,7 +203,7 @@ func _input(event):
 				# Mode édition : clic gauche pour sélectionner/déplacer un bâtiment
 				var mouse_pos := get_viewport().get_mouse_position()
 				# Trouver le bâtiment le plus proche du curseur
-				var closest_b: Dictionary = null
+				var closest_b = null
 				var closest_dist := 99999.0
 				for b in batiments:
 					var d := mouse_pos.distance_to(Vector2(b.x, b.z))
