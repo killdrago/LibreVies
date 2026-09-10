@@ -404,19 +404,18 @@ func creer_ville():
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit avec tuiles (style image fond basique) — rangées espacées et visibles
-		var roof_w: float = b.w + 0.3
-		var roof_d: float = b.d + 0.3
+		var roof_w: float = b.w + 1.0
+		var roof_d: float = b.d + 1.0
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 1
 		for i in range(rows):
-			var y_offset: float = b.h + 0.02
+			var y_offset: float = b.h + 0.15
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Toit arrondi et centré : décalé vers la gauche d'une largeur de fenêtre
-			var window_shift: float = b.w * 0.22
-			_make_prism(Vector3(b.x - roof_w*0.05 - window_shift, y_offset, b.z - roof_d*0.05),
-				Vector3(roof_w * 0.5, 0.18, roof_d), col, 1.0)
-			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05 - window_shift, y_offset, b.z - roof_d*0.05),
-				Vector3(roof_w * 0.5, 0.18, roof_d), col, 0.0)
+			# Toit arrondi, centré, sans shift : couvre toute la maison
+			_make_prism(Vector3(b.x - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+				Vector3(roof_w * 0.5, 0.28, roof_d), col, 1.0)
+			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05, y_offset, b.z - roof_d*0.05),
+				Vector3(roof_w * 0.5, 0.28, roof_d), col, 0.0)
 		# Porte (marron foncé + cadre)
 		_make_box(Vector3(b.x, b.h*0.25, b.z+b.d/2.0+0.06), Vector3(b.w*0.22, b.h*0.48, 0.14), Color(0.22,0.12,0.04))
 		_make_box(Vector3(b.x, b.h*0.5, b.z+b.d/2.0+0.06), Vector3(b.w*0.26, 0.06, 0.15), Color(0.35,0.20,0.08))
@@ -818,12 +817,7 @@ func creer_hud():
 	vbox.add_child(vue_label)
 
 	# Titre droite
-	var titre = Label.new()
-	titre.text = "LibreVie"
-	titre.position = Vector2(1100, 15)
-	titre.add_theme_font_size_override("font_size", 30)
-	titre.add_theme_color_override("font_color", Color(1, 0.86, 0.20))
-	canvas.add_child(titre)
+	
 
 	# Contrôles bas
 	var ctrl = Label.new()
