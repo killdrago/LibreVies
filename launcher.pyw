@@ -491,19 +491,23 @@ class App(tk.Tk):
         threading.Thread(target=self._run_update, daemon=True).start()
 
     def _restart_launcher(self):
-        # Redémarre le launcher (même exécutable / script) et quitte le processus actuel
+        # Fermer la fenêtre du launcher actuel pour éviter le double
+        self.destroy()
+        time.sleep(0.2)
+        # Redémarrer le launcher (même exécutable / script) et quitter le processus actuel
         try:
-            exe = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
-            # Si c'est un .py, relancer avec python ; sinon relancer directement
-            cmd = [exe] if sys.executable == exe else [sys.executable, exe]
-            # Si le script est lancé directement par pythonw
-            if not getattr(sys, 'frozen', False) and 'python' not in sys.executable.lower():
+            if getattr(sys, 'frozen', False):
+                # Exécutable compilé
+                exe = sys.executable
+                cmd = [exe]
+            else:
+                # Script Python (.pyw)
                 cmd = [sys.executable, sys.argv[0]]
             subprocess.Popen(cmd, cwd=GAME_DIR)
         except Exception:
             pass
-        # Quitter le processus actuel après un court délai pour laisser le nouveau démarrer
-        threading.Thread(target=lambda: (time.sleep(0.5), sys.exit(0)), daemon=True).start()
+        # Quitter le processus actuel immédiatement après lancement du nouveau
+        sys.exit(0)
 
     def _run_update(self):
         # 1) Télécharger version_url.json distant et comparer au local
