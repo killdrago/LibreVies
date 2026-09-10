@@ -939,7 +939,6 @@ func _toggle_edition():
 		edit_style.border_width_left = 2
 		edit_style.border_width_right = 2
 		edit_style.border_color = Color(0.5, 0.8, 1.0)
-		edit_panel.add_theme_stylebox_override("panel", edit_style)
 		canvas.add_child(edit_panel)
 
 		var edit_vbox = VBoxContainer.new()
