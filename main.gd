@@ -404,15 +404,15 @@ func creer_ville():
 		# Fondations (pierre)
 		_make_box(Vector3(b.x, 0.1, b.z), Vector3(b.w+0.2, 0.2, b.d+0.2), Color(0.50,0.48,0.45))
 		# Toit avec tuiles (style image fond basique) — rangées espacées et visibles
-		var roof_w: float = b.w + 0.35
-		var roof_d: float = b.d + 0.35
+		var roof_w: float = b.w + 0.4
+		var roof_d: float = b.d + 0.4
 		var tile_colors := [Color(0.85, 0.35, 0.10), Color(0.75, 0.30, 0.08), Color(0.90, 0.40, 0.12), Color(0.70, 0.25, 0.05)]
 		var rows := 1
 		for i in range(rows):
-			var y_offset: float = b.h + 0.08
+			var y_offset: float = b.h + 0.10
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Toit arrondi, centré : décalé 5px gauche
-			var window_shift: float = -0.05
+			# Toit arrondi, centré : décalé vers la gauche largeur fenêtre
+			var window_shift: float = -b.w * 0.08
 			_make_prism(Vector3(b.x - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.56, roof_d), col, 1.0)
 			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
@@ -817,8 +817,49 @@ func creer_hud():
 	vue_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(vue_label)
 
+	# === ÉCHELLE VISUELLE (haut à droite) ===
+	var echelle_panel = PanelContainer.new()
+	echelle_panel.position = Vector2(1100, 15)
+	echelle_panel.size = Vector2(160, 50)
+	var echelle_style = StyleBoxFlat.new()
+	echelle_style.bg_color = Color(0, 0, 0, 0.5)
+	echelle_style.corner_radius_top_left = 6
+	echelle_style.corner_radius_top_right = 6
+	echelle_style.corner_radius_bottom_left = 6
+	echelle_style.corner_radius_bottom_right = 6
+	echelle_panel.add_theme_stylebox_override("panel", echelle_style)
+	canvas.add_child(echelle_panel)
+
+	var echelle_vbox = VBoxContainer.new()
+	echelle_vbox.position = Vector2(5, 5)
+	echelle_vbox.size = Vector2(150, 40)
+	echelle_panel.add_child(echelle_vbox)
+
+	var echelle_titre = Label.new()
+	echelle_titre.text = "Tailles (px)"
+	echelle_titre.add_theme_font_size_override("font_size", 10)
+	echelle_titre.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	echelle_vbox.add_child(echelle_titre)
+
+	var echelle_tailles = Label.new()
+	echelle_tailles.text = "roof_w: %.2f | roof_d: %.2f | y: %.2f | subd: 2" % [0.4, 0.4, 0.10, 2]
+	echelle_tailles.add_theme_font_size_override("font_size", 9)
+	echelle_tailles.add_theme_color_override("font_color", Color(1, 1, 1))
+	echelle_vbox.add_child(echelle_tailles)
+
+	# Image fenêtre (icône)
+	var fen_icon = TextureRect.new()
+	fen_icon.position = Vector2(1080, 65)
+	fen_icon.size = Vector2(30, 30)
+	var tex_fen = load("res://icon.png")
+	if tex_fen:
+		fen_icon.texture = tex_fen
+	else:
+		fen_icon.visible = false
+	canvas.add_child(fen_icon)
+
 	# Titre droite
-	
+
 
 	# Contrôles bas
 	var ctrl = Label.new()
