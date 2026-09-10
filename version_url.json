@@ -72,6 +72,14 @@
     "wood_texture.png": {
       "hash": "b0ccd8951902e603c974eb1c0c0cbc5d",
       "size": 1389240
+    },
+    "BDD/bdd.json": {
+      "hash": "09912c72f4a69ec2fb0ddb902bf8eba1",
+      "size": 3390
+    },
+    "edition/editor.py": {
+      "hash": "23bc925662158d152938c51c137eeb01",
+      "size": 569
     }
   },
   "main.gd.hash": "bab05bac132bb5225aba25c87d786ac4",
