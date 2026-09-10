@@ -866,45 +866,6 @@ func creer_hud():
 	vue_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(vue_label)
 
-	# === ÉCHELLE VISUELLE (haut à droite) ===
-	var echelle_panel = PanelContainer.new()
-	echelle_panel.position = Vector2(1100, 15)
-	echelle_panel.size = Vector2(160, 50)
-	var echelle_style = StyleBoxFlat.new()
-	echelle_style.bg_color = Color(0, 0, 0, 0.5)
-	echelle_style.corner_radius_top_left = 6
-	echelle_style.corner_radius_top_right = 6
-	echelle_style.corner_radius_bottom_left = 6
-	echelle_style.corner_radius_bottom_right = 6
-	echelle_panel.add_theme_stylebox_override("panel", echelle_style)
-	canvas.add_child(echelle_panel)
-
-	var echelle_vbox = VBoxContainer.new()
-	echelle_vbox.position = Vector2(5, 5)
-	echelle_vbox.size = Vector2(150, 40)
-	echelle_panel.add_child(echelle_vbox)
-
-	var echelle_titre = Label.new()
-	echelle_titre.text = "Tailles (px)"
-	echelle_titre.add_theme_font_size_override("font_size", 10)
-	echelle_titre.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-	echelle_vbox.add_child(echelle_titre)
-
-	var echelle_tailles = Label.new()
-	# Valeurs réelles du PrismMesh (Supermarche : w=5, d=4, h=4) — roof_w = w+0.4, roof_d = d+0.4, y_offset = h+0.10, subd=2, hauteur=0.56
-	echelle_tailles.text = "roof_w: 5.40 | roof_d: 4.40 | y: 4.10 | subd: 2 | h: 0.56"
-	echelle_tailles.add_theme_font_size_override("font_size", 9)
-	echelle_tailles.add_theme_color_override("font_color", Color(1, 1, 1))
-	echelle_vbox.add_child(echelle_tailles)
-
-	# Échelle de mesure (px) — texte stylisé
-	var echelle_barre = Label.new()
-	echelle_barre.text = "|----5----10----15----20|"
-	echelle_barre.add_theme_font_size_override("font_size", 9)
-	echelle_barre.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
-	echelle_barre.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	echelle_vbox.add_child(echelle_barre)
-
 	# Image fenêtre (icône)
 	var fen_icon = TextureRect.new()
 	fen_icon.position = Vector2(1080, 65)
