@@ -117,6 +117,7 @@ func _process(delta):
 				selected_node.position += offset_3d
 
 	# --- MOUVEMENT ---
+	var move := Vector3.ZERO
 	var speed: float = RUN if Input.is_action_pressed("sprint") else SPD
 
 	if Input.is_action_pressed("move_forward"): move.z -= 1
