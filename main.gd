@@ -842,10 +842,19 @@ func creer_hud():
 	echelle_vbox.add_child(echelle_titre)
 
 	var echelle_tailles = Label.new()
-	echelle_tailles.text = "roof_w: %.2f | roof_d: %.2f | y: %.2f | subd: 2" % [0.4, 0.4, 0.10, 2]
+	# Valeurs réelles du PrismMesh (Supermarche : w=5, d=4, h=4) — roof_w = w+0.4, roof_d = d+0.4, y_offset = h+0.10, subd=2, hauteur=0.56
+	echelle_tailles.text = "roof_w: 5.40 | roof_d: 4.40 | y: 4.10 | subd: 2 | h: 0.56"
 	echelle_tailles.add_theme_font_size_override("font_size", 9)
 	echelle_tailles.add_theme_color_override("font_color", Color(1, 1, 1))
 	echelle_vbox.add_child(echelle_tailles)
+
+	# Échelle de mesure (px) — texte stylisé
+	var echelle_barre = Label.new()
+	echelle_barre.text = "|----5----10----15----20|"
+	echelle_barre.add_theme_font_size_override("font_size", 9)
+	echelle_barre.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
+	echelle_barre.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	echelle_vbox.add_child(echelle_barre)
 
 	# Image fenêtre (icône)
 	var fen_icon = TextureRect.new()
