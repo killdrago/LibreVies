@@ -247,14 +247,14 @@ func _input(event):
 					var b = batiments[selected_node.index]
 					b.x += event.relative.x * 0.02
 					b.z -= event.relative.y * 0.02
-		else:
-		# Mode normal : la molette fonctionne toujours (zoom)
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			cam_drag = event.pressed
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			cam_dist = max(3.0, cam_dist - 0.5)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			cam_dist = min(18.0, cam_dist + 0.5)
+	else:
+	# Mode normal : la molette et le clic droit fonctionnent toujours
+	if event.button_index == MOUSE_BUTTON_RIGHT:
+		cam_drag = event.pressed
+	if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		cam_dist = max(3.0, cam_dist - 0.5)
+	if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		cam_dist = min(18.0, cam_dist + 0.5)
 
 	if event is InputEventMouseMotion and cam_drag:
 		var do_invert := false
