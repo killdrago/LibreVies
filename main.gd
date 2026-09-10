@@ -248,8 +248,8 @@ func _input(event):
 					b.x += event.relative.x * 0.02
 					b.z -= event.relative.y * 0.02
 	else:
-	# Mode normal : la molette et le clic droit fonctionnent toujours
-	if event.button_index == MOUSE_BUTTON_RIGHT:
+		# Mode normal : la molette et le clic droit fonctionnent toujours
+		if event.button_index == MOUSE_BUTTON_RIGHT:
 		cam_drag = event.pressed
 	if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		cam_dist = max(3.0, cam_dist - 0.5)
