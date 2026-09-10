@@ -6,8 +6,8 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0866b-librevies",
   "files": {
     "main.gd": {
-      "hash": "219039e5878fe00075f98d8b1b5994b8",
-      "size": 33526
+      "hash": "36480f9fbc86c6a072b8cec16c70276c",
+      "size": 33597
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -70,6 +70,6 @@
       "size": 1432
     }
   },
-  "main.gd.hash": "219039e5878fe00075f98d8b1b5994b8",
-  "main.gd.size": 33526
+  "main.gd.hash": "36480f9fbc86c6a072b8cec16c70276c",
+  "main.gd.size": 33597
 }

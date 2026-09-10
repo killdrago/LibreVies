@@ -342,9 +342,10 @@ func _make_sphere(pos: Vector3, radius: float, col: Color, emission: bool = fals
 func _make_prism(pos: Vector3, size: Vector3, col: Color, left_to_right: float = 1.0, parent: Node = self) -> MeshInstance3D:
 	var mesh = PrismMesh.new()
 	mesh.size = size
-	mesh.subdivide_depth = 0
-	mesh.subdivide_height = 0
-	mesh.subdivide_width = 0
+	# Arrondi low-poly (subdivide > 0 pour arrondir les arêtes, compatible GPU)
+	mesh.subdivide_depth = 2
+	mesh.subdivide_height = 2
+	mesh.subdivide_width = 2
 	mesh.left_to_right = left_to_right
 	var node = MeshInstance3D.new()
 	node.mesh = mesh
