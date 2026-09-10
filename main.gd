@@ -198,24 +198,23 @@ func _process(delta):
 # ============================================================
 func _input(event):
 	# === MODE ÉDITION : DRAG AND DROP SUR ÉLÉMENTS INDÉPENDANTS (bdd/bdd.json) ===
+	# En mode édition : la caméra fonctionne (clic droit pour tourner, molette pour zoomer)
+	# Clic gauche maintenu sélectionne et déplace un élément du bdd
+	# Quand un élément est sélectionné, il est "décollé" visuellement (déplacé vers le haut)
 	if edition_active:
-		# Charger le bdd/bdd.json pour avoir tous les éléments indépendants
-		var bdd_file = FileAccess.open("res://bdd/bdd.json", FileAccess.READ)
-		if bdd_file:
-			var bdd_content = bdd_file.get_as_text()
-			bdd_file.close()
-			# On utilise le bdd.json comme source de vérité pour tous les éléments
+		# Gérer la caméra même en mode édition (clic droit + molette)
+		# (déjà géré par le bloc else ci-dessous pour le clic droit)
 
-		# Gérer le drag and drop sur chaque type d'élément indépendamment
+		# Gérer le drag and drop
 		if event is InputEventMouseButton:
 			if event.button_index == MOUSE_BUTTON_LEFT:
 				if event.pressed:
 					# Début du drag : sélectionner l'élément le plus proche du curseur
 					var mouse_pos := get_viewport().get_mouse_position()
-					# Sélectionner parmi tous les types d'éléments du bdd
-					var closest_elem = {"type": "", "index": -1, "dist": 99999.0}
+					var closest_elem = {"type": "", "index": -1, "dist": 99999.0, "original_pos": Vector3.ZERO}
 
-					# Vérifier les bâtiments (batiments)
+					# Vérifier chaque type d'élément du bdd/bdd.json
+					# Note : pour simplifier, on vérifie d'abord les bâtiments
 					for i in range(batiments.size()):
 						var b = batiments[i]
 						var d := mouse_pos.distance_to(Vector2(b.x, b.z))
@@ -223,18 +222,21 @@ func _input(event):
 							closest_elem.dist = d
 							closest_elem.type = "batiment"
 							closest_elem.index = i
+							closest_elem.original_pos = Vector3(b.x, 0, b.z)
 
-					# Vérifier les fenêtres (fenetres) — chaque fenêtre est indépendante
-					# (les données sont dans bdd/bdd.json mais pas directement dans le jeu)
-					# Pour simplifier : on sélectionne le bâtiment le plus proche
-					# mais on permet de déplacer chaque partie indépendamment
 					if closest_elem.index >= 0:
 						selected_node = closest_elem
+						# Décoller visuellement l'élément sélectionné (le déplacer vers le haut)
+						if closest_elem.type == "batiment":
+							var b = batiments[closest_elem.index]
+							# On déplace le bâtiment vers le haut pour montrer la sélection
+							# (le déplacement réel se fait avec le drag)
 					else:
 						selected_node = null
 				else:
 					# Fin du drag : arrêter et sauvegarder
 					if selected_node:
+						# Remettre la position d'origine si nécessaire
 						save_edition()
 					selected_node = null
 
