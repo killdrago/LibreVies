@@ -411,8 +411,8 @@ func creer_ville():
 		for i in range(rows):
 			var y_offset: float = b.h + 0.15
 			var col: Color = tile_colors[i % len(tile_colors)]
-			# Toit arrondi, centré, double hauteur : décalé 5px gauche
-			var window_shift: float = -0.05
+			# Toit arrondi, centré, double hauteur : décalé vers gauche largeur fenêtre
+			var window_shift: float = -b.w * 0.22
 			_make_prism(Vector3(b.x - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
 				Vector3(roof_w * 0.5, 0.56, roof_d), col, 1.0)
 			_make_prism(Vector3(b.x + roof_w*0.5 - roof_w*0.05 + window_shift, y_offset, b.z - roof_d*0.05),
