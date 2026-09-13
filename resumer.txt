@@ -32,6 +32,17 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   c'est le launcher qui se met à jour lui-même.
 - DONC : à chaque modif de fichier du jeu, il FAUT regénérer version_url.json
   (hashs + tailles) et merger sur main pour que les joueurs reçoivent la MAJ.
+- FORMAT raw_url (piège déjà rencontré, 404) : une URL raw NE CONTIENT PAS
+  "/tree/". Bon format : https://raw.githubusercontent.com/killdrago/LibreVies/<BRANCHE>
+  (ex. branche de test : .../LibreVies/arena/01a09a4d-librevies ; prod : .../LibreVies/main).
+  Le launcher 2.5.1 a une fonction normalize_raw_url() qui répare toute seule
+  les URLs copiées depuis le site (github.com/.../tree/BRANCHE ou
+  raw.githubusercontent.com/.../tree/BRANCHE).
+- DEPUIS LA 2.5.1 : le manifeste distant (version_url.json sur GitHub) donne le
+  raw_url de téléchargement ; le manifeste de la branche de travail pointe vers
+  CETTE branche (auto-référent) pour que les testeurs reçoivent la MAJ de la
+  branche. APRÈS MERGE SUR main : vérifier que le raw_url du manifeste main est
+  bien ".../LibreVies/main" (sinon les joueurs resteraient branchés sur la branche).
 - Script de regénération utilisé (à refaire à chaque MAJ) : parcourir la liste
   "files" de version_url.json, recalculer md5/taille de chaque fichier présent
   dans le repo, réécrire le json (indent=2, clés : launcher_version,

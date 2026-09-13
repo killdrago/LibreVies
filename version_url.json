@@ -1,9 +1,9 @@
 {
-  "launcher_version": "2.5.0",
+  "launcher_version": "2.5.1",
   "game_version": "0.3.0",
-  "notes": "Rendu low-poly PrimitiveMesh (0.3.0) : monde, personnage et HUD refaits fideles a la capture ; migration Godot 4.7.2",
-  "game_url": "https://github.com/killdrago/LibreVies/tree/main",
-  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/main",
+  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Source des MAJ = branche de travail (raw_url). Launcher 2.5.1 : accepte les URLs 'tree' et suit le raw_url local.",
+  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
+  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
       "hash": "24d9de2505507664b53564feef8c8b47",
@@ -18,8 +18,8 @@
       "size": 5211
     },
     "launcher.pyw": {
-      "hash": "ba6d4cdc6af937037796176053b3f736",
-      "size": 25810
+      "hash": "b2f1ffb9e469efadc6976f86a640376d",
+      "size": 26627
     },
     "build_launcher.bat": {
       "hash": "ad04ef2ac8af46f6f2faf6b595121531",
@@ -66,8 +66,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "59c2dbe2fc99cd21a17da382455d0469",
-      "size": 9015
+      "hash": "62237ddf297a7ac759d15e2cf335b778",
+      "size": 9880
     }
   }
 }

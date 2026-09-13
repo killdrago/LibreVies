@@ -14,7 +14,7 @@ GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.7.2-stable
 BANNER = os.path.join(GAME_DIR, "banniere_v1.png")
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "2.5.0"
+LAUNCHER_VERSION = "2.5.1"
 GAME_VERSION = "0.3.0"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
@@ -74,13 +74,32 @@ def get_remote_url(fname, raw_url):
     return f"{raw_url}/{urllib.request.quote(fname)}"
 
 
+def normalize_raw_url(url):
+    """Accepte les formes 'github.com/.../tree/BRANCHE' ou
+    'raw.githubusercontent.com/.../tree/BRANCHE' et renvoie toujours
+    une URL raw utilisable : https://raw.githubusercontent.com/OWNER/REPO/BRANCHE"""
+    url = (url or "").strip().rstrip("/")
+    if not url:
+        return url
+    if "raw.githubusercontent.com" in url:
+        return url.replace("/tree/", "/")
+    if "github.com" in url:
+        parts = url.split("github.com/", 1)[1]
+        seg = [s for s in parts.split("/") if s]
+        if len(seg) >= 4 and seg[2] == "tree":
+            return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/{seg[3]}"
+        if len(seg) >= 2:
+            return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/HEAD"
+    return url
+
+
 # ============================================================
 # MISE A JOUR
 # ============================================================
 
 def check_for_updates(progress_cb):
     local_cfg = load_local_config()
-    raw_url = local_cfg.get("raw_url", "")
+    raw_url = normalize_raw_url(local_cfg.get("raw_url", ""))
     if not raw_url:
         return {"error": "Pas d'URL configuree", "modified": [], "remote_cfg": None}
     try:
@@ -112,7 +131,7 @@ def check_for_updates(progress_cb):
 
 
 def apply_updates(modified, remote_cfg, progress_cb):
-    raw_url = remote_cfg.get("raw_url", "")
+    raw_url = normalize_raw_url(remote_cfg.get("raw_url", ""))
     errors = []; downloaded = 0; total = len(modified)
     for i, (fname, _, expected_hash, _) in enumerate(modified):
         pct = int(20 + (i / total) * 70)
