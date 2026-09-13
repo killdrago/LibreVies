@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b5"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b6"    # témoin de build : titre de fenêtre + message d'accueil
 
 # VARIABLES JOUEUR
 var player_pv := PV_MAX
@@ -571,7 +571,12 @@ func mat_std(col: Color, unlit := false, emissive := false) -> StandardMaterial3
 	m.roughness = 0.9
 	m.metallic = 0.0
 	if unlit:
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNLIT
+		# Godot 4.7 : l'enum ShadingMode n'a que PIXEL/VERTEX, pas de mode
+		# unlit natif => albedo noir + emission plate pleine couleur.
+		m.albedo_color = Color(0, 0, 0)
+		m.emission_enabled = true
+		m.emission = col
+		m.emission_energy_multiplier = 1.0
 	if emissive:
 		m.emission_enabled = true
 		m.emission = col

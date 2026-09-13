@@ -141,6 +141,13 @@ pour l'herbe/fleurs/rochers (perf).
   ("func _process(delta: float)"). Ne JAMAIS faire "var x := dict.champ".
   Idem : "$Nom" renvoie un Node statiquement => typer ("var sun:
   DirectionalLight3D = $DirectionalLight3D").
+- AUTRE PIEGE Godot 4.7 : BaseMaterial3D.ShadingMode ne contient QUE
+  SHADING_MODE_PIXEL et SHADING_MODE_VERTEX. Il n'y a PAS de
+  SHADING_MODE_UNLIT (ni sur StandardMaterial3D). Pour un rendu "unlit"
+  (nuages blancs plats) : emission_enabled + emission = couleur +
+  emission_energy_multiplier = 1.0, ou un vrai ShaderMaterial render_mode
+  unlit. Ne jamais écrire StandardMaterial3D.SHADING_MODE_UNLIT /
+  BaseMaterial3D.SHADING_MODE_UNLIT : erreur de parse garantie.
 
 7) ETAT GIT / LIVRAISON
 -----------------------
