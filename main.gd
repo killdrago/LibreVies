@@ -14,6 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
+const BUILD := "0.3.0-b5"    # témoin de build : titre de fenêtre + message d'accueil
 
 # VARIABLES JOUEUR
 var player_pv := PV_MAX
@@ -91,6 +92,7 @@ var _mat_cache := {}
 func _ready():
 	camera = $Camera3D
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	DisplayServer.window_set_title("LibreVie %s" % BUILD)
 
 	load_config()
 
@@ -114,7 +116,7 @@ func _ready():
 	timer.timeout.connect(_on_regen)
 	add_child(timer)
 
-	show_info("Bienvenue dans LibreVie !")
+	show_info("Bienvenue dans LibreVie ! (%s)" % BUILD)
 
 func _on_regen():
 	if not player_dead and player_pv < PV_MAX:
