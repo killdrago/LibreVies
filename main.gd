@@ -569,7 +569,7 @@ func mat_std(col: Color, unlit := false, emissive := false) -> StandardMaterial3
 	m.roughness = 0.9
 	m.metallic = 0.0
 	if unlit:
-		m.shading_mode = StandardMaterial3D.SHADING_MODE_UNLIT
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNLIT
 	if emissive:
 		m.emission_enabled = true
 		m.emission = col
