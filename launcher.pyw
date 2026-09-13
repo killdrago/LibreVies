@@ -87,7 +87,7 @@ def normalize_raw_url(url):
         parts = url.split("github.com/", 1)[1]
         seg = [s for s in parts.split("/") if s]
         if len(seg) >= 4 and seg[2] == "tree":
-            return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/{seg[3]}"
+            return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/{'/'.join(seg[3:])}"
         if len(seg) >= 2:
             return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/HEAD"
     return url
