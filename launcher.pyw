@@ -342,7 +342,7 @@ class App(tk.Tk):
                                 font=("Segoe UI", 16, "bold"), fill=ACCENT, anchor="center")
         self.canvas.create_text(512, 500, text="Espace reserve aux annonceurs",
                                 font=("Segoe UI", 14), fill=TEXT2, anchor="center")
-        self.canvas.create_text(512, 540, text="Contactez-nous pour placer votre pub ici",
+        self.canvas.create_text(512, 540, text="Contactez-nous a \"  librevies@hotmail.com \" pour placer votre pub ici",
                                 font=("Segoe UI", 10), fill="#556677", anchor="center")
 
         # ====== BARRE + BOUTONS ======
