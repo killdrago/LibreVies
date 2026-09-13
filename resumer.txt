@@ -1,1 +1,142 @@
-	
+================================================================================
+LIBREVIES — RESUME DE PROJET (pour une autre IA / prochaine session)
+Dernière mise à jour : 13/09/2026 — branche arena/01a09a4d-librevies (session Arena)
+================================================================================
+
+1) C'EST QUOI
+-------------
+Jeu vidéo 3D "LibreVie" (MMO solo pour l'instant) fait avec GODOT 4, lancé par un
+launcher Python/Tkinter (launcher.pyw) qui télécharge Godot si absent et qui
+fait l'auto-update des fichiers du jeu depuis GitHub.
+Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
+
+2) VERSIONS ACTUELLES
+---------------------
+- Moteur : GODOT 4.7.2-stable (migration faite le 13/09/2026).
+  * project.godot : config/features=PackedStringArray("4.7")
+  * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
+  * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
+- launcher.pyw : LAUNCHER_VERSION = "2.5.0", GAME_VERSION = "0.3.0"
+- version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
+  calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
+
+3) FONCTIONNEMENT DE L'AUTO-UPDATE (IMPORTANT)
+----------------------------------------------
+- launcher.pyw lit son version_url.json LOCAL, puis télécharge le
+  version_url.json DISTANT sur raw_url (branche main de GitHub).
+- Il compare le hash md5 LOCAL de chaque fichier listé ("files") au hash distant.
+  Texte (.gd,.tscn,.godot,.pyw,.py,.bat,.json,...) : md5 après normalisation
+  CRLF->LF. Binaires (png, glb, ico) : md5 brut. Si différent ou absent =>
+  téléchargement depuis raw_url/<fichier>.
+- launcher.pyw est volontairement ignoré par l'update (évite la boucle) :
+  c'est le launcher qui se met à jour lui-même.
+- DONC : à chaque modif de fichier du jeu, il FAUT regénérer version_url.json
+  (hashs + tailles) et merger sur main pour que les joueurs reçoivent la MAJ.
+- Script de regénération utilisé (à refaire à chaque MAJ) : parcourir la liste
+  "files" de version_url.json, recalculer md5/taille de chaque fichier présent
+  dans le repo, réécrire le json (indent=2, clés : launcher_version,
+  game_version, notes, game_url, raw_url, files{nom:{hash,size}}).
+
+4) CE QUI A ETE FAIT LE 13/09/2026 (grosse MAJ 0.3.0)
+-----------------------------------------------------
+Objectif : reproduire le rendu de la capture "image/1er image develloppement.png"
+(style low-poly coloré : collines, sapins, château, héros au marteau, rats/
+araignées, HUD moderne) EN MIGRANT TOUT vers PrimitiveMesh / low-poly.
+Réponse à la question du dev : OUI c'est possible avec BoxMesh, SphereMesh,
+CylinderMesh, PrismMesh, CapsuleMesh (+ CylinderMesh radius_top=0 pour les
+cônes) ; le terrain et les rochers/touffes sont des ArrayMesh générés par
+SurfaceTool (triangles + generate_normals = facettes plates), mis en MultiMesh
+pour l'herbe/fleurs/rochers (perf).
+
+- main.gd REECRIT (~1740 lignes, tout en code, un seul fichier pour l'update) :
+  * PLUS AUCUN nœud CSG (avant : CSGBox3D/CSGCylinder3D/CSGSphere3D).
+  * Helpers _box/_cyl/_cone/_sph/_caps/_prism/_facette avec CACHE de meshes et
+    de matériaux (mat_std) => peu de ressources, beaucoup d'instances.
+  * Terrain : fonction hauteur_terrain(x,z) (plat dans TOWN_R=32, collines
+    ensuite, grosse colline au nord en z=-78 pour le château). Le sol, le chemin
+    de terre (CHEMIN = polyline, couleur dirt par face) et les couleurs de face
+    (vertex colors, vertex_color_use_as_albedo) sont un ArrayMesh facetté.
+  * Décor : sapins (cônes empilés), arbres ronds, fleurs, rochers, touffes
+    d'herbe (MultiMesh), nuages box unlit qui dérivent, lampadaires émissifs,
+    barils, caisses, clôtures, bannières (emblème épées croisées), panneaux.
+  * Ville : 9 bâtiments (murs box + toit PrismMesh + porte/fenêtres/auvent/
+    cheminée/escalier) + 4 PNJ capsule/sphère avec Label3D billboard.
+  * Château fort sur la colline nord : enceinte, créneaux, tours cylindriques
+    + toits côniques rouges, donjon, drapeaux.
+  * NOUVEAU PERSONNAGE (remplace glb/perso_voxel.glb, plus chargé du tout) :
+    héros low-poly construit en primitives : jambes/bras = pivots Node3D +
+    CapsuleMesh, torse/tunique/ceinture/baudrier = BoxMesh+PrismMesh, tête box
+    + cheveux piquants (prisms), yeux, marteau (cylindre + box) dans la main
+    droite. Animation marche = rotation des pivots ; animation attaque =
+    rotation du bras droit (player_attack_anim).
+  * Ennemis : souris/rats (corps facetté, oreilles, queue, yeux rouges émissifs)
+    et araignées (8 pattes 2 segments, yeux rouges). IA : errance + poursuite
+    si <10 m + attaque au contact (dégâts au joueur, mort + [R] renaître).
+    Barre de vie rouge au-dessus (billboard look_at caméra) quand blessés.
+  * Combat : dégâts 25 (comme le "25" du screen), dégâts flottants Label3D,
+    étincelles d'impact émissives, respawn des ennemis après 10 s (Timer connect,
+    plus de await dans les boucles => plus de bug de gel).
+  * Ramassage : cailloux (rochers facettés) et pièces d'or (cylindres émissifs
+    qui tournent), respawn par Timer connect.
+  * HUD refait façon capture : portrait rond (shader canvas_item découpe
+    circulaire sur pp_lv_3.png) + barre HP rouge "x HP" ; pilules or/cailloux en
+    haut à droite ; MINI-CARTE ronde custom (_draw : ennemis rouges, objets,
+    château, flèche joueur) ; panneau de quête "PROBLÈME DE RATS" (10 rats /
+    5 araignées, comptage des kills, coche verte) ; HOTBAR 5 slots dessinés en
+    _draw (marteau, potion rouge x5, potion bleue x5, parchemin, vide) avec
+    sélection jaune et touches 1-5 (potions utilisables : soin / boost vitesse) ;
+    barre LVL + XP en bas à gauche (gain d'XP par kill, levels up) ; options et
+    inventaire conservés (O / I) ; label info central avec outline.
+  * Environnement : WorldEnvironment en code (ProceduralSkyMaterial ciel bleu vif,
+    ambient sky, tonemap FILMIC) + soleil DirectionalLight3D chaud avec ombres.
+  * Caméra : orbitale 3e personne (clic droit molette) + vue 1re personne [V],
+    clamp au-dessus du terrain.
+  * Touches : ZQSD/flèches, MAJ courir, ESPACE saut, clic attaque, E ramasser,
+    V vue, I inventaire, O options, R renaître, 1-5 slots, ÉCHAP quitter.
+
+5) FICHIERS IMPORTANTS
+----------------------
+- main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
+  Camera3D, le reste est créé par le code).
+- launcher.pyw : launcher Tkinter + auto-update + téléchargement Godot.
+- build_launcher.bat : build exe du launcher (PyInstaller).
+- version_url.json : manifeste d'update (voir §3).
+- resumer.txt : ce fichier.
+- glb/ : anciens personnages voxel + scripts Python de génération (NON
+  utilisés par le jeu depuis la 0.3.0, gardés pour référence).
+- image/ : captures de référence (dont "1er image develloppement.png" = cible
+  visuelle de la 0.3.0), bannières, logos, chapitres, miniatures YouTube.
+- godot/ : cache editor/import du projet (shader_cache etc.), pas touché.
+
+6) REGLES / PIEGES A RETENIR
+----------------------------
+- Le launcher compare les hashs : tout fichier modifié doit être dans
+  version_url.json avec son nouveau hash, sinon les joueurs ne le recevront pas.
+- Tout nouveau fichier .gd ajouté au jeu devrait être ajouté à la liste "files".
+  (Actuellement tout le jeu tient dans main.gd exprès pour simplifier l'update.)
+- Ne pas remettre de nœuds CSG : perf et style low-poly obligent (PrimitiveMesh
+  partagés via _mesh_cache / _mat_cache).
+- Le joueur et les objets sont posés via hauteur_terrain(x,z) : toute nouvelle
+  construction au sol doit utiliser cette fonction (zone plate sous TOWN_R).
+- Collisions bâtiments = liste "batiments" (AABB 2D manuelles), pas de physique.
+- gl_compatibility : pas de SDFGI/voxel ; ciel = ProceduralSkyMaterial OK.
+- Godot 4.7 : API GDScript 2.0 (typed, Signal.connect, queue_redraw,
+  ThemeDB.fallback_font, draw_style_box, MiniMesh non : MultiMesh).
+
+7) ETAT GIT / LIVRAISON
+-----------------------
+- Session Arena = branche arena/01a09a4d-librevies (commit + push faits).
+- Pour que les joueurs reçoivent la 0.3.0 : merger cette branche sur main
+  (PR ouverte depuis la branche de session).
+- Pas de test de rendu possible dans le sandbox Arena (pas de binaire Godot ni
+  de GL téléchargeable) : le code a été relu ligne à ligne pour l'API Godot 4.7
+  mais UN LANCEMENT REEL DU JEU RESTE A FAIRE par le dev pour validation visuelle.
+
+8) IDEES POUR LA SUITE
+----------------------
+- Ombres portées des nuages / variation heure du jour.
+- Intérieurs des bâtiments, vrais commerces (achat/vente).
+- Sauvegarde de partie (position, XP, quêtes) dans user://.
+- Sons/musique, particules de coup, anim d'attaque des ennemis.
+- Remplacer les Label3D noms de PNJ par des billboards texturés.
+================================================================================

@@ -10,18 +10,24 @@ if getattr(sys, 'frozen', False):
     GAME_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
-GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip"
+GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip"
 BANNER = os.path.join(GAME_DIR, "banniere_v1.png")
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "2.4.0"
-GAME_VERSION = "0.2.0"
+LAUNCHER_VERSION = "2.5.0"
+GAME_VERSION = "0.3.0"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
 ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
+    {"date": "13/09/2026", "t": "Version 0.3 — Rendu low-poly PrimitiveMesh",
+     "d": "Monde entier reconstruit en PrimitiveMesh (Box/Sphere/Cylinder/Prism/Capsule) : collines facettees, sapins, chateau, nuages. Fidèle à la capture de référence."},
+    {"date": "13/09/2026", "t": "Nouveau personnage + HUD complet",
+     "d": "Héros low-poly au marteau (remplace perso_voxel.glb), rats/araignées, dégâts flottants, mini-carte, quêtes, hotbar, barre d'XP."},
+    {"date": "13/09/2026", "t": "Migration Godot 4.7.2",
+     "d": "Projet et launcher migrés vers Godot 4.7.2-stable (dernière version)."},
     {"date": "31/07/2026", "t": "Auto-Update v2.0",
      "d": "Le launcher se met a jour automatiquement. Aucune action requise."},
     {"date": "31/07/2026", "t": "Version bump integre",
