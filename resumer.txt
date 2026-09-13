@@ -133,6 +133,14 @@ pour l'herbe/fleurs/rochers (perf).
 - gl_compatibility : pas de SDFGI/voxel ; ciel = ProceduralSkyMaterial OK.
 - Godot 4.7 : API GDScript 2.0 (typed, Signal.connect, queue_redraw,
   ThemeDB.fallback_font, draw_style_box, MiniMesh non : MultiMesh).
+- PIEGE GDScript TYPAGE (rencontré 13/09/2026) : "var x := <expr>" échoue en
+  compile ("Cannot infer the type") dès que l'expr contient un Variant
+  (valeur lue dans un Dictionary/Array non typé, ex. e.pv, f.t). Solutions
+  appliquées : annoter explicitement ("var x: float = ..."), typer les
+  tableaux ("var CHEMIN: Array[Vector2] = [...]"), ou typer les params
+  ("func _process(delta: float)"). Ne JAMAIS faire "var x := dict.champ".
+  Idem : "$Nom" renvoie un Node statiquement => typer ("var sun:
+  DirectionalLight3D = $DirectionalLight3D").
 
 7) ETAT GIT / LIVRAISON
 -----------------------

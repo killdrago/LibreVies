@@ -123,7 +123,7 @@ func _on_regen():
 # ============================================================
 # PROCESS
 # ============================================================
-func _process(delta):
+func _process(delta: float):
 	# Nuages qui dérivent
 	for n in nuages:
 		n.position.x += delta * 0.6
@@ -140,7 +140,7 @@ func _process(delta):
 		var f = floaters[i]
 		f.t += delta
 		f.node.position.y += delta * 1.6
-		var m := 1.0 - f.t / 1.0
+		var m: float = 1.0 - float(f.t)
 		if m <= 0.0:
 			f.node.queue_free()
 			floaters.remove_at(i)
@@ -151,7 +151,7 @@ func _process(delta):
 	for i in range(sparks.size() - 1, -1, -1):
 		var s = sparks[i]
 		s.t += delta
-		var k := s.t / 0.25
+		var k: float = float(s.t) / 0.25
 		if k >= 1.0:
 			s.node.queue_free()
 			sparks.remove_at(i)
@@ -342,7 +342,7 @@ func hauteur_terrain(x: float, z: float) -> float:
 	h += maxf(0.0, 10.0 - dc * 0.22)
 	return h * t
 
-var CHEMIN := [
+var CHEMIN: Array[Vector2] = [
 	Vector2(0, 30), Vector2(3, 18), Vector2(-2, 6), Vector2(1, -8),
 	Vector2(4, -20), Vector2(-1, -34), Vector2(1, -48), Vector2(3, -60), Vector2(0, -72),
 ]
@@ -498,8 +498,8 @@ func mesh_tris(tris: PackedVector3Array, cols: PackedColorArray) -> ArrayMesh:
 # Touffe d'herbe : 3 pointes
 func make_touffe() -> ArrayMesh:
 	var tris := PackedVector3Array()
-	var offs := [Vector3(0, 0, 0), Vector3(0.09, 0, 0.05), Vector3(-0.07, 0, 0.08)]
-	var hts := [0.42, 0.32, 0.28]
+	var offs: Array[Vector3] = [Vector3(0, 0, 0), Vector3(0.09, 0, 0.05), Vector3(-0.07, 0, 0.08)]
+	var hts: Array[float] = [0.42, 0.32, 0.28]
 	for k in range(3):
 		var o := offs[k]
 		var h := hts[k]
@@ -551,7 +551,7 @@ func creer_environnement():
 	get_viewport().world_3d.environment = env
 
 	# Soleil (le DirectionalLight3D de main.tscn)
-	var sun := $DirectionalLight3D
+	var sun: DirectionalLight3D = $DirectionalLight3D
 	sun.rotation = Vector3(deg_to_rad(-52), deg_to_rad(-32), 0)
 	sun.light_color = Color(1.0, 0.96, 0.88)
 	sun.light_energy = 1.25
@@ -697,7 +697,7 @@ func creer_ville():
 		# Fondations pierre
 		_box(Vector3(b.x, y + 0.1, b.z), Vector3(b.w + 0.25, 0.25, b.d + 0.25), PIERRE)
 		# Toit en prisme (pignon) + débords
-		var rh := b.d * 0.42
+		var rh: float = b.d * 0.42
 		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.5, rh, b.w + 0.5), b.roof, null, Vector3(0, deg_to_rad(90), 0))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
@@ -791,7 +791,7 @@ func creer_chateau():
 	_box(Vector3(1.6, 2.6, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
 	_box(Vector3(0, 4.6, 9), Vector3(4.0, 0.9, 2.0), Color(0.30, 0.18, 0.08), root)
 	# Tours d'angle + donjon
-	var tours := [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
+	var tours: Array[Vector3] = [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
 	for k in range(tours.size()):
 		var t := tours[k]
 		var hh := 9.0 if k < 4 else 12.0
@@ -1011,8 +1011,8 @@ func creer_ennemis():
 	]
 	for zone in zones:
 		for i in range(zone.n):
-			var x := zone.cx + randf_range(-8, 8)
-			var z := zone.cz + randf_range(-8, 8)
+			var x: float = zone.cx + randf_range(-8, 8)
+			var z: float = zone.cz + randf_range(-8, 8)
 			var root := Node3D.new()
 			root.position = Vector3(x, hauteur_terrain(x, z), z)
 			add_child(root)
@@ -1069,7 +1069,7 @@ func _construire_araignee(root: Node3D):
 	for cote in [-1, 1]:
 		for k in range(4):
 			var a := deg_to_rad(-50 + k * 33)
-			var hx := cos(a) * 0.35 * cote
+			var hx: float = cos(a) * 0.35 * cote
 			var hz := sin(a) * 0.35 - 0.1
 			var patte := Node3D.new()
 			patte.position = Vector3(hx * 0.6, 0.5, hz)
@@ -1078,7 +1078,7 @@ func _construire_araignee(root: Node3D):
 			_box(Vector3(0.28 * cote, 0.16, 0), Vector3(0.56, 0.05, 0.05), CORPS.darkened(0.1), patte, Vector3(0, 0, deg_to_rad(-30) * cote))
 			_box(Vector3(0.62 * cote, -0.12, 0), Vector3(0.5, 0.04, 0.04), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(40) * cote))
 
-func update_ennemis(delta):
+func update_ennemis(delta: float):
 	for e in enemies:
 		if not e.alive:
 			continue
@@ -1099,11 +1099,12 @@ func update_ennemis(delta):
 				var a := randf_range(0, TAU)
 				e.dir = Vector3(cos(a), 0, sin(a))
 		var spd: float = e.spd * (1.4 if dist < 10.0 else 0.6)
-		if e.dir.length() > 0.1:
-			var np := node.global_position + e.dir * spd * delta
+		var ndir: Vector3 = e.dir
+		if ndir.length() > 0.1:
+			var np := node.global_position + ndir * spd * delta
 			if abs(np.x) < WORLD - 3 and abs(np.z) < WORLD - 3:
 				node.global_position = np
-			var lk := node.global_position + e.dir
+			var lk := node.global_position + ndir
 			node.look_at(Vector3(lk.x, node.global_position.y, lk.z), Vector3.UP)
 		node.global_position.y = hauteur_terrain(node.global_position.x, node.global_position.z)
 		# Barre de vie orientée caméra + remplissage
@@ -1301,7 +1302,7 @@ class Portrait extends Control:
 		draw_arc(c, r - 0.5, 0, TAU, 40, Color(0.10, 0.08, 0.07), 2.0)
 
 class Pill extends Control:
-	var parent: Node = null
+	var parent = null
 	var kind := "or"
 	func _process(_d): queue_redraw()
 	func _draw():
@@ -1327,7 +1328,7 @@ class Pill extends Control:
 			HORIZONTAL_ALIGNMENT_LEFT, size.x - 42, 20, Color(1, 1, 1))
 
 class MiniMap extends Control:
-	var parent: Node = null
+	var parent = null
 	func _process(_d): queue_redraw()
 	func _draw():
 		if parent == null or parent.player_node == null: return
@@ -1359,7 +1360,7 @@ class MiniMap extends Control:
 			if p.length() > r - 6: continue
 			draw_circle(c + p, 2.5, Color(1.0, 0.82, 0.15))
 		# Joueur (flèche)
-		var fw := -parent.player_node.global_transform.basis.z
+		var fw: Vector3 = -parent.player_node.global_transform.basis.z
 		var d := Vector2(fw.x, fw.z).normalized()
 		var pp := Vector2(parent.player_node.global_position.x, parent.player_node.global_position.z) * sc
 		var per := Vector2(-d.y, d.x)
@@ -1371,7 +1372,7 @@ class MiniMap extends Control:
 		draw_arc(c, r - 3.5, 0, TAU, 48, Color(0.75, 0.62, 0.30), 1.5)
 
 class Hotbar extends Control:
-	var parent: Node = null
+	var parent = null
 	const S := 56.0
 	const GAP := 8.0
 	func _process(_d): queue_redraw()
@@ -1420,7 +1421,7 @@ class Hotbar extends Control:
 			draw_line(c + Vector2(-6, -5 + k * 5), c + Vector2(6, -5 + k * 5), Color(0.45, 0.40, 0.32), 1.5)
 
 class BarreXP extends Control:
-	var parent: Node = null
+	var parent = null
 	func _process(_d): queue_redraw()
 	func _draw():
 		var sb := StyleBoxFlat.new()
