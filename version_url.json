@@ -1,61 +1,48 @@
 {
-  "launcher_version": "2.6.0",
+  "launcher_version": "2.7.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Launcher 2.6.0 : images integrees (base64), plus aucune image requise sur disque.",
+  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Update par NUMEROS DE VERSION (2.7.0) : tout changement de fichier = +1 sur son numero ; nouveau fichier = nouvelle ligne a 0.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "522873f8ffe194c318af414142de0acd",
-      "size": 67262
+      "version": 0
     },
     "main.tscn": {
-      "hash": "0652db0411d434377ceff6c191db7c1e",
-      "size": 602
+      "version": 0
     },
     "project.godot": {
-      "hash": "6e8f0a9c2f35f391578b5315a940cfbd",
-      "size": 5211
+      "version": 0
     },
     "launcher.pyw": {
-      "hash": "59c74a07e45c9845b4edec9da41627ac",
-      "size": 628202
+      "version": 0
     },
     "build_launcher.bat": {
-      "hash": "4db739ba34ca09c06e428cf3e8c64b40",
-      "size": 1348
+      "version": 0
     },
     "glb/perso_voxel.glb": {
-      "hash": "90920d44158eb82b0a3676a23ab39475",
-      "size": 86628
+      "version": 0
     },
     "glb/perso_voxel 1.glb": {
-      "hash": "bb0902a2d4b4a2ee2f2386541a983869",
-      "size": 131872
+      "version": 0
     },
     "glb/perso_voxel 2.glb": {
-      "hash": "90b12d376eac910b1e5ab0a8c46b2f24",
-      "size": 144456
+      "version": 0
     },
     "glb/generer_perso_voxel.py": {
-      "hash": "ccf9fa9075578acc774a9a72a4fb9208",
-      "size": 9835
+      "version": 0
     },
     "glb/generer_tout.py": {
-      "hash": "d5647422d96a638ea52525948e7b48d1",
-      "size": 12720
+      "version": 0
     },
     "glb/viewer_perso.py": {
-      "hash": "a2fde4e3c1849d23678959f8eb5a84e5",
-      "size": 5264
+      "version": 0
     },
     "glb/_viewer.html": {
-      "hash": "7714b73b94cb015a535c78a327e2db52",
-      "size": 4020
+      "version": 0
     },
     "resumer.txt": {
-      "hash": "d357af13ee30be1fb0406ca874ac4686",
-      "size": 11651
+      "version": 0
     }
   }
 }

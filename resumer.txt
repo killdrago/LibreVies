@@ -23,19 +23,35 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
 3) FONCTIONNEMENT DE L'AUTO-UPDATE (IMPORTANT)
 ----------------------------------------------
 - launcher.pyw lit son version_url.json LOCAL, puis télécharge le
-  version_url.json DISTANT sur raw_url (branche main de GitHub).
-- Il compare le hash md5 LOCAL de chaque fichier listé ("files") au hash distant.
-  Texte (.gd,.tscn,.godot,.pyw,.py,.bat,.json,...) : md5 après normalisation
-  CRLF->LF. Binaires (png, glb, ico) : md5 brut. Si différent ou absent =>
-  téléchargement depuis raw_url/<fichier>.
+  version_url.json DISTANT sur raw_url (branche de travail ou main).
+- DEPUIS LA 2.7.0 (14/09/2026) : PLUS DE HASH MD5. Chaque fichier listé dans
+  "files" a un NUMERO ENTIER : ex. {"main.gd": {"version": 3}}. Le launcher
+  compare le numéro LOCAL (son version_url.json local) au numéro DISTANT :
+  différents, ou fichier absent sur disque => téléchargement depuis
+  raw_url/<fichier>. Après update, le version_url.json local est remplacé
+  par le distant (les numéros locaux deviennent ceux du distant).
+
+- !!! REGLE IMPERATIVE (décision du dev du 14/09/2026, À RESPECTER ABSOLUMENT) !!!
+  * TOUT changement dans un fichier listé (même une seule ligne) = +1 sur le
+    numéro "version" DE CE FICHIER dans version_url.json.
+  * TOUT NOUVEAU fichier utile au jeu = MISE EN PLACE de sa ligne dans
+    version_url.json, en commençant à {"version": 0}, puis +1 à chaque
+    changement suivant.
+  * TOUT fichier supprimé du jeu = sa ligne retirée de version_url.json.
+  * Sans ces incrémentations, le fichier ne sera PAS distribué aux joueurs.
+
 - launcher.pyw est volontairement ignoré par l'update (évite la boucle) :
-  c'est le launcher qui se met à jour lui-même.
-- DONC : à chaque modif de fichier du jeu, il FAUT regénérer version_url.json
-  (hashs + tailles) et merger sur main pour que les joueurs reçoivent la MAJ.
+  on le remplace à la main, ou via le .exe recompilé par build_launcher.bat.
+- Contrapartie acceptée du système à numéros (vs hashs) : une modif manuelle
+  d'un fichier SANS incrémenter son numéro est invisible pour le launcher,
+  et un fichier local corrompu n'est plus auto-réparé. Simple > robuste ici.
+- Migration : un ancien manifeste local (format hash) n'a pas de "version"
+  => considéré -1 => tous les fichiers sont retéléchargés une seule fois au
+  premier lancement en 2.7.0, puis tout rentre dans l'ordre.
 - FORMAT raw_url (piège déjà rencontré, 404) : une URL raw NE CONTIENT PAS
   "/tree/". Bon format : https://raw.githubusercontent.com/killdrago/LibreVies/<BRANCHE>
   (ex. branche de test : .../LibreVies/arena/01a09a4d-librevies ; prod : .../LibreVies/main).
-  Le launcher 2.5.1 a une fonction normalize_raw_url() qui répare toute seule
+  Le launcher 2.5.1+ a une fonction normalize_raw_url() qui répare tout seul
   les URLs copiées depuis le site (github.com/.../tree/BRANCHE ou
   raw.githubusercontent.com/.../tree/BRANCHE).
 - DEPUIS LA 2.5.1 : le manifeste distant (version_url.json sur GitHub) donne le
@@ -43,10 +59,6 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   CETTE branche (auto-référent) pour que les testeurs reçoivent la MAJ de la
   branche. APRÈS MERGE SUR main : vérifier que le raw_url du manifeste main est
   bien ".../LibreVies/main" (sinon les joueurs resteraient branchés sur la branche).
-- Script de regénération utilisé (à refaire à chaque MAJ) : parcourir la liste
-  "files" de version_url.json, recalculer md5/taille de chaque fichier présent
-  dans le repo, réécrire le json (indent=2, clés : launcher_version,
-  game_version, notes, game_url, raw_url, files{nom:{hash,size}}).
 
 4) CE QUI A ETE FAIT LE 13/09/2026 (grosse MAJ 0.3.0)
 -----------------------------------------------------

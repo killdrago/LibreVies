@@ -64,7 +64,7 @@ else:
 GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip"
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "2.6.0"
+LAUNCHER_VERSION = "2.7.0"
 GAME_VERSION = "0.3.0"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
@@ -72,6 +72,8 @@ ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
+    {"date": "14/09/2026", "t": "Launcher 2.7.0 — update par numeros de version",
+     "d": "Fini les hashs md5 : chaque fichier a un numero \"version\" dans version_url.json. Regle imperative : tout changement de fichier = +1 sur son numero ; tout nouveau fichier = nouvelle ligne a 0."},
     {"date": "14/09/2026", "t": "Launcher 2.6.0 — images integrees",
      "d": "Banniere, icone et ICO sont maintenant integres en base64 dans launcher.pyw : plus aucun fichier image n'est requis a cote du launcher. export_icon() pour le build exe."},
     {"date": "13/09/2026", "t": "Version 0.3 — Rendu low-poly PrimitiveMesh",
@@ -94,19 +96,6 @@ NEWS = [
 # ============================================================
 # OUTILS
 # ============================================================
-
-TEXT_EXTS = ('.gd', '.tscn', '.godot', '.pyw', '.py', '.bat', '.json',
-             '.cfg', '.txt', '.md', '.html', '.css', '.js', '.csv')
-
-def file_hash(path, normalize=False):
-    try:
-        with open(path, 'rb') as f:
-            data = f.read()
-        if normalize:
-            data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
-        return hashlib.md5(data).hexdigest()
-    except:
-        return None
 
 def load_local_config():
     if os.path.exists(CONFIG_PATH):
@@ -163,21 +152,23 @@ def check_for_updates(progress_cb):
     except Exception as e:
         return {"error": f"Pas de connexion: {e}", "modified": [], "remote_cfg": None}
 
+    local_files = local_cfg.get("files", {})
     remote_files = remote_cfg.get("files", {})
     modified = []
     for fname, info in remote_files.items():
         # Ne pas mettre a jour le launcher lui-meme (evite la boucle)
         if fname == "launcher.pyw":
             continue
-        is_text = fname.lower().endswith(TEXT_EXTS)
-        local_h = file_hash(os.path.join(GAME_DIR, fname), normalize=is_text)
-        if local_h is None:
+        remote_v = int(info.get("version", 0))
+        linfo = local_files.get(fname)
+        local_v = int(linfo.get("version", -1)) if isinstance(linfo, dict) else -1
+        if not os.path.exists(os.path.join(GAME_DIR, fname)):
             action = "NOUVEAU"
-        elif local_h != info["hash"]:
+        elif local_v != remote_v:
             action = "MODIFIE"
         else:
             continue
-        modified.append((fname, local_h, info["hash"], action))
+        modified.append((fname, local_v, remote_v, action))
 
     return {"error": None, "modified": modified, "remote_cfg": remote_cfg}
 
@@ -185,9 +176,9 @@ def check_for_updates(progress_cb):
 def apply_updates(modified, remote_cfg, progress_cb):
     raw_url = normalize_raw_url(remote_cfg.get("raw_url", ""))
     errors = []; downloaded = 0; total = len(modified)
-    for i, (fname, _, expected_hash, _) in enumerate(modified):
+    for i, (fname, local_v, remote_v, _) in enumerate(modified):
         pct = int(20 + (i / total) * 70)
-        progress_cb(pct, f"Telechargement ({i+1}/{total}): {fname}")
+        progress_cb(pct, f"Telechargement ({i+1}/{total}): {fname} (v{local_v} -> v{remote_v})")
         try:
             local_path = os.path.join(GAME_DIR, fname)
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
@@ -201,13 +192,7 @@ def apply_updates(modified, remote_cfg, progress_cb):
             if os.path.exists(local_path):
                 os.remove(local_path)
             os.rename(tmp, local_path)
-            # Vérifier que le hash correspond (normaliser les line endings pour les fichiers texte)
-            is_text = fname.lower().endswith(TEXT_EXTS)
-            actual_hash = file_hash(local_path, normalize=is_text)
-            if actual_hash == expected_hash:
-                downloaded += 1
-            else:
-                errors.append(f"{fname}: hash ne correspond pas apres telechargement")
+            downloaded += 1
         except Exception as e:
             errors.append(f"{fname}: {e}")
         time.sleep(0.05)
