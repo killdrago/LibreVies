@@ -14,8 +14,18 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b10"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b11"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
+const HAUT_COLLISION := 2.0  # hauteur "logique" des obstacles : saut max 1,6 m → infranchissables
+const ACTIONS_REGLABLES := ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "pickup", "camera_view", "inventaire", "options_menu"]
+const LIBELLES_TOUCHES := {
+	"move_forward": "Avancer", "move_back": "Reculer",
+	"move_left": "Gauche", "move_right": "Droite",
+	"jump": "Sauter", "sprint": "Courir",
+	"attack": "Attaquer", "pickup": "Ramasser",
+	"camera_view": "Vue 1ère/3ème pers.", "inventaire": "Inventaire",
+	"options_menu": "Menu options",
+}
 
 # VARIABLES JOUEUR
 var player_pv := PV_MAX
@@ -86,8 +96,15 @@ var batiments := []
 var colliders: Array[Dictionary] = []   # collisions statiques (bâtiments, props, clôture, rochers)
 var portes: Array[Dictionary] = []      # portails du village + leurs gardes
 var monde_env: Environment              # réglages luminosité / contraste / saturation
-var opt_lum := 50                       # 1..100
-var opt_con := 50                       # 1..100
+var chemin_lisse: Array[Vector2] = []   # courbe lissée de la route (Catmull-Rom)
+var opt_lum := 30                       # 1..100 (défaut demandé par le dev)
+var capture_action := ""                # action en cours de reconfiguration (Options > Contrôles)
+var touches_boutons := {}               # action -> Button
+var panneau_graph: VBoxContainer
+var panneau_ctrl: VBoxContainer
+var tab_graph: Button
+var tab_ctrl: Button
+var opt_con := 100                      # 1..100 (défaut demandé par le dev)
 var nuages := []
 var floaters := []
 var sparks := []
@@ -104,10 +121,13 @@ func _ready():
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	DisplayServer.window_set_title("LibreVie %s" % BUILD)
 
+	ajouter_actions_perso()
+	lisser_chemin()
 	load_config()
 
 	creer_environnement()
 	creer_terrain()
+	creer_route()
 	creer_ville()
 	creer_chateau()
 	creer_fontaine()
@@ -188,6 +208,9 @@ func _process(delta: float):
 	if Input.is_action_pressed("move_back"): move.z += 1
 	if Input.is_action_pressed("move_left"): move.x -= 1
 	if Input.is_action_pressed("move_right"): move.x += 1
+	# Pendant qu'on reconfigure une touche (Options), le héros ne bouge plus
+	if capture_action != "":
+		move = Vector3.ZERO
 
 	var is_moving: bool = move.length() > 0
 
@@ -206,7 +229,7 @@ func _process(delta: float):
 
 		if abs(new_pos.x) < WORLD - 2 and abs(new_pos.z) < WORLD - 2:
 			# Collisions universelles : bâtiments, clôture, props, rochers, arbres...
-			var res := resoudre_collisions(new_pos.x, new_pos.z, 0.45)
+			var res := resoudre_collisions(new_pos.x, new_pos.z, 0.45, player_node.global_position.y)
 			new_pos.x = res.x
 			new_pos.z = res.y
 			# Les monstres sont solides eux aussi (on ne passe plus au travers)
@@ -280,6 +303,38 @@ func _process(delta: float):
 # INPUT
 # ============================================================
 func _input(event):
+	# Capture d'une touche pour le réglage des contrôles (Options > Contrôles)
+	if capture_action != "":
+		if event is InputEventKey and event.pressed and not event.echo:
+			var kc: int = event.physical_keycode
+			if kc == 0:
+				kc = event.keycode
+			if kc != KEY_ESCAPE:
+				set_action_key(capture_action, kc)
+				save_config()
+			capture_action = ""
+			rafraichir_boutons_touches()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseButton and event.pressed:
+			var bi: int = event.button_index
+			if bi == MOUSE_BUTTON_LEFT or bi == MOUSE_BUTTON_RIGHT or bi == MOUSE_BUTTON_MIDDLE:
+				set_action_mouse(capture_action, bi)
+				capture_action = ""
+				rafraichir_boutons_touches()
+				save_config()
+				get_viewport().set_input_as_handled()
+				return
+		get_viewport().set_input_as_handled()
+		return
+
+	if event.is_action_pressed("camera_view"):
+		cam_mode = "first" if cam_mode == "third" else "third"
+	if event.is_action_pressed("options_menu"):
+		_toggle_options()
+	if event.is_action_pressed("inventaire"):
+		_toggle_inventory()
+
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			cam_drag = event.pressed
@@ -311,12 +366,6 @@ func _input(event):
 		ramasser()
 
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_V:
-			cam_mode = "first" if cam_mode == "third" else "third"
-		if event.keycode == KEY_O:
-			_toggle_options()
-		if event.keycode == KEY_I:
-			_toggle_inventory()
 		if event.keycode == KEY_R and player_dead:
 			renaitre()
 		if event.keycode == KEY_ESCAPE:
@@ -374,14 +423,124 @@ var CHEMIN: Array[Vector2] = [
 ]
 
 func dist_chemin(p: Vector2) -> float:
+	var pts: Array[Vector2] = chemin_lisse if chemin_lisse.size() > 2 else CHEMIN
 	var best := 1e9
-	for i in range(CHEMIN.size() - 1):
-		var a := CHEMIN[i]
-		var b := CHEMIN[i + 1]
+	for i in range(pts.size() - 1):
+		var a := pts[i]
+		var b := pts[i + 1]
 		var ab := b - a
 		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
 		best = minf(best, (p - (a + ab * t)).length())
 	return best
+
+# Courbe lissée de la route (Catmull-Rom) : fini les carrés, place aux courbes
+func lisser_chemin():
+	chemin_lisse.clear()
+	var pts := CHEMIN
+	var n := pts.size()
+	if n < 2:
+		return
+	for i in range(n - 1):
+		var p0: Vector2 = pts[maxi(i - 1, 0)]
+		var p1: Vector2 = pts[i]
+		var p2: Vector2 = pts[i + 1]
+		var p3: Vector2 = pts[mini(i + 2, n - 1)]
+		var seg := p1.distance_to(p2)
+		var steps := maxi(int(seg * 2.0), 4)
+		for k in range(steps):
+			var t := float(k) / float(steps)
+			var t2 := t * t
+			var t3 := t2 * t
+			var x := 0.5 * (2.0 * p1.x + (-p0.x + p2.x) * t + (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2 + (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3)
+			var y := 0.5 * (2.0 * p1.y + (-p0.y + p2.y) * t + (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 + (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3)
+			chemin_lisse.append(Vector2(x, y))
+	chemin_lisse.append(pts[n - 1])
+
+# Route en ruban courbe + pavés (remplace les carrés de couleur du terrain)
+func creer_route():
+	var n := chemin_lisse.size()
+	if n < 2:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var tangs: Array[Vector2] = []
+	var perps: Array[Vector2] = []
+	for i in range(n):
+		var tg := Vector2(1, 0)
+		if i == 0:
+			tg = chemin_lisse[1] - chemin_lisse[0]
+		elif i == n - 1:
+			tg = chemin_lisse[n - 1] - chemin_lisse[n - 2]
+		else:
+			tg = chemin_lisse[i + 1] - chemin_lisse[i - 1]
+		tg = tg.normalized()
+		tangs.append(tg)
+		perps.append(Vector2(-tg.y, tg.x))
+	# --- Ruban : bordures sombres + voie claire ---
+	var offs: Array[float] = [-2.85, -2.4, 2.4, 2.85]
+	var tris := PackedVector3Array()
+	var cols := PackedColorArray()
+	for i in range(n - 1):
+		for k in range(3):
+			var base := Color(0.40, 0.38, 0.35) if (k == 0 or k == 2) else Color(0.58, 0.55, 0.50)
+			var ca := base.lightened(rng.randf_range(-0.045, 0.045))
+			var cb := base.lightened(rng.randf_range(-0.045, 0.045))
+			var a0 := point_route(i, offs[k], perps[i])
+			var a1 := point_route(i, offs[k + 1], perps[i])
+			var b0 := point_route(i + 1, offs[k], perps[i + 1])
+			var b1 := point_route(i + 1, offs[k + 1], perps[i + 1])
+			tris.push_back(a0); cols.push_back(ca)
+			tris.push_back(b0); cols.push_back(cb)
+			tris.push_back(a1); cols.push_back(ca)
+			tris.push_back(b0); cols.push_back(cb)
+			tris.push_back(b1); cols.push_back(cb)
+			tris.push_back(a1); cols.push_back(ca)
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh_tris(tris, cols)
+	var mat_route := StandardMaterial3D.new()
+	mat_route.albedo_color = Color(1, 1, 1)
+	mat_route.roughness = 0.95
+	mat_route.vertex_color_use_as_albedo = true
+	mi.material_override = mat_route
+	add_child(mi)
+	# --- Pavés (petites pierres plates, 3 nuances) ---
+	var pave := CylinderMesh.new()
+	pave.top_radius = 0.30
+	pave.bottom_radius = 0.34
+	pave.height = 0.08
+	pave.radial_segments = 6
+	pave.rings = 1
+	var teintes := [Color(0.62, 0.59, 0.54), Color(0.53, 0.50, 0.46), Color(0.68, 0.65, 0.60)]
+	for ni in range(3):
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = pave
+		mm.instance_count = 340
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.material_override = mat_std(teintes[ni])
+		add_child(mmi)
+		for k in range(340):
+			var idx := rng.randi_range(0, n - 1)
+			var p: Vector2 = chemin_lisse[idx]
+			var perp: Vector2 = perps[idx]
+			var tang: Vector2 = tangs[idx]
+			var off := rng.randf_range(-2.05, 2.05)
+			var jit := rng.randf_range(-0.4, 0.4)
+			var x := p.x + perp.x * off + tang.x * jit
+			var z := p.y + perp.y * off + tang.y * jit
+			var s := rng.randf_range(0.7, 1.3)
+			var tr := Transform3D()
+			tr = tr.rotated(Vector3.UP, rng.randf_range(0, TAU))
+			tr = tr.scaled(Vector3(s, rng.randf_range(0.5, 1.0), s))
+			tr.origin = Vector3(x, hauteur_terrain(x, z) + 0.055, z)
+			mm.set_instance_transform(k, tr)
+
+func point_route(i: int, off: float, perp: Vector2) -> Vector3:
+	var p: Vector2 = chemin_lisse[i]
+	var x := p.x + perp.x * off
+	var z := p.y + perp.y * off
+	return Vector3(x, hauteur_terrain(x, z) + 0.04, z)
 
 # Le village de départ est PROTÉGÉ : clôture visuelle + zone interdite aux monstres
 func dans_village(x: float, z: float) -> bool:
@@ -397,13 +556,13 @@ func appliquer_reglages_visuels():
 # ============================================================
 # COLLISIONS UNIVERSELLES (b9) : plus rien ne se traverse
 # ============================================================
-func col_cercle(x: float, z: float, r: float):
-	colliders.append({"t": "c", "x": x, "z": z, "r": r, "g": r + 1.0})
+func col_cercle(x: float, z: float, r: float, h: float = HAUT_COLLISION):
+	colliders.append({"t": "c", "x": x, "z": z, "r": r, "g": r + 1.0, "h": h})
 
-func col_boite(x: float, z: float, w: float, d: float):
-	colliders.append({"t": "b", "x": x, "z": z, "w": w, "d": d, "g": maxf(w, d) * 0.5 + 1.0})
+func col_boite(x: float, z: float, w: float, d: float, h: float = HAUT_COLLISION):
+	colliders.append({"t": "b", "x": x, "z": z, "w": w, "d": d, "g": maxf(w, d) * 0.5 + 1.0, "h": h})
 
-func resoudre_collisions(px: float, pz: float, rayon: float) -> Vector2:
+func resoudre_collisions(px: float, pz: float, rayon: float, pieds: float = 0.0) -> Vector2:
 	var p := Vector2(px, pz)
 	for _passe in range(2):
 		for c in colliders:
@@ -411,6 +570,10 @@ func resoudre_collisions(px: float, pz: float, rayon: float) -> Vector2:
 			var cz: float = c.z
 			var g: float = c.g
 			if absf(p.x - cx) > g + rayon and absf(p.y - cz) > g + rayon:
+				continue
+			# Anti-saut : chaque obstacle a une hauteur logique (2 m par défaut)
+			# et le saut du héros culmine à 1,6 m → on ne passe PAR-DESSUS rien
+			if pieds > 0.0 and pieds > hauteur_terrain(cx, cz) + float(c.h):
 				continue
 			if c.t == "c":
 				var rr: float = float(c.r) + rayon
@@ -471,8 +634,6 @@ func creer_terrain():
 			col = col.lightened(clampf(cy * 0.03, 0.0, 0.18))
 			var v := rng.randf_range(-0.045, 0.045)
 			col = Color(col.r + v, col.g + v * 0.8, col.b + v * 0.5)
-			if dist_chemin(Vector2(cx, cz)) < 2.4:
-				col = Color(0.62, 0.50, 0.33).lightened(rng.randf_range(-0.04, 0.04))
 			tris.push_back(v00); cols.push_back(col)
 			tris.push_back(v10); cols.push_back(col)
 			tris.push_back(v11); cols.push_back(col)
@@ -937,11 +1098,21 @@ func creer_chateau():
 func creer_fontaine():
 	var y := hauteur_terrain(0, 0)
 	col_cercle(0, 0, 2.6)
+	# Bassin principal + eau
 	_cyl(Vector3(0, y + 0.45, 0), 2.5, 2.3, 0.9, Color(0.62, 0.61, 0.60), self, 12)
 	_cyl(Vector3(0, y + 0.85, 0), 2.1, 2.1, 0.25, Color(0.18, 0.58, 0.88), self, 12)
+	# Colonne centrale
 	_cyl(Vector3(0, y + 1.7, 0), 0.32, 0.26, 2.2, Color(0.66, 0.65, 0.64), self, 8)
-	_sph(Vector3(0, y + 2.9, 0), 0.42, Color(0.66, 0.65, 0.64), self)
-	_cyl(Vector3(0, y + 1.05, 0), 0.10, 0.16, 0.9, Color(0.55, 0.80, 0.95), self, 6)
+	# Vasque haute (la "boule en l'air" reposait sur la colonne — maintenant
+	# c'est une vraie vasque qui reçoit l'eau, avec l'orbe posé dedans)
+	_cyl(Vector3(0, y + 2.72, 0), 0.95, 0.5, 0.24, Color(0.66, 0.65, 0.64), self, 10)
+	_cyl(Vector3(0, y + 2.85, 0), 0.82, 0.82, 0.06, Color(0.30, 0.65, 0.90), self, 10)
+	# Orbe d'eau au sommet (joyau de la fontaine, légèrement lumineux)
+	_sph(Vector3(0, y + 3.18, 0), 0.34, Color(0.35, 0.72, 0.95), self, true)
+	# Quatre filets d'eau retombant de la vasque haute dans le bassin
+	for k in range(4):
+		var a := float(k) * TAU / 4.0 + 0.4
+		_cyl(Vector3(cos(a) * 0.78, y + 1.85, sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.55, 0.80, 0.95), self, 5)
 
 func creer_arbres():
 	var pins := [
@@ -981,19 +1152,8 @@ func creer_arbre_rond(x: float, z: float):
 	_facette(Vector3(0.6, 2.4, 0.4), Color(0.18, 0.50, 0.17), root, Vector3(1.4, 1.2, 1.4))
 
 func creer_props():
-	# Lampadaires / lanternes
-	for p in [[-3, 6], [3, 6], [-3, -6], [3, -6], [-10, 0], [10, 0], [0, 10], [0, -10]]:
-		var y := hauteur_terrain(p[0], p[1])
-		var root := Node3D.new()
-		root.position = Vector3(p[0], y, p[1])
-		add_child(root)
-		col_cercle(p[0], p[1], 0.25)
-		_box(Vector3(0, 0.05, 0), Vector3(0.5, 0.12, 0.5), Color(0.20, 0.20, 0.22), root)
-		_box(Vector3(0, 1.5, 0), Vector3(0.14, 3.0, 0.14), Color(0.16, 0.16, 0.18), root)
-		_box(Vector3(0, 3.05, 0), Vector3(0.5, 0.1, 0.1), Color(0.16, 0.16, 0.18), root)
-		var lan := _box(Vector3(0.22, 2.75, 0), Vector3(0.26, 0.4, 0.26), Color(1.0, 0.80, 0.30), root)
-		lan.material_override = mat_std(Color(1.0, 0.80, 0.30), false, true)
-		_cone(Vector3(0.22, 3.05, 0), 0.2, 0.25, Color(0.16, 0.16, 0.18), root, 4)
+	# Lampadaires alignés le long de la route du village (plus au milieu de la route !)
+	poser_lampadaires_route()
 	# Barils + caisses près de l'auberge et du supermarché
 	for p in [[8.2, 5.6], [8.7, 6.2], [-8.0, -3.6], [-8.6, -4.1], [12.4, 1.0]]:
 		var y := hauteur_terrain(p[0], p[1])
@@ -1018,6 +1178,47 @@ func creer_props():
 	creer_banniere(6.0, 8.0, Color(0.55, 0.16, 0.16))
 	creer_panneau(-4.0, 8.5)
 	creer_panneau(5.0, -8.5)
+
+# ============================================================
+# LAMPADAIRES LE LONG DE LA ROUTE DU VILLAGE
+# ============================================================
+func creer_lampadaire(x: float, z: float):
+	var y := hauteur_terrain(x, z)
+	var root := Node3D.new()
+	root.position = Vector3(x, y, z)
+	add_child(root)
+	col_cercle(x, z, 0.25)
+	_box(Vector3(0, 0.05, 0), Vector3(0.5, 0.12, 0.5), Color(0.20, 0.20, 0.22), root)
+	_box(Vector3(0, 1.5, 0), Vector3(0.14, 3.0, 0.14), Color(0.16, 0.16, 0.18), root)
+	_box(Vector3(0, 3.05, 0), Vector3(0.5, 0.1, 0.1), Color(0.16, 0.16, 0.18), root)
+	var lan := _box(Vector3(0.22, 2.75, 0), Vector3(0.26, 0.4, 0.26), Color(1.0, 0.80, 0.30), root)
+	lan.material_override = mat_std(Color(1.0, 0.80, 0.30), false, true)
+	_cone(Vector3(0.22, 3.05, 0), 0.2, 0.25, Color(0.16, 0.16, 0.18), root, 4)
+
+func poser_lampadaires_route():
+	var dist_accum := 0.0
+	var prochain := 6.0
+	var cote := 1.0
+	var n := chemin_lisse.size()
+	for i in range(n - 1):
+		var p: Vector2 = chemin_lisse[i]
+		dist_accum += p.distance_to(chemin_lisse[i + 1])
+		if p.length() > 24.0:
+			continue    # hors du village : pas de lampadaire
+		if dist_accum < prochain:
+			continue
+		prochain = dist_accum + 13.0
+		cote = -cote    # en alternance d'un côté puis de l'autre
+		var tang := (chemin_lisse[i + 1] - p).normalized()
+		var lx := p.x + (-tang.y) * 3.4 * cote
+		var lz := p.y + tang.x * 3.4 * cote
+		var pose := true
+		for b in batiments:
+			if absf(lx - float(b.x)) < float(b.w) * 0.5 + 1.0 and absf(lz - float(b.z)) < float(b.d) * 0.5 + 1.0:
+				pose = false
+				break
+		if pose:
+			creer_lampadaire(lx, lz)
 
 # ============================================================
 # CLÔTURE DU VILLAGE — enceinte complète + portails sur la route
@@ -1915,45 +2116,60 @@ func creer_hud():
 	opt_btn.pressed.connect(_toggle_options)
 	canvas.add_child(opt_btn)
 
-	# ===== Panel options =====
+	# ===== Panel options (onglets Graphique / Contrôles) =====
 	options_panel = PanelContainer.new()
-	options_panel.position = Vector2(440, 250)
-	options_panel.size = Vector2(400, 310)
+	options_panel.position = Vector2(330, 130)
+	options_panel.size = Vector2(620, 470)
 	options_panel.visible = false
 	var opt_style := StyleBoxFlat.new()
-	opt_style.bg_color = Color(0.1, 0.1, 0.1, 0.92)
+	opt_style.bg_color = Color(0.1, 0.1, 0.1, 0.94)
 	opt_style.set_corner_radius_all(10)
 	opt_style.border_width_bottom = 2; opt_style.border_width_top = 2
 	opt_style.border_width_left = 2; opt_style.border_width_right = 2
 	opt_style.border_color = Color(1, 0.86, 0.2)
 	options_panel.add_theme_stylebox_override("panel", opt_style)
 	canvas.add_child(options_panel)
-	var opt_vbox := VBoxContainer.new()
-	opt_vbox.position = Vector2(20, 20)
-	opt_vbox.size = Vector2(360, 270)
-	options_panel.add_child(opt_vbox)
+	var opt_root := VBoxContainer.new()
+	opt_root.position = Vector2(16, 12)
+	opt_root.size = Vector2(588, 446)
+	opt_root.add_theme_constant_override("separation", 8)
+	options_panel.add_child(opt_root)
 	var opt_title := Label.new()
 	opt_title.text = "OPTIONS"
 	opt_title.add_theme_font_size_override("font_size", 22)
 	opt_title.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
 	opt_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	opt_vbox.add_child(opt_title)
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 15)
-	opt_vbox.add_child(spacer)
-	invert_check = CheckBox.new()
-	invert_check.text = "Inverser axe Y de la camera (clic droit)"
-	invert_check.add_theme_font_size_override("font_size", 16)
-	invert_check.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	invert_check.button_pressed = cam_invert_y
-	invert_check.toggled.connect(func(pressed: bool): cam_invert_y = pressed; save_config())
-	opt_vbox.add_child(invert_check)
-	var spacer_visu := Control.new()
-	spacer_visu.custom_minimum_size = Vector2(0, 14)
-	opt_vbox.add_child(spacer_visu)
-	# --- Luminosité (1..100) ---
+	opt_root.add_child(opt_title)
+	var opt_hbox := HBoxContainer.new()
+	opt_hbox.add_theme_constant_override("separation", 14)
+	opt_root.add_child(opt_hbox)
+	# --- Onglets (colonne de gauche) ---
+	var tabs_vbox := VBoxContainer.new()
+	tabs_vbox.custom_minimum_size = Vector2(150, 0)
+	tabs_vbox.add_theme_constant_override("separation", 6)
+	opt_hbox.add_child(tabs_vbox)
+	tab_graph = Button.new()
+	tab_graph.text = "Graphique"
+	tab_graph.custom_minimum_size = Vector2(150, 40)
+	tabs_vbox.add_child(tab_graph)
+	tab_ctrl = Button.new()
+	tab_ctrl.text = "Contrôles"
+	tab_ctrl.custom_minimum_size = Vector2(150, 40)
+	tabs_vbox.add_child(tab_ctrl)
+	tab_graph.pressed.connect(func(): panneau_graph.visible = true; panneau_ctrl.visible = false)
+	tab_ctrl.pressed.connect(func(): panneau_graph.visible = false; panneau_ctrl.visible = true)
+	# --- Onglet GRAPHIQUE : luminosité + contraste ---
+	panneau_graph = VBoxContainer.new()
+	panneau_graph.custom_minimum_size = Vector2(404, 360)
+	panneau_graph.add_theme_constant_override("separation", 12)
+	opt_hbox.add_child(panneau_graph)
+	var g_title := Label.new()
+	g_title.text = "RÉGLAGES VISUELS"
+	g_title.add_theme_font_size_override("font_size", 16)
+	g_title.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+	panneau_graph.add_child(g_title)
 	var row_lum := HBoxContainer.new()
-	opt_vbox.add_child(row_lum)
+	panneau_graph.add_child(row_lum)
 	var lbl_l := Label.new()
 	lbl_l.text = "Luminosité"
 	lbl_l.add_theme_font_size_override("font_size", 15)
@@ -1965,7 +2181,7 @@ func creer_hud():
 	slider_lum.max_value = 100
 	slider_lum.step = 1
 	slider_lum.value = opt_lum
-	slider_lum.custom_minimum_size = Vector2(170, 22)
+	slider_lum.custom_minimum_size = Vector2(200, 22)
 	row_lum.add_child(slider_lum)
 	lbl_val_lum = Label.new()
 	lbl_val_lum.text = str(opt_lum)
@@ -1974,9 +2190,8 @@ func creer_hud():
 	lbl_val_lum.custom_minimum_size = Vector2(42, 0)
 	row_lum.add_child(lbl_val_lum)
 	slider_lum.value_changed.connect(func(v: float): opt_lum = int(v); lbl_val_lum.text = str(opt_lum); appliquer_reglages_visuels(); save_config())
-	# --- Contraste (1..100) ---
 	var row_con := HBoxContainer.new()
-	opt_vbox.add_child(row_con)
+	panneau_graph.add_child(row_con)
 	var lbl_c := Label.new()
 	lbl_c.text = "Contraste"
 	lbl_c.add_theme_font_size_override("font_size", 15)
@@ -1988,7 +2203,7 @@ func creer_hud():
 	slider_con.max_value = 100
 	slider_con.step = 1
 	slider_con.value = opt_con
-	slider_con.custom_minimum_size = Vector2(170, 22)
+	slider_con.custom_minimum_size = Vector2(200, 22)
 	row_con.add_child(slider_con)
 	lbl_val_con = Label.new()
 	lbl_val_con.text = str(opt_con)
@@ -1997,14 +2212,46 @@ func creer_hud():
 	lbl_val_con.custom_minimum_size = Vector2(42, 0)
 	row_con.add_child(lbl_val_con)
 	slider_con.value_changed.connect(func(v: float): opt_con = int(v); lbl_val_con.text = str(opt_con); appliquer_reglages_visuels(); save_config())
-	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 20)
-	opt_vbox.add_child(spacer2)
+	# --- Onglet CONTRÔLES : axe Y inversé + toutes les touches ---
+	panneau_ctrl = VBoxContainer.new()
+	panneau_ctrl.custom_minimum_size = Vector2(404, 360)
+	panneau_ctrl.add_theme_constant_override("separation", 3)
+	panneau_ctrl.visible = false
+	opt_hbox.add_child(panneau_ctrl)
+	invert_check = CheckBox.new()
+	invert_check.text = "Inverser axe Y de la caméra (clic droit)"
+	invert_check.add_theme_font_size_override("font_size", 15)
+	invert_check.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	invert_check.button_pressed = cam_invert_y
+	invert_check.toggled.connect(func(pressed: bool): cam_invert_y = pressed; save_config())
+	panneau_ctrl.add_child(invert_check)
+	panneau_ctrl.add_child(HSeparator.new())
+	var c_title := Label.new()
+	c_title.text = "Touches — clique sur un cadre puis appuie sur la touche voulue"
+	c_title.add_theme_font_size_override("font_size", 13)
+	c_title.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
+	panneau_ctrl.add_child(c_title)
+	for act in ACTIONS_REGLABLES:
+		var row := HBoxContainer.new()
+		panneau_ctrl.add_child(row)
+		var lbl := Label.new()
+		lbl.text = str(LIBELLES_TOUCHES[act])
+		lbl.add_theme_font_size_override("font_size", 14)
+		lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		lbl.custom_minimum_size = Vector2(185, 0)
+		row.add_child(lbl)
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(130, 25)
+		btn.text = texte_touche(act)
+		row.add_child(btn)
+		touches_boutons[act] = btn
+		btn.pressed.connect(func(): capture_action = act; rafraichir_boutons_touches())
+	# --- Fermer ---
 	var close_btn := Button.new()
 	close_btn.text = "Fermer"
-	close_btn.size = Vector2(100, 30)
+	close_btn.custom_minimum_size = Vector2(120, 32)
 	close_btn.pressed.connect(_toggle_options)
-	opt_vbox.add_child(close_btn)
+	opt_root.add_child(close_btn)
 
 	# ===== Panel inventaire =====
 	inv_panel = PanelContainer.new()
@@ -2091,11 +2338,75 @@ func _toggle_inventory():
 		inv_panel.visible = not inv_panel.visible
 		inv_open = inv_panel.visible
 
+# ============================================================
+# TOUCHES CONFIGURABLES (Options > Contrôles)
+# ============================================================
+func ajouter_actions_perso():
+	var defs := {"camera_view": KEY_V, "inventaire": KEY_I, "options_menu": KEY_O}
+	for a in defs:
+		var act := str(a)
+		if not InputMap.has_action(act):
+			InputMap.add_action(act)
+			var ev := InputEventKey.new()
+			ev.physical_keycode = int(defs[a])
+			InputMap.action_add_event(act, ev)
+
+func set_action_key(action: String, keycode: int):
+	InputMap.action_erase_events(action)
+	var ev := InputEventKey.new()
+	ev.physical_keycode = keycode
+	InputMap.action_add_event(action, ev)
+
+func set_action_mouse(action: String, button: int):
+	InputMap.action_erase_events(action)
+	var ev := InputEventMouseButton.new()
+	ev.button_index = button
+	InputMap.action_add_event(action, ev)
+
+func texte_touche(action: String) -> String:
+	var evs := InputMap.action_get_events(action)
+	for ev in evs:
+		if ev is InputEventKey:
+			var kc: int = ev.physical_keycode
+			if kc == 0:
+				kc = ev.keycode
+			if kc != 0:
+				return OS.get_keycode_string(kc)
+		if ev is InputEventMouseButton:
+			if ev.button_index == MOUSE_BUTTON_LEFT:
+				return "Clic gauche"
+			if ev.button_index == MOUSE_BUTTON_RIGHT:
+				return "Clic droit"
+			if ev.button_index == MOUSE_BUTTON_MIDDLE:
+				return "Clic milieu"
+	return "—"
+
+func rafraichir_boutons_touches():
+	for a in touches_boutons:
+		var btn: Button = touches_boutons[a]
+		if capture_action == str(a):
+			btn.text = "Appuie..."
+		else:
+			btn.text = texte_touche(str(a))
+
 func save_config():
 	var cfg := ConfigFile.new()
 	cfg.set_value("options", "cam_invert_y", cam_invert_y)
 	cfg.set_value("options", "luminosite", opt_lum)
 	cfg.set_value("options", "contraste", opt_con)
+	for a in ACTIONS_REGLABLES:
+		var evs := InputMap.action_get_events(a)
+		for ev in evs:
+			if ev is InputEventKey:
+				var kc: int = ev.physical_keycode
+				if kc == 0:
+					kc = ev.keycode
+				if kc != 0:
+					cfg.set_value("touches", a, kc)
+				break
+			if ev is InputEventMouseButton:
+				cfg.set_value("touches", a, -int(ev.button_index))
+				break
 	cfg.save(config_path)
 
 func load_config():
@@ -2104,11 +2415,18 @@ func load_config():
 		cam_invert_y = cfg.get_value("options", "cam_invert_y", false)
 		if is_instance_valid(invert_check):
 			invert_check.button_pressed = cam_invert_y
-		opt_lum = int(cfg.get_value("options", "luminosite", 50))
-		opt_con = int(cfg.get_value("options", "contraste", 50))
+		opt_lum = int(cfg.get_value("options", "luminosite", 30))
+		opt_con = int(cfg.get_value("options", "contraste", 100))
 		if is_instance_valid(slider_lum):
 			slider_lum.value = opt_lum
 			lbl_val_lum.text = str(opt_lum)
 		if is_instance_valid(slider_con):
 			slider_con.value = opt_con
 			lbl_val_con.text = str(opt_con)
+		for a in ACTIONS_REGLABLES:
+			if cfg.has_section_key("touches", a):
+				var v: int = int(cfg.get_value("touches", a, 0))
+				if v > 0:
+					set_action_key(a, v)
+				elif v < 0:
+					set_action_mouse(a, -v)

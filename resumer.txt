@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b10" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b11" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -182,6 +182,41 @@ pour l'herbe/fleurs/rochers (perf).
     opt_con initiaux + defaults dans load_config si besoin).
   * applying: appliquer_reglages_visuels() ; sauvegardé dans config.cfg
     (clés options/luminosite, options/contraste) via save_config/load_config.
+
+4d) MAJ DU 14/09/2026 (build b11)
+----------------------------------
+- MENU OPTIONS À ONGLETS (gauche) : "Graphique" (sliders Luminosité +
+  Contraste 1..100) et "Contrôles" (inversion axe Y + TOUTES les touches
+  configurables). Défauts demandés par le dev : LUMINOSITÉ 30, CONTRASTE 100
+  (var opt_lum/opt_con + defaults load_config).
+- TOUCHES CONFIGURABLES : const ACTIONS_REGLABLES (11 actions) +
+  LIBELLES_TOUCHES (libellés français). Cliquer un cadre puis appuyer une
+  touche (ou clic souris) = rebind via InputMap (capture dans _input, var
+  capture_action ; le héros est gelé pendant la capture ; ESC annule).
+  Sauvé dans config.cfg section [touches] (keycode > 0 = clavier,
+  < 0 = -button_index souris). Les anciennes touches codées en dur V/O/I
+  sont devenues les actions custom camera_view / options_menu / inventaire
+  (créées par ajouter_actions_perso() dans _ready AVANT load_config).
+  R/ESC/1-5 restent codés en dur (système).
+- ANTI-SAUT : le saut culmine à 1,6 m (vel 8, g 20) mais chaque collider a
+  une HAUTEUR LOGIQUE (const HAUT_COLLISION = 2.0) → impossible de sauter
+  par-dessus quoi que ce soit (clôture, caisses, barils...). resoudre_collisions
+  a un param pieds (y du joueur) : obstacle ignoré seulement si les pieds
+  sont au-dessus de hauteur_terrain(x,z) + h (jamais en pratique).
+- ROUTE EN COURBES (fini les carrés !) : lisser_chemin() génère chemin_lisse
+  (Catmull-Rom sur CHEMIN, ~2 points/m). dist_chemin() utilise la courbe.
+  Le terrain n'est PLUS coloré en carrés pour la route ; creer_route() pose
+  un RUBAN (3 bandes : bordures sombres + voie 4,8 m, vertex colors avec
+  jitter, material dédié vertex_color_use_as_albedo) + 1020 PAVÉS
+  (CylinderMesh plats, 3 MultiMesh de 340, nuances pierre).
+- LAMPADAIRES : plus au milieu de la route ! poser_lampadaires_route() les
+  aligne le long de la courbe dans le village (tous les ~13 m, en alternance
+  gauche/droite à 3,4 m de l'axe, évite les bâtiments). creer_lampadaire(x,z).
+- FONTAINE RÉNOVÉE : la "boule qui volait dans le vide" au centre du village
+  était l'ornement de la fontaine (sphère au sommet de la colonne). Ajout
+  d'une vasque haute + orbe d'eau lumineux posé dedans + 4 filets d'eau
+  retombant dans le bassin : on comprend maintenant que c'est une fontaine.
+- Piège GDScript re-vérifié : Vector2 = (x, y) JAMAIS de .z sur un Vector2.
 
 5) FICHIERS IMPORTANTS
 ----------------------

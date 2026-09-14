@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b10 : FIX parseur (Vector2 p.y) sur les collisions b9. b9 : collisions universelles, gardes des portails, message d'accueil retiré, couleurs adoucies + sliders Luminosité/Contraste (1-100). Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b11 : options à onglets (Graphique : luminosité 30 / contraste 100 par défaut ; Contrôles : toutes les touches configurables), anti-saut par-dessus les obstacles, route en courbes avec pavés, lampadaires le long de la route, fontaine rénovée. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "756209b61b0d38048f767885ae887894",
-      "size": 81615
+      "hash": "7c6f2c07595efc53ae6df845a4cbc501",
+      "size": 93898
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -54,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "d2c26c0f6c8cb53e7bf94469e633d632",
-      "size": 16948
+      "hash": "4854cca4c5398dca4bab2554208ca5b1",
+      "size": 19341
     }
   }
 }
