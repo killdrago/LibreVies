@@ -24,30 +24,28 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
 ----------------------------------------------
 - launcher.pyw lit son version_url.json LOCAL, puis télécharge le
   version_url.json DISTANT sur raw_url (branche de travail ou main).
-- DEPUIS LA 2.7.0 (14/09/2026) : PLUS DE HASH MD5. Chaque fichier listé dans
-  "files" a un NUMERO ENTIER : ex. {"main.gd": {"version": 3}}. Le launcher
-  compare le numéro LOCAL (son version_url.json local) au numéro DISTANT :
-  différents, ou fichier absent sur disque => téléchargement depuis
-  raw_url/<fichier>. Après update, le version_url.json local est remplacé
-  par le distant (les numéros locaux deviennent ceux du distant).
+- SYSTÈME = HASH MD5 par fichier (launcher 2.8.0). Une parenthèse "numéros de
+  version" (2.7.0) a été essayée puis ABANDONNÉE le 14/09/2026 à la demande du
+  dev : avec les numéros, un fichier corrompu n'était pas réparé. Le hash, si.
+  NE PAS revenir aux numéros.
+- Comparaison : hash md5 LOCAL du fichier sur disque (texte .gd,.tscn,.godot,
+  .pyw,.py,.bat,.json,... : md5 après normalisation CRLF->LF ; binaires png/glb/
+  ico : md5 brut) vs hash du manifeste distant. Différent ou fichier absent =>
+  téléchargement depuis raw_url/<fichier>, puis VÉRIFICATION du hash après
+  téléchargement (réparation des fichiers corrompus incluse).
+- Après update, le version_url.json local est remplacé par le distant.
 
-- !!! REGLE IMPERATIVE (décision du dev du 14/09/2026, À RESPECTER ABSOLUMENT) !!!
-  * TOUT changement dans un fichier listé (même une seule ligne) = +1 sur le
-    numéro "version" DE CE FICHIER dans version_url.json.
-  * TOUT NOUVEAU fichier utile au jeu = MISE EN PLACE de sa ligne dans
-    version_url.json, en commençant à {"version": 0}, puis +1 à chaque
-    changement suivant.
-  * TOUT fichier supprimé du jeu = sa ligne retirée de version_url.json.
-  * Sans ces incrémentations, le fichier ne sera PAS distribué aux joueurs.
+- !!! REGLE IMPERATIVE (décision du dev, À RESPECTER ABSOLUMENT) !!!
+  * TOUT changement dans un fichier listé (même une seule ligne) = NOUVEAU HASH
+    dans version_url.json (pour que la MAJ soit téléchargée).
+  * TOUT nouveau fichier utile au jeu = AJOUTER SA LIGNE dans version_url.json
+    ainsi que SON HASH.
+  * TOUT fichier supprimé = RETIRER SA LIGNE de version_url.json.
+  * Sans ça, la modification n'est PAS distribuée aux joueurs.
 
 - launcher.pyw est volontairement ignoré par l'update (évite la boucle) :
   on le remplace à la main, ou via le .exe recompilé par build_launcher.bat.
-- Contrapartie acceptée du système à numéros (vs hashs) : une modif manuelle
-  d'un fichier SANS incrémenter son numéro est invisible pour le launcher,
-  et un fichier local corrompu n'est plus auto-réparé. Simple > robuste ici.
-- Migration : un ancien manifeste local (format hash) n'a pas de "version"
-  => considéré -1 => tous les fichiers sont retéléchargés une seule fois au
-  premier lancement en 2.7.0, puis tout rentre dans l'ordre.
+  (Il est quand même listé avec son hash, pour info/vérification manuelle.)
 - FORMAT raw_url (piège déjà rencontré, 404) : une URL raw NE CONTIENT PAS
   "/tree/". Bon format : https://raw.githubusercontent.com/killdrago/LibreVies/<BRANCHE>
   (ex. branche de test : .../LibreVies/arena/01a09a4d-librevies ; prod : .../LibreVies/main).
@@ -59,6 +57,13 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   CETTE branche (auto-référent) pour que les testeurs reçoivent la MAJ de la
   branche. APRÈS MERGE SUR main : vérifier que le raw_url du manifeste main est
   bien ".../LibreVies/main" (sinon les joueurs resteraient branchés sur la branche).
+- Script de regénération utilisé (à refaire à chaque MAJ) : parcourir la liste
+  "files" de version_url.json, recalculer md5/taille de chaque fichier présent
+  dans le repo (texte = md5 après CRLF->LF), réécrire le json (indent=2, clés :
+  launcher_version, game_version, notes, game_url, raw_url, files{nom:{hash,size}}).
+- Migration 2.7.0->2.8.0 : un manifeste local au format "numéros" n'a pas de
+  clé "hash" => tous les fichiers sont retéléchargés UNE seule fois au premier
+  lancement en 2.8.0, puis le système à hashs reprend la main.
 
 4) CE QUI A ETE FAIT LE 13/09/2026 (grosse MAJ 0.3.0)
 -----------------------------------------------------
