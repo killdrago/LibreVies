@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b8"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b9"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 
 # VARIABLES JOUEUR
@@ -66,6 +66,10 @@ var inv_panel: PanelContainer
 var inv_open := false
 var options_panel: PanelContainer
 var invert_check: CheckBox
+var slider_lum: HSlider
+var slider_con: HSlider
+var lbl_val_lum: Label
+var lbl_val_con: Label
 var minimap: Control
 var hotbar: Control
 var barre_xp: Control
@@ -79,6 +83,11 @@ var enemies := []
 var cailloux_items := []
 var argent_items := []
 var batiments := []
+var colliders: Array[Dictionary] = []   # collisions statiques (bâtiments, props, clôture, rochers)
+var portes: Array[Dictionary] = []      # portails du village + leurs gardes
+var monde_env: Environment              # réglages luminosité / contraste / saturation
+var opt_lum := 50                       # 1..100
+var opt_con := 50                       # 1..100
 var nuages := []
 var floaters := []
 var sparks := []
@@ -118,7 +127,6 @@ func _ready():
 	timer.timeout.connect(_on_regen)
 	add_child(timer)
 
-	show_info("Bienvenue dans LibreVie ! (%s)" % BUILD)
 
 func _on_regen():
 	if not player_dead and player_pv < PV_MAX:
@@ -165,6 +173,7 @@ func _process(delta: float):
 
 	# --- IA ENNEMIS ---
 	update_ennemis(delta)
+	update_gardes(delta)
 
 	if player_dead:
 		return
@@ -195,14 +204,27 @@ func _process(delta: float):
 		var dir: Vector3 = (forward * -move.z + right * move.x).normalized()
 		var new_pos: Vector3 = player_node.global_position + dir * speed * delta
 
-		# Collisions bâtiments
-		var blocked: bool = false
-		for b in batiments:
-			if abs(new_pos.x - b.x) < b.w / 2 + 0.5 and abs(new_pos.z - b.z) < b.d / 2 + 0.5:
-				blocked = true
-				break
-
-		if not blocked and abs(new_pos.x) < WORLD - 2 and abs(new_pos.z) < WORLD - 2:
+		if abs(new_pos.x) < WORLD - 2 and abs(new_pos.z) < WORLD - 2:
+			# Collisions universelles : bâtiments, clôture, props, rochers, arbres...
+			var res := resoudre_collisions(new_pos.x, new_pos.z, 0.45)
+			new_pos.x = res.x
+			new_pos.z = res.y
+			# Les monstres sont solides eux aussi (on ne passe plus au travers)
+			for e in enemies:
+				if not e.alive:
+					continue
+				var en: Node3D = e.node
+				var dx: float = new_pos.x - en.global_position.x
+				var dz: float = new_pos.z - en.global_position.z
+				var rr := 0.95
+				var d2 := dx * dx + dz * dz
+				if d2 < rr * rr:
+					var d := sqrt(d2)
+					if d < 0.0001:
+						new_pos.x = en.global_position.x + rr
+					else:
+						new_pos.x = en.global_position.x + dx / d * rr
+						new_pos.z = en.global_position.z + dz / d * rr
 			player_node.global_position = new_pos
 
 		# Orientation
@@ -365,6 +387,65 @@ func dist_chemin(p: Vector2) -> float:
 func dans_village(x: float, z: float) -> bool:
 	return Vector2(x, z).length() < VILLAGE_R
 
+# Réglages visuels (Options) : 1..100 -> 0.51..1.5
+func appliquer_reglages_visuels():
+	if monde_env == null:
+		return
+	monde_env.adjustment_brightness = 0.5 + float(opt_lum) / 100.0
+	monde_env.adjustment_contrast = 0.5 + float(opt_con) / 100.0
+
+# ============================================================
+# COLLISIONS UNIVERSELLES (b9) : plus rien ne se traverse
+# ============================================================
+func col_cercle(x: float, z: float, r: float):
+	colliders.append({"t": "c", "x": x, "z": z, "r": r, "g": r + 1.0})
+
+func col_boite(x: float, z: float, w: float, d: float):
+	colliders.append({"t": "b", "x": x, "z": z, "w": w, "d": d, "g": maxf(w, d) * 0.5 + 1.0})
+
+func resoudre_collisions(px: float, pz: float, rayon: float) -> Vector2:
+	var p := Vector2(px, pz)
+	for _passe in range(2):
+		for c in colliders:
+			var cx: float = c.x
+			var cz: float = c.z
+			var g: float = c.g
+			if absf(p.x - cx) > g + rayon and absf(p.z - cz) > g + rayon:
+				continue
+			if c.t == "c":
+				var rr: float = float(c.r) + rayon
+				var dx: float = p.x - cx
+				var dz: float = p.z - cz
+				var d2 := dx * dx + dz * dz
+				if d2 < rr * rr:
+					var d := sqrt(d2)
+					if d < 0.0001:
+						p = Vector2(cx + rr, cz)
+					else:
+						p = Vector2(cx + dx / d * rr, cz + dz / d * rr)
+			else:
+				var hw: float = float(c.w) * 0.5 + rayon
+				var hd: float = float(c.d) * 0.5 + rayon
+				var dx2: float = p.x - cx
+				var dz2: float = p.z - cz
+				if absf(dx2) < hw and absf(dz2) < hd:
+					var ox: float = hw - absf(dx2)
+					var oz: float = hd - absf(dz2)
+					if ox < oz:
+						p.x = cx + (1.0 if dx2 >= 0.0 else -1.0) * hw
+					else:
+						p.z = cz + (1.0 if dz2 >= 0.0 else -1.0) * hd
+		# Clôture du village : anneau bloquant SAUF aux portails (route)
+		var dl := p.length()
+		if absf(dl - VILLAGE_R) < 0.4 + rayon and dist_chemin(p) > 3.4:
+			if dl < 0.001:
+				p = Vector2(VILLAGE_R + 0.4 + rayon, 0)
+			elif dl >= VILLAGE_R:
+				p = p / dl * (VILLAGE_R + 0.4 + rayon)
+			else:
+				p = p / dl * (VILLAGE_R - 0.4 - rayon)
+	return p
+
 func creer_terrain():
 	var N := 88
 	var pas := (WORLD * 2.0) / float(N)
@@ -497,6 +578,9 @@ func creer_terrain():
 			tr = tr.scaled(Vector3(s * rng4.randf_range(0.8, 1.3), s * 0.75, s))
 			tr.origin = Vector3(x, hauteur_terrain(x, z) + s * 0.18, z)
 			mm.set_instance_transform(k, tr)
+			# Collision, sauf si le rocher est posé sur la route
+			if dist_chemin(Vector2(x, z)) > 2.8:
+				col_cercle(x, z, 0.42 * s)
 
 # Maille facettée à partir de triangles (normales plates)
 func mesh_tris(tris: PackedVector3Array, cols: PackedColorArray) -> ArrayMesh:
@@ -562,6 +646,11 @@ func creer_environnement():
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 1.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	# Couleurs globales adoucies (saturation) + réglages luminosité/contraste
+	monde_env = env
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 0.85
+	appliquer_reglages_visuels()
 	get_viewport().world_3d.environment = env
 
 	# Soleil (le DirectionalLight3D de main.tscn)
@@ -746,6 +835,7 @@ func creer_ville():
 				_box(Vector3(b.x, y + 0.06 + step * 0.1, b.z + b.d / 2.0 + 0.6 + step * 0.35),
 					Vector3(b.w * 0.6, 0.12, 0.35), Color(0.60, 0.58, 0.55))
 		batiments.append({"x": b.x, "z": b.z, "w": b.w + 0.5, "d": b.d + 0.5})
+		col_boite(b.x, b.z, b.w + 0.5, b.d + 0.5)
 
 	# PNJ (villageois low-poly)
 	var pnj = [
@@ -759,6 +849,7 @@ func creer_ville():
 		var root := Node3D.new()
 		root.position = Vector3(d.x, y, d.z)
 		add_child(root)
+		col_cercle(d.x, d.z, 0.4)
 		_caps(Vector3(0, 0.55, 0), 0.19, 0.62, d.c, root)              # corps
 		_prism(Vector3(0, 0.28, 0), Vector3(0.44, 0.30, 0.44), d.c.darkened(0.15), root)  # jupe
 		_sph(Vector3(0, 1.02, 0), 0.17, Color(0.93, 0.78, 0.62), root) # tête
@@ -826,12 +917,26 @@ func creer_chateau():
 	# Fenêtres du donjon
 	for fx in [-2.5, 0.0, 2.5]:
 		_box(Vector3(fx, 7.5, -0.4), Vector3(0.8, 1.6, 0.3), Color(0.25, 0.30, 0.42), root)
+	# Collisions du château (coordonnées monde) — porte sud laissée passable
+	col_boite(0, -87, 32, 1.6)
+	col_boite(-16, -78, 1.6, 20)
+	col_boite(16, -78, 1.6, 20)
+	col_boite(-9.1, -69, 13.8, 1.6)
+	col_boite(9.1, -69, 13.8, 1.6)
+	col_cercle(-16, -87, 2.3)
+	col_cercle(16, -87, 2.3)
+	col_cercle(-16, -69, 2.3)
+	col_cercle(16, -69, 2.3)
+	col_cercle(-6, -82, 2.9)
+	col_cercle(6, -82, 2.9)
+	col_boite(0, -82, 9, 7)
 
 # ============================================================
 # FONTAINE / ARBRES / PROPS / NUAGE
 # ============================================================
 func creer_fontaine():
 	var y := hauteur_terrain(0, 0)
+	col_cercle(0, 0, 2.6)
 	_cyl(Vector3(0, y + 0.45, 0), 2.5, 2.3, 0.9, Color(0.62, 0.61, 0.60), self, 12)
 	_cyl(Vector3(0, y + 0.85, 0), 2.1, 2.1, 0.25, Color(0.18, 0.58, 0.88), self, 12)
 	_cyl(Vector3(0, y + 1.7, 0), 0.32, 0.26, 2.2, Color(0.66, 0.65, 0.64), self, 8)
@@ -854,6 +959,7 @@ func creer_arbres():
 
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
+	col_cercle(x, z, 0.4)
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -866,6 +972,7 @@ func creer_pin(x: float, z: float):
 
 func creer_arbre_rond(x: float, z: float):
 	var y := hauteur_terrain(x, z)
+	col_cercle(x, z, 0.45)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
@@ -880,6 +987,7 @@ func creer_props():
 		var root := Node3D.new()
 		root.position = Vector3(p[0], y, p[1])
 		add_child(root)
+		col_cercle(p[0], p[1], 0.25)
 		_box(Vector3(0, 0.05, 0), Vector3(0.5, 0.12, 0.5), Color(0.20, 0.20, 0.22), root)
 		_box(Vector3(0, 1.5, 0), Vector3(0.14, 3.0, 0.14), Color(0.16, 0.16, 0.18), root)
 		_box(Vector3(0, 3.05, 0), Vector3(0.5, 0.1, 0.1), Color(0.16, 0.16, 0.18), root)
@@ -891,16 +999,20 @@ func creer_props():
 		var y := hauteur_terrain(p[0], p[1])
 		_cyl(Vector3(p[0], y + 0.45, p[1]), 0.34, 0.30, 0.9, Color(0.55, 0.36, 0.18), self, 10)
 		_cyl(Vector3(p[0], y + 0.62, p[1]), 0.36, 0.36, 0.1, Color(0.30, 0.28, 0.28), self, 10)
+		col_cercle(p[0], p[1], 0.45)
 	for p in [[-12.6, -4.4], [12.6, 4.6], [-12.4, 4.8]]:
 		var y := hauteur_terrain(p[0], p[1])
 		_box(Vector3(p[0], y + 0.35, p[1]), Vector3(0.7, 0.7, 0.7), Color(0.62, 0.45, 0.24))
 		_box(Vector3(p[0], y + 0.36, p[1]), Vector3(0.72, 0.12, 0.72), Color(0.48, 0.34, 0.17))
+		col_boite(p[0], p[1], 0.8, 0.8)
 	# Clôtures le long des routes
 	for i in range(-6, 7):
 		if abs(i) < 2: continue
 		var y := hauteur_terrain(i * 2.4, 4.6)
 		_box(Vector3(i * 2.4, y + 0.45, 4.6), Vector3(0.1, 0.9, 0.1), Color(0.52, 0.36, 0.18))
 		_box(Vector3(i * 2.4, y + 0.7, 4.6), Vector3(2.4, 0.09, 0.07), Color(0.58, 0.41, 0.21))
+	col_boite(-9.6, 4.6, 12.0, 0.25)
+	col_boite(9.6, 4.6, 12.0, 0.25)
 	# Panneaux / bannières (comme le screen)
 	creer_banniere(-5.5, -3.0, Color(0.16, 0.30, 0.62))
 	creer_banniere(6.0, 8.0, Color(0.55, 0.16, 0.16))
@@ -971,12 +1083,51 @@ func creer_cloture_village():
 		var lan := _box(Vector3(mx2, my2 + 2.36, mz2), Vector3(0.24, 0.34, 0.24), Color(1.0, 0.80, 0.30))
 		lan.material_override = mat_std(Color(1.0, 0.80, 0.30), false, true)
 		_cone(Vector3(mx2, my2 + 2.60, mz2), 0.19, 0.22, Color(0.16, 0.16, 0.18), null, 4)
+		# Garde posté à côté du portail (côté village)
+		var gx2 := cos(a0) * VILLAGE_R * 0.90
+		var gz2 := sin(a0) * VILLAGE_R * 0.90
+		var garde := creer_garde(gx2, gz2)
+		portes.append({"x": mx2, "z": mz2, "garde": garde, "cd": 0.0})
+
+# ============================================================
+# GARDE DU VILLAGE (low-poly, hallebarde) — protège les portails
+# ============================================================
+func creer_garde(x: float, z: float) -> Node3D:
+	var y := hauteur_terrain(x, z)
+	var root := Node3D.new()
+	root.position = Vector3(x, y, z)
+	add_child(root)
+	var ACIER := Color(0.45, 0.50, 0.58)
+	var TUNIQUE := Color(0.20, 0.32, 0.55)
+	_caps(Vector3(0, 0.62, 0), 0.21, 0.7, TUNIQUE, root)                            # corps
+	_prism(Vector3(0, 0.30, 0), Vector3(0.48, 0.32, 0.48), ACIER.darkened(0.2), root)  # jupe d'armure
+	_sph(Vector3(0, 1.12, 0), 0.17, Color(0.93, 0.78, 0.62), root)                  # tête
+	_cone(Vector3(0, 1.28, 0), 0.20, 0.26, ACIER, root, 8)                          # casque
+	_box(Vector3(0, 1.16, 0.02), Vector3(0.36, 0.06, 0.38), ACIER, root)            # bord du casque
+	_caps(Vector3(-0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)       # bras
+	_caps(Vector3(0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)
+	_cyl(Vector3(0.38, 1.0, 0), 0.035, 0.03, 2.2, Color(0.42, 0.28, 0.14), root, 6) # hallebarde
+	_box(Vector3(0.38, 2.0, 0), Vector3(0.08, 0.42, 0.16), Color(0.75, 0.77, 0.80), root)
+	_cone(Vector3(0.38, 2.3, 0), 0.07, 0.24, Color(0.80, 0.82, 0.85), root, 6)
+	var label := Label3D.new()
+	label.text = "Garde"
+	label.position = Vector3(0, 1.75, 0)
+	label.font_size = 20
+	label.pixel_size = 0.005
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = Color(0.7, 0.85, 1, 1)
+	label.outline_size = 8
+	label.outline_modulate = Color(0.1, 0.1, 0.1, 0.9)
+	root.add_child(label)
+	col_cercle(x, z, 0.4)
+	return root
 
 func creer_banniere(x: float, z: float, col: Color):
 	var y := hauteur_terrain(x, z)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
+	col_cercle(x, z, 0.22)
 	_box(Vector3(0, 1.6, 0), Vector3(0.16, 3.2, 0.16), Color(0.40, 0.27, 0.13), root)
 	_box(Vector3(0, 3.15, 0), Vector3(1.5, 0.14, 0.14), Color(0.40, 0.27, 0.13), root)
 	_box(Vector3(0, 2.35, 0.02), Vector3(1.1, 1.5, 0.06), col, root)
@@ -990,6 +1141,7 @@ func creer_panneau(x: float, z: float):
 	root.position = Vector3(x, y, z)
 	root.rotation.y = randf_range(0, TAU)
 	add_child(root)
+	col_cercle(x, z, 0.18)
 	_box(Vector3(0, 0.9, 0), Vector3(0.12, 1.8, 0.12), Color(0.42, 0.28, 0.14), root)
 	_box(Vector3(0, 1.7, 0), Vector3(1.3, 0.5, 0.08), Color(0.62, 0.45, 0.24), root)
 	_box(Vector3(0.2, 1.35, 0), Vector3(1.0, 0.4, 0.08), Color(0.55, 0.39, 0.20), root, Vector3(0, 0, deg_to_rad(20)))
@@ -1206,7 +1358,10 @@ func update_ennemis(delta: float):
 				# Village protégé : la bébête longe la clôture sans jamais entrer
 				e.t_wander = minf(float(e.t_wander), 0.4)
 			elif abs(np.x) < WORLD - 3 and abs(np.z) < WORLD - 3:
-				node.global_position = np
+				# Les monstres ne traversent plus rien non plus
+				var res := resoudre_collisions(np.x, np.z, 0.35)
+				node.global_position.x = res.x
+				node.global_position.z = res.y
 			var lk := node.global_position + ndir
 			node.look_at(Vector3(lk.x, node.global_position.y, lk.z), Vector3.UP)
 		node.global_position.y = hauteur_terrain(node.global_position.x, node.global_position.z)
@@ -1227,6 +1382,43 @@ func update_ennemis(delta: float):
 			spawn_floater(pp + Vector3(0, 1.8, 0), "-6", Color(1, 0.3, 0.2))
 			if player_pv <= 0:
 				mourir()
+
+# ============================================================
+# GARDES DES PORTAILS : toute bébête à moins de 2 m de la porte
+# se fait attaquer (25 dégâts / 0,8 s) jusqu'à mort.
+# ============================================================
+func update_gardes(delta: float):
+	for p in portes:
+		p.cd = float(p.cd) - delta
+		if float(p.cd) > 0.0:
+			continue
+		var gx: float = p.x
+		var gz: float = p.z
+		var cible = null
+		for e in enemies:
+			if not e.alive:
+				continue
+			var en: Node3D = e.node
+			var dq := Vector2(en.global_position.x - gx, en.global_position.z - gz)
+			if dq.length() < 2.0:
+				cible = e
+				break
+		if cible == null:
+			continue
+		p.cd = 0.8
+		var monstre: Node3D = cible.node
+		if is_instance_valid(p.garde):
+			var gd: Node3D = p.garde
+			if Vector2(monstre.global_position.x - gd.global_position.x, monstre.global_position.z - gd.global_position.z).length() > 0.05:
+				gd.look_at(Vector3(monstre.global_position.x, gd.global_position.y, monstre.global_position.z), Vector3.UP)
+		cible.pv = int(cible.pv) - 25
+		spawn_floater(monstre.global_position + Vector3(0, 1.3, 0), "-25", Color(1, 0.85, 0.3))
+		spawn_spark(monstre.global_position + Vector3(0, 0.6, 0))
+		if int(cible.pv) <= 0:
+			cible.alive = false
+			monstre.visible = false
+			show_info("Un garde du village a repoussé %s !" % cible.name)
+			get_tree().create_timer(10.0).timeout.connect(_respawn_enemy.bind(cible))
 
 func mourir():
 	player_pv = 0
@@ -1726,7 +1918,7 @@ func creer_hud():
 	# ===== Panel options =====
 	options_panel = PanelContainer.new()
 	options_panel.position = Vector2(440, 250)
-	options_panel.size = Vector2(400, 200)
+	options_panel.size = Vector2(400, 310)
 	options_panel.visible = false
 	var opt_style := StyleBoxFlat.new()
 	opt_style.bg_color = Color(0.1, 0.1, 0.1, 0.92)
@@ -1738,7 +1930,7 @@ func creer_hud():
 	canvas.add_child(options_panel)
 	var opt_vbox := VBoxContainer.new()
 	opt_vbox.position = Vector2(20, 20)
-	opt_vbox.size = Vector2(360, 160)
+	opt_vbox.size = Vector2(360, 270)
 	options_panel.add_child(opt_vbox)
 	var opt_title := Label.new()
 	opt_title.text = "OPTIONS"
@@ -1756,6 +1948,55 @@ func creer_hud():
 	invert_check.button_pressed = cam_invert_y
 	invert_check.toggled.connect(func(pressed: bool): cam_invert_y = pressed; save_config())
 	opt_vbox.add_child(invert_check)
+	var spacer_visu := Control.new()
+	spacer_visu.custom_minimum_size = Vector2(0, 14)
+	opt_vbox.add_child(spacer_visu)
+	# --- Luminosité (1..100) ---
+	var row_lum := HBoxContainer.new()
+	opt_vbox.add_child(row_lum)
+	var lbl_l := Label.new()
+	lbl_l.text = "Luminosité"
+	lbl_l.add_theme_font_size_override("font_size", 15)
+	lbl_l.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	lbl_l.custom_minimum_size = Vector2(110, 0)
+	row_lum.add_child(lbl_l)
+	slider_lum = HSlider.new()
+	slider_lum.min_value = 1
+	slider_lum.max_value = 100
+	slider_lum.step = 1
+	slider_lum.value = opt_lum
+	slider_lum.custom_minimum_size = Vector2(170, 22)
+	row_lum.add_child(slider_lum)
+	lbl_val_lum = Label.new()
+	lbl_val_lum.text = str(opt_lum)
+	lbl_val_lum.add_theme_font_size_override("font_size", 15)
+	lbl_val_lum.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
+	lbl_val_lum.custom_minimum_size = Vector2(42, 0)
+	row_lum.add_child(lbl_val_lum)
+	slider_lum.value_changed.connect(func(v: float): opt_lum = int(v); lbl_val_lum.text = str(opt_lum); appliquer_reglages_visuels(); save_config())
+	# --- Contraste (1..100) ---
+	var row_con := HBoxContainer.new()
+	opt_vbox.add_child(row_con)
+	var lbl_c := Label.new()
+	lbl_c.text = "Contraste"
+	lbl_c.add_theme_font_size_override("font_size", 15)
+	lbl_c.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	lbl_c.custom_minimum_size = Vector2(110, 0)
+	row_con.add_child(lbl_c)
+	slider_con = HSlider.new()
+	slider_con.min_value = 1
+	slider_con.max_value = 100
+	slider_con.step = 1
+	slider_con.value = opt_con
+	slider_con.custom_minimum_size = Vector2(170, 22)
+	row_con.add_child(slider_con)
+	lbl_val_con = Label.new()
+	lbl_val_con.text = str(opt_con)
+	lbl_val_con.add_theme_font_size_override("font_size", 15)
+	lbl_val_con.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
+	lbl_val_con.custom_minimum_size = Vector2(42, 0)
+	row_con.add_child(lbl_val_con)
+	slider_con.value_changed.connect(func(v: float): opt_con = int(v); lbl_val_con.text = str(opt_con); appliquer_reglages_visuels(); save_config())
 	var spacer2 := Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 20)
 	opt_vbox.add_child(spacer2)
@@ -1853,6 +2094,8 @@ func _toggle_inventory():
 func save_config():
 	var cfg := ConfigFile.new()
 	cfg.set_value("options", "cam_invert_y", cam_invert_y)
+	cfg.set_value("options", "luminosite", opt_lum)
+	cfg.set_value("options", "contraste", opt_con)
 	cfg.save(config_path)
 
 func load_config():
@@ -1861,3 +2104,11 @@ func load_config():
 		cam_invert_y = cfg.get_value("options", "cam_invert_y", false)
 		if is_instance_valid(invert_check):
 			invert_check.button_pressed = cam_invert_y
+		opt_lum = int(cfg.get_value("options", "luminosite", 50))
+		opt_con = int(cfg.get_value("options", "contraste", 50))
+		if is_instance_valid(slider_lum):
+			slider_lum.value = opt_lum
+			lbl_val_lum.text = str(opt_lum)
+		if is_instance_valid(slider_con):
+			slider_con.value = opt_con
+			lbl_val_con.text = str(opt_con)

@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b8 : le village de depart est PROTEGE (cloture + portails, monstres interdits d'entree). Launcher 2.8.0 : systeme de hashs md5. Regle imperative : tout changement de fichier = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retiree.",
+  "notes": "MAJ 0.3.0-b9 : collisions universelles (bâtiments/props/clôture/monstres), gardes des portails (tuent les monstres à moins de 2 m), message d'accueil retiré, couleurs adoucies + sliders Luminosité/Contraste (1-100) dans Options. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "5479d6ec6da5cd9d007f718ccc3376f9",
-      "size": 71581
+      "hash": "4cc84215d29d81d1a0ecef3dd576adae",
+      "size": 81614
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -54,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "1ef1c2d64c4ade2c943627c8e0b93826",
-      "size": 14252
+      "hash": "fa849808da4ac5ef784f1d9e52de057d",
+      "size": 16727
     }
   }
 }

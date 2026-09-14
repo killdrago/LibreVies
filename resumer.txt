@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b8" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b9" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -143,6 +143,42 @@ pour l'herbe/fleurs/rochers (perf).
     c'est une barrière logique pour les monstres uniquement).
   * Rochers scatterés évités l'anneau de clôture (push radial), pin [0,26]
     déplacé en [5,29] (il était pile sur le portail sud).
+
+4c) MAJ DU 14/09/2026 (build b9)
+---------------------------------
+- COLLISIONS UNIVERSELLES (demande du dev : "c'est pas normal de passer au
+  travers des objets"). Système maison 2D (X/Z), sans moteur physique :
+  * var colliders: Array[Dictionary] — entrées {"t":"c",x,z,r,g} (cercles) ou
+    {"t":"b",x,z,w,d,g} (boîtes) ; helpers col_cercle()/col_boite().
+  * resoudre_collisions(px,pz,rayon) -> Vector2 : 2 passes de push-out +
+    early-out par "g" (demi-diagonale). Gère AUSSI l'anneau de clôture du
+    village (bloquant partout SAUF où dist_chemin < 3.4 = portails).
+  * Joueur : rayon 0.45, appliqué dans _process (remplace l'ancien check
+    "blocked" sur batiments). Les MONSTRES sont solides pour le joueur
+    (push-out rayon 0.95) et résolvent aussi les collisions statiques (0.35).
+  * Colliders posés : bâtiments, PNJ, château (murs+tours+donjon, porte sud
+    passable), fontaine, pins, arbres ronds, lampadaires, barils, caisses,
+    clôtures de route, bannières, panneaux, rochers scatterés (sauf si sur
+    la route : dist_chemin > 2.8), gardes.
+- GARDES DES PORTAILS (demande du dev) : un garde low-poly à hallebarde
+  (creer_garde()) posté côté village à chaque portail (var portes). Si un
+  monstre vivant approche à MOINS DE 2 m du point milieu du portail :
+  le garde l'attaque (25 dégâts toutes les 0,8 s, floater doré + étincelles,
+  look_at du monstre) jusqu'à le tuer ; respawn normal 10 s ; PAS d'XP/argent
+  pour le joueur (c'est le garde qui tue). Logique dans update_gardes(delta),
+  appelée juste après update_ennemis dans _process.
+- MESSAGE D'ACCUEIL RETIRÉ (demande du dev) : plus de show_info "Bienvenue"
+  au lancement. Le témoin BUILD reste dans le TITRE DE FENÊTRE uniquement.
+- COULEURS ADOUCIES + RÉGLAGES VISUELS (demande du dev : couleurs "trop
+  fortes") : dans creer_environnement(), env.adjustment_enabled = true avec
+  adjustment_saturation = 0.85 par défaut (adoucit tout le jeu), plus
+  adjustment_brightness/contrast pilotés par le MENU OPTIONS :
+  * Deux HSlider 1..100 ("Luminosité", "Contraste") avec valeur affichée,
+    mapping 0.5 + v/100 (50 = neutre 1.0). Défauts actuels : 50/50.
+    => LE DEV DOIT DONNER SES VALEURS PAR DÉFAUT après test (changer opt_lum/
+    opt_con initiaux + defaults dans load_config si besoin).
+  * applying: appliquer_reglages_visuels() ; sauvegardé dans config.cfg
+    (clés options/luminosite, options/contraste) via save_config/load_config.
 
 5) FICHIERS IMPORTANTS
 ----------------------
