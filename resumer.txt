@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b9" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b10" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -146,6 +146,9 @@ pour l'herbe/fleurs/rochers (perf).
 
 4c) MAJ DU 14/09/2026 (build b9)
 ---------------------------------
+- b10 : FIX erreur parseur b9 — dans resoudre_collisions(), le point est un
+  Vector2 : ne JAMAIS écrire p.z sur un Vector2 (c'est p.y). Erreur réelle
+  rencontrée : "Cannot find member z in base Vector2" (413,54).
 - COLLISIONS UNIVERSELLES (demande du dev : "c'est pas normal de passer au
   travers des objets"). Système maison 2D (X/Z), sans moteur physique :
   * var colliders: Array[Dictionary] — entrées {"t":"c",x,z,r,g} (cercles) ou

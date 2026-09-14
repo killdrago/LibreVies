@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b9"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b10"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 
 # VARIABLES JOUEUR
@@ -410,12 +410,12 @@ func resoudre_collisions(px: float, pz: float, rayon: float) -> Vector2:
 			var cx: float = c.x
 			var cz: float = c.z
 			var g: float = c.g
-			if absf(p.x - cx) > g + rayon and absf(p.z - cz) > g + rayon:
+			if absf(p.x - cx) > g + rayon and absf(p.y - cz) > g + rayon:
 				continue
 			if c.t == "c":
 				var rr: float = float(c.r) + rayon
 				var dx: float = p.x - cx
-				var dz: float = p.z - cz
+				var dz: float = p.y - cz
 				var d2 := dx * dx + dz * dz
 				if d2 < rr * rr:
 					var d := sqrt(d2)
@@ -427,14 +427,14 @@ func resoudre_collisions(px: float, pz: float, rayon: float) -> Vector2:
 				var hw: float = float(c.w) * 0.5 + rayon
 				var hd: float = float(c.d) * 0.5 + rayon
 				var dx2: float = p.x - cx
-				var dz2: float = p.z - cz
+				var dz2: float = p.y - cz
 				if absf(dx2) < hw and absf(dz2) < hd:
 					var ox: float = hw - absf(dx2)
 					var oz: float = hd - absf(dz2)
 					if ox < oz:
 						p.x = cx + (1.0 if dx2 >= 0.0 else -1.0) * hw
 					else:
-						p.z = cz + (1.0 if dz2 >= 0.0 else -1.0) * hd
+						p.y = cz + (1.0 if dz2 >= 0.0 else -1.0) * hd
 		# Clôture du village : anneau bloquant SAUF aux portails (route)
 		var dl := p.length()
 		if absf(dl - VILLAGE_R) < 0.4 + rayon and dist_chemin(p) > 3.4:
