@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b11" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b12" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -217,6 +217,43 @@ pour l'herbe/fleurs/rochers (perf).
   d'une vasque haute + orbe d'eau lumineux posé dedans + 4 filets d'eau
   retombant dans le bassin : on comprend maintenant que c'est une fontaine.
 - Piège GDScript re-vérifié : Vector2 = (x, y) JAMAIS de .z sur un Vector2.
+
+4e) MAJ DU 14/09/2026 (build b12)
+----------------------------------
+- SAUT RÉALISTE (le dev a corrigé ma lecture de b11 : il VOULAIT pouvoir
+  sauter par-dessus ce qui est plus bas que le saut) :
+  * Chaque collider a sa HAUTEUR RÉELLE (caisse 0.75, baril 0.95, clôture
+    route 0.85, clôture village HAUT_CLOTURE=1.0, fontaine 0.95, rocher
+    0.45*s+0.2, PNJ/garde 1.8, lampadaire 3.0, pin/arbre 2.2, maison = sa
+    hauteur b.h, château 5/9/12). Saut du héros = 1,6 m max : tout ce qui
+    est < 1,6 se franchit en sautant, le reste bloque.
+  * PERCHAGE : hauteur_support(x,z,pieds) renvoie le sol le plus haut sous
+    le héros (terrain OU sommet d'un objet sous ses pieds, tolérance 0,25).
+    Gravité : on se pose seulement en RETOMBANT (vel_y <= 0) → on peut
+    rester perché sur les caisses/barils/rochers/muret de la fontaine.
+  * Epsilon 0,05 dans resoudre_collisions : debout SUR un objet, il ne
+    pousse plus vers l'extérieur.
+  * Monstres : pieds = 0 par défaut → ne sautent rien, ne franchissent
+    JAMAIS la clôture du village (protection intacte). Le héros en montée
+    de saut passe au-dessus d'un monstre (skip si pieds > 1,0 au-dessus).
+- URBANISME DU VILLAGE :
+  * MAIRIE (toit bleu) DÉCALÉE de (0,-15) à (-9,-20) : elle était À CHEVAL
+    SUR LA ROUTE (demande du dev : "que rien ne gêne la route").
+  * FONTAINE MIGRÉE de (0,0) à (-9,-11.5) : sur la grande place vide devant
+    la mairie (entre mairie au nord et supermarché au sud). creer_fontaine
+    est maintenant paramétrée (x, z).
+  * Supermarché décalé (-10,-6) -> (-10,-5), barils (-8.0,-3.6)/(-8.6,-4.1)
+    -> (-7.0,-1.4)/(-7.7,-1.9), caisse (-12.6,-4.4) -> (-14.2,-6.0),
+    pin [-9,-13] -> [-14,-14] : pour libérer la place de la fontaine.
+- MENU OPTIONS : onglets GAUCHE stylés en COULEUR (onglet actif = OR,
+  inactif = BLEU NUIT, texte clair) via styliser_onglets()/onglet_style() :
+  le dev les confondait avec les cadres de touches (gris) de droite.
+- PANNEAU QUÊTE RÉDUCTIBLE : petit bouton "—" en haut à droite du panneau
+  (quest_toggle) ; cliqué = le panneau se réduit à sa barre de titre
+  (280x42, bouton "+"), recliqué = il se redéploie (280x96). _toggle_quete().
+- BARRE XP/LVL SUPPRIMÉE (demande du dev : "le truc en bas lvl1 0/100
+  retire-le") : classe BarreXP, var barre_xp et sa création dans creer_hud
+  supprimées. Le système d'XP interne (xp/level/xp_need/gagner_xp) reste.
 
 5) FICHIERS IMPORTANTS
 ----------------------

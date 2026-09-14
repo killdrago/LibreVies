@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b11 : options à onglets (Graphique : luminosité 30 / contraste 100 par défaut ; Contrôles : toutes les touches configurables), anti-saut par-dessus les obstacles, route en courbes avec pavés, lampadaires le long de la route, fontaine rénovée. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b12 : saut réaliste (objets bas franchissables + perchage dessus), mairie décalée hors de la route, fontaine sur la place devant la mairie, onglets Options en couleur, panneau quête réductible, barre XP retirée. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "7c6f2c07595efc53ae6df845a4cbc501",
-      "size": 93898
+      "hash": "c7666a66c8df8813db02b07791f3f907",
+      "size": 96298
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -54,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "4854cca4c5398dca4bab2554208ca5b1",
-      "size": 19341
+      "hash": "600be2a5c2f5fcef1306bb6cec516cf1",
+      "size": 21779
     }
   }
 }

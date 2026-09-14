@@ -14,9 +14,10 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b11"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b12"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
-const HAUT_COLLISION := 2.0  # hauteur "logique" des obstacles : saut max 1,6 m → infranchissables
+const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
+const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
 const ACTIONS_REGLABLES := ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "pickup", "camera_view", "inventaire", "options_menu"]
 const LIBELLES_TOUCHES := {
 	"move_forward": "Avancer", "move_back": "Reculer",
@@ -82,7 +83,9 @@ var lbl_val_lum: Label
 var lbl_val_con: Label
 var minimap: Control
 var hotbar: Control
-var barre_xp: Control
+var quest_panel: PanelContainer
+var quest_toggle: Button
+var quest_reduit := false
 var pill_or: Control
 var pill_cailloux: Control
 var quete_titre: Label
@@ -130,7 +133,7 @@ func _ready():
 	creer_route()
 	creer_ville()
 	creer_chateau()
-	creer_fontaine()
+	creer_fontaine(-9.0, -11.5)   # sur la place, devant la mairie (toit bleu)
 	creer_arbres()
 	creer_props()
 	creer_cloture_village()
@@ -237,6 +240,9 @@ func _process(delta: float):
 				if not e.alive:
 					continue
 				var en: Node3D = e.node
+				# Un monstre, c'est ~1 m de haut : en pleine montée de saut on passe au-dessus
+				if player_node.global_position.y - hauteur_terrain(en.global_position.x, en.global_position.z) > 1.0:
+					continue
 				var dx: float = new_pos.x - en.global_position.x
 				var dz: float = new_pos.z - en.global_position.z
 				var rr := 0.95
@@ -254,14 +260,16 @@ func _process(delta: float):
 		var look: Vector3 = player_node.global_position + dir
 		player_node.look_at(look, Vector3.UP)
 
-	# --- GRAVITE / SOL ---
-	var sol := hauteur_terrain(player_node.global_position.x, player_node.global_position.z)
+	# --- GRAVITE / SOL (avec atterrissage sur les objets : on peut se percher) ---
+	var sol := hauteur_support(player_node.global_position.x, player_node.global_position.z, player_node.global_position.y)
 	player_vel_y -= 20 * delta
 	player_node.global_position.y += player_vel_y * delta
-	if player_node.global_position.y <= sol:
+	if player_node.global_position.y <= sol and player_vel_y <= 0.0:
 		player_node.global_position.y = sol
 		player_vel_y = 0
 		player_on_ground = true
+	elif player_node.global_position.y > sol + 0.02:
+		player_on_ground = false
 
 	# --- ANIMATION MARCHE ---
 	if is_moving:
@@ -571,9 +579,10 @@ func resoudre_collisions(px: float, pz: float, rayon: float, pieds: float = 0.0)
 			var g: float = c.g
 			if absf(p.x - cx) > g + rayon and absf(p.y - cz) > g + rayon:
 				continue
-			# Anti-saut : chaque obstacle a une hauteur logique (2 m par défaut)
-			# et le saut du héros culmine à 1,6 m → on ne passe PAR-DESSUS rien
-			if pieds > 0.0 and pieds > hauteur_terrain(cx, cz) + float(c.h):
+			# Hauteur RÉELLE des objets : ce qui est plus bas que le saut (1,6 m)
+			# peut être franchi en sautant (et on peut atterrir dessus, voir
+			# hauteur_support). Epsilon 0,05 : debout SUR un objet, il ne pousse plus.
+			if pieds > 0.0 and pieds > hauteur_terrain(cx, cz) + float(c.h) - 0.05:
 				continue
 			if c.t == "c":
 				var rr: float = float(c.r) + rayon
@@ -598,9 +607,11 @@ func resoudre_collisions(px: float, pz: float, rayon: float, pieds: float = 0.0)
 						p.x = cx + (1.0 if dx2 >= 0.0 else -1.0) * hw
 					else:
 						p.y = cz + (1.0 if dz2 >= 0.0 else -1.0) * hd
-		# Clôture du village : anneau bloquant SAUF aux portails (route)
+		# Clôture du village (1 m de haut) : bloquante SAUF aux portails (route).
+		# Le héros peut sauter par-dessus (saut 1,6 m) ; les monstres (pieds = 0)
+		# ne la franchissent JAMAIS — le village reste protégé.
 		var dl := p.length()
-		if absf(dl - VILLAGE_R) < 0.4 + rayon and dist_chemin(p) > 3.4:
+		if pieds <= hauteur_terrain(p.x, p.y) + HAUT_CLOTURE - 0.05 and absf(dl - VILLAGE_R) < 0.4 + rayon and dist_chemin(p) > 3.4:
 			if dl < 0.001:
 				p = Vector2(VILLAGE_R + 0.4 + rayon, 0)
 			elif dl >= VILLAGE_R:
@@ -608,6 +619,27 @@ func resoudre_collisions(px: float, pz: float, rayon: float, pieds: float = 0.0)
 			else:
 				p = p / dl * (VILLAGE_R - 0.4 - rayon)
 	return p
+
+# Atterrissage sur les objets : quand le héros retombe (vel_y <= 0) au-dessus
+# d'un objet dont le sommet est sous ses pieds, il se pose DESSUS (perché).
+func hauteur_support(x: float, z: float, pieds: float) -> float:
+	var sol := hauteur_terrain(x, z)
+	for c in colliders:
+		var cx: float = c.x
+		var cz: float = c.z
+		if absf(x - cx) > 4.0 and absf(z - cz) > 4.0:
+			continue
+		var dedans := false
+		if c.t == "c":
+			dedans = Vector2(x - cx, z - cz).length() < float(c.r) + 0.1
+		else:
+			dedans = absf(x - cx) < float(c.w) * 0.5 + 0.05 and absf(z - cz) < float(c.d) * 0.5 + 0.05
+		if not dedans:
+			continue
+		var top := hauteur_terrain(cx, cz) + float(c.h)
+		if top > sol and pieds >= top - 0.25:
+			sol = top
+	return sol
 
 func creer_terrain():
 	var N := 88
@@ -741,7 +773,7 @@ func creer_terrain():
 			mm.set_instance_transform(k, tr)
 			# Collision, sauf si le rocher est posé sur la route
 			if dist_chemin(Vector2(x, z)) > 2.8:
-				col_cercle(x, z, 0.42 * s)
+				col_cercle(x, z, 0.42 * s, 0.45 * s + 0.2)
 
 # Maille facettée à partir de triangles (normales plates)
 func mesh_tris(tris: PackedVector3Array, cols: PackedColorArray) -> ArrayMesh:
@@ -949,11 +981,11 @@ func _prism(pos: Vector3, size: Vector3, col: Color, parent: Node = null, rot :=
 func creer_ville():
 	var PIERRE := Color(0.50, 0.48, 0.45)
 	var data = [
-		{"x":-10,"z":-6,"w":5,"h":4,"d":4,"c":Color(0.85,0.74,0.56),"n":"Supermarche","roof":Color(0.72,0.28,0.12)},
+		{"x":-10,"z":-5,"w":5,"h":4,"d":4,"c":Color(0.85,0.74,0.56),"n":"Supermarche","roof":Color(0.72,0.28,0.12)},
 		{"x":-10,"z":3,"w":4,"h":3.5,"d":3.5,"c":Color(0.80,0.66,0.45),"n":"Armurerie","roof":Color(0.45,0.45,0.48)},
 		{"x":10,"z":-6,"w":4,"h":3.5,"d":3.5,"c":Color(0.60,0.78,0.66),"n":"Vetements","roof":Color(0.62,0.38,0.20)},
 		{"x":10,"z":3,"w":4,"h":4,"d":4,"c":Color(0.82,0.66,0.42),"n":"Auberge","roof":Color(0.68,0.24,0.10)},
-		{"x":0,"z":-15,"w":8,"h":6,"d":6,"c":Color(0.88,0.85,0.76),"n":"Mairie","roof":Color(0.32,0.47,0.58)},
+		{"x":-9,"z":-20,"w":8,"h":6,"d":6,"c":Color(0.88,0.85,0.76),"n":"Mairie","roof":Color(0.32,0.47,0.58)},
 		{"x":-20,"z":-12,"w":4,"h":3.5,"d":3.5,"c":Color(0.83,0.70,0.52),"n":"Maison","roof":Color(0.68,0.24,0.10)},
 		{"x":-20,"z":-4,"w":3.5,"h":3,"d":3.5,"c":Color(0.78,0.64,0.46),"n":"Maison","roof":Color(0.60,0.32,0.16)},
 		{"x":20,"z":8,"w":4,"h":3.5,"d":3.5,"c":Color(0.83,0.70,0.52),"n":"Maison","roof":Color(0.68,0.24,0.10)},
@@ -996,7 +1028,7 @@ func creer_ville():
 				_box(Vector3(b.x, y + 0.06 + step * 0.1, b.z + b.d / 2.0 + 0.6 + step * 0.35),
 					Vector3(b.w * 0.6, 0.12, 0.35), Color(0.60, 0.58, 0.55))
 		batiments.append({"x": b.x, "z": b.z, "w": b.w + 0.5, "d": b.d + 0.5})
-		col_boite(b.x, b.z, b.w + 0.5, b.d + 0.5)
+		col_boite(b.x, b.z, b.w + 0.5, b.d + 0.5, float(b.h))
 
 	# PNJ (villageois low-poly)
 	var pnj = [
@@ -1010,7 +1042,7 @@ func creer_ville():
 		var root := Node3D.new()
 		root.position = Vector3(d.x, y, d.z)
 		add_child(root)
-		col_cercle(d.x, d.z, 0.4)
+		col_cercle(d.x, d.z, 0.4, 1.8)
 		_caps(Vector3(0, 0.55, 0), 0.19, 0.62, d.c, root)              # corps
 		_prism(Vector3(0, 0.28, 0), Vector3(0.44, 0.30, 0.44), d.c.darkened(0.15), root)  # jupe
 		_sph(Vector3(0, 1.02, 0), 0.17, Color(0.93, 0.78, 0.62), root) # tête
@@ -1079,44 +1111,41 @@ func creer_chateau():
 	for fx in [-2.5, 0.0, 2.5]:
 		_box(Vector3(fx, 7.5, -0.4), Vector3(0.8, 1.6, 0.3), Color(0.25, 0.30, 0.42), root)
 	# Collisions du château (coordonnées monde) — porte sud laissée passable
-	col_boite(0, -87, 32, 1.6)
-	col_boite(-16, -78, 1.6, 20)
-	col_boite(16, -78, 1.6, 20)
-	col_boite(-9.1, -69, 13.8, 1.6)
-	col_boite(9.1, -69, 13.8, 1.6)
-	col_cercle(-16, -87, 2.3)
-	col_cercle(16, -87, 2.3)
-	col_cercle(-16, -69, 2.3)
-	col_cercle(16, -69, 2.3)
-	col_cercle(-6, -82, 2.9)
-	col_cercle(6, -82, 2.9)
-	col_boite(0, -82, 9, 7)
+	col_boite(0, -87, 32, 1.6, 5.0)
+	col_boite(-16, -78, 1.6, 20, 5.0)
+	col_boite(16, -78, 1.6, 20, 5.0)
+	col_boite(-9.1, -69, 13.8, 1.6, 5.0)
+	col_boite(9.1, -69, 13.8, 1.6, 5.0)
+	col_cercle(-16, -87, 2.3, 9.0)
+	col_cercle(16, -87, 2.3, 9.0)
+	col_cercle(-16, -69, 2.3, 9.0)
+	col_cercle(16, -69, 2.3, 9.0)
+	col_cercle(-6, -82, 2.9, 12.0)
+	col_cercle(6, -82, 2.9, 12.0)
+	col_boite(0, -82, 9, 7, 9.0)
 
 # ============================================================
 # FONTAINE / ARBRES / PROPS / NUAGE
 # ============================================================
-func creer_fontaine():
-	var y := hauteur_terrain(0, 0)
-	col_cercle(0, 0, 2.6)
-	# Bassin principal + eau
-	_cyl(Vector3(0, y + 0.45, 0), 2.5, 2.3, 0.9, Color(0.62, 0.61, 0.60), self, 12)
-	_cyl(Vector3(0, y + 0.85, 0), 2.1, 2.1, 0.25, Color(0.18, 0.58, 0.88), self, 12)
+func creer_fontaine(x: float, z: float):
+	var y := hauteur_terrain(x, z)
+	col_cercle(x, z, 2.6, 0.95)
+	# Bassin principal + eau (muret assez bas : on peut sauter dessus)
+	_cyl(Vector3(x, y + 0.45, z), 2.5, 2.3, 0.9, Color(0.62, 0.61, 0.60), self, 12)
+	_cyl(Vector3(x, y + 0.85, z), 2.1, 2.1, 0.25, Color(0.18, 0.58, 0.88), self, 12)
 	# Colonne centrale
-	_cyl(Vector3(0, y + 1.7, 0), 0.32, 0.26, 2.2, Color(0.66, 0.65, 0.64), self, 8)
-	# Vasque haute (la "boule en l'air" reposait sur la colonne — maintenant
-	# c'est une vraie vasque qui reçoit l'eau, avec l'orbe posé dedans)
-	_cyl(Vector3(0, y + 2.72, 0), 0.95, 0.5, 0.24, Color(0.66, 0.65, 0.64), self, 10)
-	_cyl(Vector3(0, y + 2.85, 0), 0.82, 0.82, 0.06, Color(0.30, 0.65, 0.90), self, 10)
-	# Orbe d'eau au sommet (joyau de la fontaine, légèrement lumineux)
-	_sph(Vector3(0, y + 3.18, 0), 0.34, Color(0.35, 0.72, 0.95), self, true)
-	# Quatre filets d'eau retombant de la vasque haute dans le bassin
+	_cyl(Vector3(x, y + 1.7, z), 0.32, 0.26, 2.2, Color(0.66, 0.65, 0.64), self, 8)
+	# Vasque haute + orbe d'eau + filets d'eau retombant dans le bassin
+	_cyl(Vector3(x, y + 2.72, z), 0.95, 0.5, 0.24, Color(0.66, 0.65, 0.64), self, 10)
+	_cyl(Vector3(x, y + 2.85, z), 0.82, 0.82, 0.06, Color(0.30, 0.65, 0.90), self, 10)
+	_sph(Vector3(x, y + 3.18, z), 0.34, Color(0.35, 0.72, 0.95), self, true)
 	for k in range(4):
 		var a := float(k) * TAU / 4.0 + 0.4
-		_cyl(Vector3(cos(a) * 0.78, y + 1.85, sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.55, 0.80, 0.95), self, 5)
+		_cyl(Vector3(x + cos(a) * 0.78, y + 1.85, z + sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.55, 0.80, 0.95), self, 5)
 
 func creer_arbres():
 	var pins := [
-		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [9, 13], [-9, -13], [9, -13],
+		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [9, 13], [-14, -14], [9, -13],
 		[-14, 9], [14, -9], [-17, 7], [17, -7], [0, 15], [0, -15], [15, 0], [-15, 0],
 		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [5, 29], [-12, 26],
 		[12, 26], [-40, 30], [40, 30], [-45, -35], [45, -35], [-55, 10], [55, 10],
@@ -1130,7 +1159,7 @@ func creer_arbres():
 
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
-	col_cercle(x, z, 0.4)
+	col_cercle(x, z, 0.4, 2.2)
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -1143,7 +1172,7 @@ func creer_pin(x: float, z: float):
 
 func creer_arbre_rond(x: float, z: float):
 	var y := hauteur_terrain(x, z)
-	col_cercle(x, z, 0.45)
+	col_cercle(x, z, 0.45, 2.2)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
@@ -1155,24 +1184,24 @@ func creer_props():
 	# Lampadaires alignés le long de la route du village (plus au milieu de la route !)
 	poser_lampadaires_route()
 	# Barils + caisses près de l'auberge et du supermarché
-	for p in [[8.2, 5.6], [8.7, 6.2], [-8.0, -3.6], [-8.6, -4.1], [12.4, 1.0]]:
+	for p in [[8.2, 5.6], [8.7, 6.2], [-7.0, -1.4], [-7.7, -1.9], [12.4, 1.0]]:
 		var y := hauteur_terrain(p[0], p[1])
 		_cyl(Vector3(p[0], y + 0.45, p[1]), 0.34, 0.30, 0.9, Color(0.55, 0.36, 0.18), self, 10)
 		_cyl(Vector3(p[0], y + 0.62, p[1]), 0.36, 0.36, 0.1, Color(0.30, 0.28, 0.28), self, 10)
-		col_cercle(p[0], p[1], 0.45)
-	for p in [[-12.6, -4.4], [12.6, 4.6], [-12.4, 4.8]]:
+		col_cercle(p[0], p[1], 0.45, 0.95)
+	for p in [[-14.2, -6.0], [12.6, 4.6], [-12.4, 4.8]]:
 		var y := hauteur_terrain(p[0], p[1])
 		_box(Vector3(p[0], y + 0.35, p[1]), Vector3(0.7, 0.7, 0.7), Color(0.62, 0.45, 0.24))
 		_box(Vector3(p[0], y + 0.36, p[1]), Vector3(0.72, 0.12, 0.72), Color(0.48, 0.34, 0.17))
-		col_boite(p[0], p[1], 0.8, 0.8)
+		col_boite(p[0], p[1], 0.8, 0.8, 0.75)
 	# Clôtures le long des routes
 	for i in range(-6, 7):
 		if abs(i) < 2: continue
 		var y := hauteur_terrain(i * 2.4, 4.6)
 		_box(Vector3(i * 2.4, y + 0.45, 4.6), Vector3(0.1, 0.9, 0.1), Color(0.52, 0.36, 0.18))
 		_box(Vector3(i * 2.4, y + 0.7, 4.6), Vector3(2.4, 0.09, 0.07), Color(0.58, 0.41, 0.21))
-	col_boite(-9.6, 4.6, 12.0, 0.25)
-	col_boite(9.6, 4.6, 12.0, 0.25)
+	col_boite(-9.6, 4.6, 12.0, 0.25, 0.85)
+	col_boite(9.6, 4.6, 12.0, 0.25, 0.85)
 	# Panneaux / bannières (comme le screen)
 	creer_banniere(-5.5, -3.0, Color(0.16, 0.30, 0.62))
 	creer_banniere(6.0, 8.0, Color(0.55, 0.16, 0.16))
@@ -1187,7 +1216,7 @@ func creer_lampadaire(x: float, z: float):
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
-	col_cercle(x, z, 0.25)
+	col_cercle(x, z, 0.25, 3.0)
 	_box(Vector3(0, 0.05, 0), Vector3(0.5, 0.12, 0.5), Color(0.20, 0.20, 0.22), root)
 	_box(Vector3(0, 1.5, 0), Vector3(0.14, 3.0, 0.14), Color(0.16, 0.16, 0.18), root)
 	_box(Vector3(0, 3.05, 0), Vector3(0.5, 0.1, 0.1), Color(0.16, 0.16, 0.18), root)
@@ -1320,7 +1349,7 @@ func creer_garde(x: float, z: float) -> Node3D:
 	label.outline_size = 8
 	label.outline_modulate = Color(0.1, 0.1, 0.1, 0.9)
 	root.add_child(label)
-	col_cercle(x, z, 0.4)
+	col_cercle(x, z, 0.4, 1.8)
 	return root
 
 func creer_banniere(x: float, z: float, col: Color):
@@ -1328,7 +1357,7 @@ func creer_banniere(x: float, z: float, col: Color):
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
-	col_cercle(x, z, 0.22)
+	col_cercle(x, z, 0.22, 3.2)
 	_box(Vector3(0, 1.6, 0), Vector3(0.16, 3.2, 0.16), Color(0.40, 0.27, 0.13), root)
 	_box(Vector3(0, 3.15, 0), Vector3(1.5, 0.14, 0.14), Color(0.40, 0.27, 0.13), root)
 	_box(Vector3(0, 2.35, 0.02), Vector3(1.1, 1.5, 0.06), col, root)
@@ -1342,7 +1371,7 @@ func creer_panneau(x: float, z: float):
 	root.position = Vector3(x, y, z)
 	root.rotation.y = randf_range(0, TAU)
 	add_child(root)
-	col_cercle(x, z, 0.18)
+	col_cercle(x, z, 0.18, 2.0)
 	_box(Vector3(0, 0.9, 0), Vector3(0.12, 1.8, 0.12), Color(0.42, 0.28, 0.14), root)
 	_box(Vector3(0, 1.7, 0), Vector3(1.3, 0.5, 0.08), Color(0.62, 0.45, 0.24), root)
 	_box(Vector3(0.2, 1.35, 0), Vector3(1.0, 0.4, 0.08), Color(0.55, 0.39, 0.20), root, Vector3(0, 0, deg_to_rad(20)))
@@ -1936,30 +1965,6 @@ class Hotbar extends Control:
 		for k in range(3):
 			draw_line(c + Vector2(-6, -5 + k * 5), c + Vector2(6, -5 + k * 5), Color(0.45, 0.40, 0.32), 1.5)
 
-class BarreXP extends Control:
-	var parent = null
-	func _process(_d): queue_redraw()
-	func _draw():
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.09, 0.08, 0.08, 0.88)
-		sb.set_corner_radius_all(4)
-		draw_style_box(sb, Rect2(Vector2.ZERO, Vector2(52, 22)))
-		draw_string(ThemeDB.fallback_font, Vector2(6, 16), "LVL %d" % parent.level,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1))
-		var rect := Rect2(Vector2(58, 0), Vector2(size.x - 58, 22))
-		var sb2 := StyleBoxFlat.new()
-		sb2.bg_color = Color(0.10, 0.12, 0.20, 0.9)
-		sb2.set_corner_radius_all(4)
-		draw_style_box(sb2, rect)
-		var r := clampf(float(parent.xp) / float(parent.xp_need), 0.0, 1.0)
-		if r > 0.01:
-			var sb3 := StyleBoxFlat.new()
-			sb3.bg_color = Color(0.20, 0.55, 0.95)
-			sb3.set_corner_radius_all(4)
-			draw_style_box(sb3, Rect2(rect.position + Vector2(2, 2), Vector2((rect.size.x - 4) * r, rect.size.y - 4)))
-		draw_string(ThemeDB.fallback_font, Vector2(rect.position.x + rect.size.x * 0.5 - 30, 16),
-			"%d / %d" % [parent.xp, parent.xp_need], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1))
-
 class Losange extends Control:
 	func _draw():
 		var c := size * 0.5
@@ -2015,21 +2020,21 @@ func creer_hud():
 	hp_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hp_bar.add_child(hp_label)
 
-	# ===== Quêtes (gauche) =====
-	var quest := PanelContainer.new()
-	quest.position = Vector2(14, 92)
-	quest.size = Vector2(280, 96)
+	# ===== Quêtes (gauche) — réductible par le petit bouton en haut à droite =====
+	quest_panel = PanelContainer.new()
+	quest_panel.position = Vector2(14, 92)
+	quest_panel.size = Vector2(280, 96)
 	var qs := StyleBoxFlat.new()
 	qs.bg_color = Color(0.10, 0.09, 0.08, 0.90)
 	qs.set_corner_radius_all(6)
 	qs.border_width_bottom = 2; qs.border_width_top = 2
 	qs.border_width_left = 2; qs.border_width_right = 2
 	qs.border_color = Color(0.05, 0.04, 0.04)
-	quest.add_theme_stylebox_override("panel", qs)
-	canvas.add_child(quest)
+	quest_panel.add_theme_stylebox_override("panel", qs)
+	canvas.add_child(quest_panel)
 	var qv := VBoxContainer.new()
 	qv.add_theme_constant_override("separation", 3)
-	quest.add_child(qv)
+	quest_panel.add_child(qv)
 	var qh := HBoxContainer.new()
 	qh.add_theme_constant_override("separation", 8)
 	qv.add_child(qh)
@@ -2041,6 +2046,14 @@ func creer_hud():
 	quete_titre.add_theme_font_size_override("font_size", 16)
 	quete_titre.add_theme_color_override("font_color", Color(1, 1, 1))
 	qh.add_child(quete_titre)
+	var qspacer := Control.new()
+	qspacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	qh.add_child(qspacer)
+	quest_toggle = Button.new()
+	quest_toggle.text = "—"
+	quest_toggle.custom_minimum_size = Vector2(26, 22)
+	quest_toggle.pressed.connect(_toggle_quete)
+	qh.add_child(quest_toggle)
 	quete_l1 = Label.new()
 	quete_l1.text = "Vaincre 10 rats (0/10)"
 	quete_l1.add_theme_font_size_override("font_size", 14)
@@ -2079,13 +2092,6 @@ func creer_hud():
 	hotbar.position = Vector2(640 - (5 * 56 + 4 * 8) / 2.0, 720 - 72)
 	hotbar.size = Vector2(5 * 56 + 4 * 8, 56)
 	canvas.add_child(hotbar)
-
-	# ===== Barre d'XP =====
-	barre_xp = BarreXP.new()
-	barre_xp.parent = self
-	barre_xp.position = Vector2(14, 720 - 36)
-	barre_xp.size = Vector2(260, 22)
-	canvas.add_child(barre_xp)
 
 	# ===== Contrôles (bas) =====
 	var ctrl := Label.new()
@@ -2156,8 +2162,8 @@ func creer_hud():
 	tab_ctrl.text = "Contrôles"
 	tab_ctrl.custom_minimum_size = Vector2(150, 40)
 	tabs_vbox.add_child(tab_ctrl)
-	tab_graph.pressed.connect(func(): panneau_graph.visible = true; panneau_ctrl.visible = false)
-	tab_ctrl.pressed.connect(func(): panneau_graph.visible = false; panneau_ctrl.visible = true)
+	tab_graph.pressed.connect(func(): panneau_graph.visible = true; panneau_ctrl.visible = false; styliser_onglets())
+	tab_ctrl.pressed.connect(func(): panneau_graph.visible = false; panneau_ctrl.visible = true; styliser_onglets())
 	# --- Onglet GRAPHIQUE : luminosité + contraste ---
 	panneau_graph = VBoxContainer.new()
 	panneau_graph.custom_minimum_size = Vector2(404, 360)
@@ -2252,6 +2258,7 @@ func creer_hud():
 	close_btn.custom_minimum_size = Vector2(120, 32)
 	close_btn.pressed.connect(_toggle_options)
 	opt_root.add_child(close_btn)
+	styliser_onglets()
 
 	# ===== Panel inventaire =====
 	inv_panel = PanelContainer.new()
@@ -2332,6 +2339,41 @@ func show_info(text: String):
 func _toggle_options():
 	if options_panel:
 		options_panel.visible = not options_panel.visible
+
+# Réduire / déplier le panneau de quête
+func _toggle_quete():
+	quest_reduit = not quest_reduit
+	if is_instance_valid(quete_l1):
+		quete_l1.visible = not quest_reduit
+	if is_instance_valid(quete_l2):
+		quete_l2.visible = not quest_reduit
+	if is_instance_valid(quest_panel):
+		quest_panel.size = Vector2(280, 42) if quest_reduit else Vector2(280, 96)
+	if is_instance_valid(quest_toggle):
+		quest_toggle.text = "+" if quest_reduit else "—"
+
+# Onglets du menu Options : bien visibles, d'une AUTRE couleur que le contenu
+# (actif = or, inactif = bleu nuit) pour ne pas les confondre avec les cadres
+# de touches à droite.
+func styliser_onglets():
+	if not (is_instance_valid(tab_graph) and is_instance_valid(tab_ctrl)):
+		return
+	onglet_style(tab_graph, panneau_graph != null and panneau_graph.visible)
+	onglet_style(tab_ctrl, panneau_ctrl != null and panneau_ctrl.visible)
+
+func onglet_style(btn: Button, actif: bool):
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.92, 0.72, 0.14) if actif else Color(0.13, 0.22, 0.38)
+	sb.set_corner_radius_all(6)
+	sb.border_width_bottom = 2; sb.border_width_top = 2
+	sb.border_width_left = 2; sb.border_width_right = 2
+	sb.border_color = Color(1, 0.86, 0.2) if actif else Color(0.40, 0.58, 0.85)
+	btn.add_theme_stylebox_override("normal", sb)
+	btn.add_theme_stylebox_override("hover", sb)
+	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	btn.add_theme_color_override("font_color", Color(0.10, 0.08, 0.02) if actif else Color(0.78, 0.87, 1.0))
+	btn.add_theme_font_size_override("font_size", 15)
 
 func _toggle_inventory():
 	if inv_panel:
