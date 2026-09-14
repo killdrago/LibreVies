@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b12 : saut réaliste (objets bas franchissables + perchage dessus), mairie décalée hors de la route, fontaine sur la place devant la mairie, onglets Options en couleur, panneau quête réductible, barre XP retirée. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b13 : détection clavier AZERTY/QWERTY (touches affichées comme sur le clavier du joueur), château posé sur un plateau plat, maire devant la mairie, fontaine sur l'espace vide au sud du village. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "c7666a66c8df8813db02b07791f3f907",
-      "size": 96298
+      "hash": "0c28ccd720cf3fed95708da502ca8914",
+      "size": 97650
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -54,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "600be2a5c2f5fcef1306bb6cec516cf1",
-      "size": 21779
+      "hash": "214ae2d521332682e074b0c4e767b58f",
+      "size": 23316
     }
   }
 }

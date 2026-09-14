@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b12" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b13" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -254,6 +254,29 @@ pour l'herbe/fleurs/rochers (perf).
 - BARRE XP/LVL SUPPRIMÉE (demande du dev : "le truc en bas lvl1 0/100
   retire-le") : classe BarreXP, var barre_xp et sa création dans creer_hud
   supprimées. Le système d'XP interne (xp/level/xp_need/gagner_xp) reste.
+
+4f) MAJ DU 14/09/2026 (build b13)
+----------------------------------
+- DÉTECTION AZERTY/QWERTY : est_clavier_azerty() via
+  DisplayServer.keyboard_get_layout_language(keyboard_get_current_layout())
+  ("fr"/"be" = AZERTY). texte_touche() affiche la touche TELLE QU'IMPRIMÉE
+  sur le clavier du joueur : keyboard_get_keycode_from_physical(physical)
+  puis préférence locale (AZERTY → Z/Q/S/D, QWERTY → W/A/S/D). Les binds
+  restent en PHYSICAL keycode (indépendants du layout, doubles binds Z+W,
+  Q+A hérités de project.godot). Label "Clavier détecté : AZERTY/QWERTY"
+  dans Options > Contrôles ; le bandeau d'aide du HUD affiche ZQSD ou WASD.
+- CHÂTEAU POSÉ SUR SA COLLINE (bug visuel signalé : seule la pointe de la
+  colline touchait le centre, le château flottait) : hauteur_terrain() ne
+  fait plus un pic (10 - dc*0.22) mais un PLATEAU plat à h=11 sur dc<=20
+  (smoothstep (32-dc)/12 autour), dc = distance à (0,-78). La plateforme
+  34x20 du château (coins à dc 19,7) repose entièrement dans le plat.
+- MAIRE remis DEVANT sa maison : la mairie a bougé en b12 (-9,-20) mais le
+  PNJ Maire était resté en (0,-11) → déplacé en (-5,8,-15,0), à droite de
+  l'escalier de la mairie. Vendeur déplacé (-10,-2.5)->(-10,-1.5) (devant
+  la porte du supermarché déplacé en b12).
+- FONTAINE déménagée de (-9,-11.5) à (9,15) : sur le grand espace vide au
+  SUD du village (le dev ne la voyait pas au nord). Pin [9,13] -> [14,11]
+  pour lui laisser la place. creer_fontaine(x, z) paramétrée depuis b12.
 
 5) FICHIERS IMPORTANTS
 ----------------------

@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b12"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b13"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -133,7 +133,7 @@ func _ready():
 	creer_route()
 	creer_ville()
 	creer_chateau()
-	creer_fontaine(-9.0, -11.5)   # sur la place, devant la mairie (toit bleu)
+	creer_fontaine(9.0, 15.0)     # espace vide au SUD du village, bien visible
 	creer_arbres()
 	creer_props()
 	creer_cloture_village()
@@ -420,10 +420,13 @@ func hauteur_terrain(x: float, z: float) -> float:
 	h += sin(x * 0.09) * cos(z * 0.07) * 2.2
 	h += sin(x * 0.21 + 1.7) * cos(z * 0.17 + 0.6) * 0.9
 	h += sin((x + z) * 0.05) * 1.4
-	# Colline du château au nord
+	# Colline du château au nord : PLATEAU plat (le château repose entièrement
+	# dessus) + pente douce autour. Avant : simple pic → seule la pointe touchait
+	# le centre du château, tout le reste flottait au-dessus du vide.
 	var dc := Vector2(x, z + 78.0).length()
-	h += maxf(0.0, 10.0 - dc * 0.22)
-	return h * t
+	var plat := clampf((32.0 - dc) / 12.0, 0.0, 1.0)
+	plat = plat * plat * (3.0 - 2.0 * plat)
+	return lerpf(h * t, 11.0, plat)
 
 var CHEMIN: Array[Vector2] = [
 	Vector2(0, 30), Vector2(3, 18), Vector2(-2, 6), Vector2(1, -8),
@@ -1032,9 +1035,9 @@ func creer_ville():
 
 	# PNJ (villageois low-poly)
 	var pnj = [
-		{"x":-10,"z":-2.5,"c":Color(0.80,0.20,0.16),"n":"Vendeur"},
+		{"x":-10,"z":-1.5,"c":Color(0.80,0.20,0.16),"n":"Vendeur"},
 		{"x":10,"z":5.5,"c":Color(0.16,0.68,0.36),"n":"Forgeron"},
-		{"x":0,"z":-11,"c":Color(0.50,0.24,0.62),"n":"Maire"},
+		{"x":-5.8,"z":-15.0,"c":Color(0.50,0.24,0.62),"n":"Maire"},
 		{"x":10.5,"z":-2.5,"c":Color(0.82,0.42,0.08),"n":"Marchand"},
 	]
 	for d in pnj:
@@ -1145,7 +1148,7 @@ func creer_fontaine(x: float, z: float):
 
 func creer_arbres():
 	var pins := [
-		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [9, 13], [-14, -14], [9, -13],
+		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [14, 11], [-14, -14], [9, -13],
 		[-14, 9], [14, -9], [-17, 7], [17, -7], [0, 15], [0, -15], [15, 0], [-15, 0],
 		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [5, 29], [-12, 26],
 		[12, 26], [-40, 30], [40, 30], [-45, -35], [45, -35], [-55, 10], [55, 10],
@@ -2095,7 +2098,7 @@ func creer_hud():
 
 	# ===== Contrôles (bas) =====
 	var ctrl := Label.new()
-	ctrl.text = "[ZQSD/Flèches] Bouger  [MAJ] Courir  [ESPACE] Saut  [Clic] Attaque  [E] Ramasser  [ClicD] Caméra  [V] Vue  [1-5] Objets  [I] Inventaire  [O] Options  [ÉCHAP] Quitter"
+	ctrl.text = "[%s/Flèches] Bouger" % ("ZQSD" if est_clavier_azerty() else "WASD") + "  [MAJ] Courir  [ESPACE] Saut  [Clic] Attaque  [E] Ramasser  [ClicD] Caméra  [V] Vue  [1-5] Objets  [I] Inventaire  [O] Options  [ÉCHAP] Quitter"
 	ctrl.position = Vector2(300, 720 - 18)
 	ctrl.add_theme_font_size_override("font_size", 12)
 	ctrl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
@@ -2237,6 +2240,11 @@ func creer_hud():
 	c_title.add_theme_font_size_override("font_size", 13)
 	c_title.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
 	panneau_ctrl.add_child(c_title)
+	var lbl_kb := Label.new()
+	lbl_kb.text = "Clavier détecté : " + ("AZERTY" if est_clavier_azerty() else "QWERTY")
+	lbl_kb.add_theme_font_size_override("font_size", 13)
+	lbl_kb.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
+	panneau_ctrl.add_child(lbl_kb)
 	for act in ACTIONS_REGLABLES:
 		var row := HBoxContainer.new()
 		panneau_ctrl.add_child(row)
@@ -2405,15 +2413,33 @@ func set_action_mouse(action: String, button: int):
 	ev.button_index = button
 	InputMap.action_add_event(action, ev)
 
+# Détection du type de clavier (AZERTY francophone vs QWERTY) via la langue
+# de la disposition courante : les touches sont affichées TELLES QU'IMPRIMÉES
+# sur le clavier du joueur (ZQSD en AZERTY, WASD en QWERTY).
+func est_clavier_azerty() -> bool:
+	var id := DisplayServer.keyboard_get_current_layout()
+	var lang := DisplayServer.keyboard_get_layout_language(id).to_lower()
+	return lang in ["fr", "be"]
+
 func texte_touche(action: String) -> String:
 	var evs := InputMap.action_get_events(action)
+	var prefs := ["Z", "Q", "S", "D"] if est_clavier_azerty() else ["W", "A", "S", "D"]
+	var repli := ""
 	for ev in evs:
 		if ev is InputEventKey:
 			var kc: int = ev.physical_keycode
 			if kc == 0:
 				kc = ev.keycode
-			if kc != 0:
-				return OS.get_keycode_string(kc)
+			if kc == 0:
+				continue
+			var loc: int = DisplayServer.keyboard_get_keycode_from_physical(kc)
+			if loc == 0:
+				loc = kc
+			var nom := OS.get_keycode_string(loc)
+			if nom in prefs:
+				return nom
+			if repli == "" and nom.length() <= 7:
+				repli = nom
 		if ev is InputEventMouseButton:
 			if ev.button_index == MOUSE_BUTTON_LEFT:
 				return "Clic gauche"
@@ -2421,6 +2447,8 @@ func texte_touche(action: String) -> String:
 				return "Clic droit"
 			if ev.button_index == MOUSE_BUTTON_MIDDLE:
 				return "Clic milieu"
+	if repli != "":
+		return repli
 	return "—"
 
 func rafraichir_boutons_touches():
