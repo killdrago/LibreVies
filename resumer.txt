@@ -110,6 +110,16 @@ pour l'herbe/fleurs/rochers (perf).
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
   Camera3D, le reste est créé par le code).
 - launcher.pyw : launcher Tkinter + auto-update + téléchargement Godot.
+  DEPUIS LA 2.6.0 : TOUTES les images sont INTEGREES en base64 dans le .pyw
+  (BANNER_B64 = banniere 1024x768 palette, ICON_B64 = icone 64x64,
+  ICO_B64 = icon.ico complet). _embedded_photo() decode via Pillow, ou via
+  fichier PNG temporaire si Pillow absent. export_icon()/export_banner()
+  recréent les fichiers si besoin (build_launcher.bat extrait icon.ico tout
+  seul depuis le launcher). CONSÉQUENCE : banniere_v1.png, pp_lv_3.png et
+  icon.ico ne sont plus nécessaires sur disque et ont été RETIRES de la liste
+  "files" de version_url.json (le launcher ne les retélécharge plus).
+  Le jeu (main.gd) affiche le portrait HUD via pp_lv_3.png SI présent,
+  sinon un visage de héros dessiné en vectoriel (ResourceLoader.exists).
 - build_launcher.bat : build exe du launcher (PyInstaller).
 - version_url.json : manifeste d'update (voir §3).
 - resumer.txt : ce fichier.

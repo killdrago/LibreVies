@@ -16,19 +16,15 @@ echo    PyInstaller OK.
 
 :compile
 echo.
-echo Verification de Pillow...
-python -c "from PIL import Image" 2>nul && goto pillow_ok
-echo    Pillow non trouve. Installation...
-pip install Pillow
-goto build
-
-:pillow_ok
-echo    Pillow OK.
-
-:build
-echo.
-echo Conversion de l'icone...
-python -c "from PIL import Image; img = Image.open('pp_lv_3.png'); img.save('icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])"
+echo Extraction de l'icone depuis launcher.pyw (images integrees)...
+python -c "import importlib.util as u; s=u.spec_from_file_location('lv','launcher.pyw'); m=u.module_from_spec(s); s.loader.exec_module(m); m.export_icon('icon.ico')"
+if exist "icon.ico" (
+    echo    icon.ico cree.
+) else (
+    echo    ERREUR : icon.ico n'a pas pu etre cree.
+    pause
+    exit /b 1
+)
 
 echo.
 echo Compilation en .exe...

@@ -1,13 +1,13 @@
 {
-  "launcher_version": "2.5.1",
+  "launcher_version": "2.6.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Source des MAJ = branche de travail (raw_url). Launcher 2.5.1 : accepte les URLs 'tree' et suit le raw_url local.",
+  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Launcher 2.6.0 : images integrees (base64), plus aucune image requise sur disque.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "eca3cd76d9f9f657bc358ba579b23c8c",
-      "size": 66385
+      "hash": "522873f8ffe194c318af414142de0acd",
+      "size": 67262
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -18,24 +18,12 @@
       "size": 5211
     },
     "launcher.pyw": {
-      "hash": "de0d21dba8cf60bc4ab1db48793e7760",
-      "size": 26638
+      "hash": "59c74a07e45c9845b4edec9da41627ac",
+      "size": 628202
     },
     "build_launcher.bat": {
-      "hash": "ad04ef2ac8af46f6f2faf6b595121531",
-      "size": 1374
-    },
-    "banniere_v1.png": {
-      "hash": "0e1afc3ce846fe7e7700c2d4ea3ac51d",
-      "size": 3788827
-    },
-    "pp_lv_3.png": {
-      "hash": "8e9ddc576a607b22d63a4b0802c2fdd3",
-      "size": 1727709
-    },
-    "icon.ico": {
-      "hash": "064257cabe19fcfdbd8593d7b882e2c8",
-      "size": 111571
+      "hash": "4db739ba34ca09c06e428cf3e8c64b40",
+      "size": 1348
     },
     "glb/perso_voxel.glb": {
       "hash": "90920d44158eb82b0a3676a23ab39475",
@@ -66,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "7c89012abd8f71ae9c65e374d21c54fb",
-      "size": 10908
+      "hash": "d357af13ee30be1fb0406ca874ac4686",
+      "size": 11651
     }
   }
 }

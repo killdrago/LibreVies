@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b6"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b7"    # témoin de build : titre de fenêtre + message d'accueil
 
 # VARIABLES JOUEUR
 var player_pv := PV_MAX
@@ -1305,6 +1305,18 @@ class Portrait extends Control:
 		draw_circle(c, r, Color(0.13, 0.10, 0.09))
 		if tex:
 			draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
+		else:
+			# Visage du héros dessiné (aucun fichier image requis)
+			draw_circle(c + Vector2(0, r * 0.10), r * 0.62, Color(0.93, 0.76, 0.58))
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.62, r * 0.05), c + Vector2(-r * 0.45, -r * 0.55),
+				c + Vector2(-r * 0.15, -r * 0.30), c + Vector2(0.0, -r * 0.72),
+				c + Vector2(r * 0.20, -r * 0.32), c + Vector2(r * 0.50, -r * 0.52),
+				c + Vector2(r * 0.62, r * 0.05), c + Vector2(r * 0.30, -r * 0.10),
+				c + Vector2(-r * 0.30, -r * 0.10)]), Color(0.35, 0.22, 0.11))
+			draw_circle(c + Vector2(-r * 0.22, r * 0.05), r * 0.09, Color(0.10, 0.10, 0.12))
+			draw_circle(c + Vector2(r * 0.22, r * 0.05), r * 0.09, Color(0.10, 0.10, 0.12))
+			draw_arc(c + Vector2(0, r * 0.26), r * 0.22, deg_to_rad(20), deg_to_rad(160), 12, Color(0.45, 0.25, 0.18), 2.0)
 		draw_arc(c, r - 1.5, 0, TAU, 40, Color(0.85, 0.72, 0.35), 3.0)
 		draw_arc(c, r - 0.5, 0, TAU, 40, Color(0.10, 0.08, 0.07), 2.0)
 
@@ -1467,7 +1479,7 @@ func creer_hud():
 	var port := Portrait.new()
 	port.position = Vector2(14, 12)
 	port.size = Vector2(62, 62)
-	var img := load("res://pp_lv_3.png")
+	var img := load("res://pp_lv_3.png") if ResourceLoader.exists("res://pp_lv_3.png") else null
 	port.tex = img
 	# Découpe circulaire du portrait
 	var sh := Shader.new()
