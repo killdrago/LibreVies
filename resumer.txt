@@ -16,7 +16,8 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * project.godot : config/features=PackedStringArray("4.7")
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
-- launcher.pyw : LAUNCHER_VERSION = "2.5.0", GAME_VERSION = "0.3.0"
+- launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
+- main.gd : const BUILD = "0.3.0-b8" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -121,6 +122,27 @@ pour l'herbe/fleurs/rochers (perf).
     clamp au-dessus du terrain.
   * Touches : ZQSD/flèches, MAJ courir, ESPACE saut, clic attaque, E ramasser,
     V vue, I inventaire, O options, R renaître, 1-5 slots, ÉCHAP quitter.
+
+4b) MAJ DU 14/09/2026 (build b8)
+---------------------------------
+- Launcher 2.6.0 : images (bannière/icône/ICO) intégrées en base64 dans le .pyw,
+  le dev a supprimé les images du repo GitHub dans la foulée (plus nécessaires).
+- Launcher 2.7.0 (numéros de version) : ESSAYÉE PUIS ABANDONNÉE le jour même
+  (un fichier corrompu n'était pas réparé). Launcher 2.8.0 = retour aux hashs.
+- VILLAGE PROTÉGÉ (demande du dev) : les monstres (rats/souris/araignées) ne
+  peuvent PLUS entrer dans le village de départ.
+  * const VILLAGE_R = 26.0 + func dans_village(x,z) -> bool (main.gd).
+  * creer_cloture_village() : vraie clôture bois tout autour (96 poteaux,
+    traverses), avec PORTAILS (grands poteaux + linteau + lanterne) uniquement
+    là où la route traverse l'enceinte (dist_chemin < 3.0).
+  * Monstres : spawn repoussé hors du cercle (VILLAGE_R+7), déplacement bloqué
+    à la frontière (ils longent la clôture ; chase = ils attendent dehors),
+    respawn jamais dedans (VILLAGE_R+4), et sécurité frame-par-frame : tout
+    monstre égaré dedans est remis dehors (VILLAGE_R+0.5).
+  * Le JOUEUR reste libre d'entrer/sortir (la clôture n'a pas de collision,
+    c'est une barrière logique pour les monstres uniquement).
+  * Rochers scatterés évités l'anneau de clôture (push radial), pin [0,26]
+    déplacé en [5,29] (il était pile sur le portail sud).
 
 5) FICHIERS IMPORTANTS
 ----------------------

@@ -14,7 +14,8 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b7"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b8"    # témoin de build : titre de fenêtre + message d'accueil
+const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 
 # VARIABLES JOUEUR
 var player_pv := PV_MAX
@@ -103,6 +104,7 @@ func _ready():
 	creer_fontaine()
 	creer_arbres()
 	creer_props()
+	creer_cloture_village()
 	creer_nuages()
 	creer_joueur()
 	creer_ennemis()
@@ -359,6 +361,10 @@ func dist_chemin(p: Vector2) -> float:
 		best = minf(best, (p - (a + ab * t)).length())
 	return best
 
+# Le village de départ est PROTÉGÉ : clôture visuelle + zone interdite aux monstres
+func dans_village(x: float, z: float) -> bool:
+	return Vector2(x, z).length() < VILLAGE_R
+
 func creer_terrain():
 	var N := 88
 	var pas := (WORLD * 2.0) / float(N)
@@ -479,6 +485,12 @@ func creer_terrain():
 				x += TOWN_R
 			x = clampf(x, -WORLD + 5, WORLD - 5)
 			z = clampf(z, -WORLD + 5, WORLD - 5)
+			# Pas de rocher planté sur la clôture du village
+			var dr := Vector2(x, z)
+			if dr.length() > 0.001 and absf(dr.length() - VILLAGE_R) < 2.2:
+				dr = dr.normalized() * (VILLAGE_R + 2.6)
+				x = dr.x
+				z = dr.y
 			var s := rng4.randf_range(0.4, 1.5)
 			var tr := Transform3D()
 			tr = tr.rotated(Vector3.UP, rng4.randf_range(0, TAU))
@@ -830,7 +842,7 @@ func creer_arbres():
 	var pins := [
 		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [9, 13], [-9, -13], [9, -13],
 		[-14, 9], [14, -9], [-17, 7], [17, -7], [0, 15], [0, -15], [15, 0], [-15, 0],
-		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [0, 26], [-12, 26],
+		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [5, 29], [-12, 26],
 		[12, 26], [-40, 30], [40, 30], [-45, -35], [45, -35], [-55, 10], [55, 10],
 		[-60, -50], [60, -50], [-70, 40], [70, 40], [0, -50], [-20, -45], [20, -45],
 	]
@@ -894,6 +906,71 @@ func creer_props():
 	creer_banniere(6.0, 8.0, Color(0.55, 0.16, 0.16))
 	creer_panneau(-4.0, 8.5)
 	creer_panneau(5.0, -8.5)
+
+# ============================================================
+# CLÔTURE DU VILLAGE — enceinte complète + portails sur la route
+# (zone interdite aux monstres : voir dans_village / update_ennemis)
+# ============================================================
+func creer_cloture_village():
+	var BOIS := Color(0.52, 0.36, 0.18)
+	var BOIS_CLAIR := Color(0.58, 0.41, 0.21)
+	var n := 96
+	var step := TAU / float(n)
+	var dernier_angle := 1e9
+	var en_trou := false
+	var a0_trou := 0.0
+	var trous := []
+	for i in range(n + 1):
+		var a := float(i) * step
+		var x := cos(a) * VILLAGE_R
+		var z := sin(a) * VILLAGE_R
+		# Ouverture uniquement là où la route traverse l'enceinte
+		if dist_chemin(Vector2(x, z)) < 3.0:
+			if not en_trou:
+				en_trou = true
+				a0_trou = dernier_angle
+			dernier_angle = 1e9
+			continue
+		if en_trou:
+			en_trou = false
+			if a0_trou < 1e8:
+				trous.append({"a0": a0_trou, "a1": a})
+		var y := hauteur_terrain(x, z)
+		# Poteau
+		_box(Vector3(x, y + 0.45, z), Vector3(0.12, 0.9, 0.12), BOIS)
+		# Traverses entre deux poteaux consécutifs
+		if absf(a - dernier_angle - step) < 0.001:
+			var ap := a - step
+			var mx := (cos(ap) + cos(a)) * 0.5 * VILLAGE_R
+			var mz := (sin(ap) + sin(a)) * 0.5 * VILLAGE_R
+			var my := hauteur_terrain(mx, mz)
+			var ry := atan2(-(sin(a) - sin(ap)), cos(a) - cos(ap))
+			var long := step * VILLAGE_R + 0.14
+			_box(Vector3(mx, my + 0.72, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
+			_box(Vector3(mx, my + 0.38, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
+		dernier_angle = a
+	# Portails : grands poteaux + linteau + lanterne au-dessus de la route
+	for trou in trous:
+		var a0: float = trou.a0
+		var a1: float = trou.a1
+		for ga in [a0, a1]:
+			var ag: float = ga
+			var gx := cos(ag) * VILLAGE_R
+			var gz := sin(ag) * VILLAGE_R
+			var gy := hauteur_terrain(gx, gz)
+			_box(Vector3(gx, gy + 1.3, gz), Vector3(0.26, 2.6, 0.26), BOIS.darkened(0.1))
+			_box(Vector3(gx, gy + 2.66, gz), Vector3(0.36, 0.12, 0.36), BOIS_CLAIR)
+		var d01 := Vector2(cos(a1) - cos(a0), sin(a1) - sin(a0))
+		var am := (a0 + a1) * 0.5
+		var mx2 := cos(am) * VILLAGE_R
+		var mz2 := sin(am) * VILLAGE_R
+		var my2 := hauteur_terrain(mx2, mz2)
+		var ry2 := atan2(-d01.y, d01.x)
+		var long2 := d01.length() * VILLAGE_R + 0.2
+		_box(Vector3(mx2, my2 + 2.6, mz2), Vector3(long2, 0.16, 0.14), BOIS_CLAIR, null, Vector3(0, ry2, 0))
+		var lan := _box(Vector3(mx2, my2 + 2.36, mz2), Vector3(0.24, 0.34, 0.24), Color(1.0, 0.80, 0.30))
+		lan.material_override = mat_std(Color(1.0, 0.80, 0.30), false, true)
+		_cone(Vector3(mx2, my2 + 2.60, mz2), 0.19, 0.22, Color(0.16, 0.16, 0.18), null, 4)
 
 func creer_banniere(x: float, z: float, col: Color):
 	var y := hauteur_terrain(x, z)
@@ -1020,6 +1097,14 @@ func creer_ennemis():
 		for i in range(zone.n):
 			var x: float = zone.cx + randf_range(-8, 8)
 			var z: float = zone.cz + randf_range(-8, 8)
+			# Naissance interdite dans le village protégé
+			if dans_village(x, z):
+				var pousse := Vector2(x, z)
+				if pousse.length() < 0.001:
+					pousse = Vector2(1, 0)
+				pousse = pousse.normalized() * (VILLAGE_R + 7.0)
+				x = pousse.x
+				z = pousse.y
 			var root := Node3D.new()
 			root.position = Vector3(x, hauteur_terrain(x, z), z)
 			add_child(root)
@@ -1107,9 +1192,20 @@ func update_ennemis(delta: float):
 				e.dir = Vector3(cos(a), 0, sin(a))
 		var spd: float = e.spd * (1.4 if dist < 10.0 else 0.6)
 		var ndir: Vector3 = e.dir
+		# Sécurité : un monstre égaré dans le village est remis dehors illico
+		if dans_village(node.global_position.x, node.global_position.z):
+			var dehors := Vector2(node.global_position.x, node.global_position.z)
+			if dehors.length() < 0.001:
+				dehors = Vector2(1, 0)
+			dehors = dehors.normalized() * (VILLAGE_R + 0.5)
+			node.global_position.x = dehors.x
+			node.global_position.z = dehors.y
 		if ndir.length() > 0.1:
 			var np := node.global_position + ndir * spd * delta
-			if abs(np.x) < WORLD - 3 and abs(np.z) < WORLD - 3:
+			if dans_village(np.x, np.z):
+				# Village protégé : la bébête longe la clôture sans jamais entrer
+				e.t_wander = minf(float(e.t_wander), 0.4)
+			elif abs(np.x) < WORLD - 3 and abs(np.z) < WORLD - 3:
 				node.global_position = np
 			var lk := node.global_position + ndir
 			node.look_at(Vector3(lk.x, node.global_position.y, lk.z), Vector3.UP)
@@ -1226,6 +1322,14 @@ func _respawn_enemy(e: Dictionary):
 	e.node.visible = true
 	e.node.position.x = e.sx + randf_range(-3, 3)
 	e.node.position.z = e.sz + randf_range(-3, 3)
+	# Respawn jamais dans le village protégé
+	if dans_village(e.node.position.x, e.node.position.z):
+		var pousse := Vector2(e.node.position.x, e.node.position.z)
+		if pousse.length() < 0.001:
+			pousse = Vector2(1, 0)
+		pousse = pousse.normalized() * (VILLAGE_R + 4.0)
+		e.node.position.x = pousse.x
+		e.node.position.z = pousse.y
 	e.node.position.y = hauteur_terrain(e.node.position.x, e.node.position.z)
 
 func gagner_xp(t: String):

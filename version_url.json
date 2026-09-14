@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0 : rendu low-poly PrimitiveMesh + Godot 4.7.2. Launcher 2.8.0 : RETOUR au systeme de hashs md5 (repare aussi les fichiers corrompus). Regle imperative : tout changement de fichier = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retiree.",
+  "notes": "MAJ 0.3.0-b8 : le village de depart est PROTEGE (cloture + portails, monstres interdits d'entree). Launcher 2.8.0 : systeme de hashs md5. Regle imperative : tout changement de fichier = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retiree.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "522873f8ffe194c318af414142de0acd",
-      "size": 67262
+      "hash": "5479d6ec6da5cd9d007f718ccc3376f9",
+      "size": 71581
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -54,8 +54,8 @@
       "size": 4020
     },
     "resumer.txt": {
-      "hash": "c9f35370719d027b0ced5a958755a5a8",
-      "size": 12767
+      "hash": "1ef1c2d64c4ade2c943627c8e0b93826",
+      "size": 14252
     }
   }
 }
