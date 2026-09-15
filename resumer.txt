@@ -306,6 +306,15 @@ pour l'herbe/fleurs/rochers (perf).
 - AMBIANCE CHAUDE type image : ciel coucher de soleil (horizon 0.98,0.74,
   0.48), soleil doré (1.0,0.90,0.74, énergie 1.3), saturation 1.0, herbe vert
   doré (0.40,0.56,0.22), route/pavés sable chaud.
+- CORRECTIF MANIFESTE (post-b14) : le launcher (2.8.0) calcule le hash des
+  fichiers TEXTE (TEXT_EXTS : .gd .tscn .godot .pyw .py .bat .json .cfg .txt
+  .md .html .css .js .csv) APRÈS NORMALISATION CRLF->LF (file_hash(normalize=
+  is_text)). LES HASHS DU MANIFESTE DOIVENT DONC ÊTRE CALCULÉS NORMALISÉS pour
+  ces extensions (md5 du contenu avec \r\n et \r remplacés par \n), et bruts
+  pour les binaires (.glb...). Une régénération raw avait cassé 4 entrées CRLF
+  (build_launcher.bat, glb/generer_tout.py, glb/viewer_perso.py,
+  glb/_viewer.html) => erreur launcher « hash ne correspond pas apres
+  telechargement ». Régénéré avec la méthode exacte du launcher.
 
 5) FICHIERS IMPORTANTS
 ----------------------
