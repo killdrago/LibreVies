@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b13"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b14"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -108,6 +108,14 @@ var panneau_ctrl: VBoxContainer
 var tab_graph: Button
 var tab_ctrl: Button
 var opt_con := 100                      # 1..100 (défaut demandé par le dev)
+var opt_res_idx := 2                    # index dans RESOLUTIONS (défaut 1280×720)
+var opt_res: OptionButton
+const RESOLUTIONS := [
+	Vector2i(1024, 768), Vector2i(1152, 864), Vector2i(1280, 720), Vector2i(1280, 768),
+	Vector2i(1280, 800), Vector2i(1280, 854), Vector2i(1280, 960), Vector2i(1280, 1024),
+	Vector2i(1366, 768), Vector2i(1400, 1050), Vector2i(1440, 900), Vector2i(1440, 960),
+	Vector2i(1600, 900), Vector2i(1600, 1024), Vector2i(1600, 1200), Vector2i(1680, 1050),
+]
 var nuages := []
 var floaters := []
 var sparks := []
@@ -292,8 +300,11 @@ func _process(delta: float):
 	if player_attack_anim > 0:
 		player_attack_anim -= delta
 		var k := 1.0 - clampf(player_attack_anim / 0.3, 0.0, 1.0)
+		var ke := k * k * (3.0 - 2.0 * k)
 		if bras_droit:
-			bras_droit.rotation.x = lerpf(-2.5, 0.7, k)
+			# b14 (demande dev) : le bras passe DEVANT (levé) puis redescend
+			# à la position verticale — plus de départ depuis l'arrière.
+			bras_droit.rotation.x = lerpf(2.6, 0.0, ke)
 
 	# --- COOLDOWNS ---
 	if player_attack_cd > 0: player_attack_cd -= delta
@@ -421,10 +432,10 @@ func hauteur_terrain(x: float, z: float) -> float:
 	h += sin(x * 0.21 + 1.7) * cos(z * 0.17 + 0.6) * 0.9
 	h += sin((x + z) * 0.05) * 1.4
 	# Colline du château au nord : PLATEAU plat (le château repose entièrement
-	# dessus) + pente douce autour. Avant : simple pic → seule la pointe touchait
-	# le centre du château, tout le reste flottait au-dessus du vide.
+	# dessus) + pente LARGE et étalée autour (b14 : 32 m de jupe au lieu de 12,
+	# profil de colline douce au lieu du « gros tas de terre »).
 	var dc := Vector2(x, z + 78.0).length()
-	var plat := clampf((32.0 - dc) / 12.0, 0.0, 1.0)
+	var plat := clampf((52.0 - dc) / 32.0, 0.0, 1.0)
 	plat = plat * plat * (3.0 - 2.0 * plat)
 	return lerpf(h * t, 11.0, plat)
 
@@ -493,7 +504,7 @@ func creer_route():
 	var cols := PackedColorArray()
 	for i in range(n - 1):
 		for k in range(3):
-			var base := Color(0.40, 0.38, 0.35) if (k == 0 or k == 2) else Color(0.58, 0.55, 0.50)
+			var base := Color(0.46, 0.36, 0.26) if (k == 0 or k == 2) else Color(0.66, 0.55, 0.40)
 			var ca := base.lightened(rng.randf_range(-0.045, 0.045))
 			var cb := base.lightened(rng.randf_range(-0.045, 0.045))
 			var a0 := point_route(i, offs[k], perps[i])
@@ -521,7 +532,7 @@ func creer_route():
 	pave.height = 0.08
 	pave.radial_segments = 6
 	pave.rings = 1
-	var teintes := [Color(0.62, 0.59, 0.54), Color(0.53, 0.50, 0.46), Color(0.68, 0.65, 0.60)]
+	var teintes := [Color(0.70, 0.60, 0.46), Color(0.60, 0.50, 0.38), Color(0.76, 0.66, 0.52)]
 	for ni in range(3):
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -541,17 +552,23 @@ func creer_route():
 			var x := p.x + perp.x * off + tang.x * jit
 			var z := p.y + perp.y * off + tang.y * jit
 			var s := rng.randf_range(0.7, 1.3)
-			var tr := Transform3D()
-			tr = tr.rotated(Vector3.UP, rng.randf_range(0, TAU))
-			tr = tr.scaled(Vector3(s, rng.randf_range(0.5, 1.0), s))
-			tr.origin = Vector3(x, hauteur_terrain(x, z) + 0.055, z)
+			# b14 : pavés POSÉS à plat sur la pente (alignés sur la normale du
+			# terrain) : plus de pavés qui flottent / s'enfoncent dans la montée.
+			var h0 := hauteur_terrain(x, z)
+			var gx := hauteur_terrain(x + 0.5, z) - hauteur_terrain(x - 0.5, z)
+			var gz := hauteur_terrain(x, z + 0.5) - hauteur_terrain(x, z - 0.5)
+			var nrm := Vector3(-gx, 1.0, -gz).normalized()
+			var xv := (Vector3.RIGHT - nrm * Vector3.RIGHT.dot(nrm)).normalized()
+			var zv := xv.cross(nrm)
+			var bas := Basis(xv, nrm, zv).rotated(nrm, rng.randf_range(0, TAU)).scaled(Vector3(s, rng.randf_range(0.5, 1.0), s))
+			var tr := Transform3D(bas, Vector3(x, h0 + 0.06, z))
 			mm.set_instance_transform(k, tr)
 
 func point_route(i: int, off: float, perp: Vector2) -> Vector3:
 	var p: Vector2 = chemin_lisse[i]
 	var x := p.x + perp.x * off
 	var z := p.y + perp.y * off
-	return Vector3(x, hauteur_terrain(x, z) + 0.04, z)
+	return Vector3(x, hauteur_terrain(x, z) + 0.09, z)
 
 # Le village de départ est PROTÉGÉ : clôture visuelle + zone interdite aux monstres
 func dans_village(x: float, z: float) -> bool:
@@ -567,6 +584,15 @@ func appliquer_reglages_visuels():
 # ============================================================
 # COLLISIONS UNIVERSELLES (b9) : plus rien ne se traverse
 # ============================================================
+func appliquer_resolution():
+	var r: Vector2i = RESOLUTIONS[clampi(opt_res_idx, 0, RESOLUTIONS.size() - 1)]
+	DisplayServer.window_set_size(Vector2i(r.x, r.y))
+	var sc := DisplayServer.window_get_current_screen()
+	var ssize := DisplayServer.screen_get_size(sc)
+	var px := maxi(int((ssize.x - r.x) / 2.0), 0)
+	var py := maxi(int((ssize.y - r.y) / 2.0), 0)
+	DisplayServer.window_set_position(Vector2i(px, py))
+
 func col_cercle(x: float, z: float, r: float, h: float = HAUT_COLLISION):
 	colliders.append({"t": "c", "x": x, "z": z, "r": r, "g": r + 1.0, "h": h})
 
@@ -665,7 +691,7 @@ func creer_terrain():
 			var cx := (x0 + x1) * 0.5
 			var cz := (z0 + z1) * 0.5
 			var cy := hauteur_terrain(cx, cz)
-			var col := Color(0.33, 0.60, 0.20)
+			var col := Color(0.40, 0.56, 0.22)
 			col = col.lightened(clampf(cy * 0.03, 0.0, 0.18))
 			var v := rng.randf_range(-0.045, 0.045)
 			col = Color(col.r + v, col.g + v * 0.8, col.b + v * 0.5)
@@ -833,10 +859,10 @@ func creer_environnement():
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.22, 0.51, 0.90)
-	sm.sky_horizon_color = Color(0.62, 0.83, 0.97)
-	sm.ground_bottom_color = Color(0.35, 0.55, 0.25)
-	sm.ground_horizon_color = Color(0.62, 0.83, 0.97)
+	sm.sky_top_color = Color(0.30, 0.46, 0.78)
+	sm.sky_horizon_color = Color(0.98, 0.74, 0.48)
+	sm.ground_bottom_color = Color(0.45, 0.50, 0.26)
+	sm.ground_horizon_color = Color(0.98, 0.74, 0.48)
 	sky.sky_material = sm
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -845,15 +871,15 @@ func creer_environnement():
 	# Couleurs globales adoucies (saturation) + réglages luminosité/contraste
 	monde_env = env
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 0.85
+	env.adjustment_saturation = 1.0
 	appliquer_reglages_visuels()
 	get_viewport().world_3d.environment = env
 
 	# Soleil (le DirectionalLight3D de main.tscn)
 	var sun: DirectionalLight3D = $DirectionalLight3D
 	sun.rotation = Vector3(deg_to_rad(-52), deg_to_rad(-32), 0)
-	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.light_energy = 1.25
+	sun.light_color = Color(1.0, 0.90, 0.74)
+	sun.light_energy = 1.3
 	sun.shadow_enabled = true
 
 # ============================================================
@@ -984,20 +1010,25 @@ func _prism(pos: Vector3, size: Vector3, col: Color, parent: Node = null, rot :=
 func creer_ville():
 	var PIERRE := Color(0.50, 0.48, 0.45)
 	var data = [
-		{"x":-10,"z":-5,"w":5,"h":4,"d":4,"c":Color(0.85,0.74,0.56),"n":"Supermarche","roof":Color(0.72,0.28,0.12)},
-		{"x":-10,"z":3,"w":4,"h":3.5,"d":3.5,"c":Color(0.80,0.66,0.45),"n":"Armurerie","roof":Color(0.45,0.45,0.48)},
-		{"x":10,"z":-6,"w":4,"h":3.5,"d":3.5,"c":Color(0.60,0.78,0.66),"n":"Vetements","roof":Color(0.62,0.38,0.20)},
-		{"x":10,"z":3,"w":4,"h":4,"d":4,"c":Color(0.82,0.66,0.42),"n":"Auberge","roof":Color(0.68,0.24,0.10)},
-		{"x":-9,"z":-20,"w":8,"h":6,"d":6,"c":Color(0.88,0.85,0.76),"n":"Mairie","roof":Color(0.32,0.47,0.58)},
-		{"x":-20,"z":-12,"w":4,"h":3.5,"d":3.5,"c":Color(0.83,0.70,0.52),"n":"Maison","roof":Color(0.68,0.24,0.10)},
-		{"x":-20,"z":-4,"w":3.5,"h":3,"d":3.5,"c":Color(0.78,0.64,0.46),"n":"Maison","roof":Color(0.60,0.32,0.16)},
-		{"x":20,"z":8,"w":4,"h":3.5,"d":3.5,"c":Color(0.83,0.70,0.52),"n":"Maison","roof":Color(0.68,0.24,0.10)},
-		{"x":20,"z":-4,"w":3.5,"h":3,"d":3.5,"c":Color(0.78,0.64,0.46),"n":"Maison","roof":Color(0.60,0.32,0.16)},
+		{"x":-10,"z":-5,"w":5,"h":4,"d":4,"c":Color(0.88,0.80,0.64),"n":"Supermarche","roof":Color(0.74,0.30,0.11)},
+		{"x":-10,"z":3,"w":4,"h":3.5,"d":3.5,"c":Color(0.86,0.76,0.58),"n":"Armurerie","roof":Color(0.66,0.26,0.10)},
+		{"x":10,"z":-6,"w":4,"h":3.5,"d":3.5,"c":Color(0.90,0.84,0.70),"n":"Vetements","roof":Color(0.78,0.36,0.14)},
+		{"x":10,"z":3,"w":4,"h":4,"d":4,"c":Color(0.87,0.78,0.60),"n":"Auberge","roof":Color(0.70,0.27,0.10)},
+		{"x":-9,"z":-20,"w":8,"h":6,"d":6,"c":Color(0.90,0.87,0.78),"n":"Mairie","roof":Color(0.28,0.42,0.60)},
+		{"x":-20,"z":-12,"w":4,"h":3.5,"d":3.5,"c":Color(0.88,0.80,0.64),"n":"Maison","roof":Color(0.72,0.29,0.11)},
+		{"x":-20,"z":-4,"w":3.5,"h":3,"d":3.5,"c":Color(0.85,0.74,0.56),"n":"Maison","roof":Color(0.64,0.25,0.09)},
+		{"x":20,"z":8,"w":4,"h":3.5,"d":3.5,"c":Color(0.88,0.80,0.64),"n":"Maison","roof":Color(0.72,0.29,0.11)},
+		{"x":20,"z":-4,"w":3.5,"h":3,"d":3.5,"c":Color(0.85,0.74,0.56),"n":"Maison","roof":Color(0.64,0.25,0.09)},
 	]
 	for b in data:
 		var y := hauteur_terrain(b.x, b.z)
 		# Murs
 		_box(Vector3(b.x, y + b.h / 2.0, b.z), Vector3(b.w, b.h, b.d), b.c)
+		# Colombages façade (thème de base : image de référence)
+		var BOIS := Color(0.36, 0.22, 0.11)
+		_box(Vector3(b.x, y + b.h * 0.52, b.z + b.d / 2.0 + 0.04), Vector3(b.w * 0.98, 0.12, 0.10), BOIS)
+		_box(Vector3(b.x - b.w / 2.0 + 0.08, y + b.h * 0.5, b.z + b.d / 2.0 + 0.04), Vector3(0.14, b.h * 0.98, 0.10), BOIS)
+		_box(Vector3(b.x + b.w / 2.0 - 0.08, y + b.h * 0.5, b.z + b.d / 2.0 + 0.04), Vector3(0.14, b.h * 0.98, 0.10), BOIS)
 		# Fondations pierre
 		_box(Vector3(b.x, y + 0.1, b.z), Vector3(b.w + 0.25, 0.25, b.d + 0.25), PIERRE)
 		# Toit en prisme (pignon) + débords
@@ -1009,13 +1040,16 @@ func creer_ville():
 		# Fenêtres façade (cadre + vitre + croix)
 		for fx in [-0.28, 0.28]:
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.18, b.h * 0.20, 0.12), Color(0.32, 0.21, 0.10))
-			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.08), Vector3(b.w * 0.13, b.h * 0.14, 0.08), Color(0.55, 0.80, 0.95))
+			var vitre := _box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.08), Vector3(b.w * 0.13, b.h * 0.14, 0.08), Color(1.0, 0.72, 0.30))
+			vitre.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(b.w * 0.13, 0.03, 0.03), Color(0.32, 0.21, 0.10))
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(0.03, b.h * 0.14, 0.03), Color(0.32, 0.21, 0.10))
 		# Fenêtres côtés
 		for fz in [-0.28, 0.28]:
-			_box(Vector3(b.x + b.w / 2.0 + 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(0.55, 0.80, 0.95))
-			_box(Vector3(b.x - b.w / 2.0 - 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(0.55, 0.80, 0.95))
+			var v2 := _box(Vector3(b.x + b.w / 2.0 + 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(1.0, 0.72, 0.30))
+			v2.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
+			var v3 := _box(Vector3(b.x - b.w / 2.0 - 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(1.0, 0.72, 0.30))
+			v3.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
 		# Auvent des commerces
 		if b.n in ["Supermarche", "Armurerie", "Vetements", "Auberge"]:
 			_box(Vector3(b.x, y + b.h * 0.44, b.z + b.d / 2.0 + 0.9), Vector3(b.w + 0.4, 0.1, 1.8), Color(0.75, 0.38, 0.12))
@@ -1133,18 +1167,22 @@ func creer_chateau():
 func creer_fontaine(x: float, z: float):
 	var y := hauteur_terrain(x, z)
 	col_cercle(x, z, 2.6, 0.95)
-	# Bassin principal + eau (muret assez bas : on peut sauter dessus)
-	_cyl(Vector3(x, y + 0.45, z), 2.5, 2.3, 0.9, Color(0.62, 0.61, 0.60), self, 12)
-	_cyl(Vector3(x, y + 0.85, z), 2.1, 2.1, 0.25, Color(0.18, 0.58, 0.88), self, 12)
+	# b14 : thème de la fontaine de l'image de référence — pierre beige claire,
+	# eau turquoise, filets d'eau blancs.
+	var PIERRE_F := Color(0.82, 0.76, 0.62)
+	# Degré extérieur (assise de blocs) + bassin principal + eau
+	_cyl(Vector3(x, y + 0.12, z), 2.95, 2.75, 0.24, PIERRE_F.darkened(0.08), self, 12)
+	_cyl(Vector3(x, y + 0.45, z), 2.5, 2.3, 0.9, PIERRE_F, self, 12)
+	_cyl(Vector3(x, y + 0.85, z), 2.1, 2.1, 0.25, Color(0.13, 0.62, 0.66), self, 12)
 	# Colonne centrale
-	_cyl(Vector3(x, y + 1.7, z), 0.32, 0.26, 2.2, Color(0.66, 0.65, 0.64), self, 8)
+	_cyl(Vector3(x, y + 1.7, z), 0.32, 0.26, 2.2, PIERRE_F, self, 8)
 	# Vasque haute + orbe d'eau + filets d'eau retombant dans le bassin
-	_cyl(Vector3(x, y + 2.72, z), 0.95, 0.5, 0.24, Color(0.66, 0.65, 0.64), self, 10)
-	_cyl(Vector3(x, y + 2.85, z), 0.82, 0.82, 0.06, Color(0.30, 0.65, 0.90), self, 10)
-	_sph(Vector3(x, y + 3.18, z), 0.34, Color(0.35, 0.72, 0.95), self, true)
+	_cyl(Vector3(x, y + 2.72, z), 0.95, 0.5, 0.24, PIERRE_F, self, 10)
+	_cyl(Vector3(x, y + 2.85, z), 0.82, 0.82, 0.06, Color(0.18, 0.70, 0.72), self, 10)
+	_sph(Vector3(x, y + 3.18, z), 0.34, Color(0.30, 0.80, 0.85), self, true)
 	for k in range(4):
 		var a := float(k) * TAU / 4.0 + 0.4
-		_cyl(Vector3(x + cos(a) * 0.78, y + 1.85, z + sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.55, 0.80, 0.95), self, 5)
+		_cyl(Vector3(x + cos(a) * 0.78, y + 1.85, z + sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.85, 0.95, 1.0), self, 5)
 
 func creer_arbres():
 	var pins := [
@@ -1995,7 +2033,7 @@ func creer_hud():
 	canvas.add_child(port)
 
 	hp_bar = ProgressBar.new()
-	hp_bar.position = Vector2(84, 26)
+	hp_bar.position = Vector2(84, 14)
 	hp_bar.size = Vector2(210, 26)
 	hp_bar.max_value = PV_MAX
 	hp_bar.value = PV_MAX
@@ -2025,7 +2063,7 @@ func creer_hud():
 
 	# ===== Quêtes (gauche) — réductible par le petit bouton en haut à droite =====
 	quest_panel = PanelContainer.new()
-	quest_panel.position = Vector2(14, 92)
+	quest_panel.position = Vector2(14, 118)
 	quest_panel.size = Vector2(280, 96)
 	var qs := StyleBoxFlat.new()
 	qs.bg_color = Color(0.10, 0.09, 0.08, 0.90)
@@ -2068,24 +2106,24 @@ func creer_hud():
 	quete_l2.add_theme_color_override("font_color", Color(0.88, 0.88, 0.88))
 	qv.add_child(quete_l2)
 
-	# ===== Or + cailloux (haut droite) =====
+	# ===== Or + cailloux : sous la barre de vie, en haut à gauche (b14) =====
 	pill_or = Pill.new()
 	pill_or.kind = "or"
 	pill_or.parent = self
-	pill_or.position = Vector2(1280 - 250 - 14, 20)
-	pill_or.size = Vector2(110, 34)
+	pill_or.position = Vector2(84, 46)
+	pill_or.size = Vector2(110, 30)
 	canvas.add_child(pill_or)
 	pill_cailloux = Pill.new()
 	pill_cailloux.kind = "cailloux"
 	pill_cailloux.parent = self
-	pill_cailloux.position = Vector2(1280 - 250 - 14 - 100, 20)
-	pill_cailloux.size = Vector2(92, 34)
+	pill_cailloux.position = Vector2(84, 80)
+	pill_cailloux.size = Vector2(92, 30)
 	canvas.add_child(pill_cailloux)
 
 	# ===== Mini-carte =====
 	minimap = MiniMap.new()
 	minimap.parent = self
-	minimap.position = Vector2(1280 - 148 - 14, 62)
+	minimap.position = Vector2(1280 - 148 - 14, 14)
 	minimap.size = Vector2(148, 148)
 	canvas.add_child(minimap)
 
@@ -2221,6 +2259,22 @@ func creer_hud():
 	lbl_val_con.custom_minimum_size = Vector2(42, 0)
 	row_con.add_child(lbl_val_con)
 	slider_con.value_changed.connect(func(v: float): opt_con = int(v); lbl_val_con.text = str(opt_con); appliquer_reglages_visuels(); save_config())
+	var row_res := HBoxContainer.new()
+	panneau_graph.add_child(row_res)
+	var lbl_r := Label.new()
+	lbl_r.text = "Résolution"
+	lbl_r.add_theme_font_size_override("font_size", 15)
+	lbl_r.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	lbl_r.custom_minimum_size = Vector2(110, 0)
+	row_res.add_child(lbl_r)
+	opt_res = OptionButton.new()
+	opt_res.custom_minimum_size = Vector2(220, 26)
+	for r in RESOLUTIONS:
+		opt_res.add_item("%d×%d" % [r.x, r.y])
+	opt_res.selected = opt_res_idx
+	opt_res.item_selected.connect(func(idx: int): opt_res_idx = idx; appliquer_resolution(); save_config())
+	row_res.add_child(opt_res)
+	appliquer_resolution()
 	# --- Onglet CONTRÔLES : axe Y inversé + toutes les touches ---
 	panneau_ctrl = VBoxContainer.new()
 	panneau_ctrl.custom_minimum_size = Vector2(404, 360)
@@ -2464,6 +2518,7 @@ func save_config():
 	cfg.set_value("options", "cam_invert_y", cam_invert_y)
 	cfg.set_value("options", "luminosite", opt_lum)
 	cfg.set_value("options", "contraste", opt_con)
+	cfg.set_value("options", "resolution", opt_res_idx)
 	for a in ACTIONS_REGLABLES:
 		var evs := InputMap.action_get_events(a)
 		for ev in evs:
@@ -2487,6 +2542,7 @@ func load_config():
 			invert_check.button_pressed = cam_invert_y
 		opt_lum = int(cfg.get_value("options", "luminosite", 30))
 		opt_con = int(cfg.get_value("options", "contraste", 100))
+		opt_res_idx = clampi(int(cfg.get_value("options", "resolution", 2)), 0, RESOLUTIONS.size() - 1)
 		if is_instance_valid(slider_lum):
 			slider_lum.value = opt_lum
 			lbl_val_lum.text = str(opt_lum)

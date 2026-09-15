@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b13" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b14" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -277,6 +277,35 @@ pour l'herbe/fleurs/rochers (perf).
 - FONTAINE déménagée de (-9,-11.5) à (9,15) : sur le grand espace vide au
   SUD du village (le dev ne la voyait pas au nord). Pin [9,13] -> [14,11]
   pour lui laisser la place. creer_fontaine(x, z) paramétrée depuis b12.
+
+4g) MAJ DU 15/09/2026 (build b14)
+----------------------------------
+- COLLINE DU CHÂTEAU : pente ÉLARGIE (jupe smoothstep de 32 m, dc 20->52, au
+  lieu de 12) : profil de colline étalée, plus d'effet « gros tas de terre ».
+  Plateau plat h=11 sur dc<=20 inchangé (château toujours posé, coins à 11,0).
+- ROUTE DE MONTAGNE RÉPARÉE : ruban relevé à +0,09 au-dessus du terrain (ne
+  perce plus la pente) ; pavés ALIGNÉS SUR LA NORMALE du terrain (transform
+  Basis construite sur la normale + rotation aléatoire autour de celle-ci) :
+  plus de pavés flottants/enfoncés dans la montée.
+- ANIMATION D'ATTAQUE : le bras droit part DEVANT (levé, rotation.x = +2,6)
+  puis redescend à la verticale (smoothstep), au lieu de partir de l'arrière
+  (demande dev).
+- HUD REORGANISÉ : les 3 barres (vie + or + cailloux) empilées EN HAUT À
+  GAUCHE (hp 84,14 ; or 84,46 ; cailloux 84,80) ; mini-carte collée EN HAUT À
+  DROITE (1118,14) ; panneau de quêtes descendu en (14,118).
+- OPTIONS > GRAPHIQUE : liste déroulante RÉSOLUTION (16 choix : 1024x768 ...
+  1680x1050) : const RESOLUTIONS (Array[Vector2i]), appliquer_resolution()
+  (window_set_size + recentrage écran), choix persisté dans user:// config
+  (clef options/resolution), appliqué au démarrage depuis creer_hud().
+- THÈME DE BASE DES MAISONS (image de référence « fond basique.png ») : murs
+  crépis crème (0.85-0.90), toits terracotta (0.64-0.78 de rouge), mairie en
+  ardoise bleue (0.28,0.42,0.60), COLOMBAGES bruns en façade (poteaux +
+  traverse), fenêtres ÉMISSIVES chaudes (1.0,0.72,0.30, mat_std emissive).
+- FONTAINE aux couleurs de l'image : pierre beige claire (0.82,0.76,0.62),
+  degré extérieur ajouté, eau turquoise (0.13,0.62,0.66), filets blancs.
+- AMBIANCE CHAUDE type image : ciel coucher de soleil (horizon 0.98,0.74,
+  0.48), soleil doré (1.0,0.90,0.74, énergie 1.3), saturation 1.0, herbe vert
+  doré (0.40,0.56,0.22), route/pavés sable chaud.
 
 5) FICHIERS IMPORTANTS
 ----------------------

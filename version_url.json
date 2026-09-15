@@ -1,61 +1,61 @@
 {
-  "launcher_version": "2.8.0",
-  "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b13 : détection clavier AZERTY/QWERTY (touches affichées comme sur le clavier du joueur), château posé sur un plateau plat, maire devant la mairie, fontaine sur l'espace vide au sud du village. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; suppression = ligne retirée.",
-  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
-  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
-  "files": {
-    "main.gd": {
-      "hash": "0c28ccd720cf3fed95708da502ca8914",
-      "size": 97650
-    },
-    "main.tscn": {
-      "hash": "0652db0411d434377ceff6c191db7c1e",
-      "size": 602
-    },
-    "project.godot": {
-      "hash": "6e8f0a9c2f35f391578b5315a940cfbd",
-      "size": 5211
-    },
-    "launcher.pyw": {
-      "hash": "b0a399e550b03bf14a77ae70abcf9320",
-      "size": 628604
-    },
-    "build_launcher.bat": {
-      "hash": "4db739ba34ca09c06e428cf3e8c64b40",
-      "size": 1348
-    },
-    "glb/perso_voxel.glb": {
-      "hash": "90920d44158eb82b0a3676a23ab39475",
-      "size": 86628
-    },
-    "glb/perso_voxel 1.glb": {
-      "hash": "bb0902a2d4b4a2ee2f2386541a983869",
-      "size": 131872
-    },
-    "glb/perso_voxel 2.glb": {
-      "hash": "90b12d376eac910b1e5ab0a8c46b2f24",
-      "size": 144456
-    },
-    "glb/generer_perso_voxel.py": {
-      "hash": "ccf9fa9075578acc774a9a72a4fb9208",
-      "size": 9835
-    },
-    "glb/generer_tout.py": {
-      "hash": "d5647422d96a638ea52525948e7b48d1",
-      "size": 12720
-    },
-    "glb/viewer_perso.py": {
-      "hash": "a2fde4e3c1849d23678959f8eb5a84e5",
-      "size": 5264
-    },
-    "glb/_viewer.html": {
-      "hash": "7714b73b94cb015a535c78a327e2db52",
-      "size": 4020
-    },
-    "resumer.txt": {
-      "hash": "214ae2d521332682e074b0c4e767b58f",
-      "size": 23316
-    }
+ "launcher_version": "2.8.0",
+ "game_version": "0.3.0",
+ "notes": "MAJ 0.3.0-b14 : pente de la colline du château élargie (fini le « tas de terre »), route de montée réparée (ruban + pavés posés sur la pente), bras d'attaque passant devant puis verticale, HUD réorganisé (3 barres en haut à gauche, carte en haut à droite), liste déroulante des résolutions dans Options > Graphique, thème des maisons/fontaine/ambiance repris de l'image de référence. Launcher 2.8.0 : hashs md5. Règle impérative : tout changement = nouveau hash ici ; nouveau fichier = nouvelle ligne avec hash ; fichier supprimé = ligne retirée.",
+ "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
+ "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
+ "files": {
+  "main.gd": {
+   "hash": "3b92a93e87d72a7d67700599b2efb2f9",
+   "size": 100835
+  },
+  "main.tscn": {
+   "hash": "0652db0411d434377ceff6c191db7c1e",
+   "size": 602
+  },
+  "project.godot": {
+   "hash": "6e8f0a9c2f35f391578b5315a940cfbd",
+   "size": 5211
+  },
+  "launcher.pyw": {
+   "hash": "b0a399e550b03bf14a77ae70abcf9320",
+   "size": 628604
+  },
+  "build_launcher.bat": {
+   "hash": "f1f5738ffeddb62d8a652768ce239997",
+   "size": 1348
+  },
+  "glb/perso_voxel.glb": {
+   "hash": "90920d44158eb82b0a3676a23ab39475",
+   "size": 86628
+  },
+  "glb/perso_voxel 1.glb": {
+   "hash": "bb0902a2d4b4a2ee2f2386541a983869",
+   "size": 131872
+  },
+  "glb/perso_voxel 2.glb": {
+   "hash": "90b12d376eac910b1e5ab0a8c46b2f24",
+   "size": 144456
+  },
+  "glb/generer_perso_voxel.py": {
+   "hash": "ccf9fa9075578acc774a9a72a4fb9208",
+   "size": 9835
+  },
+  "glb/generer_tout.py": {
+   "hash": "c7905209017e439fb98011e1d74a939b",
+   "size": 12720
+  },
+  "glb/viewer_perso.py": {
+   "hash": "92e607df3fd4e7c7f3b148bfb711ab7b",
+   "size": 5264
+  },
+  "glb/_viewer.html": {
+   "hash": "ed0c9150f2c7214370f1f9077d185a7f",
+   "size": 4020
+  },
+  "resumer.txt": {
+   "hash": "8b445948aa831e2c20889010dab95311",
+   "size": 25283
   }
+ }
 }
