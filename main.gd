@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b27"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b28"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -73,6 +73,7 @@ var bras_droit: Node3D
 # HUD
 var hp_bar: ProgressBar
 var hp_label: Label
+var mort_label: Label
 var info_label: Label
 var inv_panel: PanelContainer
 var inv_open := false
@@ -291,8 +292,10 @@ func _process(delta: float):
 
 	# --- ANIMATION MARCHE ---
 	if is_moving:
-		player_walk_time += delta * 9
-		var swing := sin(player_walk_time) * 0.55
+		# b28 : la cadence des bras/jambes SUIT la vitesse (sprint = plus rapide)
+		var sprinte := Input.is_action_pressed("sprint")
+		player_walk_time += delta * (14.0 if sprinte else 9.0)
+		var swing := sin(player_walk_time) * (0.78 if sprinte else 0.55)
 		if jambe_gauche: jambe_gauche.rotation.x = swing
 		if jambe_droite: jambe_droite.rotation.x = -swing
 		if bras_gauche: bras_gauche.rotation.x = -swing * 0.7
@@ -454,7 +457,7 @@ func hauteur_terrain(x: float, z: float) -> float:
 
 var CHEMIN: Array[Vector2] = [
 	Vector2(0, 30), Vector2(3, 18), Vector2(-2, 6), Vector2(1, -8),
-	Vector2(4, -20), Vector2(-1, -34), Vector2(1, -48), Vector2(3, -60), Vector2(0, -64),  # b27 : stop AVANT l'enceinte
+	Vector2(4, -20), Vector2(-1, -34), Vector2(1, -48), Vector2(3, -60), Vector2(0, -67.5),  # b28 : stop JUSTE SOUS la porte du château
 ]
 
 func dist_chemin(p: Vector2) -> float:
@@ -1938,11 +1941,18 @@ func update_gardes(delta: float):
 func mourir():
 	player_pv = 0
 	player_dead = true
-	show_info("Vous êtes mort... [R] pour renaître")
+	# b28 : le perso se COUCHE par terre et le message reste affiché
+	player_node.rotation.z = deg_to_rad(90)
+	player_node.global_position.y += 0.2
+	if is_instance_valid(mort_label):
+		mort_label.visible = true
 
 func renaitre():
 	player_dead = false
 	player_pv = PV_MAX
+	player_node.rotation.z = 0.0
+	if is_instance_valid(mort_label):
+		mort_label.visible = false
 	player_node.global_position = Vector3(0, 0, 6)
 	player_protected = true
 	player_prot_timer = 5.0
@@ -2387,6 +2397,19 @@ func creer_hud():
 	pill_cailloux.position = Vector2(14, 80)
 	pill_cailloux.size = Vector2(92, 30)
 	canvas.add_child(pill_cailloux)
+
+	# b28 : message de mort PERSISTANT, centré (reste jusqu'à R)
+	mort_label = Label.new()
+	mort_label.text = "💀  Vous êtes mort — appuie sur R pour renaître"
+	mort_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mort_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mort_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mort_label.add_theme_font_size_override("font_size", 30)
+	mort_label.add_theme_color_override("font_color", Color(1, 0.35, 0.3))
+	mort_label.add_theme_color_override("font_outline_color", Color(0.05, 0.0, 0.0))
+	mort_label.add_theme_constant_override("outline_size", 6)
+	mort_label.visible = false
+	canvas.add_child(mort_label)
 
 	# ===== Mini-carte =====
 	minimap = MiniMap.new()

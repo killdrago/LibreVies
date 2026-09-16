@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b27" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b28" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -548,6 +548,20 @@ pour l'herbe/fleurs/rochers (perf).
 - 14 faces mur_briques : 6 extérieures (b25/b26) + 8 INTÉRIEURES cour
   (nord int z-8.2, sud int z8.2 x2, est/ouest int, donjon côtés x±4.5 et
   arrière z-7.5). Créneaux/tours/donjon = BRIQUE grise.
+
+4u) MAJ DU 16/09/2026 (build b28)
+----------------------------------
+- ROUTE : dernier point CHEMIN (0,-67.5) : elle s'arrête JUSTE SOUS la
+  porte sud du château (sous la pancarte CHÂTEAU), face extérieure du
+  mur = -68.2.
+- COURSE : cadence de marche proportionnelle à la vitesse — sprint :
+  player_walk_time += delta*14 (vs 9) et amplitude swing 0.78 (vs 0.55) :
+  bras/jambes bougent vite en courant.
+- MORT : mourir() couche le perso (player_node.rotation.z = 90°, +0.2 en
+  y pour ne pas s'enfoncer) + mort_label (Label centré plein écran,
+  font 30 rouge contour noir) « 💀 Vous êtes mort — appuie sur R pour
+  renaître » PERSISTANT jusqu'à renaitre() (qui remet rotation 0 et
+  masque le label). Château gris b27 accepté (« on dira que ça ira »).
 
 5) FICHIERS IMPORTANTS
 ----------------------
