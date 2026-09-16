@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b29" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b30" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -579,6 +579,24 @@ pour l'herbe/fleurs/rochers (perf).
   z 0.65) et cycle de frappe recalé : angle de frappe -1.15 rad => le
   marteau tombe PILE sur le sommet de l'enclume (vérifié géométriquement :
   bout du marteau (0.24, 0.65, 0.63) vs sommet enclume y 0.67).
+
+4w) MAJ DU 16/09/2026 (build b30)
+----------------------------------
+- MARCHES MAIRIE inversées corrigées : y = 0.26 - step*0.1 (la plus haute
+  contre la porte, descend vers l'extérieur).
+- FONTAINE : bague col_cercle(x,z,1.15, 2.9) = sommet de la vasque haute
+  (eau 2.85) : plus AUCUN passage à travers vasque/filets/pinacle ; et on
+  ne peut plus se percher dessus (apex saut 2.55 < 2.9-0.25).
+- ROUTE 100% DÉGAGÉE : touffes (while dist_chemin<3.2), rochers (<4.0),
+  cailloux et pièces (<3.0) ressamplés hors du ruban de route.
+- PNJ = MÊME STYLE QUE LE JOUEUR : tête BOÎTE avec 2 yeux noirs, torse
+  boîte + ceinture, épaules boules, bras/jambes capsules + bottes boîte ;
+  coiffes et habits par métier : Forgeron bandana rouge + barbe + tablier
+  de cuir ; Vendeur béret bleu + panneau clair ; Maire haut-de-forme noir
+  + cheveux blancs + écharpe ; Marchand capuche + sacoche. Enclume posée
+  sur BILLOT (souche 0.5 + enclume 0.72 + table 0.86) = hauteur de frappe
+  du marteau (pivot bras 1.12, angle frappe -1.23 rad). Colliders ajoutés :
+  étal Vendeur, enclume, cageot Marchand (on ne traverse plus).
 
 5) FICHIERS IMPORTANTS
 ----------------------

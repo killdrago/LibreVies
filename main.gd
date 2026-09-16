@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b29"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b30"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -787,6 +787,12 @@ func creer_terrain():
 				x += TOWN_R
 			x = clampf(x, -WORLD + 4, WORLD - 4)
 			z = clampf(z, -WORLD + 4, WORLD - 4)
+			# b30 : rien sur la route (touffes)
+			var garde := 0
+			while dist_chemin(Vector2(x, z)) < 3.2 and garde < 8:
+				x = rng2.randf_range(-WORLD + 4, WORLD - 4)
+				z = rng2.randf_range(-WORLD + 4, WORLD - 4)
+				garde += 1
 			var y := hauteur_terrain(x, z)
 			var tr := Transform3D()
 			tr = tr.rotated(Vector3.UP, rng2.randf_range(0, TAU))
@@ -823,6 +829,12 @@ func creer_terrain():
 				dr = dr.normalized() * (VILLAGE_R + 2.6)
 				x = dr.x
 				z = dr.y
+			# b30 : rien sur la route (rochers)
+			var garde := 0
+			while dist_chemin(Vector2(x, z)) < 4.0 and garde < 8:
+				x = rng4.randf_range(-WORLD + 5, WORLD - 5)
+				z = rng4.randf_range(-WORLD + 5, WORLD - 5)
+				garde += 1
 			var s := rng4.randf_range(0.4, 1.5)
 			var tr := Transform3D()
 			tr = tr.rotated(Vector3.UP, rng4.randf_range(0, TAU))
@@ -1150,7 +1162,7 @@ func creer_ville():
 		# Escalier de la Mairie
 		if b.n == "Mairie":
 			for step in range(3):
-				_box(Vector3(b.x, y + 0.06 + step * 0.1, b.z + b.d / 2.0 + 0.6 + step * 0.35),
+				_box(Vector3(b.x, y + 0.26 - step * 0.1, b.z + b.d / 2.0 + 0.6 + step * 0.35),
 					Vector3(b.w * 0.6, 0.12, 0.35), Color(0.60, 0.58, 0.55))
 		_parent_capture = null
 		batiments.append({"x": b.x, "z": b.z, "w": b.w + 0.5, "d": b.d + 0.5, "root": broot, "fade": false})
@@ -1171,25 +1183,40 @@ func creer_ville():
 		root.position = Vector3(d.x, y, d.z)
 		add_child(root)
 		col_cercle(d.x, d.z, 0.4, 1.8)
-		# b25 : jambes + bras ARTICULÉS et matériel de métier : ils travaillent
-		var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.11, 0.42, 0); root.add_child(jambe_g)
-		_caps(Vector3(0, -0.21, 0), 0.075, 0.42, Color(0.30, 0.24, 0.20), jambe_g)
-		var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.11, 0.42, 0); root.add_child(jambe_d)
-		_caps(Vector3(0, -0.21, 0), 0.075, 0.42, Color(0.30, 0.24, 0.20), jambe_d)
-		_caps(Vector3(0, 0.62, 0), 0.19, 0.62, d.c, root)              # corps
-		_prism(Vector3(0, 0.34, 0), Vector3(0.44, 0.26, 0.44), d.c.darkened(0.15), root)  # jupe/tablier
-		_sph(Vector3(0, 1.06, 0), 0.17, Color(0.93, 0.78, 0.62), root) # tête
-		_sph(Vector3(0, 1.16, 0), 0.16, d.c.darkened(0.3), root)       # chapeau/cheveux
-		var bras_g := Node3D.new(); bras_g.position = Vector3(-0.24, 0.86, 0); root.add_child(bras_g)
-		_caps(Vector3(0, -0.21, 0), 0.07, 0.42, d.c.darkened(0.1), bras_g)
-		var bras_d := Node3D.new(); bras_d.position = Vector3(0.24, 0.86, 0); root.add_child(bras_d)
-		_caps(Vector3(0, -0.21, 0), 0.07, 0.42, d.c.darkened(0.1), bras_d)
+		# b30 : PNJ construits COMME le joueur (tête boîte + yeux, torse boîte,
+		# bottes, épaules boules) + coiffe et habits propres à chaque métier
+		var PEAU := Color(0.93, 0.76, 0.58)
+		var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.11, 0.60, 0); root.add_child(jambe_g)
+		var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.11, 0.60, 0); root.add_child(jambe_d)
+		for j in [jambe_g, jambe_d]:
+			_caps(Vector3(0, -0.25, 0), 0.09, 0.50, d.c.darkened(0.30), j)
+			_box(Vector3(0, -0.53, -0.03), Vector3(0.16, 0.15, 0.24), Color(0.30, 0.22, 0.12), j)
+		_box(Vector3(0, 0.95, 0), Vector3(0.42, 0.50, 0.27), d.c, root)
+		_box(Vector3(0, 0.74, 0), Vector3(0.44, 0.10, 0.29), Color(0.35, 0.24, 0.13), root)
+		_sph(Vector3(-0.30, 1.14, 0), 0.10, d.c, root)
+		_sph(Vector3(0.30, 1.14, 0), 0.10, d.c, root)
+		var bras_g := Node3D.new(); bras_g.position = Vector3(-0.29, 1.12, 0); root.add_child(bras_g)
+		var bras_d := Node3D.new(); bras_d.position = Vector3(0.29, 1.12, 0); root.add_child(bras_d)
+		for b in [bras_g, bras_d]:
+			_caps(Vector3(0, -0.19, 0), 0.07, 0.38, d.c, b)
+			_sph(Vector3(0, -0.40, 0), 0.07, PEAU, b)
+		var tete := Node3D.new(); tete.position = Vector3(0, 1.38, 0); root.add_child(tete)
+		_box(Vector3(0, 0, 0), Vector3(0.28, 0.28, 0.26), PEAU, tete)
+		_box(Vector3(-0.07, 0.03, 0.135), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
+		_box(Vector3(0.07, 0.03, 0.135), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 		if d.n == "Forgeron":
+			_box(Vector3(0, 0.16, 0), Vector3(0.30, 0.10, 0.28), Color(0.55, 0.15, 0.12), tete)
+			_box(Vector3(0, -0.11, 0.11), Vector3(0.18, 0.10, 0.06), Color(0.30, 0.20, 0.14), tete)
+			_box(Vector3(0, 0.85, 0.15), Vector3(0.30, 0.55, 0.06), Color(0.45, 0.30, 0.16), root)
 			_box(Vector3(0, -0.44, 0.06), Vector3(0.05, 0.34, 0.05), Color(0.45, 0.30, 0.14), bras_d)
 			_box(Vector3(0, -0.60, 0.06), Vector3(0.14, 0.12, 0.10), Color(0.35, 0.35, 0.38), bras_d)
-			_box(Vector3(0.24, 0.42, 0.65), Vector3(0.55, 0.34, 0.35), Color(0.25, 0.25, 0.28), root)
-			_box(Vector3(0.24, 0.62, 0.65), Vector3(0.20, 0.10, 0.24), Color(0.35, 0.35, 0.38), root)
+			_box(Vector3(0.24, 0.25, 0.65), Vector3(0.30, 0.50, 0.30), Color(0.40, 0.27, 0.13), root)
+			_box(Vector3(0.24, 0.72, 0.65), Vector3(0.55, 0.20, 0.35), Color(0.25, 0.25, 0.28), root)
+			_box(Vector3(0.24, 0.86, 0.65), Vector3(0.20, 0.08, 0.24), Color(0.35, 0.35, 0.38), root)
 		elif d.n == "Vendeur":
+			_box(Vector3(0, 0.17, 0), Vector3(0.32, 0.08, 0.30), Color(0.20, 0.30, 0.55), tete)
+			_box(Vector3(0, 0.13, 0.17), Vector3(0.22, 0.04, 0.10), Color(0.20, 0.30, 0.55), tete)
+			_box(Vector3(0, 0.92, 0.145), Vector3(0.22, 0.42, 0.04), d.c.lightened(0.30), root)
 			_box(Vector3(0, 0.45, 0.8), Vector3(1.3, 0.10, 0.7), Color(0.52, 0.36, 0.19), root)
 			_box(Vector3(-0.45, 0.25, 0.8), Vector3(0.10, 0.40, 0.10), Color(0.40, 0.27, 0.13), root)
 			_box(Vector3(0.45, 0.25, 0.8), Vector3(0.10, 0.40, 0.10), Color(0.40, 0.27, 0.13), root)
@@ -1197,11 +1224,24 @@ func creer_ville():
 			for q in range(4):
 				_sph(Vector3(-0.4 + q * 0.27, 0.56, 0.8), 0.09, fruits[q], root)
 		elif d.n == "Maire":
-			_box(Vector3(0, 0.66, 0.16), Vector3(0.10, 0.55, 0.06), Color(0.85, 0.75, 0.55), root, Vector3(0, 0, deg_to_rad(30)))
+			_box(Vector3(0, 0.16, 0), Vector3(0.36, 0.04, 0.34), Color(0.15, 0.15, 0.18), tete)
+			_box(Vector3(0, 0.30, 0), Vector3(0.24, 0.24, 0.24), Color(0.15, 0.15, 0.18), tete)
+			_box(Vector3(-0.15, 0.06, 0), Vector3(0.04, 0.14, 0.20), Color(0.85, 0.85, 0.85), tete)
+			_box(Vector3(0.15, 0.06, 0), Vector3(0.04, 0.14, 0.20), Color(0.85, 0.85, 0.85), tete)
+			_box(Vector3(0, 0.95, 0.15), Vector3(0.10, 0.50, 0.05), Color(0.85, 0.75, 0.55), root, Vector3(0, 0, deg_to_rad(35)))
 			_box(Vector3(0, -0.42, 0.10), Vector3(0.16, 0.22, 0.04), Color(0.92, 0.88, 0.75), bras_g)
 		elif d.n == "Marchand":
+			_box(Vector3(0, 0.18, -0.02), Vector3(0.30, 0.12, 0.30), Color(0.40, 0.30, 0.20), tete)
+			_box(Vector3(0, 0.10, -0.16), Vector3(0.28, 0.16, 0.06), Color(0.40, 0.30, 0.20), tete)
+			_box(Vector3(0.16, 0.70, 0.14), Vector3(0.12, 0.14, 0.10), Color(0.42, 0.28, 0.15), root)
 			_sph(Vector3(0, 0.80, -0.24), 0.20, Color(0.55, 0.42, 0.25), root)
 			_box(Vector3(0.55, 0.22, 0.3), Vector3(0.45, 0.44, 0.45), Color(0.52, 0.36, 0.19), root)
+		if d.n == "Vendeur":
+			col_boite(d.x, d.z + 0.8, 1.4, 0.8, 0.95)
+		elif d.n == "Forgeron":
+			col_boite(d.x + 0.24, d.z + 0.65, 0.6, 0.4, 0.95)
+		elif d.n == "Marchand":
+			col_boite(d.x + 0.55, d.z + 0.3, 0.5, 0.5, 0.5)
 		pnj_items.append({"n": d.n, "root": root, "bras_g": bras_g, "bras_d": bras_d, "jambe_g": jambe_g, "jambe_d": jambe_d, "y": y, "t": randf() * 10.0})
 		var label := Label3D.new()
 		label.text = d.n
@@ -1403,7 +1443,7 @@ func creer_arbres():
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
 	col_cercle(x, z, 0.55, 4.4)  # b23 : le HAUT de la fontaine est solide aussi
-	col_cercle(x, z, 1.15, 2.4)  # b29 : la VASQUE haute entière est solide
+	col_cercle(x, z, 1.15, 2.9)  # b30 : bague au SOMMET de la vasque : plus rien ne traverse
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -1967,7 +2007,7 @@ func creer_objets():
 		var x := randf_range(-50, 50)
 		var z := randf_range(-50, 50)
 		# b29 : AUCUN caillou/pièce dans le village (ressamplé hors enceinte)
-		while Vector2(x, z).length() < VILLAGE_R + 2.0:
+		while Vector2(x, z).length() < VILLAGE_R + 2.0 or dist_chemin(Vector2(x, z)) < 3.0:
 			x = randf_range(-50, 50)
 			z = randf_range(-50, 50)
 		var mi := _facette(Vector3(x, hauteur_terrain(x, z) + 0.14, z), Color(0.56, 0.54, 0.50), self, Vector3(0.28, 0.22, 0.28))
@@ -1976,7 +2016,7 @@ func creer_objets():
 		var x := randf_range(-40, 40)
 		var z := randf_range(-40, 40)
 		# b29 : jamais dans le village
-		while Vector2(x, z).length() < VILLAGE_R + 2.0:
+		while Vector2(x, z).length() < VILLAGE_R + 2.0 or dist_chemin(Vector2(x, z)) < 3.0:
 			x = randf_range(-40, 40)
 			z = randf_range(-40, 40)
 		var mi := _cyl(Vector3(x, hauteur_terrain(x, z) + 0.12, z), 0.18, 0.18, 0.05, Color(1, 0.84, 0.1), self, 12)
@@ -2722,7 +2762,7 @@ func update_pnj(delta: float):
 		if p.n == "Forgeron":
 			# frappe l'enclume : le bras monte puis claque
 			var cyc := fmod(t * 1.4, 1.0)
-			var ang: float = -2.3 + 1.15 * (cyc / 0.7) if cyc < 0.7 else -1.15 - 1.15 * ((cyc - 0.7) / 0.3)
+			var ang: float = -2.4 + 1.17 * (cyc / 0.7) if cyc < 0.7 else -1.23 - 1.17 * ((cyc - 0.7) / 0.3)
 			p.bras_d.rotation.x = ang
 			p.bras_g.rotation.x = -0.5
 		elif p.n == "Vendeur":
