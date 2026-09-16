@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b24 : petites boules jaunes (fleurs) retirées, murs du château avec parement de pierres, pieds du joueur posés sur les pavés de la route, barres HP/or/cailloux alignées à gauche comme l'encart de quête, croix ✕ pour fermer l'encart + touche dédiée (position de Q ; A en AZERTY, réglable dans Options). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b25 : château sans la plateforme (trait horizontal retiré), murs en briques appareillées décalées comme la photo de référence, barres HP/or/cailloux en haut à gauche avec portrait en bas, PNJ animés qui travaillent (forgeron qui frappe l'enclume, vendeur à son étal, maire, marchand). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "ce25c9aeb8ca06280cf9217b38bf49a7",
-   "size": 112349
+   "hash": "6c9746ec51b755f0afcb89fe033e2314",
+   "size": 116961
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "ed00e610ba059fcb678fc76d8bdffea2",
-   "size": 37462
+   "hash": "d99bad88a33aed310e39da50501ba440",
+   "size": 38867
   }
  }
 }

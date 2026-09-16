@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b24" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b25" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -499,6 +499,29 @@ pour l'herbe/fleurs/rochers (perf).
   (car le Q imprimé = move_left en ZQSD, conflit). Réglable dans Options >
   Contrôles (ACTIONS_REGLABLES + LIBELLES_TOUCHES mis à jour) ; texte
   d'aide affiche texte_touche("quest_panel").
+
+4r) MAJ DU 16/09/2026 (build b25)
+----------------------------------
+- CHÂTEAU : plateforme SUPPRIMÉE (c'était « le grand trait horizontal en
+  bas ») ; enceinte/tours/donjon descendent jusqu'au sol (murs h 6,
+  tours h hh+1, donjon h 11) ; porte+linteau descendus (1.9/3.9) ;
+  collisions montées en conséquence (6/10/13/11).
+- MURS EN BRIQUES APPAREILLÉES (demande photo jointe : tour en briques
+  décalées) : func mur_briques(p0, udir, ndir, length, htop, base, seed,
+  parent) = UN maillage ArrayMesh coloré par face (rangées décalées
+  bw 1.6 / br 0.55, joints 0.12/0.14 = mur derrière, 3 teintes aléatoires,
+  quads saillants ndir*0.07, vertex_color_use_as_albedo). Remplace le
+  damier b24. Faces : nord, 2 segments sud, est, ouest, donjon avant.
+  Règle de winding : udir = droite écran de la face (+Z=>+x, -Z=>-x,
+  +X=>-z, -X=>+z), tris (a,b,c),(a,c,d).
+- HUD : barres HP/or/cailloux EN HAUT à gauche (14,14)/(14,46)/(14,80),
+  encart quête revenu à (14,118) ; portrait ancré en BAS à gauche
+  (anchor_top=1, offsets -76/-14).
+- PNJ QUI TRAVAILLENT : jambes + bras articulés (Node3D pivots) ;
+  Forgeron = marteau en main + enclume, frappe cyclique (update_pnj) ;
+  Vendeur = étal + 4 fruits, bras qui présentent ; Maire = écharpe +
+  parchemin, se tourne lentement ; Marchand = sac à dos + cageot,
+  trottine. pnj_items[] + update_pnj(delta) appelé dans _process.
 
 5) FICHIERS IMPORTANTS
 ----------------------

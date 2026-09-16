@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b24"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b25"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -109,6 +109,7 @@ var chemin_lisse: Array[Vector2] = []   # courbe lissée de la route (Catmull-Ro
 var opt_lum := 30                       # 1..100 (défaut demandé par le dev)
 var capture_action := ""                # action en cours de reconfiguration (Options > Contrôles)
 var touches_boutons := {}               # action -> Button
+var pnj_items := []                       # b25 : PNJ animés (métiers)
 var panneau_graph: VBoxContainer
 var panneau_ctrl: VBoxContainer
 var tab_graph: Button
@@ -178,6 +179,9 @@ func _process(delta: float):
 		n.position.x += delta * 0.6
 		if n.position.x > WORLD + 40:
 			n.position.x = -WORLD - 40
+
+	# b25 : PNJ qui travaillent (animations par métier)
+	update_pnj(delta)
 
 	# Pièces qui tournent
 	for a in argent_items:
@@ -1164,12 +1168,38 @@ func creer_ville():
 		root.position = Vector3(d.x, y, d.z)
 		add_child(root)
 		col_cercle(d.x, d.z, 0.4, 1.8)
-		_caps(Vector3(0, 0.55, 0), 0.19, 0.62, d.c, root)              # corps
-		_prism(Vector3(0, 0.28, 0), Vector3(0.44, 0.30, 0.44), d.c.darkened(0.15), root)  # jupe
-		_sph(Vector3(0, 1.02, 0), 0.17, Color(0.93, 0.78, 0.62), root) # tête
-		_sph(Vector3(0, 1.12, 0), 0.16, d.c.darkened(0.3), root)       # chapeau/cheveux
-		_caps(Vector3(-0.24, 0.62, 0), 0.07, 0.42, d.c.darkened(0.1), root)
-		_caps(Vector3(0.24, 0.62, 0), 0.07, 0.42, d.c.darkened(0.1), root)
+		# b25 : jambes + bras ARTICULÉS et matériel de métier : ils travaillent
+		var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.11, 0.42, 0); root.add_child(jambe_g)
+		_caps(Vector3(0, -0.21, 0), 0.075, 0.42, Color(0.30, 0.24, 0.20), jambe_g)
+		var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.11, 0.42, 0); root.add_child(jambe_d)
+		_caps(Vector3(0, -0.21, 0), 0.075, 0.42, Color(0.30, 0.24, 0.20), jambe_d)
+		_caps(Vector3(0, 0.62, 0), 0.19, 0.62, d.c, root)              # corps
+		_prism(Vector3(0, 0.34, 0), Vector3(0.44, 0.26, 0.44), d.c.darkened(0.15), root)  # jupe/tablier
+		_sph(Vector3(0, 1.06, 0), 0.17, Color(0.93, 0.78, 0.62), root) # tête
+		_sph(Vector3(0, 1.16, 0), 0.16, d.c.darkened(0.3), root)       # chapeau/cheveux
+		var bras_g := Node3D.new(); bras_g.position = Vector3(-0.24, 0.86, 0); root.add_child(bras_g)
+		_caps(Vector3(0, -0.21, 0), 0.07, 0.42, d.c.darkened(0.1), bras_g)
+		var bras_d := Node3D.new(); bras_d.position = Vector3(0.24, 0.86, 0); root.add_child(bras_d)
+		_caps(Vector3(0, -0.21, 0), 0.07, 0.42, d.c.darkened(0.1), bras_d)
+		if d.n == "Forgeron":
+			_box(Vector3(0, -0.44, 0.06), Vector3(0.05, 0.34, 0.05), Color(0.45, 0.30, 0.14), bras_d)
+			_box(Vector3(0, -0.60, 0.06), Vector3(0.14, 0.12, 0.10), Color(0.35, 0.35, 0.38), bras_d)
+			_box(Vector3(0.0, 0.42, 0.75), Vector3(0.55, 0.34, 0.35), Color(0.25, 0.25, 0.28), root)
+			_box(Vector3(0.0, 0.62, 0.75), Vector3(0.20, 0.10, 0.24), Color(0.35, 0.35, 0.38), root)
+		elif d.n == "Vendeur":
+			_box(Vector3(0, 0.45, 0.8), Vector3(1.3, 0.10, 0.7), Color(0.52, 0.36, 0.19), root)
+			_box(Vector3(-0.45, 0.25, 0.8), Vector3(0.10, 0.40, 0.10), Color(0.40, 0.27, 0.13), root)
+			_box(Vector3(0.45, 0.25, 0.8), Vector3(0.10, 0.40, 0.10), Color(0.40, 0.27, 0.13), root)
+			var fruits := [Color(0.85, 0.2, 0.15), Color(0.95, 0.7, 0.1), Color(0.3, 0.6, 0.2), Color(0.6, 0.3, 0.6)]
+			for q in range(4):
+				_sph(Vector3(-0.4 + q * 0.27, 0.56, 0.8), 0.09, fruits[q], root)
+		elif d.n == "Maire":
+			_box(Vector3(0, 0.66, 0.16), Vector3(0.10, 0.55, 0.06), Color(0.85, 0.75, 0.55), root, Vector3(0, 0, deg_to_rad(30)))
+			_box(Vector3(0, -0.42, 0.10), Vector3(0.16, 0.22, 0.04), Color(0.92, 0.88, 0.75), bras_g)
+		elif d.n == "Marchand":
+			_sph(Vector3(0, 0.80, -0.24), 0.20, Color(0.55, 0.42, 0.25), root)
+			_box(Vector3(0.55, 0.22, 0.3), Vector3(0.45, 0.44, 0.45), Color(0.52, 0.36, 0.19), root)
+		pnj_items.append({"n": d.n, "root": root, "bras_g": bras_g, "bras_d": bras_d, "jambe_g": jambe_g, "jambe_d": jambe_d, "y": y, "t": randf() * 10.0})
 		var label := Label3D.new()
 		label.text = d.n
 		label.position = Vector3(0, 1.55, 0)
@@ -1184,6 +1214,43 @@ func creer_ville():
 # ============================================================
 # CHÂTEAU (fond, sur la colline)
 # ============================================================
+# b25 : parement de briques décalées sur une face de mur (1 maillage coloré).
+# udir = droite écran de la face, ndir = normale sortante, v = vertical.
+func mur_briques(p0: Vector3, udir: Vector3, ndir: Vector3, length: float, htop: float, base: Color, seedk: int, parent: Node):
+	var vdir := Vector3.UP
+	var tris := PackedVector3Array()
+	var cols := PackedColorArray()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seedk
+	var bw := 1.6
+	var br := 0.55
+	var rows := int(htop / br)
+	for r in range(rows):
+		var dec := 0.0 if r % 2 == 0 else bw * 0.5
+		var v0 := 0.18 + r * br
+		var v1 := v0 + br - 0.12
+		var u := -length / 2.0 + dec
+		while u < length / 2.0 - 0.2:
+			var u1 := minf(u + bw - 0.14, length / 2.0)
+			var k := rng.randi() % 3
+			var col := base if k == 0 else (base.lightened(0.07) if k == 1 else base.darkened(0.08))
+			var a := p0 + udir * u + vdir * v0 + ndir * 0.07
+			var b := p0 + udir * u1 + vdir * v0 + ndir * 0.07
+			var c := p0 + udir * u1 + vdir * v1 + ndir * 0.07
+			var d := p0 + udir * u + vdir * v1 + ndir * 0.07
+			tris.push_back(a); tris.push_back(b); tris.push_back(c)
+			tris.push_back(a); tris.push_back(c); tris.push_back(d)
+			for q in range(6):
+				cols.push_back(col)
+			u += bw
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh_tris(tris, cols)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.9
+	mi.material_override = mat
+	parent.add_child(mi)
+
 func creer_chateau():
 	var cx := 0.0
 	var cz := -78.0
@@ -1195,14 +1262,14 @@ func creer_chateau():
 	root.position = Vector3(cx, y, cz)
 	add_child(root)
 
-	# Plateforme
-	_box(Vector3(0, 0.5, 0), Vector3(34, 2.0, 20), PIERRE_F, root)
+	# b25 : plateforme SUPPRIMÉE (le grand trait horizontal en bas) :
+	# l'enceinte descend jusqu'au sol
 	# Enceinte
-	_box(Vector3(0, 3.5, -9), Vector3(32, 5, 1.6), PIERRE, root)
-	_box(Vector3(-16, 3.5, 0), Vector3(1.6, 5, 20), PIERRE, root)
-	_box(Vector3(16, 3.5, 0), Vector3(1.6, 5, 20), PIERRE, root)
-	_box(Vector3(-8, 3.5, 9), Vector3(16, 5, 1.6), PIERRE, root)
-	_box(Vector3(8, 3.5, 9), Vector3(16, 5, 1.6), PIERRE, root)
+	_box(Vector3(0, 3.0, -9), Vector3(32, 6, 1.6), PIERRE, root)
+	_box(Vector3(-16, 3.0, 0), Vector3(1.6, 6, 20), PIERRE, root)
+	_box(Vector3(16, 3.0, 0), Vector3(1.6, 6, 20), PIERRE, root)
+	_box(Vector3(-8, 3.0, 9), Vector3(16, 6, 1.6), PIERRE, root)
+	_box(Vector3(8, 3.0, 9), Vector3(16, 6, 1.6), PIERRE, root)
 	# Créneaux
 	for i in range(-15, 16, 3):
 		_box(Vector3(i, 6.4, -9), Vector3(1.2, 0.9, 1.8), PIERRE, root)
@@ -1211,9 +1278,9 @@ func creer_chateau():
 		_box(Vector3(-16, 6.4, i), Vector3(1.8, 0.9, 1.2), PIERRE, root)
 		_box(Vector3(16, 6.4, i), Vector3(1.8, 0.9, 1.2), PIERRE, root)
 	# Porte
-	_box(Vector3(-1.6, 2.6, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
-	_box(Vector3(1.6, 2.6, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
-	_box(Vector3(0, 4.6, 9), Vector3(4.0, 0.9, 2.0), Color(0.30, 0.18, 0.08), root)
+	_box(Vector3(-1.6, 1.9, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
+	_box(Vector3(1.6, 1.9, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
+	_box(Vector3(0, 3.9, 9), Vector3(4.0, 0.9, 2.0), Color(0.30, 0.18, 0.08), root)
 	# b23 : pancarte du château au-dessus de la porte sud
 	_box(Vector3(0, 5.75, 10.05), Vector3(3.2, 0.7, 0.12), Color(0.30, 0.19, 0.09), root)
 	_box(Vector3(0, 5.75, 10.12), Vector3(3.0, 0.55, 0.08), Color(0.52, 0.36, 0.19), root)
@@ -1224,54 +1291,45 @@ func creer_chateau():
 	lblc.modulate = Color(0.16, 0.10, 0.04)
 	lblc.position = Vector3(0, 5.75, 10.17)
 	root.add_child(lblc)
-	# b24 : PAREMENT DE PIERRES sur les murs extérieurs (côté visible) :
-	# gros blocs en damier clair/sombre, façon château fort
-	var PC1 := PIERRE.lightened(0.08)
-	var PC2 := PIERRE.darkened(0.10)
-	for ix in range(10):
-		for iy in range(3):
-			_box(Vector3(-14.4 + ix * 3.2, 1.9 + iy * 1.7, -9.83), Vector3(2.6, 0.55, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
-	for seg in [-8.0, 8.0]:
-		for ix in range(5):
-			for iy in range(3):
-				_box(Vector3(seg - 6.4 + ix * 3.2, 1.9 + iy * 1.7, 9.83), Vector3(2.6, 0.55, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
-	for side in [-1.0, 1.0]:
-		for iz in range(6):
-			for iy in range(3):
-				_box(Vector3(side * 16.83, 1.9 + iy * 1.7, -8.0 + iz * 3.2), Vector3(0.12, 0.55, 2.6), PC1 if (iz + iy) % 2 == 0 else PC2, root)
-	for ix in range(3):
-		for iy in range(4):
-			_box(Vector3(-3.0 + ix * 3.0, 3.4 + iy * 2.0, -0.44), Vector3(2.4, 0.6, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
+	# b25 : murs en BRIQUES APPAREILLÉES (rangées décalées, façon photo) :
+	# un seul maillage coloré par face (léger), joints = mur derrière
+	mur_briques(Vector3(0, 0, -9.8), Vector3(-1, 0, 0), Vector3(0, 0, -1), 32.0, 5.9, PIERRE, 11, root)
+	mur_briques(Vector3(8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, PIERRE, 12, root)
+	mur_briques(Vector3(-8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, PIERRE, 13, root)
+	mur_briques(Vector3(-16.8, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0), 20.0, 5.9, PIERRE, 14, root)
+	mur_briques(Vector3(16.8, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0), 20.0, 5.9, PIERRE, 15, root)
+	mur_briques(Vector3(0, 0, -0.5), Vector3(1, 0, 0), Vector3(0, 0, 1), 9.0, 10.8, PIERRE, 16, root)
+
 	# Tours d'angle + donjon
 	var tours: Array[Vector3] = [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
 	for k in range(tours.size()):
 		var t := tours[k]
 		var hh := 9.0 if k < 4 else 12.0
 		var rr := 2.2 if k < 4 else 2.8
-		_cyl(Vector3(t.x, hh / 2.0 + 1.0, t.z), rr, rr * 0.9, hh, PIERRE, root, 8)
+		_cyl(Vector3(t.x, (hh + 1.0) / 2.0, t.z), rr, rr * 0.9, hh + 1.0, PIERRE, root, 8)
 		_cone(Vector3(t.x, hh + 1.0 + 2.2, t.z), rr + 0.5, 4.4, TOIT, root, 8)
 		# Drapeau
 		_cyl(Vector3(t.x, hh + 5.2, t.z), 0.06, 0.06, 1.8, Color(0.35, 0.22, 0.10), root, 6)
 		_box(Vector3(t.x + 0.5, hh + 5.8, t.z), Vector3(1.0, 0.6, 0.06), Color(0.85, 0.15, 0.15), root)
 	# Donjon central
-	_box(Vector3(0, 6.5, -4), Vector3(9, 9, 7), PIERRE, root)
+	_box(Vector3(0, 5.5, -4), Vector3(9, 11, 7), PIERRE, root)
 	_prism(Vector3(0, 12.5, -4), Vector3(8, 3.0, 10), TOIT, root, Vector3(0, deg_to_rad(90), 0))
 	# Fenêtres du donjon
 	for fx in [-2.5, 0.0, 2.5]:
 		_box(Vector3(fx, 7.5, -0.4), Vector3(0.8, 1.6, 0.3), Color(0.25, 0.30, 0.42), root)
 	# Collisions du château (coordonnées monde) — porte sud laissée passable
-	col_boite(0, -87, 32, 1.6, 5.0)
-	col_boite(-16, -78, 1.6, 20, 5.0)
-	col_boite(16, -78, 1.6, 20, 5.0)
-	col_boite(-9.1, -69, 13.8, 1.6, 5.0)
-	col_boite(9.1, -69, 13.8, 1.6, 5.0)
-	col_cercle(-16, -87, 2.3, 9.0)
-	col_cercle(16, -87, 2.3, 9.0)
-	col_cercle(-16, -69, 2.3, 9.0)
-	col_cercle(16, -69, 2.3, 9.0)
-	col_cercle(-6, -82, 2.9, 12.0)
-	col_cercle(6, -82, 2.9, 12.0)
-	col_boite(0, -82, 9, 7, 9.0)
+	col_boite(0, -87, 32, 1.6, 6.0)
+	col_boite(-16, -78, 1.6, 20, 6.0)
+	col_boite(16, -78, 1.6, 20, 6.0)
+	col_boite(-9.1, -69, 13.8, 1.6, 6.0)
+	col_boite(9.1, -69, 13.8, 1.6, 6.0)
+	col_cercle(-16, -87, 2.3, 10.0)
+	col_cercle(16, -87, 2.3, 10.0)
+	col_cercle(-16, -69, 2.3, 10.0)
+	col_cercle(16, -69, 2.3, 10.0)
+	col_cercle(-6, -82, 2.9, 13.0)
+	col_cercle(6, -82, 2.9, 13.0)
+	col_boite(0, -82, 9, 7, 11.0)
 	col_boite(0, -69, 4.4, 1.6, 5.0)   # b15 : porte sud BLOQUÉE, on ne peut plus entrer
 
 # ============================================================
@@ -2192,8 +2250,15 @@ func creer_hud():
 
 	# ===== Portrait + barre de vie (haut gauche) =====
 	var port := Portrait.new()
-	port.position = Vector2(14, 12)
-	port.size = Vector2(62, 62)
+	# b25 : portrait en BAS à gauche (les barres remontent en haut à gauche)
+	port.anchor_left = 0.0
+	port.anchor_top = 1.0
+	port.anchor_right = 0.0
+	port.anchor_bottom = 1.0
+	port.offset_left = 14
+	port.offset_top = -76
+	port.offset_right = 76
+	port.offset_bottom = -14
 	var img := load("res://pp_lv_3.png") if ResourceLoader.exists("res://pp_lv_3.png") else null
 	port.tex = img
 	# Découpe circulaire du portrait
@@ -2205,7 +2270,7 @@ func creer_hud():
 	canvas.add_child(port)
 
 	hp_bar = ProgressBar.new()
-	hp_bar.position = Vector2(14, 82)
+	hp_bar.position = Vector2(14, 14)
 	hp_bar.size = Vector2(210, 26)
 	hp_bar.max_value = PV_MAX
 	hp_bar.value = PV_MAX
@@ -2235,7 +2300,7 @@ func creer_hud():
 
 	# ===== Quêtes (gauche) — réductible par le petit bouton en haut à droite =====
 	quest_panel = PanelContainer.new()
-	quest_panel.position = Vector2(14, 188)
+	quest_panel.position = Vector2(14, 118)
 	quest_panel.size = Vector2(280, 96)
 	var qs := StyleBoxFlat.new()
 	qs.bg_color = Color(0.10, 0.09, 0.08, 0.90)
@@ -2288,13 +2353,13 @@ func creer_hud():
 	pill_or = Pill.new()
 	pill_or.kind = "or"
 	pill_or.parent = self
-	pill_or.position = Vector2(14, 114)
+	pill_or.position = Vector2(14, 46)
 	pill_or.size = Vector2(110, 30)
 	canvas.add_child(pill_or)
 	pill_cailloux = Pill.new()
 	pill_cailloux.kind = "cailloux"
 	pill_cailloux.parent = self
-	pill_cailloux.position = Vector2(14, 150)
+	pill_cailloux.position = Vector2(14, 80)
 	pill_cailloux.size = Vector2(92, 30)
 	canvas.add_child(pill_cailloux)
 
@@ -2593,6 +2658,30 @@ func _toggle_options():
 		options_panel.visible = not options_panel.visible
 
 # Réduire / déplier le panneau de quête
+func update_pnj(delta: float):
+	for p in pnj_items:
+		p.t += delta
+		var t: float = p.t
+		if p.n == "Forgeron":
+			# frappe l'enclume : le bras monte puis claque
+			var cyc := fmod(t * 1.4, 1.0)
+			var ang: float = -2.3 + 1.7 * (cyc / 0.7) if cyc < 0.7 else -0.6 - 1.7 * ((cyc - 0.7) / 0.3)
+			p.bras_d.rotation.x = ang
+			p.bras_g.rotation.x = -0.5
+		elif p.n == "Vendeur":
+			p.bras_d.rotation.x = -1.2 + sin(t * 2.2) * 0.25
+			p.bras_g.rotation.x = -0.9 + sin(t * 2.2 + 1.0) * 0.2
+		elif p.n == "Maire":
+			p.root.rotation.y = sin(t * 0.5) * 0.35
+			p.bras_d.rotation.x = -0.45
+			p.bras_g.rotation.x = -0.6
+		elif p.n == "Marchand":
+			p.root.position.y = p.y + absf(sin(t * 1.8)) * 0.06
+			p.bras_d.rotation.x = sin(t * 3.0) * 0.3 - 0.3
+			p.bras_g.rotation.x = -sin(t * 3.0) * 0.3 - 0.3
+		p.jambe_g.rotation.x = sin(t * 2.0) * 0.08
+		p.jambe_d.rotation.x = -sin(t * 2.0) * 0.08
+
 func _fermer_quete():
 	quest_ferme = true
 	if is_instance_valid(quest_panel):
