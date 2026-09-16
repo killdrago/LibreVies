@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b25" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b26" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -522,6 +522,18 @@ pour l'herbe/fleurs/rochers (perf).
   Vendeur = étal + 4 fruits, bras qui présentent ; Maire = écharpe +
   parchemin, se tourne lentement ; Marchand = sac à dos + cageot,
   trottine. pnj_items[] + update_pnj(delta) appelé dans _process.
+
+4s) MAJ DU 16/09/2026 (build b26)
+----------------------------------
+- TEXTURE DU CHÂTEAU = photo de référence (tour en briques) : palette
+  terracotta. Dans creer_chateau : BRIQUE := Color(0.76,0.42,0.28) pour
+  briques/créneaux/tours/donjon ; PIERRE := Color(0.88,0.84,0.76) =
+  joints crème (murs derrière les briques) + encadrement de porte.
+  mur_briques passe en 4 nuances (base, +0.10, -0.08, -0.16).
+- PORTE SUD : encadrement crème comme la photo (2 piédroits 0.7x3.6 +
+  bandeau arche 5.4x0.8) + linteau bois descendu à 3.75 ; 4 meurtrières
+  sombres (0.30x1.0) en saillie z 9.90 sur les segments sud.
+- PNJ validés par le dev (b25) : ne plus y toucher sauf demande.
 
 5) FICHIERS IMPORTANTS
 ----------------------

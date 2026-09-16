@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b25"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b26"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1232,8 +1232,14 @@ func mur_briques(p0: Vector3, udir: Vector3, ndir: Vector3, length: float, htop:
 		var u := -length / 2.0 + dec
 		while u < length / 2.0 - 0.2:
 			var u1 := minf(u + bw - 0.14, length / 2.0)
-			var k := rng.randi() % 3
-			var col := base if k == 0 else (base.lightened(0.07) if k == 1 else base.darkened(0.08))
+			var k := rng.randi() % 4
+			var col := base
+			if k == 1:
+				col = base.lightened(0.10)
+			elif k == 2:
+				col = base.darkened(0.08)
+			elif k == 3:
+				col = base.darkened(0.16)
 			var a := p0 + udir * u + vdir * v0 + ndir * 0.07
 			var b := p0 + udir * u1 + vdir * v0 + ndir * 0.07
 			var c := p0 + udir * u1 + vdir * v1 + ndir * 0.07
@@ -1255,7 +1261,10 @@ func creer_chateau():
 	var cx := 0.0
 	var cz := -78.0
 	var y := hauteur_terrain(cx, cz)
-	var PIERRE := Color(0.80, 0.76, 0.68)
+	# b26 : palette de la photo de référence : briques terracotta,
+	# joints/encadrements crème, toits rouges
+	var PIERRE := Color(0.88, 0.84, 0.76)   # joints / encadrements crème
+	var BRIQUE := Color(0.76, 0.42, 0.28)   # briques terracotta
 	var PIERRE_F := Color(0.70, 0.66, 0.58)
 	var TOIT := Color(0.78, 0.26, 0.14)
 	var root := Node3D.new()
@@ -1272,15 +1281,22 @@ func creer_chateau():
 	_box(Vector3(8, 3.0, 9), Vector3(16, 6, 1.6), PIERRE, root)
 	# Créneaux
 	for i in range(-15, 16, 3):
-		_box(Vector3(i, 6.4, -9), Vector3(1.2, 0.9, 1.8), PIERRE, root)
-		_box(Vector3(i, 6.4, 9), Vector3(1.2, 0.9, 1.8), PIERRE, root)
+		_box(Vector3(i, 6.4, -9), Vector3(1.2, 0.9, 1.8), BRIQUE, root)
+		_box(Vector3(i, 6.4, 9), Vector3(1.2, 0.9, 1.8), BRIQUE, root)
 	for i in range(-8, 9, 3):
-		_box(Vector3(-16, 6.4, i), Vector3(1.8, 0.9, 1.2), PIERRE, root)
-		_box(Vector3(16, 6.4, i), Vector3(1.8, 0.9, 1.2), PIERRE, root)
+		_box(Vector3(-16, 6.4, i), Vector3(1.8, 0.9, 1.2), BRIQUE, root)
+		_box(Vector3(16, 6.4, i), Vector3(1.8, 0.9, 1.2), BRIQUE, root)
 	# Porte
 	_box(Vector3(-1.6, 1.9, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
 	_box(Vector3(1.6, 1.9, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
-	_box(Vector3(0, 3.9, 9), Vector3(4.0, 0.9, 2.0), Color(0.30, 0.18, 0.08), root)
+	_box(Vector3(0, 3.75, 9), Vector3(4.0, 0.5, 2.0), Color(0.30, 0.18, 0.08), root)
+	# b26 : encadrement crème de la porte (comme la photo)
+	_box(Vector3(-2.35, 1.8, 9), Vector3(0.7, 3.6, 2.1), PIERRE, root)
+	_box(Vector3(2.35, 1.8, 9), Vector3(0.7, 3.6, 2.1), PIERRE, root)
+	_box(Vector3(0, 4.25, 9), Vector3(5.4, 0.8, 2.1), PIERRE, root)
+	# b26 : meurtrières sombres sur les murs sud (détail photo)
+	for mx in [-11.0, -5.0, 5.0, 11.0]:
+		_box(Vector3(mx, 3.4, 9.90), Vector3(0.30, 1.0, 0.12), Color(0.15, 0.12, 0.10), root)
 	# b23 : pancarte du château au-dessus de la porte sud
 	_box(Vector3(0, 5.75, 10.05), Vector3(3.2, 0.7, 0.12), Color(0.30, 0.19, 0.09), root)
 	_box(Vector3(0, 5.75, 10.12), Vector3(3.0, 0.55, 0.08), Color(0.52, 0.36, 0.19), root)
@@ -1293,12 +1309,12 @@ func creer_chateau():
 	root.add_child(lblc)
 	# b25 : murs en BRIQUES APPAREILLÉES (rangées décalées, façon photo) :
 	# un seul maillage coloré par face (léger), joints = mur derrière
-	mur_briques(Vector3(0, 0, -9.8), Vector3(-1, 0, 0), Vector3(0, 0, -1), 32.0, 5.9, PIERRE, 11, root)
-	mur_briques(Vector3(8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, PIERRE, 12, root)
-	mur_briques(Vector3(-8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, PIERRE, 13, root)
-	mur_briques(Vector3(-16.8, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0), 20.0, 5.9, PIERRE, 14, root)
-	mur_briques(Vector3(16.8, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0), 20.0, 5.9, PIERRE, 15, root)
-	mur_briques(Vector3(0, 0, -0.5), Vector3(1, 0, 0), Vector3(0, 0, 1), 9.0, 10.8, PIERRE, 16, root)
+	mur_briques(Vector3(0, 0, -9.8), Vector3(-1, 0, 0), Vector3(0, 0, -1), 32.0, 5.9, BRIQUE, 11, root)
+	mur_briques(Vector3(8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, BRIQUE, 12, root)
+	mur_briques(Vector3(-8, 0, 9.8), Vector3(1, 0, 0), Vector3(0, 0, 1), 16.0, 5.9, BRIQUE, 13, root)
+	mur_briques(Vector3(-16.8, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0), 20.0, 5.9, BRIQUE, 14, root)
+	mur_briques(Vector3(16.8, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0), 20.0, 5.9, BRIQUE, 15, root)
+	mur_briques(Vector3(0, 0, -0.5), Vector3(1, 0, 0), Vector3(0, 0, 1), 9.0, 10.8, BRIQUE, 16, root)
 
 	# Tours d'angle + donjon
 	var tours: Array[Vector3] = [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
@@ -1306,13 +1322,13 @@ func creer_chateau():
 		var t := tours[k]
 		var hh := 9.0 if k < 4 else 12.0
 		var rr := 2.2 if k < 4 else 2.8
-		_cyl(Vector3(t.x, (hh + 1.0) / 2.0, t.z), rr, rr * 0.9, hh + 1.0, PIERRE, root, 8)
+		_cyl(Vector3(t.x, (hh + 1.0) / 2.0, t.z), rr, rr * 0.9, hh + 1.0, BRIQUE, root, 8)
 		_cone(Vector3(t.x, hh + 1.0 + 2.2, t.z), rr + 0.5, 4.4, TOIT, root, 8)
 		# Drapeau
 		_cyl(Vector3(t.x, hh + 5.2, t.z), 0.06, 0.06, 1.8, Color(0.35, 0.22, 0.10), root, 6)
 		_box(Vector3(t.x + 0.5, hh + 5.8, t.z), Vector3(1.0, 0.6, 0.06), Color(0.85, 0.15, 0.15), root)
 	# Donjon central
-	_box(Vector3(0, 5.5, -4), Vector3(9, 11, 7), PIERRE, root)
+	_box(Vector3(0, 5.5, -4), Vector3(9, 11, 7), BRIQUE, root)
 	_prism(Vector3(0, 12.5, -4), Vector3(8, 3.0, 10), TOIT, root, Vector3(0, deg_to_rad(90), 0))
 	# Fenêtres du donjon
 	for fx in [-2.5, 0.0, 2.5]:
