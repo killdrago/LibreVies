@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b26 : texture du château reprise de la photo du dev — briques terracotta à joints crème sur tous les murs, tours et donjon, encadrement de porte crème en arche, meurtrières sombres, 4 nuances de briques. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b27 : la route ne traverse plus l'enceinte du château ; murs du château en briques de pierre GRISES à joints gris (extérieur ET intérieur de la cour, 14 faces appareillées), encadrement de porte gris — plus rien de blanc. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "edefaab802155d07ac4c2df702a35a62",
-   "size": 117676
+   "hash": "39ccf1ac1e6d45367bd907f533c1b333",
+   "size": 118620
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "f2e407ab3177b207d545fc1a73b5a1a8",
-   "size": 39555
+   "hash": "08e1cc3c4514472679ae92b471a57538",
+   "size": 40334
   }
  }
 }

@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b26" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b27" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -534,6 +534,20 @@ pour l'herbe/fleurs/rochers (perf).
   bandeau arche 5.4x0.8) + linteau bois descendu à 3.75 ; 4 meurtrières
   sombres (0.30x1.0) en saillie z 9.90 sur les segments sud.
 - PNJ validés par le dev (b25) : ne plus y toucher sauf demande.
+
+4t) MAJ DU 16/09/2026 (build b27)
+----------------------------------
+- ROUTE : dernier point CHEMIN (0,-72) -> (0,-64) : la route s'arrête
+  AVANT l'enceinte du château (face sud extérieure = -68.2), elle ne
+  traverse plus la cour.
+- CHÂTEAU = MUR DE PIERRE GRISE (le dev veut des briques GRISES à joints,
+  pas terracotta, pas le motif hexagonal de la route) : BRIQUE :=
+  Color(0.52,0.52,0.55), PIERRE (mortier/joints) := Color(0.66,0.65,0.62),
+  4 nuances (base, +0.12, -0.10, -0.22). Encadrement de porte =
+  PIERRE.darkened(0.12) — PLUS RIEN DE BLANC/CRÈME.
+- 14 faces mur_briques : 6 extérieures (b25/b26) + 8 INTÉRIEURES cour
+  (nord int z-8.2, sud int z8.2 x2, est/ouest int, donjon côtés x±4.5 et
+  arrière z-7.5). Créneaux/tours/donjon = BRIQUE grise.
 
 5) FICHIERS IMPORTANTS
 ----------------------
