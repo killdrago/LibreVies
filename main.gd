@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b33"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b34"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -111,6 +111,8 @@ var opt_lum := 30                       # 1..100 (défaut demandé par le dev)
 var capture_action := ""                # action en cours de reconfiguration (Options > Contrôles)
 var touches_boutons := {}               # action -> Button
 var pnj_items := []                       # b25 : PNJ animés (métiers)
+var _place_ecran_pos := Vector2i(-1, -1)    # b34 : écran/position voulus
+var _place_ecran_frames := 0
 var panneau_graph: VBoxContainer
 var panneau_ctrl: VBoxContainer
 var tab_graph: Button
@@ -178,6 +180,11 @@ func _on_regen():
 # PROCESS
 # ============================================================
 func _process(delta: float):
+	# b34 : fenêtre repositionnée sur l'écran du launcher pendant le démarrage
+	if _place_ecran_frames > 0:
+		_place_ecran_frames -= 1
+		_apply_ecran()
+
 	# Nuages qui dérivent
 	for n in nuages:
 		n.position.x += delta * 0.6
@@ -1691,16 +1698,7 @@ func creer_garde(x: float, z: float) -> Node3D:
 	_cone(Vector3(0, 1.50, 0), 0.10, 0.32, Color(0.84, 0.86, 0.90), halle, 6)
 	_box(Vector3(-0.16, 0.90, 0), Vector3(0.22, 0.32, 0.07), Color(0.78, 0.80, 0.84), halle)
 	_box(Vector3(0, -1.20, 0), Vector3(0.10, 0.14, 0.10), Color(0.45, 0.50, 0.58), halle)
-	var label := Label3D.new()
-	label.text = "Garde"
-	label.position = Vector3(0, 2.05, 0)
-	label.font_size = 20
-	label.pixel_size = 0.005
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.modulate = Color(0.7, 0.85, 1, 1)
-	label.outline_size = 8
-	label.outline_modulate = Color(0.1, 0.1, 0.1, 0.9)
-	root.add_child(label)
+	# b34 : étiquette « Garde » RETIRÉE (au-dessus du casque)
 	col_cercle(x, z, 0.4, 1.8)
 	return root
 
@@ -1990,15 +1988,23 @@ func placer_ecran_launcher():
 	var parts := txt.split(" ")
 	if parts.size() != 2:
 		return
-	var px := int(parts[0])
-	var py := int(parts[1])
+	_place_ecran_pos = Vector2i(int(parts[0]), int(parts[1]))
+	_place_ecran_frames = 45   # b34 : ré-applique pendant ~0.75 s
+	_apply_ecran()
+	call_deferred("_apply_ecran")
+
+func _apply_ecran():
+	if _place_ecran_pos.x < 0:
+		return
+	var px := _place_ecran_pos.x
+	var py := _place_ecran_pos.y
 	for i in range(DisplayServer.get_screen_count()):
 		var sp := DisplayServer.screen_get_position(i)
 		var ss := DisplayServer.screen_get_size(i)
 		if px >= sp.x and px < sp.x + ss.x and py >= sp.y and py < sp.y + ss.y:
 			DisplayServer.window_set_current_screen(i)
 			break
-	DisplayServer.window_set_position(Vector2i(px, py))
+	DisplayServer.window_set_position(_place_ecran_pos)
 
 func update_gardes(delta: float):
 	# b33 : le garde ne se déplace PLUS en patrouille (effet crabe) : il ne
@@ -2034,8 +2040,9 @@ func update_gardes(delta: float):
 				walking = true
 			if dl < 2.0 and float(p.cd) <= 0.0:
 				p.cd = 0.8
-				cible.pv = int(cible.pv) - 25
-				spawn_floater(cible.node.global_position + Vector3(0, 1.3, 0), "-25", Color(1, 0.85, 0.3))
+				# b34 : le garde est OVERPOWER : ONE SHOT sur tout monstre
+				cible.pv = 0
+				spawn_floater(cible.node.global_position + Vector3(0, 1.3, 0), "-999", Color(1, 0.85, 0.3))
 				spawn_spark(cible.node.global_position + Vector3(0, 0.6, 0))
 				if int(cible.pv) <= 0:
 					cible.alive = false

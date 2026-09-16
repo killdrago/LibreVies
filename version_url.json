@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b33 : gardes sans effet crabe (ils ne marchent que pour attaquer dans leur zone puis reviennent au poste), portes de la ville deux fois plus hautes avec pancarte LIBREVIES au milieu, jeu forcé sur l'écran du launcher via screen_pref.txt (multi-écrans). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b34 : étiquette Garde retirée, gardes ONE SHOT sur tous les monstres, correctif multi-écrans DPI dans le launcher (SetProcessDpiAwareness) + repositionnement insistant de la fenêtre du jeu pendant 0.75 s au démarrage. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "8cc49cca4d10b9c507668252e9b2e0a9",
-   "size": 126737
+   "hash": "edc4bf8916aafa6df9384b221651323a",
+   "size": 127017
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -18,16 +18,16 @@
    "size": 5556
   },
   "launcher.pyw": {
-   "hash": "c54fccbae997e34100f6e2e22770e961",
-   "size": 629318
+   "hash": "dff125105cea2601167256e8246116b8",
+   "size": 629669
   },
   "build_launcher.bat": {
    "hash": "4db739ba34ca09c06e428cf3e8c64b40",
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "df0ec3f6c951e89d9f7c0c4bc8ce8a14",
-   "size": 46444
+   "hash": "f0758bfa4bda7741a09a69326600a7c4",
+   "size": 47528
   }
  }
 }

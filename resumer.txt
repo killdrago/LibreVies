@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b33" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b34" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -649,6 +649,24 @@ pour l'herbe/fleurs/rochers (perf).
   au _ready : choisit l'écran DONT LE RECT contient ce point
   (window_set_current_screen) puis window_set_position. Renforce le
   --position de b32. Fichier runtime, pas au manifest.
+
+4aa) MAJ DU 16/09/2026 (build b34)
+-----------------------------------
+- ÉTIQUETTE « Garde » AU-DESSUS DU CASQUE SUPPRIMÉE.
+- GARDES OVERPOWER (demande dev) : ONE SHOT — cible.pv = 0 direct à chaque
+  touche (floater « -999 »). C'est le boss des boss, il protège bien.
+- MULTI-ÉCRANS (dev : 6 écrans, dispos 1-3-2 / 5-6-4, principal = 6, le
+  jeu partait sur 1) : CAUSE PROBABLE = scalings DPI différents par
+  écran => tkinter (DPI-unaware) rendait des coords virtualisées.
+  FIX launcher : SetProcessDpiAwareness(2) (fallback SetProcessDPIAware)
+  AVANT la création Tk => winfo_x/y en pixels physiques réels.
+  FIX jeu : placer_ecran_launcher() mémorise _place_ecran_pos et
+  _apply_ecran() (choix de l'écran par rect + window_set_position) est
+  RÉ-APPLIQUÉ chaque frame pendant 45 frames (~0.75 s) au démarrage
+  (contre les resets de fenêtre tardifs).
+  RAPPEL ABSOLU : ces correctifs vivent dans launcher.pyw — le dev DOIT
+  recopier launcher.pyw ou reconstruire LibreVies.exe (build_launcher.bat),
+  la maj auto du jeu ne met PAS à jour le launcher.
 
 5) FICHIERS IMPORTANTS
 ----------------------

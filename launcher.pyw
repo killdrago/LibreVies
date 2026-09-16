@@ -4,6 +4,18 @@ Double-clique sur launcher.pyw ou LibreVies.exe pour lancer.
 """
 import tkinter as tk
 import subprocess, threading, os, sys, time, zipfile
+
+# b34 : MULTI-ECRANS avec scalings differents : sans ca, tkinter rend des
+# coordonnees virtualisees et le jeu atterrit sur le mauvais ecran.
+try:
+    import ctypes
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        import ctypes
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
 import urllib.request, hashlib, json, shutil
 import base64, io, tempfile
 
