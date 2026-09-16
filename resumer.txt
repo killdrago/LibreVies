@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b22" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b23" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -458,6 +458,25 @@ pour l'herbe/fleurs/rochers (perf).
 - MARTEAU : manche commence JUSTE SOUS la main (local -0.05..-0.45, bague
   à -0.08) ; tête DIVISÉE PAR 2 (0.16/0.16/0.22) et remontée à la cheville
   (local -0.53 => ~0.19 m du sol, ne touche plus le sol).
+
+4p) MAJ DU 16/09/2026 (build b23)
+----------------------------------
+- FONTAINE : le HAUT est maintenant solide (col_cercle x,z, r 0.55, h 4.4) :
+  le dev grimpait sur le bassin et traversait colonne/vasque haute/jet.
+  Le bas était déjà solide (bassin r 2.6 h 0.95).
+- MANCHES affinés (circonférence /3, « c'était une bûche ») : marteau r
+  0.032/0.028 (bague 0.045), hallebarde du garde r 0.04/0.035 (bague
+  0.055).
+- PIÈCES D'OR plus rares : 6 -> 3 (respawn 60 s inchangé). Les « petites
+  boules jaunes » que le dev voyait = LUCIOLES de nuit (décor, sphères
+  émissives r 0.045) — expliqué, aucun changement.
+- PANCARTES EN BOIS au-dessus des portes : dans creer_ville (liste data
+  avec champ "n") + château. Plaque sombre 2 couches + Label3D (font 64,
+  pixel_size 0.0035 village / 0.0075 château, modulate brun foncé).
+  Texte : NOMS.get(b.n) -> SUPERMARCHÉ, ARMURERIE, VÊTEMENTS, AUBERGE,
+  MAIRIE, MAISON ; château = "CHÂTEAU" au-dessus de la porte sud (z +9).
+  ATTENTION : pas de func maison() ! Les bâtiments sont construits dans
+  la boucle de creer_ville() sur data[] (x,z,w,h,d,c,n,roof).
 
 5) FICHIERS IMPORTANTS
 ----------------------

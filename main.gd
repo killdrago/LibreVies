@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b22"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b23"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1126,6 +1126,18 @@ func creer_ville():
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
 		_box(Vector3(b.x, y + b.h * 0.56, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.28, 0.08, 0.16), Color(0.38, 0.22, 0.09))
+		# b23 : belle pancarte en bois au-dessus de la porte, avec le nom du lieu
+		var NOMS := {"Supermarche": "SUPERMARCHÉ", "Armurerie": "ARMURERIE", "Vetements": "VÊTEMENTS", "Auberge": "AUBERGE", "Mairie": "MAIRIE", "Maison": "MAISON"}
+		var txt: String = NOMS.get(b.n, b.n)
+		_box(Vector3(b.x, y + b.h * 0.78, b.z + b.d / 2.0 + 0.09), Vector3(b.w * 0.65, 0.46, 0.07), Color(0.30, 0.19, 0.09))
+		_box(Vector3(b.x, y + b.h * 0.78, b.z + b.d / 2.0 + 0.11), Vector3(b.w * 0.60, 0.34, 0.06), Color(0.52, 0.36, 0.19))
+		var lbl := Label3D.new()
+		lbl.text = txt
+		lbl.font_size = 64
+		lbl.pixel_size = 0.0035
+		lbl.modulate = Color(0.16, 0.10, 0.04)
+		lbl.position = Vector3(b.x, y + b.h * 0.78, b.z + b.d / 2.0 + 0.15)
+		broot.add_child(lbl)
 		# Fenêtres façade (cadre + vitre + croix)
 		for fx in [-0.28, 0.28]:
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.18, b.h * 0.20, 0.12), Color(0.32, 0.21, 0.10))
@@ -1221,6 +1233,16 @@ func creer_chateau():
 	_box(Vector3(-1.6, 2.6, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
 	_box(Vector3(1.6, 2.6, 9), Vector3(0.8, 3.4, 2.0), Color(0.30, 0.18, 0.08), root)
 	_box(Vector3(0, 4.6, 9), Vector3(4.0, 0.9, 2.0), Color(0.30, 0.18, 0.08), root)
+	# b23 : pancarte du château au-dessus de la porte sud
+	_box(Vector3(0, 5.75, 10.05), Vector3(3.2, 0.7, 0.12), Color(0.30, 0.19, 0.09), root)
+	_box(Vector3(0, 5.75, 10.12), Vector3(3.0, 0.55, 0.08), Color(0.52, 0.36, 0.19), root)
+	var lblc := Label3D.new()
+	lblc.text = "CHÂTEAU"
+	lblc.font_size = 64
+	lblc.pixel_size = 0.0075
+	lblc.modulate = Color(0.16, 0.10, 0.04)
+	lblc.position = Vector3(0, 5.75, 10.17)
+	root.add_child(lblc)
 	# Tours d'angle + donjon
 	var tours: Array[Vector3] = [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
 	for k in range(tours.size()):
@@ -1295,7 +1317,7 @@ func creer_arbres():
 
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
-	col_cercle(x, z, 0.4, 2.2)
+	col_cercle(x, z, 0.55, 4.4)  # b23 : le HAUT de la fontaine est solide aussi
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -1490,8 +1512,8 @@ func creer_garde(x: float, z: float) -> Node3D:
 	halle.position = Vector3(0.34, 1.25, 0.05)
 	halle.rotation.z = deg_to_rad(0)   # b19 : verticale, prolongement du bras
 	root.add_child(halle)
-	_cyl(Vector3(0, 0, 0), 0.11, 0.10, 2.5, Color(0.86, 0.70, 0.44), halle, 8)
-	_cyl(Vector3(0, 0.55, 0), 0.13, 0.13, 0.07, Color(0.22, 0.22, 0.26), halle, 8)
+	_cyl(Vector3(0, 0, 0), 0.04, 0.035, 2.5, Color(0.86, 0.70, 0.44), halle, 8)
+	_cyl(Vector3(0, 0.55, 0), 0.055, 0.055, 0.05, Color(0.22, 0.22, 0.26), halle, 8)
 	_box(Vector3(0, 1.10, 0), Vector3(0.12, 0.50, 0.20), Color(0.78, 0.80, 0.84), halle)
 	_cone(Vector3(0, 1.50, 0), 0.10, 0.32, Color(0.84, 0.86, 0.90), halle, 6)
 	_box(Vector3(-0.16, 0.90, 0), Vector3(0.22, 0.32, 0.07), Color(0.78, 0.80, 0.84), halle)
@@ -1615,8 +1637,8 @@ func creer_joueur():
 	# b20 : manche DANS le poing, bois très clair + bagues sombres de contraste
 	# b22 : manche commence JUSTE SOUS la main (tient dans le poing) ;
 	# tête DIVISÉE PAR 2 et remontée à la cheville (~0.19 m du sol).
-	_cyl(Vector3(0, -0.25, 0), 0.09, 0.08, 0.40, Color(0.86, 0.70, 0.44), marteau, 8)
-	_cyl(Vector3(0, -0.08, 0), 0.11, 0.11, 0.06, Color(0.22, 0.22, 0.26), marteau, 8)
+	_cyl(Vector3(0, -0.25, 0), 0.032, 0.028, 0.40, Color(0.86, 0.70, 0.44), marteau, 8)
+	_cyl(Vector3(0, -0.08, 0), 0.045, 0.045, 0.05, Color(0.22, 0.22, 0.26), marteau, 8)
 	_box(Vector3(0, -0.53, 0), Vector3(0.16, 0.16, 0.22), Color(0.55, 0.55, 0.58), marteau)
 	_box(Vector3(0, -0.53, 0), Vector3(0.18, 0.07, 0.24), Color(0.35, 0.24, 0.12), marteau)
 
@@ -1853,7 +1875,7 @@ func creer_objets():
 		var z := randf_range(-50, 50)
 		var mi := _facette(Vector3(x, hauteur_terrain(x, z) + 0.14, z), Color(0.56, 0.54, 0.50), self, Vector3(0.28, 0.22, 0.28))
 		cailloux_items.append({"node": mi, "gone": false})
-	for i in range(6):
+	for i in range(3):  # b23 : pièces plus RARES
 		var x := randf_range(-40, 40)
 		var z := randf_range(-40, 40)
 		var mi := _cyl(Vector3(x, hauteur_terrain(x, z) + 0.12, z), 0.18, 0.18, 0.05, Color(1, 0.84, 0.1), self, 12)
