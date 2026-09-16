@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b31"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b32"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1245,16 +1245,19 @@ func creer_ville():
 		elif d.n == "Marchand":
 			col_boite(d.x + 0.55, d.z + 0.3, 0.5, 0.5, 0.5)
 		pnj_items.append({"n": d.n, "root": root, "bras_g": bras_g, "bras_d": bras_d, "jambe_g": jambe_g, "jambe_d": jambe_d, "y": y, "t": randf() * 10.0})
-		var label := Label3D.new()
-		label.text = d.n
-		label.position = Vector3(0, 1.55, 0)
-		label.font_size = 22
-		label.pixel_size = 0.005
-		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		label.modulate = Color(1, 1, 0.55)
-		label.outline_size = 8
-		label.outline_modulate = Color(0.1, 0.1, 0.1, 0.9)
-		root.add_child(label)
+		# b32 : étiquettes RETIRÉES (elles traversaient les têtes) ; seul le
+		# Maire garde la sienne, remontée au-dessus du haut-de-forme
+		if d.n == "Maire":
+			var label := Label3D.new()
+			label.text = d.n
+			label.position = Vector3(0, 1.95, 0)
+			label.font_size = 22
+			label.pixel_size = 0.005
+			label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			label.modulate = Color(1, 1, 0.55)
+			label.outline_size = 8
+			label.outline_modulate = Color(0.1, 0.1, 0.1, 0.9)
+			root.add_child(label)
 
 # ============================================================
 # CHÂTEAU (fond, sur la colline)
@@ -1618,7 +1621,7 @@ func creer_cloture_village():
 		var gx2 := cos(a0) * VILLAGE_R * 0.90
 		var gz2 := sin(a0) * VILLAGE_R * 0.90
 		var garde := creer_garde(gx2, gz2)
-		portes.append({"x": mx2, "z": mz2, "garde": garde, "cd": 0.0, "lunge": 0.0, "tx": 0.0, "tz": 0.0, "bx": garde.global_position.x, "bz": garde.global_position.z})
+		portes.append({"x": mx2, "z": mz2, "garde": garde, "cd": 0.0, "lunge": 0.0, "tx": 0.0, "tz": 0.0, "bx": garde.global_position.x, "bz": garde.global_position.z, "pt": 0.0, "po": 0.0, "face": 0.0})
 
 # ============================================================
 # GARDE DU VILLAGE (low-poly, hallebarde) — protège les portails
@@ -1632,8 +1635,8 @@ func creer_garde(x: float, z: float) -> Node3D:
 	var TUNIQUE := Color(0.20, 0.32, 0.55)
 	# b31 : lifting du garde — même gabarit que le joueur, en ARMURE complète
 	var PEAU := Color(0.93, 0.76, 0.58)
-	var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.12, 0.62, 0); root.add_child(jambe_g)
-	var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.12, 0.62, 0); root.add_child(jambe_d)
+	var jambe_g := Node3D.new(); jambe_g.name = "jg"; jambe_g.position = Vector3(-0.12, 0.62, 0); root.add_child(jambe_g)
+	var jambe_d := Node3D.new(); jambe_d.name = "jd"; jambe_d.position = Vector3(0.12, 0.62, 0); root.add_child(jambe_d)
 	for j in [jambe_g, jambe_d]:
 		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, ACIER.darkened(0.30), j)   # jambards
 		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), ACIER.darkened(0.45), j)  # solerets
@@ -1962,6 +1965,7 @@ func update_ennemis(delta: float):
 # ============================================================
 func update_gardes(delta: float):
 	for p in portes:
+		p.face = float(p.face) - delta
 		# b15 : le garde FAIT UN PAS vers le monstre quand il frappe, puis revient
 		if float(p.lunge) > 0.0:
 			p.lunge = float(p.lunge) - delta
@@ -1971,6 +1975,35 @@ func update_gardes(delta: float):
 				dd = dd.normalized()
 				p.garde.global_position.x = float(p.bx) + dd.x * kk * 0.7
 				p.garde.global_position.z = float(p.bz) + dd.y * kk * 0.7
+			p.po = 0.0
+		else:
+			# b32 : PATROUILLE : le garde MARCHE le long de son portail
+			p.pt = float(p.pt) + delta
+			var rad2 := Vector2(float(p.x), float(p.z)).normalized()
+			var tang := Vector2(-rad2.y, rad2.x)
+			var targeto: float = sin(float(p.pt) * 0.6) * 1.6
+			p.po = lerpf(float(p.po), targeto, clampf(delta * 2.0, 0.0, 1.0))
+			if is_instance_valid(p.garde):
+				p.garde.global_position.x = float(p.bx) + tang.x * float(p.po)
+				p.garde.global_position.z = float(p.bz) + tang.y * float(p.po)
+				p.garde.global_position.y = hauteur_terrain(p.garde.global_position.x, p.garde.global_position.z)
+		# b32 : REGARD vers le monstre frappé (sinon vers l'extérieur) + pas
+		if is_instance_valid(p.garde):
+			var gd: Node3D = p.garde
+			if float(p.face) > 0.0:
+				var fdx := float(p.tx) - gd.global_position.x
+				var fdz := float(p.tz) - gd.global_position.z
+				gd.rotation.y = atan2(fdx, fdz)
+			else:
+				var rado := Vector2(float(p.x), float(p.z)).normalized()
+				gd.rotation.y = atan2(rado.x, rado.y)
+			var sw: float = sin(float(p.pt) * 4.0) * 0.35 if float(p.lunge) <= 0.0 else 0.0
+			var jg := gd.get_node_or_null("jg")
+			var jd := gd.get_node_or_null("jd")
+			if jg:
+				jg.rotation.x = sw
+			if jd:
+				jd.rotation.x = -sw
 		p.cd = float(p.cd) - delta
 		if float(p.cd) > 0.0:
 			continue
@@ -1989,6 +2022,7 @@ func update_gardes(delta: float):
 			continue
 		p.cd = 0.8
 		p.lunge = 0.4
+		p.face = 0.8
 		p.tx = cible.node.global_position.x
 		p.tz = cible.node.global_position.z
 		var monstre: Node3D = cible.node

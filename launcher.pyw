@@ -279,8 +279,12 @@ def preload(path, cb, done):
     except Exception as e:
         cb(100, f"Pret ({e})"); done(True)
 
-def launch(path):
-    subprocess.Popen([path, "--path", GAME_DIR])
+def launch(path, pos=None):
+    args = [path, "--path", GAME_DIR]
+    if pos:
+        # b32 : le jeu s'ouvre SUR L'ECRAN du launcher (position fenetre)
+        args += ["--position", "%d,%d" % (int(pos[0]), int(pos[1]))]
+    subprocess.Popen(args)
 
 
 # ============================================================
@@ -613,7 +617,13 @@ class App(tk.Tk):
 
     def play(self):
         if self.ready and self.godot:
-            launch(self.godot); self.destroy()
+            pos = None
+            try:
+                self.update_idletasks()
+                pos = (self.winfo_x(), self.winfo_y())
+            except Exception:
+                pos = None
+            launch(self.godot, pos); self.destroy()
 
 
 if __name__ == "__main__":
