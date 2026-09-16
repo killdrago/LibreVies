@@ -623,6 +623,13 @@ class App(tk.Tk):
                 pos = (self.winfo_x(), self.winfo_y())
             except Exception:
                 pos = None
+            if pos:
+                # b33 : le jeu lira ce fichier pour s'afficher sur le bon ecran
+                try:
+                    with open(os.path.join(GAME_DIR, "screen_pref.txt"), "w") as fh:
+                        fh.write("%d %d" % (int(pos[0]), int(pos[1])))
+                except Exception:
+                    pass
             launch(self.godot, pos); self.destroy()
 
 

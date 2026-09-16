@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b32" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b33" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -630,6 +630,25 @@ pour l'herbe/fleurs/rochers (perf).
   des jambes (jg/jd nommés dans creer_garde, rotation.x sin) ; REGARD :
   rotation.y = atan2 vers le monstre frappé pendant p.face 0.8 s (sinon
   vers l'extérieur du village). Champs portes += pt/po/face.
+
+4z) MAJ DU 16/09/2026 (build b33)
+----------------------------------
+- GARDES : patrouille latérale SUPPRIMÉE (« effet crabe » : ils marchaient
+  de gauche à droite en regardant dehors). Nouveau update_gardes : le
+  garde NE BOUGE QUE (a) pour marcher vers une cible DANS SA ZONE (2.5 m
+  autour de SON portail, vitesse 2.6, s'arrête à 1.5 m, frappe 25 dg/0.8 s)
+  ou (b) pour REVENIR à son poste (2.0 m/s). Regard = cible sinon
+  extérieur ; jambes balancent seulement en marche. Champs lunge/tx/tz/
+  face désormais inutilisés (dict portes inchangé).
+- PORTES DE VILLE ×2 PLUS HAUTES : poteaux 5.2 m (0.30²), chapeaux 5.26,
+  linteau 5.2, lanterne 4.86 ; PANCARTE AU MILIEU (plaque 2 couches
+  2.6x0.7) avec le NOM DE LA VILLE = « LIBREVIES » (titre du jeu), deux
+  Label3D dos à dos (yaw radial ±PI) lisibles dedans et dehors.
+- MULTI-ÉCRANS (6 écrans chez le dev) : le launcher écrit sa position de
+  fenêtre dans GAME_DIR/screen_pref.txt ; main.gd placer_ecran_launcher()
+  au _ready : choisit l'écran DONT LE RECT contient ce point
+  (window_set_current_screen) puis window_set_position. Renforce le
+  --position de b32. Fichier runtime, pas au manifest.
 
 5) FICHIERS IMPORTANTS
 ----------------------

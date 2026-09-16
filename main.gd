@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b32"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b33"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -165,6 +165,9 @@ func _ready():
 	timer.autostart = true
 	timer.timeout.connect(_on_regen)
 	add_child(timer)
+
+	# b33 : jeu affiché sur l'écran où était le launcher
+	placer_ecran_launcher()
 
 
 func _on_regen():
@@ -1604,8 +1607,9 @@ func creer_cloture_village():
 			var gx := cos(ag) * VILLAGE_R
 			var gz := sin(ag) * VILLAGE_R
 			var gy := hauteur_terrain(gx, gz)
-			_box(Vector3(gx, gy + 1.3, gz), Vector3(0.26, 2.6, 0.26), BOIS.darkened(0.1))
-			_box(Vector3(gx, gy + 2.66, gz), Vector3(0.36, 0.12, 0.36), BOIS_CLAIR)
+			# b33 : porte DEUX FOIS plus haute
+			_box(Vector3(gx, gy + 2.6, gz), Vector3(0.30, 5.2, 0.30), BOIS.darkened(0.1))
+			_box(Vector3(gx, gy + 5.26, gz), Vector3(0.40, 0.14, 0.40), BOIS_CLAIR)
 		var d01 := Vector2(cos(a1) - cos(a0), sin(a1) - sin(a0))
 		var am := (a0 + a1) * 0.5
 		var mx2 := cos(am) * VILLAGE_R
@@ -1613,10 +1617,24 @@ func creer_cloture_village():
 		var my2 := hauteur_terrain(mx2, mz2)
 		var ry2 := atan2(-d01.y, d01.x)
 		var long2 := d01.length() * VILLAGE_R + 0.2
-		_box(Vector3(mx2, my2 + 2.6, mz2), Vector3(long2, 0.16, 0.14), BOIS_CLAIR, null, Vector3(0, ry2, 0))
-		var lan := _box(Vector3(mx2, my2 + 2.36, mz2), Vector3(0.24, 0.34, 0.24), Color(1.0, 0.80, 0.30))
+		_box(Vector3(mx2, my2 + 5.2, mz2), Vector3(long2, 0.18, 0.16), BOIS_CLAIR, null, Vector3(0, ry2, 0))
+		var lan := _box(Vector3(mx2, my2 + 4.86, mz2), Vector3(0.24, 0.34, 0.24), Color(1.0, 0.80, 0.30))
 		lan.material_override = mat_std(Color(1.0, 0.80, 0.30), false, true)
-		_cone(Vector3(mx2, my2 + 2.60, mz2), 0.19, 0.22, Color(0.16, 0.16, 0.18), null, 4)
+		_cone(Vector3(mx2, my2 + 5.10, mz2), 0.19, 0.22, Color(0.16, 0.16, 0.18), null, 4)
+		# b33 : pancarte AU MILIEU de la porte, nom de la ville : LIBREVIES
+		_box(Vector3(mx2, my2 + 4.35, mz2), Vector3(2.6, 0.7, 0.10), Color(0.30, 0.19, 0.09), null, Vector3(0, ry2, 0))
+		_box(Vector3(mx2, my2 + 4.35, mz2), Vector3(2.4, 0.55, 0.12), Color(0.52, 0.36, 0.19), null, Vector3(0, ry2, 0))
+		var radg := Vector2(mx2, mz2).normalized()
+		var yawg := atan2(radg.x, radg.y)
+		for cote in [1.0, -1.0]:
+			var lv := Label3D.new()
+			lv.text = "LIBREVIES"
+			lv.font_size = 64
+			lv.pixel_size = 0.0045
+			lv.modulate = Color(0.16, 0.10, 0.04)
+			lv.rotation.y = yawg if cote > 0.0 else yawg + PI
+			lv.position = Vector3(mx2 + radg.x * 0.07 * cote, my2 + 4.35, mz2 + radg.y * 0.07 * cote)
+			add_child(lv)
 		# Garde posté à côté du portail (côté village)
 		var gx2 := cos(a0) * VILLAGE_R * 0.90
 		var gz2 := sin(a0) * VILLAGE_R * 0.90
@@ -1963,81 +1981,90 @@ func update_ennemis(delta: float):
 # GARDES DES PORTAILS : toute bébête à moins de 2 m de la porte
 # se fait attaquer (25 dégâts / 0,8 s) jusqu'à mort.
 # ============================================================
+# b33 : le launcher écrit la position de SA fenêtre dans screen_pref.txt ;
+# le jeu choisit l'écran qui contient ce point et s'y place (multi-écrans).
+func placer_ecran_launcher():
+	if not FileAccess.file_exists("res://screen_pref.txt"):
+		return
+	var txt := FileAccess.get_file_as_string("res://screen_pref.txt").strip_edges()
+	var parts := txt.split(" ")
+	if parts.size() != 2:
+		return
+	var px := int(parts[0])
+	var py := int(parts[1])
+	for i in range(DisplayServer.get_screen_count()):
+		var sp := DisplayServer.screen_get_position(i)
+		var ss := DisplayServer.screen_get_size(i)
+		if px >= sp.x and px < sp.x + ss.x and py >= sp.y and py < sp.y + ss.y:
+			DisplayServer.window_set_current_screen(i)
+			break
+	DisplayServer.window_set_position(Vector2i(px, py))
+
 func update_gardes(delta: float):
+	# b33 : le garde ne se déplace PLUS en patrouille (effet crabe) : il ne
+	# bouge QUE pour aller attaquer une cible DANS SA ZONE (autour de SON
+	# portail) puis revient à son poste. Regard = cible / extérieur.
 	for p in portes:
-		p.face = float(p.face) - delta
-		# b15 : le garde FAIT UN PAS vers le monstre quand il frappe, puis revient
-		if float(p.lunge) > 0.0:
-			p.lunge = float(p.lunge) - delta
-			var kk := sin(clampf((0.4 - float(p.lunge)) / 0.4, 0.0, 1.0) * PI)
-			var dd := Vector2(float(p.tx) - float(p.bx), float(p.tz) - float(p.bz))
-			if dd.length() > 0.01 and is_instance_valid(p.garde):
-				dd = dd.normalized()
-				p.garde.global_position.x = float(p.bx) + dd.x * kk * 0.7
-				p.garde.global_position.z = float(p.bz) + dd.y * kk * 0.7
-			p.po = 0.0
-		else:
-			# b32 : PATROUILLE : le garde MARCHE le long de son portail
-			p.pt = float(p.pt) + delta
-			var rad2 := Vector2(float(p.x), float(p.z)).normalized()
-			var tang := Vector2(-rad2.y, rad2.x)
-			var targeto: float = sin(float(p.pt) * 0.6) * 1.6
-			p.po = lerpf(float(p.po), targeto, clampf(delta * 2.0, 0.0, 1.0))
-			if is_instance_valid(p.garde):
-				p.garde.global_position.x = float(p.bx) + tang.x * float(p.po)
-				p.garde.global_position.z = float(p.bz) + tang.y * float(p.po)
-				p.garde.global_position.y = hauteur_terrain(p.garde.global_position.x, p.garde.global_position.z)
-		# b32 : REGARD vers le monstre frappé (sinon vers l'extérieur) + pas
-		if is_instance_valid(p.garde):
-			var gd: Node3D = p.garde
-			if float(p.face) > 0.0:
-				var fdx := float(p.tx) - gd.global_position.x
-				var fdz := float(p.tz) - gd.global_position.z
-				gd.rotation.y = atan2(fdx, fdz)
-			else:
-				var rado := Vector2(float(p.x), float(p.z)).normalized()
-				gd.rotation.y = atan2(rado.x, rado.y)
-			var sw: float = sin(float(p.pt) * 4.0) * 0.35 if float(p.lunge) <= 0.0 else 0.0
-			var jg := gd.get_node_or_null("jg")
-			var jd := gd.get_node_or_null("jd")
-			if jg:
-				jg.rotation.x = sw
-			if jd:
-				jd.rotation.x = -sw
-		p.cd = float(p.cd) - delta
-		if float(p.cd) > 0.0:
+		var gd: Node3D = p.garde
+		if not is_instance_valid(gd):
 			continue
-		var gx: float = p.x
-		var gz: float = p.z
+		p.cd = float(p.cd) - delta
+		var gpos := Vector2(gd.global_position.x, gd.global_position.z)
+		var base := Vector2(float(p.bx), float(p.bz))
+		var gate := Vector2(float(p.x), float(p.z))
 		var cible = null
 		for e in enemies:
 			if not e.alive:
 				continue
 			var en: Node3D = e.node
-			var dq := Vector2(en.global_position.x - gx, en.global_position.z - gz)
-			if dq.length() < 2.0:
+			var dq := Vector2(en.global_position.x - gate.x, en.global_position.z - gate.y)
+			if dq.length() < 2.5:
 				cible = e
 				break
-		if cible == null:
-			continue
-		p.cd = 0.8
-		p.lunge = 0.4
-		p.face = 0.8
-		p.tx = cible.node.global_position.x
-		p.tz = cible.node.global_position.z
-		var monstre: Node3D = cible.node
-		if is_instance_valid(p.garde):
-			var gd: Node3D = p.garde
-			if Vector2(monstre.global_position.x - gd.global_position.x, monstre.global_position.z - gd.global_position.z).length() > 0.05:
-				gd.look_at(Vector3(monstre.global_position.x, gd.global_position.y, monstre.global_position.z), Vector3.UP)
-		cible.pv = int(cible.pv) - 25
-		spawn_floater(monstre.global_position + Vector3(0, 1.3, 0), "-25", Color(1, 0.85, 0.3))
-		spawn_spark(monstre.global_position + Vector3(0, 0.6, 0))
-		if int(cible.pv) <= 0:
-			cible.alive = false
-			monstre.visible = false
-			show_info("Un garde du village a repoussé %s !" % cible.name)
-			get_tree().create_timer(10.0).timeout.connect(_respawn_enemy.bind(cible))
+		var walking := false
+		var look := Vector2.ZERO
+		if cible != null:
+			var tp := Vector2(cible.node.global_position.x, cible.node.global_position.z)
+			look = tp - gpos
+			var dl := look.length()
+			if dl > 1.5:
+				var mv := look.normalized() * minf(2.6 * delta, dl - 1.4)
+				gd.global_position.x += mv.x
+				gd.global_position.z += mv.y
+				walking = true
+			if dl < 2.0 and float(p.cd) <= 0.0:
+				p.cd = 0.8
+				cible.pv = int(cible.pv) - 25
+				spawn_floater(cible.node.global_position + Vector3(0, 1.3, 0), "-25", Color(1, 0.85, 0.3))
+				spawn_spark(cible.node.global_position + Vector3(0, 0.6, 0))
+				if int(cible.pv) <= 0:
+					cible.alive = false
+					cible.node.visible = false
+					show_info("Un garde du village a repoussé %s !" % cible.name)
+					get_tree().create_timer(10.0).timeout.connect(_respawn_enemy.bind(cible))
+		else:
+			var db := base - gpos
+			if db.length() > 0.15:
+				var mv := db.normalized() * minf(2.0 * delta, db.length())
+				gd.global_position.x += mv.x
+				gd.global_position.z += mv.y
+				walking = true
+				look = db
+			elif gate.length() > 0.01:
+				look = gate.normalized()
+			else:
+				look = Vector2(0, 1)
+		gd.global_position.y = hauteur_terrain(gd.global_position.x, gd.global_position.z)
+		if look.length() > 0.01:
+			gd.rotation.y = atan2(look.x, look.y)
+		p.pt = float(p.pt) + delta
+		var sw: float = sin(float(p.pt) * 8.0) * 0.45 if walking else 0.0
+		var jg := gd.get_node_or_null("jg")
+		var jd := gd.get_node_or_null("jd")
+		if jg:
+			jg.rotation.x = sw
+		if jd:
+			jd.rotation.x = -sw
 
 func mourir():
 	player_pv = 0
