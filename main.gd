@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b17"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b18"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -98,6 +98,7 @@ var argent_items := []
 var batiments := []
 var _parent_capture: Node = null      # racine courante des pièces de bâtiment
 var _fade_cache := {}                 # matériaux translucides (camouflage)
+var camo_objs := []                   # objets camouflables (bâtiments + arbres)
 var colliders: Array[Dictionary] = []   # collisions statiques (bâtiments, props, clôture, rochers)
 var portes: Array[Dictionary] = []      # portails du village + leurs gardes
 var monde_env: Environment              # réglages luminosité / contraste / saturation
@@ -607,18 +608,20 @@ func maj_camouflage():
 		return
 	var cp := Vector2(camera.global_position.x, camera.global_position.z)
 	var pp := Vector2(player_node.global_position.x, player_node.global_position.z)
-	for bt in batiments:
-		var r := Rect2(Vector2(bt.x - bt.w / 2.0, bt.z - bt.d / 2.0), Vector2(bt.w, bt.d))
+	# b18 : TOUT objet (bâtiment OU arbre) entre la caméra et le joueur
+	# devient translucide — emprises élargies, 14 échantillons sur le segment.
+	for co in camo_objs:
+		var r := Rect2(Vector2(co.x - co.rx, co.z - co.rz), Vector2(co.rx * 2.0, co.rz * 2.0))
 		var want := false
 		if not r.has_point(cp):
-			for k in range(1, 10):
-				if r.has_point(cp.lerp(pp, float(k) / 10.0)):
+			for k in range(1, 14):
+				if r.has_point(cp.lerp(pp, float(k) / 14.0)):
 					want = true
 					break
-		if want == bt.fade:
+		if want == co.fade:
 			continue
-		bt.fade = want
-		for mi in bt.root.get_children():
+		co.fade = want
+		for mi in co.root.get_children():
 			if want:
 				mi.material_override = mat_fade(mi.get_meta("mat", mi.material_override))
 			else:
@@ -975,6 +978,7 @@ func _cyl(pos: Vector3, r_bot: float, r_top: float, h: float, col: Color, parent
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
 	mi.material_override = mat_std(col)
+	mi.set_meta("mat", mi.material_override)
 	mi.position = pos
 	mi.rotation = rot
 	(parent if parent else self).add_child(mi)
@@ -999,6 +1003,7 @@ func _sph(pos: Vector3, r: float, col: Color, parent: Node = null, emissive := f
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
 	mi.material_override = mat_std(col, false, emissive)
+	mi.set_meta("mat", mi.material_override)
 	mi.position = pos
 	(parent if parent else self).add_child(mi)
 	return mi
@@ -1010,6 +1015,7 @@ func _facette(pos: Vector3, col: Color, parent: Node = null, scale := Vector3.ON
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
 	mi.material_override = mat_std(col)
+	mi.set_meta("mat", mi.material_override)
 	mi.position = pos
 	mi.scale = scale
 	(parent if parent else self).add_child(mi)
@@ -1027,6 +1033,7 @@ func _caps(pos: Vector3, r: float, h: float, col: Color, parent: Node = null) ->
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
 	mi.material_override = mat_std(col)
+	mi.set_meta("mat", mi.material_override)
 	mi.position = pos
 	(parent if parent else self).add_child(mi)
 	return mi
@@ -1093,7 +1100,13 @@ func creer_ville():
 				var zm: float = side * tm * (b.d + 0.5) / 2.0
 				var ym: float = y + b.h + rh * (1.0 - tm) + 0.02
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
-				_box(Vector3(b.x, ym, b.z + zm), Vector3(b.w + 0.55, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc, null, Vector3(side * ang, 0, 0))
+				# b18 : TEXTURE de tuiles : 6 carreaux par rang, joints + damier
+				var NW := 6
+				var lw := (b.w + 0.55) / float(NW)
+				for j in range(NW):
+					var xm := -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
+					var tc2: Color = tc.lightened(0.05) if (ti + j) % 2 == 0 else tc.darkened(0.07)
+					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.86, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc2, null, Vector3(side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
@@ -1126,14 +1139,16 @@ func creer_ville():
 					Vector3(b.w * 0.6, 0.12, 0.35), Color(0.60, 0.58, 0.55))
 		_parent_capture = null
 		batiments.append({"x": b.x, "z": b.z, "w": b.w + 0.5, "d": b.d + 0.5, "root": broot, "fade": false})
+		# b18 : emprise ÉLARGIE aux débords de toit (+0.8) pour le camouflage
+		camo_objs.append({"root": broot, "x": b.x, "z": b.z, "rx": (b.w + 0.5) / 2.0 + 0.8, "rz": (b.d + 0.5) / 2.0 + 0.8, "fade": false})
 		col_boite(b.x, b.z, b.w + 0.5, b.d + 0.5, float(b.h))
 
 	# PNJ (villageois low-poly)
 	var pnj = [
-		{"x":-10,"z":-2.1,"c":Color(0.80,0.20,0.16),"n":"Vendeur"},
-		{"x":-10,"z":5.65,"c":Color(0.16,0.68,0.36),"n":"Forgeron"},
-		{"x":-9,"z":-14.6,"c":Color(0.50,0.24,0.62),"n":"Maire"},
-		{"x":10,"z":-3.35,"c":Color(0.82,0.42,0.08),"n":"Marchand"},
+		{"x":-8.25,"z":-2.1,"c":Color(0.80,0.20,0.16),"n":"Vendeur"},
+		{"x":-8.6,"z":5.65,"c":Color(0.16,0.68,0.36),"n":"Forgeron"},
+		{"x":-6.0,"z":-15.0,"c":Color(0.50,0.24,0.62),"n":"Maire"},
+		{"x":11.4,"z":-3.35,"c":Color(0.82,0.42,0.08),"n":"Marchand"},
 	]
 	for d in pnj:
 		var y := hauteur_terrain(d.x, d.z)
@@ -1270,6 +1285,7 @@ func creer_pin(x: float, z: float):
 	root.position = Vector3(x, y, z)
 	root.scale = Vector3.ONE * s
 	add_child(root)
+	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.5 * s, "rz": 1.5 * s, "fade": false})
 	# b15 : TRONC bien visible (épais, haut) puis feuillage au-dessus
 	_cyl(Vector3(0, 1.1, 0), 0.34, 0.24, 2.2, Color(0.58, 0.40, 0.22), root, 8)
 	_cone(Vector3(0, 3.3, 0), 1.35, 2.4, Color(0.13, 0.42, 0.16), root, 7)
@@ -1282,6 +1298,7 @@ func creer_arbre_rond(x: float, z: float):
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
+	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.9, "rz": 1.9, "fade": false})
 	# b15 : tronc épais + feuillage remonté (ne trempe plus dans les maisons)
 	_cyl(Vector3(0, 1.5, 0), 0.36, 0.26, 3.0, Color(0.58, 0.40, 0.22), root, 8)
 	_facette(Vector3(0, 4.2, 0), Color(0.22, 0.58, 0.20), root, Vector3(2.4, 2.0, 2.4))
@@ -1446,14 +1463,14 @@ func creer_garde(x: float, z: float) -> Node3D:
 	# b15 : hallebarde ENTIÈREMENT visible : manche clair épais tenu de biais,
 	# fer + croc latéral + talon (avant : fin manche sombre = on ne voyait que le haut).
 	var halle := Node3D.new()
-	halle.position = Vector3(0.42, 0.95, 0)
-	halle.rotation.z = deg_to_rad(-14)
+	halle.position = Vector3(0.55, 0.95, 0.05)
+	halle.rotation.z = deg_to_rad(-25)
 	root.add_child(halle)
-	_cyl(Vector3(0, 0, 0), 0.075, 0.065, 2.4, Color(0.74, 0.56, 0.32), halle, 8)
-	_box(Vector3(0, 1.05, 0), Vector3(0.10, 0.46, 0.18), Color(0.78, 0.80, 0.84), halle)
-	_cone(Vector3(0, 1.42, 0), 0.09, 0.30, Color(0.84, 0.86, 0.90), halle, 6)
-	_box(Vector3(-0.15, 0.85, 0), Vector3(0.20, 0.30, 0.06), Color(0.78, 0.80, 0.84), halle)
-	_box(Vector3(0, -1.12, 0), Vector3(0.09, 0.12, 0.09), Color(0.45, 0.50, 0.58), halle)
+	_cyl(Vector3(0, 0, 0), 0.09, 0.08, 2.5, Color(0.85, 0.66, 0.38), halle, 8)
+	_box(Vector3(0, 1.10, 0), Vector3(0.12, 0.50, 0.20), Color(0.78, 0.80, 0.84), halle)
+	_cone(Vector3(0, 1.50, 0), 0.10, 0.32, Color(0.84, 0.86, 0.90), halle, 6)
+	_box(Vector3(-0.16, 0.90, 0), Vector3(0.22, 0.32, 0.07), Color(0.78, 0.80, 0.84), halle)
+	_box(Vector3(0, -1.20, 0), Vector3(0.10, 0.14, 0.10), Color(0.45, 0.50, 0.58), halle)
 	var label := Label3D.new()
 	label.text = "Garde"
 	label.position = Vector3(0, 1.75, 0)
@@ -1565,12 +1582,13 @@ func creer_joueur():
 	# Marteau (main droite)
 	var marteau := Node3D.new()
 	marteau.position = Vector3(0, -0.44, 0)
+	marteau.rotation.z = deg_to_rad(-28)   # b18 : porté DE BIAIS vers l'extérieur
 	bras_droit.add_child(marteau)
-	# b15 : MANCHE épais et bien visible + tête au bout + pommeau
-	_cyl(Vector3(0, -0.18, 0), 0.075, 0.065, 1.0, Color(0.68, 0.50, 0.28), marteau, 8)
-	_box(Vector3(0, -0.66, 0), Vector3(0.24, 0.28, 0.38), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.66, 0), Vector3(0.28, 0.12, 0.40), Color(0.35, 0.24, 0.12), marteau)
-	_sph(Vector3(0, 0.34, 0), 0.08, Color(0.35, 0.24, 0.12), marteau)
+	# b18 : manche TRÈS visible : épais, bois clair, dépassant du corps
+	_cyl(Vector3(0, -0.18, 0), 0.09, 0.08, 1.1, Color(0.82, 0.64, 0.36), marteau, 8)
+	_box(Vector3(0, -0.70, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.70, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
+	_sph(Vector3(0, 0.38, 0), 0.09, Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()

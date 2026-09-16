@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b17" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b18" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -375,6 +375,25 @@ pour l'herbe/fleurs/rochers (perf).
   bâtiment ; si traversé => matériaux remplacés par mat_fade() (duplicate +
   TRANSPARENCY_ALPHA, alpha 0.28, émission atténuée), sinon restaurés.
   La maison entre la caméra et le joueur devient translucide.
+
+4k) MAJ DU 16/09/2026 (build b18)
+----------------------------------
+- MANCHES VRAIMENT VISIBLES : le manche vertical le long du torse était
+  masqué par la silhouette du corps. Marteau : marteau.rotation.z = -28°
+  (porté de biais vers l'extérieur), manche r 0.09 L 1.1 bois très clair
+  (0.82,0.64,0.36). Hallebarde : halle.position (0.55,0.95,0.05), rot z
+  -25°, manche r 0.09 L 2.5 clair (0.85,0.66,0.38).
+- PNJ DÉCALÉS SUR LE CÔTÉ de la porte (le dev implémentera l'entrée dans
+  les bâtiments plus tard) : Vendeur (-8.25,-2.1), Forgeron (-8.6,5.65),
+  Marchand (11.4,-3.35), Maire (-6.0,-15.0) (à côté de l'escalier).
+- TUILES TEXTURÉES : chaque rang = 6 carreaux avec joints (largeur 86 %) et
+  damier clair/foncé (ti+j) : fini l'effet « traits horizontaux ».
+- CAMOUFLAGE ÉTENDU : liste camo_objs = bâtiments (emprise XZ élargie de
+  +0.8 pour les débords de toit : un bout de toit resté entre la caméra et
+  le joueur garde le bâtiment translucide) + ARBRES (pins rx=rz=1.5*s,
+  ronds 1.9). 14 échantillons sur le segment caméra->joueur. meta "mat"
+  posée dans TOUS les helpers (_box _cyl _cone->via _cyl _sph _facette
+  _caps _prism) pour restaurer le matériau d'origine au dé-fondu.
 
 5) FICHIERS IMPORTANTS
 ----------------------
