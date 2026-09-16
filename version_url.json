@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b21 : RACINE du bug des manches/troncs/pièces trouvée (CylinderMesh natif invisible chez le dev) -> tous les cylindres reconstruits en ArrayMesh (make_tube) ; pièces d'or visibles et ramassables ; plus de coup à travers la clôture du village (joueur ET monstres), portée melee 2.4. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b22 : manches pleins (faces des tubes retournées, plus de translucidité), sapins retirés de la route et limités à 5 en ville (+2 arbres), troncs raccordés au feuillage, épaules qui effleurent le torse (bras/arme écartés), marteau divisé par 2 remonté à la cheville avec manche sous la main. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "0434a66e5901ee965b0ca0649204db19",
-   "size": 109930
+   "hash": "59f70648389d561afa239558a4207fcf",
+   "size": 110173
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "8232bb3d38f7686259c5158973b4f736",
-   "size": 33981
+   "hash": "b67a90f6fe15534c3ad561218776ba0e",
+   "size": 35016
   }
  }
 }

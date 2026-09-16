@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b21" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b22" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -441,6 +441,23 @@ pour l'herbe/fleurs/rochers (perf).
   travers la clôture ; attaque des monstres bloquée pareil. Fini l'abri
   derrière la barrière pour tuer sans risque.
 - PIÈCES : rayon 0.14->0.18, épaisseur 0.05, ramassage 3.0->3.5.
+
+4o) MAJ DU 16/09/2026 (build b22)
+----------------------------------
+- TUBES translucides corrigés : les faces latérales de make_tube étaient
+  émises dans le mauvais sens (culled => on voyait à travers le manche).
+  Ordre des triangles latéraux inversé (b0,t1,t0 / b0,b1,t1).
+- SAPINS : ceux SUR la route retirés ([0,15], [0,-15], [0,-50], [5,29]) ;
+  en ville 5 MAXI bien espacés ([-14,-14], [14,-9], [-17,7], [14,11],
+  [-9,13]) + 2 arbres ronds ([-14,7], [14,7]) ; forêt extérieure gardée.
+- TRONCS montent jusqu'au feuillage : pin tronc h 2.6 (sommet 2.6 dans le
+  cône 2.1), rond h 3.6 (sommet 3.6 dans la facette 3.2) ; nervures
+  allongées en conséquence.
+- ÉPAULES : sphères x ±0.33 (effleurent le torse 0.22 au lieu d'y entrer) ;
+  pivots de bras x ±0.31 => mains et arme écartées du corps.
+- MARTEAU : manche commence JUSTE SOUS la main (local -0.05..-0.45, bague
+  à -0.08) ; tête DIVISÉE PAR 2 (0.16/0.16/0.22) et remontée à la cheville
+  (local -0.53 => ~0.19 m du sol, ne touche plus le sol).
 
 5) FICHIERS IMPORTANTS
 ----------------------

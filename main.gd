@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b21"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b22"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -980,8 +980,8 @@ func make_tube(r_bot: float, r_top: float, h: float, seg: int) -> ArrayMesh:
 		var b1 := Vector3(cos(a1) * r_bot, y0, sin(a1) * r_bot)
 		var t0 := Vector3(cos(a0) * r_top, y1, sin(a0) * r_top)
 		var t1 := Vector3(cos(a1) * r_top, y1, sin(a1) * r_top)
-		tris.push_back(b0); tris.push_back(t0); tris.push_back(t1)
-		tris.push_back(b0); tris.push_back(t1); tris.push_back(b1)
+		tris.push_back(b0); tris.push_back(t1); tris.push_back(t0)
+		tris.push_back(b0); tris.push_back(b1); tris.push_back(t1)
 		tris.push_back(ct); tris.push_back(t0); tris.push_back(t1)
 		tris.push_back(cb); tris.push_back(b1); tris.push_back(b0)
 	return mesh_tris(tris, PackedColorArray())
@@ -1280,11 +1280,12 @@ func creer_fontaine(x: float, z: float):
 
 func creer_arbres():
 	var pins := [
-		[-6, 6], [6, 6], [-6, -6], [6, -6], [-9, 13], [14, 11], [-14, -14], [9, -13],
-		[-14, 9], [14, -9], [-17, 7], [17, -7], [0, 15], [0, -15], [15, 0], [-15, 0],
-		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [5, 29], [-12, 26],
+		# b22 : 5 sapins MAXI en ville (espacés, hors route et bâtiments) ;
+		# ceux qui étaient SUR la route ([0,15], [0,-15], [0,-50], [5,29]) retirés.
+		[-14, -14], [14, -9], [-17, 7], [14, 11], [-9, 13],
+		[-26, 18], [26, 18], [-26, -20], [26, -20], [-34, 0], [34, 0], [-12, 26],
 		[12, 26], [-40, 30], [40, 30], [-45, -35], [45, -35], [-55, 10], [55, 10],
-		[-60, -50], [60, -50], [-70, 40], [70, 40], [0, -50], [-20, -45], [20, -45],
+		[-60, -50], [60, -50], [-70, 40], [70, 40], [-20, -45], [20, -45],
 	]
 	for p in pins:
 		creer_pin(p[0], p[1])
@@ -1302,11 +1303,11 @@ func creer_pin(x: float, z: float):
 	add_child(root)
 	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.5 * s, "rz": 1.5 * s, "fade": false})
 	# b15 : TRONC bien visible (épais, haut) puis feuillage au-dessus
-	_cyl(Vector3(0, 1.1, 0), 0.34, 0.24, 2.2, Color(0.50, 0.34, 0.17), root, 8)
+	_cyl(Vector3(0, 1.3, 0), 0.34, 0.24, 2.6, Color(0.50, 0.34, 0.17), root, 8)
 	_cone(Vector3(0, 0.25, 0), 0.55, 0.5, Color(0.50, 0.34, 0.17), root, 8)
 	for k in range(4):
 		var a := float(k) * TAU / 4.0
-		_box(Vector3(cos(a) * 0.30, 1.1, sin(a) * 0.30), Vector3(0.10, 2.0, 0.10), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
+		_box(Vector3(cos(a) * 0.30, 1.3, sin(a) * 0.30), Vector3(0.10, 2.4, 0.10), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
 	_cone(Vector3(0, 3.3, 0), 1.35, 2.4, Color(0.13, 0.42, 0.16), root, 7)
 	_cone(Vector3(0, 4.4, 0), 1.05, 2.1, Color(0.16, 0.50, 0.19), root, 7)
 	_cone(Vector3(0, 5.4, 0), 0.72, 1.8, Color(0.20, 0.58, 0.22), root, 7)
@@ -1319,11 +1320,11 @@ func creer_arbre_rond(x: float, z: float):
 	add_child(root)
 	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.9, "rz": 1.9, "fade": false})
 	# b15 : tronc épais + feuillage remonté (ne trempe plus dans les maisons)
-	_cyl(Vector3(0, 1.5, 0), 0.36, 0.26, 3.0, Color(0.50, 0.34, 0.17), root, 8)
+	_cyl(Vector3(0, 1.8, 0), 0.36, 0.26, 3.6, Color(0.50, 0.34, 0.17), root, 8)
 	_cone(Vector3(0, 0.3, 0), 0.6, 0.6, Color(0.50, 0.34, 0.17), root, 8)
 	for k in range(4):
 		var a := float(k) * TAU / 4.0 + 0.4
-		_box(Vector3(cos(a) * 0.32, 1.5, sin(a) * 0.32), Vector3(0.11, 2.6, 0.11), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
+		_box(Vector3(cos(a) * 0.32, 1.8, sin(a) * 0.32), Vector3(0.11, 3.2, 0.11), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
 	_facette(Vector3(0, 4.2, 0), Color(0.22, 0.58, 0.20), root, Vector3(2.4, 2.0, 2.4))
 	_facette(Vector3(0.7, 3.6, 0.4), Color(0.18, 0.50, 0.17), root, Vector3(1.4, 1.2, 1.4))
 
@@ -1579,12 +1580,13 @@ func creer_joueur():
 	# Baudrier
 	_box(Vector3(0, 1.0, 0), Vector3(0.46, 0.09, 0.30), CUIR, player_node, Vector3(0, 0, deg_to_rad(35)))
 	# Épaules
-	_sph(Vector3(-0.27, 1.18, 0), 0.11, TUNIQUE, player_node)
-	_sph(Vector3(0.27, 1.18, 0), 0.11, TUNIQUE, player_node)
+	# b22 : boules d'épaule qui EFFLEURENT le torse (x 0.33) => bras écartés
+	_sph(Vector3(-0.33, 1.18, 0), 0.11, TUNIQUE, player_node)
+	_sph(Vector3(0.33, 1.18, 0), 0.11, TUNIQUE, player_node)
 
 	# Bras (pivots)
-	bras_gauche = Node3D.new(); bras_gauche.position = Vector3(-0.27, 1.16, 0); player_node.add_child(bras_gauche)
-	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.27, 1.16, 0); player_node.add_child(bras_droit)
+	bras_gauche = Node3D.new(); bras_gauche.position = Vector3(-0.31, 1.16, 0); player_node.add_child(bras_gauche)
+	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.31, 1.16, 0); player_node.add_child(bras_droit)
 	for b in [bras_gauche, bras_droit]:
 		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
 		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
@@ -1611,10 +1613,12 @@ func creer_joueur():
 	# en bas, sommet du manche dans la main. Bras droit légèrement écarté du
 	# corps (rotation.z -10°) pour que le manche se découpe sur le décor.
 	# b20 : manche DANS le poing, bois très clair + bagues sombres de contraste
-	_cyl(Vector3(0, -0.10, 0), 0.11, 0.10, 0.7, Color(0.86, 0.70, 0.44), marteau, 8)
-	_cyl(Vector3(0, -0.44, 0), 0.13, 0.13, 0.07, Color(0.22, 0.22, 0.26), marteau, 8)
-	_box(Vector3(0, -0.58, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.58, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
+	# b22 : manche commence JUSTE SOUS la main (tient dans le poing) ;
+	# tête DIVISÉE PAR 2 et remontée à la cheville (~0.19 m du sol).
+	_cyl(Vector3(0, -0.25, 0), 0.09, 0.08, 0.40, Color(0.86, 0.70, 0.44), marteau, 8)
+	_cyl(Vector3(0, -0.08, 0), 0.11, 0.11, 0.06, Color(0.22, 0.22, 0.26), marteau, 8)
+	_box(Vector3(0, -0.53, 0), Vector3(0.16, 0.16, 0.22), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.53, 0), Vector3(0.18, 0.07, 0.24), Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()
