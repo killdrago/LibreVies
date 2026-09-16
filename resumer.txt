@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b19" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b20" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -407,6 +407,22 @@ pour l'herbe/fleurs/rochers (perf).
   touche que rotation.x) => le manche se découpe sur le décor tout en
   restant dans l'axe du bras. Hallebarde : verticale (rot z 0), tenue dans
   la main du garde (x 0.34, origine y 1.25, talon au sol).
+
+4m) MAJ DU 16/09/2026 (build b20)
+----------------------------------
+- CAMOUFLAGE FIABILISÉ (bug mairie/maison : le toit restait solide alors
+  qu'il gênait) : 40 échantillons sur le segment caméra->joueur (pas 14) et
+  suppression du garde « caméra hors de la zone » : si la caméra est DANS
+  la zone élargie (dos au bâtiment) et le joueur dehors, le bâtiment passe
+  fantôme quand même. Seul cas sans fondu : caméra ET joueur dans la zone
+  (on longe le mur de près).
+- BRAS DROIT REDRESSÉ (le dev veut un bras droit) : rotation.z -10°
+  supprimée. Manche du marteau DANS le poing : cylindre r 0.11 bois très
+  clair (0.86,0.70,0.44) + BAGUE sombre de contraste sous le poing ; tête
+  au bout en bas. Hallebarde : manche r 0.11 clair + bague sombre.
+- TRONCS TEXTURÉS « écorce » : cylindre brun + 4 nervures verticales
+  sombres autour + cône de collet à la base (pins et arbres ronds) : le
+  tronc se lit comme un tronc, pas comme un cylindre nu.
 
 5) FICHIERS IMPORTANTS
 ----------------------

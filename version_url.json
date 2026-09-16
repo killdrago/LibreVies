@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b19 : correctif de parse (lw/xm/r typés), manches remis dans l'axe du bras (prolongement du bras dans le poing, bras droit écarté de 10° pour la lisibilité), hallebarde verticale dans la main du garde. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b20 : camouflage fiabilisé (40 échantillons, caméra dans la zone élargie = fantôme aussi), bras droit redressé avec manche clair bagué dans le poing, troncs avec écorce (nervures + collet). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "11f1d47665efb67785410b95bfd47cfe",
-   "size": 107580
+   "hash": "5816d2a4d758b914962d595d82df84f9",
+   "size": 108476
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "ecdd3c3055a780cf5a33a60956014b79",
-   "size": 31852
+   "hash": "bb25e78d35235f2e95be261ae0b9ad50",
+   "size": 32829
   }
  }
 }

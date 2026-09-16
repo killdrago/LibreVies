@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b19"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b20"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -613,9 +613,12 @@ func maj_camouflage():
 	for co in camo_objs:
 		var r: Rect2 = Rect2(Vector2(co.x - co.rx, co.z - co.rz), Vector2(co.rx * 2.0, co.rz * 2.0))
 		var want := false
-		if not r.has_point(cp):
-			for k in range(1, 14):
-				if r.has_point(cp.lerp(pp, float(k) / 14.0)):
+		# b20 : si la caméra EST dans la zone élargie (dos au bâtiment) et le
+		# joueur dehors, le mur/toit est entre les deux => fantôme aussi.
+		# Seul cas sans fondu : caméra ET joueur inside (on longe le mur).
+		if not (r.has_point(cp) and r.has_point(pp)):
+			for k in range(1, 40):
+				if r.has_point(cp.lerp(pp, float(k) / 40.0)):
 					want = true
 					break
 		if want == co.fade:
@@ -1287,7 +1290,11 @@ func creer_pin(x: float, z: float):
 	add_child(root)
 	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.5 * s, "rz": 1.5 * s, "fade": false})
 	# b15 : TRONC bien visible (épais, haut) puis feuillage au-dessus
-	_cyl(Vector3(0, 1.1, 0), 0.34, 0.24, 2.2, Color(0.58, 0.40, 0.22), root, 8)
+	_cyl(Vector3(0, 1.1, 0), 0.34, 0.24, 2.2, Color(0.50, 0.34, 0.17), root, 8)
+	_cone(Vector3(0, 0.25, 0), 0.55, 0.5, Color(0.50, 0.34, 0.17), root, 8)
+	for k in range(4):
+		var a := float(k) * TAU / 4.0
+		_box(Vector3(cos(a) * 0.30, 1.1, sin(a) * 0.30), Vector3(0.10, 2.0, 0.10), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
 	_cone(Vector3(0, 3.3, 0), 1.35, 2.4, Color(0.13, 0.42, 0.16), root, 7)
 	_cone(Vector3(0, 4.4, 0), 1.05, 2.1, Color(0.16, 0.50, 0.19), root, 7)
 	_cone(Vector3(0, 5.4, 0), 0.72, 1.8, Color(0.20, 0.58, 0.22), root, 7)
@@ -1300,7 +1307,11 @@ func creer_arbre_rond(x: float, z: float):
 	add_child(root)
 	camo_objs.append({"root": root, "x": x, "z": z, "rx": 1.9, "rz": 1.9, "fade": false})
 	# b15 : tronc épais + feuillage remonté (ne trempe plus dans les maisons)
-	_cyl(Vector3(0, 1.5, 0), 0.36, 0.26, 3.0, Color(0.58, 0.40, 0.22), root, 8)
+	_cyl(Vector3(0, 1.5, 0), 0.36, 0.26, 3.0, Color(0.50, 0.34, 0.17), root, 8)
+	_cone(Vector3(0, 0.3, 0), 0.6, 0.6, Color(0.50, 0.34, 0.17), root, 8)
+	for k in range(4):
+		var a := float(k) * TAU / 4.0 + 0.4
+		_box(Vector3(cos(a) * 0.32, 1.5, sin(a) * 0.32), Vector3(0.11, 2.6, 0.11), Color(0.33, 0.21, 0.10), root, Vector3(0, -a, 0))
 	_facette(Vector3(0, 4.2, 0), Color(0.22, 0.58, 0.20), root, Vector3(2.4, 2.0, 2.4))
 	_facette(Vector3(0.7, 3.6, 0.4), Color(0.18, 0.50, 0.17), root, Vector3(1.4, 1.2, 1.4))
 
@@ -1466,7 +1477,8 @@ func creer_garde(x: float, z: float) -> Node3D:
 	halle.position = Vector3(0.34, 1.25, 0.05)
 	halle.rotation.z = deg_to_rad(0)   # b19 : verticale, prolongement du bras
 	root.add_child(halle)
-	_cyl(Vector3(0, 0, 0), 0.09, 0.08, 2.5, Color(0.85, 0.66, 0.38), halle, 8)
+	_cyl(Vector3(0, 0, 0), 0.11, 0.10, 2.5, Color(0.86, 0.70, 0.44), halle, 8)
+	_cyl(Vector3(0, 0.55, 0), 0.13, 0.13, 0.07, Color(0.22, 0.22, 0.26), halle, 8)
 	_box(Vector3(0, 1.10, 0), Vector3(0.12, 0.50, 0.20), Color(0.78, 0.80, 0.84), halle)
 	_cone(Vector3(0, 1.50, 0), 0.10, 0.32, Color(0.84, 0.86, 0.90), halle, 6)
 	_box(Vector3(-0.16, 0.90, 0), Vector3(0.22, 0.32, 0.07), Color(0.78, 0.80, 0.84), halle)
@@ -1561,7 +1573,6 @@ func creer_joueur():
 	# Bras (pivots)
 	bras_gauche = Node3D.new(); bras_gauche.position = Vector3(-0.27, 1.16, 0); player_node.add_child(bras_gauche)
 	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.27, 1.16, 0); player_node.add_child(bras_droit)
-	bras_droit.rotation.z = deg_to_rad(-10)   # b19 : bras écarté du corps = arme lisible
 	for b in [bras_gauche, bras_droit]:
 		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
 		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
@@ -1587,9 +1598,11 @@ func creer_joueur():
 	# b19 : manche = PROLONGEMENT DU BRAS : pris dans le poing, tête au bout
 	# en bas, sommet du manche dans la main. Bras droit légèrement écarté du
 	# corps (rotation.z -10°) pour que le manche se découpe sur le décor.
-	_cyl(Vector3(0, -0.10, 0), 0.09, 0.08, 0.7, Color(0.82, 0.64, 0.36), marteau, 8)
-	_box(Vector3(0, -0.55, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.55, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
+	# b20 : manche DANS le poing, bois très clair + bagues sombres de contraste
+	_cyl(Vector3(0, -0.10, 0), 0.11, 0.10, 0.7, Color(0.86, 0.70, 0.44), marteau, 8)
+	_cyl(Vector3(0, -0.44, 0), 0.13, 0.13, 0.07, Color(0.22, 0.22, 0.26), marteau, 8)
+	_box(Vector3(0, -0.58, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.58, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()
