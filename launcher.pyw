@@ -635,6 +635,14 @@ class App(tk.Tk):
                 pos = (self.winfo_x(), self.winfo_y())
             except Exception:
                 pos = None
+            if pos is None:
+                # b36 : FILET — si winfo_x/y echoue, la souris est encore sur
+                # le bouton JOUER, donc sur l'ecran du launcher : on prend sa
+                # position globale => le jeu s'ouvrira sur le MEME ecran.
+                try:
+                    pos = (self.winfo_pointerx(), self.winfo_pointery())
+                except Exception:
+                    pos = None
             if pos:
                 # b33 : le jeu lira ce fichier pour s'afficher sur le bon ecran
                 try:

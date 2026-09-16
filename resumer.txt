@@ -696,6 +696,23 @@ pour l'herbe/fleurs/rochers (perf).
   après la maj, ou utiliser launcher.pyw.
 - Manifeste : 7 entrées (ajout launcher_update.pyw). main.gd b35.
 
+4ac) MAJ DU 16/09/2026 (b36 — LAUNCHER SEUL, jeu inchangé)
+----------------------------------------------------------
+- Dev : il lance TOUJOURS par launcher.pyw (jamais l'exe) => le canal
+  launcher_update.pyw de b35 suffit à réparer sa machine, pas besoin de
+  rebuild exe. Demande : corriger le launcher du repo pour que JOUER ouvre
+  le jeu sur le MÊME écran, SANS rien changer d'autre.
+- Audit : play() (ligne ~630) est l'UNIQUE point de lancement ; il écrit
+  déjà screen_pref.txt + passe --position (b32/b33) et SetProcessDpiAware-
+  ness(2) est déjà en tête de fichier (b34). Rien d'autre touché.
+- SEUL AJOUT (b36) : filet dans play() — si winfo_x()/winfo_y() lève une
+  exception (pos None), on prend winfo_pointerx()/winfo_pointery() (la
+  souris est sur le bouton JOUER donc sur l'écran du launcher) =>
+  screen_pref.txt et --position sont TOUJOURS renseignés.
+- launcher_update.pyw recopié à l'identique (canal de réparation b35).
+- main.gd/main.tscn/project.godot/build_launcher.bat INCHANGÉS (hashs
+  identiques à b35). Hashs launcher.pyw + launcher_update.pyw régénérés.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

@@ -1,7 +1,7 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b35 : RÉPARATION AUTOMATIQUE du launcher — nouveau fichier launcher_update.pyw (copie neuve du launcher) que les anciens launchers téléchargent ; le jeu le recopie par-dessus launcher.pyw au démarrage. Filet multi-écrans côté jeu : écran de la souris (= écran du clic JOUER) puis dernière position mémorisée (winpos.json). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ b36 : LAUNCHER — clic sur JOUER ouvre TOUJOURS le jeu sur le même écran que le launcher (screen_pref.txt + --position + DPI awareness ; nouveau filet : si winfo_x/y échoue, position de la souris sur le bouton JOUER). launcher_update.pyw = copie neuve recopiée par le jeu au démarrage (réparation auto des anciens launchers). Rien d'autre changé. Jeu 0.3.0-b35 inchangé. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
@@ -18,20 +18,20 @@
       "size": 5556
     },
     "launcher.pyw": {
-      "hash": "dff125105cea2601167256e8246116b8",
-      "size": 629669
+      "hash": "fe4cdb8b70bd0dcb7afa5acc46139604",
+      "size": 630088
     },
     "launcher_update.pyw": {
-      "hash": "dff125105cea2601167256e8246116b8",
-      "size": 629669
+      "hash": "fe4cdb8b70bd0dcb7afa5acc46139604",
+      "size": 630088
     },
     "build_launcher.bat": {
       "hash": "4db739ba34ca09c06e428cf3e8c64b40",
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "21c091a30f8bb060a981cd610140fcc3",
-      "size": 49405
+      "hash": "0014871d9c9e74eaab9a6e722a0a657a",
+      "size": 50520
     }
   }
 }
