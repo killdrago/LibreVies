@@ -736,9 +736,31 @@ pour l'herbe/fleurs/rochers (perf).
     équivalent (pour le lancement) à celui du dev.
   * Manifeste : 6 entrées. Hashs régénérés (main.gd, launcher.pyw,
     resumer.txt changés ; les 3 autres identiques).
-- INTERDICTION ABSOLUE de réintroduire : --position, screen_pref.txt,
-  SetProcessDpiAwareness dans le launcher, ou tout forçage de position/
-  d'écran côté jeu. LA BONNE MÉTHODE = ne rien passer à Godot.
+- INTERDICTION de réintroduire CÔTÉ LAUNCHER : --position, screen_pref.txt,
+  SetProcessDpiAwareness. Le launcher ne passe RIEN à Godot. (Côté jeu,
+  voir 4ae : la détection écran de la souris est la méthode VALIDÉE.)
+
+4ae) MAJ DU 16/09/2026 (build b38) — ÉCRAN DE LA SOURIS (IDÉE DU DEV)
+---------------------------------------------------------------------
+- Constat dev : même avec le retour b37 (lancement simple), le jeu ne
+  s'ouvre PAS toujours sur l'écran du launcher (Windows/Godot le met où il
+  veut). IDÉE DU DEV, IMPLÉMENTÉE : détecter l'écran où est la souris du
+  joueur au démarrage (elle est sur le bouton JOUER du launcher) et y
+  placer le jeu.
+- Pourquoi côté JEU et pas launcher : Godot est DPI-aware =>
+  DisplayServer.mouse_get_position() et screen_get_position/size sont des
+  coordonnées PHYSIQUES cohérentes entre elles, même avec des scalings
+  différents par écran. Tkinter dans le launcher renvoie des coordonnées
+  virtualisées => c'est ce qui faisait échouer --position/screen_pref.
+- main.gd b38 : _detecter_ecran_souris() appelé en TOUT DÉBUT de _ready :
+  trouve l'écran contenant la souris, calcule la position fenêtre centrée
+  sur la souris et CLAMPÉE dans l'écran (clampi), puis
+  _placer_sur_ecran_souris() = window_set_current_screen + window_set_
+  position, RÉ-APPLIQUÉ 45 frames (~0.75 s) dans _process (_ecran_frames)
+  contre les resets tardifs de fenêtre. Vars : _ecran_souris, _ecran_pos.
+- Launcher INCHANGÉ (b37) : il ne passe rien ; le dev garde son launcher
+  local qui téléchargera simplement main.gd b38.
+- Manifeste : 6 entrées, seul le hash main.gd change.
 
 5) FICHIERS IMPORTANTS
 ----------------------

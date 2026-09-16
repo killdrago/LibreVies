@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b37"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b38"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -111,6 +111,9 @@ var opt_lum := 30                       # 1..100 (défaut demandé par le dev)
 var capture_action := ""                # action en cours de reconfiguration (Options > Contrôles)
 var touches_boutons := {}               # action -> Button
 var pnj_items := []                       # b25 : PNJ animés (métiers)
+var _ecran_souris := -1                   # b38 : écran où est la souris au démarrage
+var _ecran_pos := Vector2i.ZERO           # b38 : position fenêtre calculée
+var _ecran_frames := 0                    # b38 : ré-applique ~0.75 s
 var panneau_graph: VBoxContainer
 var panneau_ctrl: VBoxContainer
 var tab_graph: Button
@@ -136,6 +139,9 @@ var _mat_cache := {}
 # READY
 # ============================================================
 func _ready():
+	# b38 : le jeu démarre sur l'écran où est la souris du joueur (= l'écran
+	# du launcher, où il vient de cliquer sur JOUER).
+	_detecter_ecran_souris()
 	camera = $Camera3D
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	DisplayServer.window_set_title("LibreVie %s" % BUILD)
@@ -175,6 +181,11 @@ func _on_regen():
 # PROCESS
 # ============================================================
 func _process(delta: float):
+	# b38 : fenêtre replacée sur l'écran de la souris pendant le démarrage
+	if _ecran_frames > 0:
+		_ecran_frames -= 1
+		_placer_sur_ecran_souris()
+
 	# Nuages qui dérivent
 	for n in nuages:
 		n.position.x += delta * 0.6
@@ -1969,6 +1980,41 @@ func update_ennemis(delta: float):
 # GARDES DES PORTAILS : toute bébête à moins de 2 m de la porte
 # se fait attaquer (25 dégâts / 0,8 s) jusqu'à mort.
 # ============================================================
+func _detecter_ecran_souris():
+	# b38 : demande du dev — détecter l'écran où est la souris du joueur et
+	# démarrer le jeu sur CET écran. Fait côté jeu car Godot est DPI-aware :
+	# mouse_get_position() renvoie des coordonnées PHYSIQUES globales,
+	# cohérentes avec screen_get_position/size même si chaque écran a un
+	# scaling différent (le forçage côté launcher échouait à cause de ça).
+	var mp := DisplayServer.mouse_get_position()
+	for i in range(DisplayServer.get_screen_count()):
+		var sp := DisplayServer.screen_get_position(i)
+		var ss := DisplayServer.screen_get_size(i)
+		if mp.x >= sp.x and mp.x < sp.x + ss.x and mp.y >= sp.y and mp.y < sp.y + ss.y:
+			_ecran_souris = i
+			break
+	if _ecran_souris < 0:
+		return
+	var sp2 := DisplayServer.screen_get_position(_ecran_souris)
+	var ss2 := DisplayServer.screen_get_size(_ecran_souris)
+	var win := DisplayServer.window_get_size()
+	var demi := Vector2i(int(win.x * 0.5), int(win.y * 0.5))
+	var x := sp2.x
+	var y := sp2.y
+	if ss2.x > win.x:
+		x = clampi(mp.x - demi.x, sp2.x, sp2.x + ss2.x - win.x)
+	if ss2.y > win.y:
+		y = clampi(mp.y - demi.y, sp2.y, sp2.y + ss2.y - win.y)
+	_ecran_pos = Vector2i(x, y)
+	_ecran_frames = 45   # ré-applique ~0.75 s contre les resets de fenêtre
+	_placer_sur_ecran_souris()
+
+func _placer_sur_ecran_souris():
+	if _ecran_souris < 0:
+		return
+	DisplayServer.window_set_current_screen(_ecran_souris)
+	DisplayServer.window_set_position(_ecran_pos)
+
 func update_gardes(delta: float):
 	# b33 : le garde ne se déplace PLUS en patrouille (effet crabe) : il ne
 	# bouge QUE pour aller attaquer une cible DANS SA ZONE (autour de SON
