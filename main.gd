@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b14"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b15"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1029,11 +1029,27 @@ func creer_ville():
 		_box(Vector3(b.x, y + b.h * 0.52, b.z + b.d / 2.0 + 0.04), Vector3(b.w * 0.98, 0.12, 0.10), BOIS)
 		_box(Vector3(b.x - b.w / 2.0 + 0.08, y + b.h * 0.5, b.z + b.d / 2.0 + 0.04), Vector3(0.14, b.h * 0.98, 0.10), BOIS)
 		_box(Vector3(b.x + b.w / 2.0 - 0.08, y + b.h * 0.5, b.z + b.d / 2.0 + 0.04), Vector3(0.14, b.h * 0.98, 0.10), BOIS)
+		# b15 : murs « texturés » : soubassement pierre + panneaux de crépi
+		# (avant/bas plus clairs, arrière ombré) — finis les gros cubes unis.
+		_box(Vector3(b.x, y + b.h * 0.14, b.z), Vector3(b.w + 0.10, b.h * 0.28, b.d + 0.10), PIERRE.lightened(0.14))
+		_box(Vector3(b.x, y + b.h * 0.62, b.z + b.d / 2.0 + 0.03), Vector3(b.w * 0.42, b.h * 0.30, 0.06), b.c.lightened(0.07))
+		_box(Vector3(b.x, y + b.h * 0.62, b.z - b.d / 2.0 - 0.03), Vector3(b.w * 0.42, b.h * 0.30, 0.06), b.c.darkened(0.06))
 		# Fondations pierre
 		_box(Vector3(b.x, y + 0.1, b.z), Vector3(b.w + 0.25, 0.25, b.d + 0.25), PIERRE)
 		# Toit en prisme (pignon) + débords
 		var rh: float = b.d * 0.42
 		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.5, rh, b.w + 0.5), b.roof, null, Vector3(0, deg_to_rad(90), 0))
+		# b15 : TUILES visibles : 4 rangs en gradins inclinés par pan + faîtage
+		var NR := 4
+		var ang := atan2(rh, (b.d + 0.5) / 2.0)
+		for side in [-1.0, 1.0]:
+			for ti in range(NR):
+				var tm := (float(ti) + 0.5) / float(NR)
+				var zm := side * tm * (b.d + 0.5) / 2.0
+				var ym := y + b.h + rh * (1.0 - tm) + 0.02
+				var tc := b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
+				_box(Vector3(b.x, ym, b.z + zm), Vector3(b.w + 0.55, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc, null, Vector3(-side * ang, 0, 0))
+		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
 		_box(Vector3(b.x, y + b.h * 0.56, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.28, 0.08, 0.16), Color(0.38, 0.22, 0.09))
@@ -1044,17 +1060,13 @@ func creer_ville():
 			vitre.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(b.w * 0.13, 0.03, 0.03), Color(0.32, 0.21, 0.10))
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(0.03, b.h * 0.14, 0.03), Color(0.32, 0.21, 0.10))
+			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60 - b.h * 0.10 - 0.05, b.z + b.d / 2.0 + 0.10), Vector3(b.w * 0.20, 0.07, 0.16), PIERRE.lightened(0.22))
 		# Fenêtres côtés
 		for fz in [-0.28, 0.28]:
 			var v2 := _box(Vector3(b.x + b.w / 2.0 + 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(1.0, 0.72, 0.30))
 			v2.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
 			var v3 := _box(Vector3(b.x - b.w / 2.0 - 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(1.0, 0.72, 0.30))
 			v3.material_override = mat_std(Color(1.0, 0.72, 0.30), false, true)
-		# Auvent des commerces
-		if b.n in ["Supermarche", "Armurerie", "Vetements", "Auberge"]:
-			_box(Vector3(b.x, y + b.h * 0.44, b.z + b.d / 2.0 + 0.9), Vector3(b.w + 0.4, 0.1, 1.8), Color(0.75, 0.38, 0.12))
-			_box(Vector3(b.x - b.w / 2.0 + 0.1, y + b.h * 0.22, b.z + b.d / 2.0 + 1.7), Vector3(0.12, b.h * 0.42, 0.12), Color(0.42, 0.26, 0.10))
-			_box(Vector3(b.x + b.w / 2.0 - 0.1, y + b.h * 0.22, b.z + b.d / 2.0 + 1.7), Vector3(0.12, b.h * 0.42, 0.12), Color(0.42, 0.26, 0.10))
 		# Cheminée des maisons
 		if b.n == "Maison":
 			_box(Vector3(b.x + b.w * 0.3, y + b.h + rh * 0.5, b.z + b.d * 0.3), Vector3(0.4, 0.9, 0.4), Color(0.62, 0.32, 0.16))
@@ -1160,6 +1172,7 @@ func creer_chateau():
 	col_cercle(-6, -82, 2.9, 12.0)
 	col_cercle(6, -82, 2.9, 12.0)
 	col_boite(0, -82, 9, 7, 9.0)
+	col_boite(0, -69, 4.4, 1.6, 5.0)   # b15 : porte sud BLOQUÉE, on ne peut plus entrer
 
 # ============================================================
 # FONTAINE / ARBRES / PROPS / NUAGE
@@ -1179,10 +1192,12 @@ func creer_fontaine(x: float, z: float):
 	# Vasque haute + orbe d'eau + filets d'eau retombant dans le bassin
 	_cyl(Vector3(x, y + 2.72, z), 0.95, 0.5, 0.24, PIERRE_F, self, 10)
 	_cyl(Vector3(x, y + 2.85, z), 0.82, 0.82, 0.06, Color(0.18, 0.70, 0.72), self, 10)
-	_sph(Vector3(x, y + 3.18, z), 0.34, Color(0.30, 0.80, 0.85), self, true)
+	# b15 : plus de BOULE VOLANTE : pinacle de pierre pointu (comme l'image)
+	_cyl(Vector3(x, y + 3.0, z), 0.16, 0.12, 0.3, PIERRE_F, self, 8)
+	_cone(Vector3(x, y + 3.32, z), 0.14, 0.34, PIERRE_F, self, 8)
 	for k in range(4):
 		var a := float(k) * TAU / 4.0 + 0.4
-		_cyl(Vector3(x + cos(a) * 0.78, y + 1.85, z + sin(a) * 0.78), 0.045, 0.07, 1.9, Color(0.85, 0.95, 1.0), self, 5)
+		_cyl(Vector3(x + cos(a) * 0.88, y + 1.82, z + sin(a) * 0.88), 0.05, 0.075, 1.85, Color(0.85, 0.95, 1.0), self, 5)
 
 func creer_arbres():
 	var pins := [
@@ -1195,7 +1210,7 @@ func creer_arbres():
 	for p in pins:
 		creer_pin(p[0], p[1])
 	# Quelques arbres ronds
-	for p in [[-12, 2], [12, 2], [-24, -8], [24, 8], [-30, 30], [30, -30]]:
+	for p in [[-14, 7], [14, 7], [-24, -8], [24, 8], [-30, 30], [30, -30]]:
 		creer_arbre_rond(p[0], p[1])
 
 func creer_pin(x: float, z: float):
@@ -1206,10 +1221,11 @@ func creer_pin(x: float, z: float):
 	root.position = Vector3(x, y, z)
 	root.scale = Vector3.ONE * s
 	add_child(root)
-	_cyl(Vector3(0, 0.9, 0), 0.16, 0.12, 1.8, Color(0.42, 0.28, 0.14), root, 6)
-	_cone(Vector3(0, 2.4, 0), 1.35, 2.4, Color(0.13, 0.42, 0.16), root, 7)
-	_cone(Vector3(0, 3.5, 0), 1.05, 2.1, Color(0.16, 0.50, 0.19), root, 7)
-	_cone(Vector3(0, 4.5, 0), 0.72, 1.8, Color(0.20, 0.58, 0.22), root, 7)
+	# b15 : TRONC bien visible (épais, haut) puis feuillage au-dessus
+	_cyl(Vector3(0, 1.0, 0), 0.24, 0.17, 2.0, Color(0.45, 0.30, 0.15), root, 7)
+	_cone(Vector3(0, 2.9, 0), 1.35, 2.4, Color(0.13, 0.42, 0.16), root, 7)
+	_cone(Vector3(0, 4.0, 0), 1.05, 2.1, Color(0.16, 0.50, 0.19), root, 7)
+	_cone(Vector3(0, 5.0, 0), 0.72, 1.8, Color(0.20, 0.58, 0.22), root, 7)
 
 func creer_arbre_rond(x: float, z: float):
 	var y := hauteur_terrain(x, z)
@@ -1217,9 +1233,10 @@ func creer_arbre_rond(x: float, z: float):
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
 	add_child(root)
-	_cyl(Vector3(0, 1.1, 0), 0.18, 0.14, 2.2, Color(0.42, 0.28, 0.14), root, 6)
-	_facette(Vector3(0, 2.9, 0), Color(0.22, 0.58, 0.20), root, Vector3(2.4, 2.0, 2.4))
-	_facette(Vector3(0.6, 2.4, 0.4), Color(0.18, 0.50, 0.17), root, Vector3(1.4, 1.2, 1.4))
+	# b15 : tronc épais + feuillage remonté (ne trempe plus dans les maisons)
+	_cyl(Vector3(0, 1.3, 0), 0.26, 0.19, 2.6, Color(0.45, 0.30, 0.15), root, 7)
+	_facette(Vector3(0, 3.6, 0), Color(0.22, 0.58, 0.20), root, Vector3(2.4, 2.0, 2.4))
+	_facette(Vector3(0.7, 3.1, 0.4), Color(0.18, 0.50, 0.17), root, Vector3(1.4, 1.2, 1.4))
 
 func creer_props():
 	# Lampadaires alignés le long de la route du village (plus au milieu de la route !)
@@ -1358,7 +1375,7 @@ func creer_cloture_village():
 		var gx2 := cos(a0) * VILLAGE_R * 0.90
 		var gz2 := sin(a0) * VILLAGE_R * 0.90
 		var garde := creer_garde(gx2, gz2)
-		portes.append({"x": mx2, "z": mz2, "garde": garde, "cd": 0.0})
+		portes.append({"x": mx2, "z": mz2, "garde": garde, "cd": 0.0, "lunge": 0.0, "tx": 0.0, "tz": 0.0, "bx": garde.global_position.x, "bz": garde.global_position.z})
 
 # ============================================================
 # GARDE DU VILLAGE (low-poly, hallebarde) — protège les portails
@@ -1377,9 +1394,17 @@ func creer_garde(x: float, z: float) -> Node3D:
 	_box(Vector3(0, 1.16, 0.02), Vector3(0.36, 0.06, 0.38), ACIER, root)            # bord du casque
 	_caps(Vector3(-0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)       # bras
 	_caps(Vector3(0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)
-	_cyl(Vector3(0.38, 1.0, 0), 0.035, 0.03, 2.2, Color(0.42, 0.28, 0.14), root, 6) # hallebarde
-	_box(Vector3(0.38, 2.0, 0), Vector3(0.08, 0.42, 0.16), Color(0.75, 0.77, 0.80), root)
-	_cone(Vector3(0.38, 2.3, 0), 0.07, 0.24, Color(0.80, 0.82, 0.85), root, 6)
+	# b15 : hallebarde ENTIÈREMENT visible : manche clair épais tenu de biais,
+	# fer + croc latéral + talon (avant : fin manche sombre = on ne voyait que le haut).
+	var halle := Node3D.new()
+	halle.position = Vector3(0.42, 0.95, 0)
+	halle.rotation.z = deg_to_rad(-14)
+	root.add_child(halle)
+	_cyl(Vector3(0, 0, 0), 0.05, 0.045, 2.3, Color(0.62, 0.45, 0.24), halle, 8)
+	_box(Vector3(0, 1.05, 0), Vector3(0.10, 0.46, 0.18), Color(0.78, 0.80, 0.84), halle)
+	_cone(Vector3(0, 1.42, 0), 0.09, 0.30, Color(0.84, 0.86, 0.90), halle, 6)
+	_box(Vector3(-0.15, 0.85, 0), Vector3(0.20, 0.30, 0.06), Color(0.78, 0.80, 0.84), halle)
+	_box(Vector3(0, -1.12, 0), Vector3(0.09, 0.12, 0.09), Color(0.45, 0.50, 0.58), halle)
 	var label := Label3D.new()
 	label.text = "Garde"
 	label.position = Vector3(0, 1.75, 0)
@@ -1492,9 +1517,11 @@ func creer_joueur():
 	var marteau := Node3D.new()
 	marteau.position = Vector3(0, -0.44, 0)
 	bras_droit.add_child(marteau)
-	_cyl(Vector3(0, -0.15, 0), 0.035, 0.035, 0.75, Color(0.48, 0.32, 0.16), marteau, 6)
-	_box(Vector3(0, -0.5, 0), Vector3(0.20, 0.24, 0.34), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.5, 0), Vector3(0.24, 0.10, 0.36), Color(0.35, 0.24, 0.12), marteau)
+	# b15 : MANCHE épais et bien visible + tête au bout + pommeau
+	_cyl(Vector3(0, -0.22, 0), 0.05, 0.045, 0.85, Color(0.55, 0.38, 0.20), marteau, 8)
+	_box(Vector3(0, -0.62, 0), Vector3(0.22, 0.26, 0.36), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.62, 0), Vector3(0.26, 0.11, 0.38), Color(0.35, 0.24, 0.12), marteau)
+	_sph(Vector3(0, 0.20, 0), 0.055, Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()
@@ -1615,6 +1642,10 @@ func update_ennemis(delta: float):
 				e.dir = Vector3(cos(a), 0, sin(a))
 		var spd: float = e.spd * (1.4 if dist < 10.0 else 0.6)
 		var ndir: Vector3 = e.dir
+		# b15 : les monstres s'arrêtent À PORTÉE de coup : plus de monstre
+		# qui rentre dans les jambes du joueur pour taper.
+		if dist < 1.5:
+			ndir = Vector3.ZERO
 		# Sécurité : un monstre égaré dans le village est remis dehors illico
 		if dans_village(node.global_position.x, node.global_position.z):
 			var dehors := Vector2(node.global_position.x, node.global_position.z)
@@ -1647,7 +1678,7 @@ func update_ennemis(delta: float):
 			else:
 				e.barre.visible = false
 		# Attaque au contact
-		if dist < 1.1 and e.cd <= 0 and not player_dead and not player_protected:
+		if dist < 1.6 and e.cd <= 0 and not player_dead and not player_protected:
 			e.cd = 1.2
 			player_pv -= 6
 			spawn_floater(pp + Vector3(0, 1.8, 0), "-6", Color(1, 0.3, 0.2))
@@ -1660,6 +1691,15 @@ func update_ennemis(delta: float):
 # ============================================================
 func update_gardes(delta: float):
 	for p in portes:
+		# b15 : le garde FAIT UN PAS vers le monstre quand il frappe, puis revient
+		if float(p.lunge) > 0.0:
+			p.lunge = float(p.lunge) - delta
+			var kk := sin(clampf((0.4 - float(p.lunge)) / 0.4, 0.0, 1.0) * PI)
+			var dd := Vector2(float(p.tx) - float(p.bx), float(p.tz) - float(p.bz))
+			if dd.length() > 0.01 and is_instance_valid(p.garde):
+				dd = dd.normalized()
+				p.garde.global_position.x = float(p.bx) + dd.x * kk * 0.7
+				p.garde.global_position.z = float(p.bz) + dd.y * kk * 0.7
 		p.cd = float(p.cd) - delta
 		if float(p.cd) > 0.0:
 			continue
@@ -1677,6 +1717,9 @@ func update_gardes(delta: float):
 		if cible == null:
 			continue
 		p.cd = 0.8
+		p.lunge = 0.4
+		p.tx = cible.node.global_position.x
+		p.tz = cible.node.global_position.z
 		var monstre: Node3D = cible.node
 		if is_instance_valid(p.garde):
 			var gd: Node3D = p.garde
@@ -2123,31 +2166,24 @@ func creer_hud():
 	# ===== Mini-carte =====
 	minimap = MiniMap.new()
 	minimap.parent = self
-	minimap.position = Vector2(1280 - 148 - 14, 14)
 	minimap.size = Vector2(148, 148)
 	canvas.add_child(minimap)
+	minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	minimap.position = Vector2(-148 - 14, 14)
 
 	# ===== Hotbar =====
 	hotbar = Hotbar.new()
 	hotbar.parent = self
-	hotbar.position = Vector2(640 - (5 * 56 + 4 * 8) / 2.0, 720 - 72)
 	hotbar.size = Vector2(5 * 56 + 4 * 8, 56)
 	canvas.add_child(hotbar)
-
-	# ===== Contrôles (bas) =====
-	var ctrl := Label.new()
-	ctrl.text = "[%s/Flèches] Bouger" % ("ZQSD" if est_clavier_azerty() else "WASD") + "  [MAJ] Courir  [ESPACE] Saut  [Clic] Attaque  [E] Ramasser  [ClicD] Caméra  [V] Vue  [1-5] Objets  [I] Inventaire  [O] Options  [ÉCHAP] Quitter"
-	ctrl.position = Vector2(300, 720 - 18)
-	ctrl.add_theme_font_size_override("font_size", 12)
-	ctrl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
-	ctrl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	ctrl.add_theme_constant_override("outline_size", 3)
-	canvas.add_child(ctrl)
+	hotbar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	hotbar.position = Vector2(-hotbar.size.x / 2.0, -hotbar.size.y - 12)
 
 	# ===== Info centre =====
 	info_label = Label.new()
 	info_label.text = ""
-	info_label.position = Vector2(440, 300)
+	info_label.set_anchors_preset(Control.PRESET_CENTER)
+	info_label.position = Vector2(-280, -40)
 	info_label.add_theme_font_size_override("font_size", 26)
 	info_label.add_theme_color_override("font_color", Color(1, 1, 0.4))
 	info_label.add_theme_color_override("font_outline_color", Color(0.1, 0.1, 0.1))
@@ -2158,15 +2194,17 @@ func creer_hud():
 	# ===== Bouton options =====
 	var opt_btn := Button.new()
 	opt_btn.text = "Options"
-	opt_btn.position = Vector2(1180, 680)
 	opt_btn.size = Vector2(86, 30)
+	opt_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	opt_btn.position = Vector2(-86 - 14, -30 - 14)
 	opt_btn.pressed.connect(_toggle_options)
 	canvas.add_child(opt_btn)
 
 	# ===== Panel options (onglets Graphique / Contrôles) =====
 	options_panel = PanelContainer.new()
-	options_panel.position = Vector2(330, 130)
 	options_panel.size = Vector2(620, 470)
+	options_panel.set_anchors_preset(Control.PRESET_CENTER)
+	options_panel.position = Vector2(-310, -235)
 	options_panel.visible = false
 	var opt_style := StyleBoxFlat.new()
 	opt_style.bg_color = Color(0.1, 0.1, 0.1, 0.94)
@@ -2299,6 +2337,13 @@ func creer_hud():
 	lbl_kb.add_theme_font_size_override("font_size", 13)
 	lbl_kb.add_theme_color_override("font_color", Color(1, 0.86, 0.2))
 	panneau_ctrl.add_child(lbl_kb)
+	# b15 : l'aide des touches n'est plus en bas du HUD, elle est ICI
+	var aide := Label.new()
+	aide.text = ("[%s/Flèches] Bouger   [MAJ] Courir   [ESPACE] Saut   [Clic] Attaque\n[E] Ramasser   [ClicD] Caméra   [V] Vue   [1-5] Objets\n[I] Inventaire   [O] Options   [ÉCHAP] Quitter" % ("ZQSD" if est_clavier_azerty() else "WASD"))
+	aide.add_theme_font_size_override("font_size", 12)
+	aide.add_theme_color_override("font_color", Color(0.72, 0.72, 0.72))
+	panneau_ctrl.add_child(aide)
+	panneau_ctrl.add_child(HSeparator.new())
 	for act in ACTIONS_REGLABLES:
 		var row := HBoxContainer.new()
 		panneau_ctrl.add_child(row)
