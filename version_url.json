@@ -1,21 +1,21 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b23 : haut de la fontaine solide (on ne la traverse plus en grimpant), manches affinés x3 (marteau + hallebarde du garde), pièces d'or plus rares (3), pancartes en bois avec le nom au-dessus des portes (MAIRIE, FORGERON/ARMURERIE, SUPERMARCHÉ, AUBERGE, MAISON, CHÂTEAU...). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b24 : petites boules jaunes (fleurs) retirées, murs du château avec parement de pierres, pieds du joueur posés sur les pavés de la route, barres HP/or/cailloux alignées à gauche comme l'encart de quête, croix ✕ pour fermer l'encart + touche dédiée (position de Q ; A en AZERTY, réglable dans Options). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "73377648fc47252cd411071b2991be9d",
-   "size": 111430
+   "hash": "ce25c9aeb8ca06280cf9217b38bf49a7",
+   "size": 112349
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
    "size": 602
   },
   "project.godot": {
-   "hash": "6e8f0a9c2f35f391578b5315a940cfbd",
-   "size": 5211
+   "hash": "52f5571046d13d8a5491eb4f9db8fa1e",
+   "size": 5556
   },
   "launcher.pyw": {
    "hash": "b0a399e550b03bf14a77ae70abcf9320",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "a5a3598ff48fd853bce4279d87aaa50b",
-   "size": 36149
+   "hash": "ed00e610ba059fcb678fc76d8bdffea2",
+   "size": 37462
   }
  }
 }

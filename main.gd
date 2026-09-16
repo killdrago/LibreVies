@@ -14,11 +14,11 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b23"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b24"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
-const ACTIONS_REGLABLES := ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "pickup", "camera_view", "inventaire", "options_menu"]
+const ACTIONS_REGLABLES := ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "pickup", "camera_view", "inventaire", "options_menu", "quest_panel"]
 const LIBELLES_TOUCHES := {
 	"move_forward": "Avancer", "move_back": "Reculer",
 	"move_left": "Gauche", "move_right": "Droite",
@@ -26,6 +26,7 @@ const LIBELLES_TOUCHES := {
 	"attack": "Attaquer", "pickup": "Ramasser",
 	"camera_view": "Vue 1ère/3ème pers.", "inventaire": "Inventaire",
 	"options_menu": "Menu options",
+	"quest_panel": "Panneau de quêtes",
 }
 
 # VARIABLES JOUEUR
@@ -85,7 +86,9 @@ var minimap: Control
 var hotbar: Control
 var quest_panel: PanelContainer
 var quest_toggle: Button
+var quest_close: Button
 var quest_reduit := false
+var quest_ferme := false
 var pill_or: Control
 var pill_cailloux: Control
 var quete_titre: Label
@@ -357,6 +360,8 @@ func _input(event):
 		_toggle_options()
 	if event.is_action_pressed("inventaire"):
 		_toggle_inventory()
+	if event.is_action_pressed("quest_panel"):
+		_toggle_quest_visible()
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
@@ -694,6 +699,10 @@ func resoudre_collisions(px: float, pz: float, rayon: float, pieds: float = 0.0)
 # d'un objet dont le sommet est sous ses pieds, il se pose DESSUS (perché).
 func hauteur_support(x: float, z: float, pieds: float) -> float:
 	var sol := hauteur_terrain(x, z)
+	# b24 : la route est pavée (sommet ~+0.10) : les pieds ne s'enfoncent plus
+	var dr := dist_chemin(Vector2(x, z))
+	if dr < 2.9:
+		sol += 0.10 * clampf((2.9 - dr) / 0.6, 0.0, 1.0)
 	for c in colliders:
 		var cx: float = c.x
 		var cz: float = c.z
@@ -778,35 +787,7 @@ func creer_terrain():
 			tr.origin = Vector3(x, y - 0.02, z)
 			mm.set_instance_transform(k, tr)
 
-	# Fleurs (MultiMesh)
-	var fleur := SphereMesh.new()
-	fleur.radius = 0.09
-	fleur.height = 0.18
-	fleur.radial_segments = 6
-	fleur.rings = 3
-	var rng3 := RandomNumberGenerator.new()
-	rng3.seed = 12
-	for ni in range(2):
-		var colf := Color(1.0, 0.85, 0.2) if ni == 0 else Color(0.95, 0.95, 0.9)
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = fleur
-		mm.instance_count = 70
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.material_override = mat_std(colf)
-		add_child(mmi)
-		for k in range(70):
-			var x := rng3.randf_range(-WORLD + 6, WORLD - 6)
-			var z := rng3.randf_range(-WORLD + 6, WORLD - 6)
-			if Vector2(x, z).length() < TOWN_R * 0.5:
-				x += TOWN_R * 0.8
-			x = clampf(x, -WORLD + 6, WORLD - 6)
-			z = clampf(z, -WORLD + 6, WORLD - 6)
-			var tr := Transform3D()
-			tr.origin = Vector3(x, hauteur_terrain(x, z) + 0.10, z)
-			tr = tr.scaled(Vector3.ONE * rng3.randf_range(0.7, 1.3))
-			mm.set_instance_transform(k, tr)
+	# b24 : fleurs SUPPRIMÉES (c'étaient les « petites boules jaunes » au sol)
 
 	# Rochers (MultiMesh facetté)
 	var roche := make_roche()
@@ -1243,6 +1224,24 @@ func creer_chateau():
 	lblc.modulate = Color(0.16, 0.10, 0.04)
 	lblc.position = Vector3(0, 5.75, 10.17)
 	root.add_child(lblc)
+	# b24 : PAREMENT DE PIERRES sur les murs extérieurs (côté visible) :
+	# gros blocs en damier clair/sombre, façon château fort
+	var PC1 := PIERRE.lightened(0.08)
+	var PC2 := PIERRE.darkened(0.10)
+	for ix in range(10):
+		for iy in range(3):
+			_box(Vector3(-14.4 + ix * 3.2, 1.9 + iy * 1.7, -9.83), Vector3(2.6, 0.55, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
+	for seg in [-8.0, 8.0]:
+		for ix in range(5):
+			for iy in range(3):
+				_box(Vector3(seg - 6.4 + ix * 3.2, 1.9 + iy * 1.7, 9.83), Vector3(2.6, 0.55, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
+	for side in [-1.0, 1.0]:
+		for iz in range(6):
+			for iy in range(3):
+				_box(Vector3(side * 16.83, 1.9 + iy * 1.7, -8.0 + iz * 3.2), Vector3(0.12, 0.55, 2.6), PC1 if (iz + iy) % 2 == 0 else PC2, root)
+	for ix in range(3):
+		for iy in range(4):
+			_box(Vector3(-3.0 + ix * 3.0, 3.4 + iy * 2.0, -0.44), Vector3(2.4, 0.6, 0.12), PC1 if (ix + iy) % 2 == 0 else PC2, root)
 	# Tours d'angle + donjon
 	var tours: Array[Vector3] = [Vector3(-16, 0, -9), Vector3(16, 0, -9), Vector3(-16, 0, 9), Vector3(16, 0, 9), Vector3(-6, 0, -4), Vector3(6, 0, -4)]
 	for k in range(tours.size()):
@@ -2206,7 +2205,7 @@ func creer_hud():
 	canvas.add_child(port)
 
 	hp_bar = ProgressBar.new()
-	hp_bar.position = Vector2(84, 14)
+	hp_bar.position = Vector2(14, 82)
 	hp_bar.size = Vector2(210, 26)
 	hp_bar.max_value = PV_MAX
 	hp_bar.value = PV_MAX
@@ -2236,7 +2235,7 @@ func creer_hud():
 
 	# ===== Quêtes (gauche) — réductible par le petit bouton en haut à droite =====
 	quest_panel = PanelContainer.new()
-	quest_panel.position = Vector2(14, 118)
+	quest_panel.position = Vector2(14, 188)
 	quest_panel.size = Vector2(280, 96)
 	var qs := StyleBoxFlat.new()
 	qs.bg_color = Color(0.10, 0.09, 0.08, 0.90)
@@ -2268,6 +2267,12 @@ func creer_hud():
 	quest_toggle.custom_minimum_size = Vector2(26, 22)
 	quest_toggle.pressed.connect(_toggle_quete)
 	qh.add_child(quest_toggle)
+	# b24 : croix pour SUPPRIMER (fermer) l'encart de quête
+	quest_close = Button.new()
+	quest_close.text = "✕"
+	quest_close.custom_minimum_size = Vector2(26, 22)
+	quest_close.pressed.connect(_fermer_quete)
+	qh.add_child(quest_close)
 	quete_l1 = Label.new()
 	quete_l1.text = "Vaincre 10 rats (0/10)"
 	quete_l1.add_theme_font_size_override("font_size", 14)
@@ -2283,13 +2288,13 @@ func creer_hud():
 	pill_or = Pill.new()
 	pill_or.kind = "or"
 	pill_or.parent = self
-	pill_or.position = Vector2(84, 46)
+	pill_or.position = Vector2(14, 114)
 	pill_or.size = Vector2(110, 30)
 	canvas.add_child(pill_or)
 	pill_cailloux = Pill.new()
 	pill_cailloux.kind = "cailloux"
 	pill_cailloux.parent = self
-	pill_cailloux.position = Vector2(84, 80)
+	pill_cailloux.position = Vector2(14, 150)
 	pill_cailloux.size = Vector2(92, 30)
 	canvas.add_child(pill_cailloux)
 
@@ -2479,7 +2484,7 @@ func creer_hud():
 	panneau_ctrl.add_child(lbl_kb)
 	# b15 : l'aide des touches n'est plus en bas du HUD, elle est ICI
 	var aide := Label.new()
-	aide.text = ("[%s/Flèches] Bouger   [MAJ] Courir   [ESPACE] Saut   [Clic] Attaque\n[E] Ramasser   [ClicD] Caméra   [V] Vue   [1-5] Objets\n[I] Inventaire   [O] Options   [ÉCHAP] Quitter" % ("ZQSD" if est_clavier_azerty() else "WASD"))
+	aide.text = ("[%s/Flèches] Bouger   [MAJ] Courir   [ESPACE] Saut   [Clic] Attaque\n[E] Ramasser   [ClicD] Caméra   [V] Vue   [1-5] Objets\n[I] Inventaire   [O] Options   [%s] Quêtes   [ÉCHAP] Quitter" % ["ZQSD" if est_clavier_azerty() else "WASD", texte_touche("quest_panel")])
 	aide.add_theme_font_size_override("font_size", 12)
 	aide.add_theme_color_override("font_color", Color(0.72, 0.72, 0.72))
 	panneau_ctrl.add_child(aide)
@@ -2588,6 +2593,16 @@ func _toggle_options():
 		options_panel.visible = not options_panel.visible
 
 # Réduire / déplier le panneau de quête
+func _fermer_quete():
+	quest_ferme = true
+	if is_instance_valid(quest_panel):
+		quest_panel.visible = false
+
+func _toggle_quest_visible():
+	quest_ferme = not quest_ferme
+	if is_instance_valid(quest_panel):
+		quest_panel.visible = not quest_ferme
+
 func _toggle_quete():
 	quest_reduit = not quest_reduit
 	if is_instance_valid(quete_l1):

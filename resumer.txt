@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b23" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b24" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -477,6 +477,28 @@ pour l'herbe/fleurs/rochers (perf).
   MAIRIE, MAISON ; château = "CHÂTEAU" au-dessus de la porte sud (z +9).
   ATTENTION : pas de func maison() ! Les bâtiments sont construits dans
   la boucle de creer_ville() sur data[] (x,z,w,h,d,c,n,roof).
+
+4q) MAJ DU 16/09/2026 (build b24)
+----------------------------------
+- « Petites boules jaunes » = FLEURS (MultiMesh SphereMesh r 0.09 jaunes +
+  blanches) — PAS des lucioles (il n'y en a jamais eu). Bloc Fleurs
+  SUPPRIMÉ de creer_props.
+- CHÂTEAU : parement de PIERRES (blocs 2.6x0.55 en damier PIERRE
+  lightened/darkened) sur faces EXTÉRIEURES visibles : mur nord (face -z),
+  2 segments sud (face +z), est/ouest (faces ±x), donjon (face +z). ~110
+  boîtes, côté cour non fait (inaccessible, porte bloquée).
+- PIEDS DANS LE SOL SUR LA ROUTE : hauteur_support() ajoute +0.10
+  (lerp sur 0.6 m) quand dist_chemin < 2.9 = sommet des pavés.
+- HUD GAUCHE réaligné sur l'encart de quête (x=14 partout) : portrait
+  (14,12), hp_bar (14,82), pill_or (14,114), pill_cailloux (14,150),
+  quest_panel (14,188).
+- QUÊTES : bouton « ✕ » à côté du « — » (quest_close -> _fermer_quete :
+  masque tout le panneau, var quest_ferme). Touche d'affichage/masquage :
+  action "quest_panel" (project.godot) = position PHYSIQUE de Q
+  (physical_keycode 81) -> QWERTY : touche Q ; AZERTY : touche imprimée A
+  (car le Q imprimé = move_left en ZQSD, conflit). Réglable dans Options >
+  Contrôles (ACTIONS_REGLABLES + LIBELLES_TOUCHES mis à jour) ; texte
+  d'aide affiche texte_touche("quest_panel").
 
 5) FICHIERS IMPORTANTS
 ----------------------
