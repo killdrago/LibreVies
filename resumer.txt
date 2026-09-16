@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b30" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b31" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -597,6 +597,24 @@ pour l'herbe/fleurs/rochers (perf).
   sur BILLOT (souche 0.5 + enclume 0.72 + table 0.86) = hauteur de frappe
   du marteau (pivot bras 1.12, angle frappe -1.23 rad). Colliders ajoutés :
   étal Vendeur, enclume, cageot Marchand (on ne traverse plus).
+
+4x) MAJ DU 16/09/2026 (build b31)
+----------------------------------
+- BUG TROUVÉ (fontaine « toujours pas solide ») : les colliders « haut de
+  fontaine » de b23/b29/b30 étaient PLACÉS DANS creer_pin() (le rep de
+  b23 avait remplacé le collider du TRONC de pin, premier match du
+  fichier) ! => la fontaine n'avait QUE le bassin, et chaque pin avait un
+  mur invisible r1.15 h2.9. Corrigé : creer_pin retrouve col_cercle(x, z,
+  0.4, 2.2) ; creer_fontaine reçoit enfin col_cercle(x, z, 0.6, 4.0)
+  (cylindre central colonne+pinacle) + col_cercle(x, z, 1.2, 3.2)
+  (plateau du haut vasque+eau), spéc exacte du dev.
+- PNJ : bassin boîte (0.36,0.20,0.24) à y 0.66 : les jambes touchent le
+  torse (trou de 10 cm comblé — vu au supermarché/armurerie/forgeron).
+- GARDES lifting style joueur + ARMURE : jambes articulées jambards +
+  solerets, bassin, cuirasse acier + plastron clair + baudrier rouge,
+  spallières boules, bras brassards + mains peau, tête boîte avec yeux +
+  casque + visière + cimier rouge ; label « Garde » monté à 2.05.
+  Hallebarde inchangée (manche fin b23).
 
 5) FICHIERS IMPORTANTS
 ----------------------

@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b30"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b31"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1193,6 +1193,8 @@ func creer_ville():
 			_box(Vector3(0, -0.53, -0.03), Vector3(0.16, 0.15, 0.24), Color(0.30, 0.22, 0.12), j)
 		_box(Vector3(0, 0.95, 0), Vector3(0.42, 0.50, 0.27), d.c, root)
 		_box(Vector3(0, 0.74, 0), Vector3(0.44, 0.10, 0.29), Color(0.35, 0.24, 0.13), root)
+		# b31 : bassin : les jambes touchent le torse (plus de trou)
+		_box(Vector3(0, 0.66, 0), Vector3(0.36, 0.20, 0.24), d.c.darkened(0.15), root)
 		_sph(Vector3(-0.30, 1.14, 0), 0.10, d.c, root)
 		_sph(Vector3(0.30, 1.14, 0), 0.10, d.c, root)
 		var bras_g := Node3D.new(); bras_g.position = Vector3(-0.29, 1.12, 0); root.add_child(bras_g)
@@ -1406,6 +1408,10 @@ func creer_chateau():
 func creer_fontaine(x: float, z: float):
 	var y := hauteur_terrain(x, z)
 	col_cercle(x, z, 2.6, 0.95)
+	# b31 : LES DEUX SEULS colliders du haut, comme demandé : le CYLINDRE
+	# central (colonne + pinacle) et le PLATEAU du haut (vasque + eau)
+	col_cercle(x, z, 0.6, 4.0)
+	col_cercle(x, z, 1.2, 3.2)
 	# b14 : thème de la fontaine de l'image de référence — pierre beige claire,
 	# eau turquoise, filets d'eau blancs.
 	var PIERRE_F := Color(0.82, 0.76, 0.62)
@@ -1442,8 +1448,7 @@ func creer_arbres():
 
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
-	col_cercle(x, z, 0.55, 4.4)  # b23 : le HAUT de la fontaine est solide aussi
-	col_cercle(x, z, 1.15, 2.9)  # b30 : bague au SOMMET de la vasque : plus rien ne traverse
+	col_cercle(x, z, 0.4, 2.2)   # tronc du pin (collider d'origine restauré)
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -1625,13 +1630,34 @@ func creer_garde(x: float, z: float) -> Node3D:
 	add_child(root)
 	var ACIER := Color(0.45, 0.50, 0.58)
 	var TUNIQUE := Color(0.20, 0.32, 0.55)
-	_caps(Vector3(0, 0.62, 0), 0.21, 0.7, TUNIQUE, root)                            # corps
-	_prism(Vector3(0, 0.30, 0), Vector3(0.48, 0.32, 0.48), ACIER.darkened(0.2), root)  # jupe d'armure
-	_sph(Vector3(0, 1.12, 0), 0.17, Color(0.93, 0.78, 0.62), root)                  # tête
-	_cone(Vector3(0, 1.28, 0), 0.20, 0.26, ACIER, root, 8)                          # casque
-	_box(Vector3(0, 1.16, 0.02), Vector3(0.36, 0.06, 0.38), ACIER, root)            # bord du casque
-	_caps(Vector3(-0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)       # bras
-	_caps(Vector3(0.27, 0.68, 0), 0.075, 0.46, TUNIQUE.darkened(0.15), root)
+	# b31 : lifting du garde — même gabarit que le joueur, en ARMURE complète
+	var PEAU := Color(0.93, 0.76, 0.58)
+	var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.12, 0.62, 0); root.add_child(jambe_g)
+	var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.12, 0.62, 0); root.add_child(jambe_d)
+	for j in [jambe_g, jambe_d]:
+		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, ACIER.darkened(0.30), j)   # jambards
+		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), ACIER.darkened(0.45), j)  # solerets
+	_box(Vector3(0, 0.70, 0), Vector3(0.38, 0.20, 0.26), ACIER.darkened(0.20), root)  # bassin
+	_box(Vector3(0, 0.98, 0), Vector3(0.44, 0.52, 0.28), ACIER, root)       # cuirasse
+	_box(Vector3(0, 0.80, 0), Vector3(0.46, 0.10, 0.30), Color(0.30, 0.22, 0.12), root)  # ceinturon
+	_box(Vector3(0, 1.02, 0.15), Vector3(0.30, 0.30, 0.05), ACIER.lightened(0.25), root)  # plastron
+	_box(Vector3(0, 1.0, 0), Vector3(0.46, 0.09, 0.30), Color(0.75, 0.15, 0.15), root, Vector3(0, 0, deg_to_rad(35)))  # baudrier
+	_sph(Vector3(-0.33, 1.18, 0), 0.13, ACIER.lightened(0.10), root)        # spallières
+	_sph(Vector3(0.33, 1.18, 0), 0.13, ACIER.lightened(0.10), root)
+	var bras_g := Node3D.new(); bras_g.position = Vector3(-0.31, 1.16, 0); root.add_child(bras_g)
+	var bras_d := Node3D.new(); bras_d.position = Vector3(0.31, 1.16, 0); root.add_child(bras_d)
+	for b in [bras_g, bras_d]:
+		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, ACIER.darkened(0.10), b)   # brassards
+		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
+	var tete := Node3D.new()
+	tete.position = Vector3(0, 1.42, 0)
+	root.add_child(tete)
+	_box(Vector3(0, 0, 0), Vector3(0.30, 0.30, 0.28), PEAU, tete)           # visage
+	_box(Vector3(-0.07, 0.03, 0.145), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
+	_box(Vector3(0.07, 0.03, 0.145), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
+	_box(Vector3(0, 0.17, 0), Vector3(0.34, 0.16, 0.32), ACIER, tete)       # casque
+	_box(Vector3(0, 0.07, 0.16), Vector3(0.26, 0.05, 0.06), ACIER.darkened(0.25), tete)  # visière
+	_box(Vector3(0, 0.32, 0), Vector3(0.06, 0.18, 0.32), Color(0.75, 0.15, 0.15), tete)  # cimier rouge
 	# b15 : hallebarde ENTIÈREMENT visible : manche clair épais tenu de biais,
 	# fer + croc latéral + talon (avant : fin manche sombre = on ne voyait que le haut).
 	var halle := Node3D.new()
@@ -1646,7 +1672,7 @@ func creer_garde(x: float, z: float) -> Node3D:
 	_box(Vector3(0, -1.20, 0), Vector3(0.10, 0.14, 0.10), Color(0.45, 0.50, 0.58), halle)
 	var label := Label3D.new()
 	label.text = "Garde"
-	label.position = Vector3(0, 1.75, 0)
+	label.position = Vector3(0, 2.05, 0)
 	label.font_size = 20
 	label.pixel_size = 0.005
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
