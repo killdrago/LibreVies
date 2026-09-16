@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b28"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b29"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -457,7 +457,7 @@ func hauteur_terrain(x: float, z: float) -> float:
 
 var CHEMIN: Array[Vector2] = [
 	Vector2(0, 30), Vector2(3, 18), Vector2(-2, 6), Vector2(1, -8),
-	Vector2(4, -20), Vector2(-1, -34), Vector2(1, -48), Vector2(3, -60), Vector2(0, -67.5),  # b28 : stop JUSTE SOUS la porte du château
+	Vector2(4, -20), Vector2(-1, -34), Vector2(1, -48), Vector2(0.5, -56), Vector2(0, -62), Vector2(0, -67.8),  # b29 : fin DROITE jusqu'à la porte
 ]
 
 func dist_chemin(p: Vector2) -> float:
@@ -1187,8 +1187,8 @@ func creer_ville():
 		if d.n == "Forgeron":
 			_box(Vector3(0, -0.44, 0.06), Vector3(0.05, 0.34, 0.05), Color(0.45, 0.30, 0.14), bras_d)
 			_box(Vector3(0, -0.60, 0.06), Vector3(0.14, 0.12, 0.10), Color(0.35, 0.35, 0.38), bras_d)
-			_box(Vector3(0.0, 0.42, 0.75), Vector3(0.55, 0.34, 0.35), Color(0.25, 0.25, 0.28), root)
-			_box(Vector3(0.0, 0.62, 0.75), Vector3(0.20, 0.10, 0.24), Color(0.35, 0.35, 0.38), root)
+			_box(Vector3(0.24, 0.42, 0.65), Vector3(0.55, 0.34, 0.35), Color(0.25, 0.25, 0.28), root)
+			_box(Vector3(0.24, 0.62, 0.65), Vector3(0.20, 0.10, 0.24), Color(0.35, 0.35, 0.38), root)
 		elif d.n == "Vendeur":
 			_box(Vector3(0, 0.45, 0.8), Vector3(1.3, 0.10, 0.7), Color(0.52, 0.36, 0.19), root)
 			_box(Vector3(-0.45, 0.25, 0.8), Vector3(0.10, 0.40, 0.10), Color(0.40, 0.27, 0.13), root)
@@ -1403,6 +1403,7 @@ func creer_arbres():
 func creer_pin(x: float, z: float):
 	var y := hauteur_terrain(x, z)
 	col_cercle(x, z, 0.55, 4.4)  # b23 : le HAUT de la fontaine est solide aussi
+	col_cercle(x, z, 1.15, 2.4)  # b29 : la VASQUE haute entière est solide
 	var s := randf_range(0.8, 1.5)
 	var root := Node3D.new()
 	root.position = Vector3(x, y, z)
@@ -1965,11 +1966,19 @@ func creer_objets():
 	for i in range(15):
 		var x := randf_range(-50, 50)
 		var z := randf_range(-50, 50)
+		# b29 : AUCUN caillou/pièce dans le village (ressamplé hors enceinte)
+		while Vector2(x, z).length() < VILLAGE_R + 2.0:
+			x = randf_range(-50, 50)
+			z = randf_range(-50, 50)
 		var mi := _facette(Vector3(x, hauteur_terrain(x, z) + 0.14, z), Color(0.56, 0.54, 0.50), self, Vector3(0.28, 0.22, 0.28))
 		cailloux_items.append({"node": mi, "gone": false})
 	for i in range(3):  # b23 : pièces plus RARES
 		var x := randf_range(-40, 40)
 		var z := randf_range(-40, 40)
+		# b29 : jamais dans le village
+		while Vector2(x, z).length() < VILLAGE_R + 2.0:
+			x = randf_range(-40, 40)
+			z = randf_range(-40, 40)
 		var mi := _cyl(Vector3(x, hauteur_terrain(x, z) + 0.12, z), 0.18, 0.18, 0.05, Color(1, 0.84, 0.1), self, 12)
 		mi.material_override = mat_std(Color(1, 0.84, 0.1), false, true)
 		argent_items.append({"node": mi, "gone": false})
@@ -2713,7 +2722,7 @@ func update_pnj(delta: float):
 		if p.n == "Forgeron":
 			# frappe l'enclume : le bras monte puis claque
 			var cyc := fmod(t * 1.4, 1.0)
-			var ang: float = -2.3 + 1.7 * (cyc / 0.7) if cyc < 0.7 else -0.6 - 1.7 * ((cyc - 0.7) / 0.3)
+			var ang: float = -2.3 + 1.15 * (cyc / 0.7) if cyc < 0.7 else -1.15 - 1.15 * ((cyc - 0.7) / 0.3)
 			p.bras_d.rotation.x = ang
 			p.bras_g.rotation.x = -0.5
 		elif p.n == "Vendeur":
