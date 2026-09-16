@@ -668,6 +668,34 @@ pour l'herbe/fleurs/rochers (perf).
   recopier launcher.pyw ou reconstruire LibreVies.exe (build_launcher.bat),
   la maj auto du jeu ne met PAS à jour le launcher.
 
+4ab) MAJ DU 16/09/2026 (build b35) — RÉPARATION DU LAUNCHER DU DEV
+------------------------------------------------------------------
+- DIAGNOSTIC (le dev a collé son launcher.pyw local) : son launcher est
+  ANCIEN (pré-b32 : pas de screen_pref.txt, pas de --position, pas de DPI
+  awareness). Comme apply_updates saute le fichier nommé "launcher.pyw",
+  AUCUN correctif écran ne pouvait jamais l'atteindre => rien ne marchait.
+  Son contenu reste INTÉGRALEMENT conservé : le launcher du dépôt est un
+  SUPERSET du sien (vérifié par grep, toutes ses UI/fonctions présentes).
+- CANAL DE RÉPARATION : version_url.json contient désormais
+  "launcher_update.pyw" (= copie exacte de launcher.pyw). L'ancien launcher
+  le télécharge (le saut ne matche QUE le nom "launcher.pyw"). Au démarrage
+  du jeu, _reparer_launcher() recopie launcher_update.pyw par-dessus
+  launcher.pyw (le launcher est déjà fermé ; res:// est inscriptible en
+  --path non exporté ; garde : taille > 2000 et contenu différent).
+  => Le launcher du dev s'auto-répare au 1er lancement du jeu ; au 2e
+  lancement il écrit screen_pref.txt et l'écran est bon.
+- FILET POUR LE 1er LANCEMENT (vieux launcher, pas de screen_pref.txt) :
+  _restituer_position_fenetre() : (1) l'écran de la souris au démarrage =
+  l'écran où le dev a cliqué JOUER dans le launcher => window_set_current_
+  screen(cet écran) + position centrée sur le clic ; (2) sinon dernière
+  position mémorisée user://winpos.json. _process sauvegarde la position
+  de la fenêtre dans winpos.json toutes les ~2 s si elle a changé
+  (_winpos_last/_winpos_t).
+- LibreVies.exe (binaire figé) est IRREPARABLE à distance : si le dev
+  utilise l'exe, il doit le reconstruire UNE fois (build_launcher.bat)
+  après la maj, ou utiliser launcher.pyw.
+- Manifeste : 7 entrées (ajout launcher_update.pyw). main.gd b35.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
