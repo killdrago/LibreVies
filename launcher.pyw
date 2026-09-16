@@ -4,18 +4,6 @@ Double-clique sur launcher.pyw ou LibreVies.exe pour lancer.
 """
 import tkinter as tk
 import subprocess, threading, os, sys, time, zipfile
-
-# b34 : MULTI-ECRANS avec scalings differents : sans ca, tkinter rend des
-# coordonnees virtualisees et le jeu atterrit sur le mauvais ecran.
-try:
-    import ctypes
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
-except Exception:
-    try:
-        import ctypes
-        ctypes.windll.user32.SetProcessDPIAware()
-    except Exception:
-        pass
 import urllib.request, hashlib, json, shutil
 import base64, io, tempfile
 
@@ -291,12 +279,11 @@ def preload(path, cb, done):
     except Exception as e:
         cb(100, f"Pret ({e})"); done(True)
 
-def launch(path, pos=None):
-    args = [path, "--path", GAME_DIR]
-    if pos:
-        # b32 : le jeu s'ouvre SUR L'ECRAN du launcher (position fenetre)
-        args += ["--position", "%d,%d" % (int(pos[0]), int(pos[1]))]
-    subprocess.Popen(args)
+def launch(path):
+    # b37 : SANS --position ni screen_pref : Windows ouvre naturellement le
+    # jeu sur l'ecran du launcher (fenetre active / souris) — c'etait la
+    # bonne logique depuis le debut (verifie sur le launcher local du dev).
+    subprocess.Popen([path, "--path", GAME_DIR])
 
 
 # ============================================================
@@ -629,20 +616,7 @@ class App(tk.Tk):
 
     def play(self):
         if self.ready and self.godot:
-            pos = None
-            try:
-                self.update_idletasks()
-                pos = (self.winfo_x(), self.winfo_y())
-            except Exception:
-                pos = None
-            if pos:
-                # b33 : le jeu lira ce fichier pour s'afficher sur le bon ecran
-                try:
-                    with open(os.path.join(GAME_DIR, "screen_pref.txt"), "w") as fh:
-                        fh.write("%d %d" % (int(pos[0]), int(pos[1])))
-                except Exception:
-                    pass
-            launch(self.godot, pos); self.destroy()
+            launch(self.godot); self.destroy()
 
 
 if __name__ == "__main__":

@@ -713,6 +713,33 @@ pour l'herbe/fleurs/rochers (perf).
 - main.gd/main.tscn/project.godot/build_launcher.bat INCHANGÉS (hashs
   identiques à b35). Hashs launcher.pyw + launcher_update.pyw régénérés.
 
+4ad) MAJ DU 16/09/2026 (build b37) — RETOUR ARRIÈRE ÉCRAN (VÉRITÉ DU DEV)
+-------------------------------------------------------------------------
+- FAIT CRUCIAL (constaté par le dev sur sa machine, 6 écrans) : son VIEUX
+  launcher local — celui qui fait simplement subprocess.Popen([godot,
+  "--path", GAME_DIR]) sans rien d'autre — ouvrait le jeu SUR LE MÊME ÉCRAN
+  que le launcher. C'est le comportement NATUREL de Windows (nouvelle
+  fenêtre sur l'écran de la fenêtre active / de la souris).
+- NOS « CORRECTIFS » b32/b33/b34/b36 (--position X,Y + screen_pref.txt +
+  SetProcessDpiAwareness + filet souris) CASSAIENT ce comportement :
+  coordonnées tkinter faussées par les scalings DPI différents => le jeu
+  forcé sur le MAUVAIS écran (et re-forcé 45 frames par _apply_ecran).
+- b37 : TOUT ce système est SUPPRIMÉ, retour à la logique d'avant :
+  * launcher.pyw : bloc DPI retiré ; launch(path) simple (plus de pos) ;
+    play() = launch(self.godot); self.destroy(). Rien d'autre touché.
+  * main.gd : placer_ecran_launcher/_apply_ecran/_place_ecran_*,
+    _reparer_launcher/_restituer_position_fenetre/_winpos_*/winpos.json
+    SUPPRIMÉS (appels + fonctions + vars + blocs _process). BUILD b37.
+  * launcher_update.pyw SUPPRIMÉ du repo ET du manifeste (demande dev :
+    « ça sert à rien, on garde la logique qu'on avait avant »). Le canal
+    de réparation b35 n'a plus lieu d'être — le launcher du repo redevient
+    équivalent (pour le lancement) à celui du dev.
+  * Manifeste : 6 entrées. Hashs régénérés (main.gd, launcher.pyw,
+    resumer.txt changés ; les 3 autres identiques).
+- INTERDICTION ABSOLUE de réintroduire : --position, screen_pref.txt,
+  SetProcessDpiAwareness dans le launcher, ou tout forçage de position/
+  d'écran côté jeu. LA BONNE MÉTHODE = ne rien passer à Godot.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b35"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b37"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -111,10 +111,6 @@ var opt_lum := 30                       # 1..100 (défaut demandé par le dev)
 var capture_action := ""                # action en cours de reconfiguration (Options > Contrôles)
 var touches_boutons := {}               # action -> Button
 var pnj_items := []                       # b25 : PNJ animés (métiers)
-var _place_ecran_pos := Vector2i(-1, -1)    # b34 : écran/position voulus
-var _place_ecran_frames := 0
-var _winpos_last := Vector2i(-9999, -9999)   # b35 : dernière position fenêtre
-var _winpos_t := 0.0
 var panneau_graph: VBoxContainer
 var panneau_ctrl: VBoxContainer
 var tab_graph: Button
@@ -140,8 +136,6 @@ var _mat_cache := {}
 # READY
 # ============================================================
 func _ready():
-	# b35 : AUTO-RÉPARATION du launcher (voir _reparer_launcher)
-	_reparer_launcher()
 	camera = $Camera3D
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	DisplayServer.window_set_title("LibreVie %s" % BUILD)
@@ -172,11 +166,6 @@ func _ready():
 	timer.timeout.connect(_on_regen)
 	add_child(timer)
 
-	# b33 : jeu affiché sur l'écran où était le launcher
-	placer_ecran_launcher()
-	# b35 : sinon (vieux launcher) : écran de la souris puis dernière position
-	_restituer_position_fenetre()
-
 
 func _on_regen():
 	if not player_dead and player_pv < PV_MAX:
@@ -186,23 +175,6 @@ func _on_regen():
 # PROCESS
 # ============================================================
 func _process(delta: float):
-	# b34 : fenêtre repositionnée sur l'écran du launcher pendant le démarrage
-	if _place_ecran_frames > 0:
-		_place_ecran_frames -= 1
-		_apply_ecran()
-
-	# b35 : mémorise la position de la fenêtre (utile multi-écrans)
-	_winpos_t += delta
-	if _winpos_t >= 2.0:
-		_winpos_t = 0.0
-		var wp := DisplayServer.window_get_position()
-		if wp != _winpos_last:
-			_winpos_last = wp
-			var fw := FileAccess.open("user://winpos.json", FileAccess.WRITE)
-			if fw:
-				fw.store_string(JSON.stringify({"x": wp.x, "y": wp.y}))
-				fw.close()
-
 	# Nuages qui dérivent
 	for n in nuages:
 		n.position.x += delta * 0.6
@@ -1997,82 +1969,6 @@ func update_ennemis(delta: float):
 # GARDES DES PORTAILS : toute bébête à moins de 2 m de la porte
 # se fait attaquer (25 dégâts / 0,8 s) jusqu'à mort.
 # ============================================================
-# b33 : le launcher écrit la position de SA fenêtre dans screen_pref.txt ;
-# le jeu choisit l'écran qui contient ce point et s'y place (multi-écrans).
-func placer_ecran_launcher():
-	if not FileAccess.file_exists("res://screen_pref.txt"):
-		return
-	var txt := FileAccess.get_file_as_string("res://screen_pref.txt").strip_edges()
-	var parts := txt.split(" ")
-	if parts.size() != 2:
-		return
-	_place_ecran_pos = Vector2i(int(parts[0]), int(parts[1]))
-	_place_ecran_frames = 45   # b34 : ré-applique pendant ~0.75 s
-	_apply_ecran()
-	call_deferred("_apply_ecran")
-
-func _reparer_launcher():
-	# b35 : le launcher ne se met JAMAIS à jour tout seul (anti-boucle) et il
-	# saute "launcher.pyw" dans sa boucle de maj. Astuce : le manifeste
-	# contient AUSSI "launcher_update.pyw" (copie neuve) que l'ancien
-	# launcher télécharge sans le savoir ; ici (le launcher est déjà fermé)
-	# on recopie ce fichier neuf par-dessus launcher.pyw. Au prochain
-	# démarrage, le launcher aura tous les correctifs (écran, DPI, etc.).
-	var src := "res://launcher_update.pyw"
-	var dst := "res://launcher.pyw"
-	if not FileAccess.file_exists(src):
-		return
-	var a := FileAccess.get_file_as_string(src)
-	var b := ""
-	if FileAccess.file_exists(dst):
-		b = FileAccess.get_file_as_string(dst)
-	if a.length() > 2000 and a != b:
-		var f := FileAccess.open(dst, FileAccess.WRITE)
-		if f:
-			f.store_string(a)
-			f.close()
-
-func _restituer_position_fenetre():
-	# Appelé seulement si screen_pref.txt n'existe pas (vieux launcher).
-	# 1) La souris est encore là où l'utilisateur a cliqué « JOUER » dans
-	#    le launcher => l'écran de la souris = l'écran du launcher.
-	var mp := DisplayServer.mouse_get_position()
-	var idx := -1
-	for i in range(DisplayServer.get_screen_count()):
-		var sp := DisplayServer.screen_get_position(i)
-		var ss := DisplayServer.screen_get_size(i)
-		if mp.x >= sp.x and mp.x < sp.x + ss.x and mp.y >= sp.y and mp.y < sp.y + ss.y:
-			idx = i
-			break
-	if idx >= 0 and idx != DisplayServer.window_get_current_screen():
-		DisplayServer.window_set_current_screen(idx)
-		DisplayServer.window_set_position(mp - Vector2i(640, 360))
-		_winpos_last = DisplayServer.window_get_position()
-		return
-	# 2) Sinon : dernière position mémorisée d'une session précédente.
-	var f := FileAccess.open("user://winpos.json", FileAccess.READ)
-	if f == null:
-		return
-	var d = JSON.parse_string(f.get_as_text())
-	f.close()
-	if d is Dictionary and d.has("x") and d.has("y"):
-		var wp := Vector2i(int(d["x"]), int(d["y"]))
-		DisplayServer.window_set_position(wp)
-		_winpos_last = wp
-
-func _apply_ecran():
-	if _place_ecran_pos.x < 0:
-		return
-	var px := _place_ecran_pos.x
-	var py := _place_ecran_pos.y
-	for i in range(DisplayServer.get_screen_count()):
-		var sp := DisplayServer.screen_get_position(i)
-		var ss := DisplayServer.screen_get_size(i)
-		if px >= sp.x and px < sp.x + ss.x and py >= sp.y and py < sp.y + ss.y:
-			DisplayServer.window_set_current_screen(i)
-			break
-	DisplayServer.window_set_position(_place_ecran_pos)
-
 func update_gardes(delta: float):
 	# b33 : le garde ne se déplace PLUS en patrouille (effet crabe) : il ne
 	# bouge QUE pour aller attaquer une cible DANS SA ZONE (autour de SON

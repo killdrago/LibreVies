@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ b36 : LAUNCHER — clic sur JOUER ouvre TOUJOURS le jeu sur le même écran que le launcher (screen_pref.txt + --position + DPI awareness ; nouveau filet : si winfo_x/y échoue, position de la souris sur le bouton JOUER). launcher_update.pyw = copie neuve recopiée par le jeu au démarrage (réparation auto des anciens launchers). Rien d'autre changé. Jeu 0.3.0-b35 inchangé. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b37 : RETOUR à la logique d'avant pour l'écran de lancement — le launcher lance simplement Godot sans --position ni screen_pref.txt (Windows ouvre le jeu sur l'écran du launcher, comme avec le launcher local du dev). Bloc DPI retiré du launcher, tout le forçage d'écran retiré du jeu, launcher_update.pyw supprimé (ligne retirée du manifeste). Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "dcc388564a2092d331dd4d0b6faa4df8",
-      "size": 129694
+      "hash": "8d12172e54ab7ee7496642bbe3adaa86",
+      "size": 125664
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -18,20 +18,16 @@
       "size": 5556
     },
     "launcher.pyw": {
-      "hash": "fe4cdb8b70bd0dcb7afa5acc46139604",
-      "size": 630088
-    },
-    "launcher_update.pyw": {
-      "hash": "fe4cdb8b70bd0dcb7afa5acc46139604",
-      "size": 630088
+      "hash": "b00fb6c4214e7493c4a20c3ad766c212",
+      "size": 628831
     },
     "build_launcher.bat": {
       "hash": "4db739ba34ca09c06e428cf3e8c64b40",
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "0014871d9c9e74eaab9a6e722a0a657a",
-      "size": 50520
+      "hash": "b950e76e016c58bba1cf17197bb7c486",
+      "size": 52374
     }
   }
 }
