@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b18"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b19"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -611,7 +611,7 @@ func maj_camouflage():
 	# b18 : TOUT objet (bâtiment OU arbre) entre la caméra et le joueur
 	# devient translucide — emprises élargies, 14 échantillons sur le segment.
 	for co in camo_objs:
-		var r := Rect2(Vector2(co.x - co.rx, co.z - co.rz), Vector2(co.rx * 2.0, co.rz * 2.0))
+		var r: Rect2 = Rect2(Vector2(co.x - co.rx, co.z - co.rz), Vector2(co.rx * 2.0, co.rz * 2.0))
 		var want := false
 		if not r.has_point(cp):
 			for k in range(1, 14):
@@ -1102,9 +1102,9 @@ func creer_ville():
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
 				# b18 : TEXTURE de tuiles : 6 carreaux par rang, joints + damier
 				var NW := 6
-				var lw := (b.w + 0.55) / float(NW)
+				var lw: float = (b.w + 0.55) / float(NW)
 				for j in range(NW):
-					var xm := -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
+					var xm: float = -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
 					var tc2: Color = tc.lightened(0.05) if (ti + j) % 2 == 0 else tc.darkened(0.07)
 					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.86, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc2, null, Vector3(side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
@@ -1463,8 +1463,8 @@ func creer_garde(x: float, z: float) -> Node3D:
 	# b15 : hallebarde ENTIÈREMENT visible : manche clair épais tenu de biais,
 	# fer + croc latéral + talon (avant : fin manche sombre = on ne voyait que le haut).
 	var halle := Node3D.new()
-	halle.position = Vector3(0.55, 0.95, 0.05)
-	halle.rotation.z = deg_to_rad(-25)
+	halle.position = Vector3(0.34, 1.25, 0.05)
+	halle.rotation.z = deg_to_rad(0)   # b19 : verticale, prolongement du bras
 	root.add_child(halle)
 	_cyl(Vector3(0, 0, 0), 0.09, 0.08, 2.5, Color(0.85, 0.66, 0.38), halle, 8)
 	_box(Vector3(0, 1.10, 0), Vector3(0.12, 0.50, 0.20), Color(0.78, 0.80, 0.84), halle)
@@ -1561,6 +1561,7 @@ func creer_joueur():
 	# Bras (pivots)
 	bras_gauche = Node3D.new(); bras_gauche.position = Vector3(-0.27, 1.16, 0); player_node.add_child(bras_gauche)
 	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.27, 1.16, 0); player_node.add_child(bras_droit)
+	bras_droit.rotation.z = deg_to_rad(-10)   # b19 : bras écarté du corps = arme lisible
 	for b in [bras_gauche, bras_droit]:
 		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
 		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
@@ -1582,13 +1583,13 @@ func creer_joueur():
 	# Marteau (main droite)
 	var marteau := Node3D.new()
 	marteau.position = Vector3(0, -0.44, 0)
-	marteau.rotation.z = deg_to_rad(-28)   # b18 : porté DE BIAIS vers l'extérieur
 	bras_droit.add_child(marteau)
-	# b18 : manche TRÈS visible : épais, bois clair, dépassant du corps
-	_cyl(Vector3(0, -0.18, 0), 0.09, 0.08, 1.1, Color(0.82, 0.64, 0.36), marteau, 8)
-	_box(Vector3(0, -0.70, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.70, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
-	_sph(Vector3(0, 0.38, 0), 0.09, Color(0.35, 0.24, 0.12), marteau)
+	# b19 : manche = PROLONGEMENT DU BRAS : pris dans le poing, tête au bout
+	# en bas, sommet du manche dans la main. Bras droit légèrement écarté du
+	# corps (rotation.z -10°) pour que le manche se découpe sur le décor.
+	_cyl(Vector3(0, -0.10, 0), 0.09, 0.08, 0.7, Color(0.82, 0.64, 0.36), marteau, 8)
+	_box(Vector3(0, -0.55, 0), Vector3(0.30, 0.30, 0.42), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.55, 0), Vector3(0.34, 0.13, 0.44), Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()

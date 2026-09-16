@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b18" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b19" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -394,6 +394,19 @@ pour l'herbe/fleurs/rochers (perf).
   ronds 1.9). 14 échantillons sur le segment caméra->joueur. meta "mat"
   posée dans TOUS les helpers (_box _cyl _cone->via _cyl _sph _facette
   _caps _prism) pour restaurer le matériau d'origine au dé-fondu.
+
+4l) MAJ DU 16/09/2026 (build b19)
+----------------------------------
+- CORRECTIF PARSE (erreur dev ligne 1105) : « var lw := (b.w + 0.55) / ... »
+  et « var xm := ... » typés explicitement (float), « var r: Rect2 » dans
+  maj_camouflage — même piège Variant/Dictionary que b16.
+- MANCHES = PROLONGEMENT DU BRAS (demande dev) : plus de port de biais.
+  Marteau : manche vertical pris DANS le poing (sommet dans la main, tête
+  au bout en bas), marteau.rotation.z = 0 ; c'est le BRAS droit qui est
+  écarté du corps (bras_droit.rotation.z = -10°, l'anim marche/attaque ne
+  touche que rotation.x) => le manche se découpe sur le décor tout en
+  restant dans l'axe du bras. Hallebarde : verticale (rot z 0), tenue dans
+  la main du garde (x 0.34, origine y 1.25, talon au sol).
 
 5) FICHIERS IMPORTANTS
 ----------------------
