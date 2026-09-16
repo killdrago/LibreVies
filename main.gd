@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b15"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b16"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1045,9 +1045,9 @@ func creer_ville():
 		for side in [-1.0, 1.0]:
 			for ti in range(NR):
 				var tm := (float(ti) + 0.5) / float(NR)
-				var zm := side * tm * (b.d + 0.5) / 2.0
-				var ym := y + b.h + rh * (1.0 - tm) + 0.02
-				var tc := b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
+				var zm: float = side * tm * (b.d + 0.5) / 2.0
+				var ym: float = y + b.h + rh * (1.0 - tm) + 0.02
+				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
 				_box(Vector3(b.x, ym, b.z + zm), Vector3(b.w + 0.55, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc, null, Vector3(-side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
 		# Porte + linteau

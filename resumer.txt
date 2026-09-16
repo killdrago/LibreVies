@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b15" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b16" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -342,6 +342,16 @@ pour l'herbe/fleurs/rochers (perf).
 - AIDE DES TOUCHES : grande ligne du bas du HUD SUPPRIMÉE ; recopiée en
   Label 3 lignes dans Options > Contrôles.
 - glb/ SUPPRIMÉ du dépôt + 7 lignes retirées du manifeste (demande du dev).
+
+4i) MAJ DU 16/09/2026 (build b16)
+----------------------------------
+- CORRECTIF PARSE GDScript (erreur dev ligne 1048) : dans la boucle des
+  tuiles, « var zm := side * tm * (b.d + 0.5) / 2.0 » échouait (« Cannot
+  infer the type ») car side vient d'un tableau NON typé ([-1.0, 1.0]) et
+  b.d / b.roof d'un Dictionary => Variant. RÈGLE : toute arithmétique ou
+  ternaire alimenté par une variable de boucle non typée ou un champ de
+  Dictionary doit être TYPÉ EXPLICITEMENT (« var zm: float = ... »,
+  « var tc: Color = ... »). zm/ym/tc typés ; le jeu reparse.
 
 5) FICHIERS IMPORTANTS
 ----------------------
