@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b20"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b21"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -530,12 +530,7 @@ func creer_route():
 	mi.material_override = mat_route
 	add_child(mi)
 	# --- Pavés (petites pierres plates, 3 nuances) ---
-	var pave := CylinderMesh.new()
-	pave.top_radius = 0.30
-	pave.bottom_radius = 0.34
-	pave.height = 0.08
-	pave.radial_segments = 6
-	pave.rings = 1
+	var pave := make_tube(0.34, 0.30, 0.08, 6)
 	var teintes := [Color(0.70, 0.60, 0.46), Color(0.60, 0.50, 0.38), Color(0.76, 0.66, 0.52)]
 	for ni in range(3):
 		var mm := MultiMesh.new()
@@ -968,16 +963,33 @@ func _box(pos: Vector3, size: Vector3, col: Color, parent: Node = null, rot := V
 	(parent if parent else (_parent_capture if _parent_capture else self)).add_child(mi)
 	return mi
 
+# b21 : tube en ArrayMesh (SurfaceTool) — le CylinderMesh natif ne s'affiche
+# PAS chez le dev (Godot 4.7.2) : manches, troncs, fontaine, pièces étaient
+# invisibles. Même pipeline que le terrain (mesh_tris) => affichage garanti.
+func make_tube(r_bot: float, r_top: float, h: float, seg: int) -> ArrayMesh:
+	var tris := PackedVector3Array()
+	var n := maxi(seg, 3)
+	var y0 := -h / 2.0
+	var y1 := h / 2.0
+	var cb := Vector3(0, y0, 0)
+	var ct := Vector3(0, y1, 0)
+	for i in range(n):
+		var a0 := float(i) / float(n) * TAU
+		var a1 := float(i + 1) / float(n) * TAU
+		var b0 := Vector3(cos(a0) * r_bot, y0, sin(a0) * r_bot)
+		var b1 := Vector3(cos(a1) * r_bot, y0, sin(a1) * r_bot)
+		var t0 := Vector3(cos(a0) * r_top, y1, sin(a0) * r_top)
+		var t1 := Vector3(cos(a1) * r_top, y1, sin(a1) * r_top)
+		tris.push_back(b0); tris.push_back(t0); tris.push_back(t1)
+		tris.push_back(b0); tris.push_back(t1); tris.push_back(b1)
+		tris.push_back(ct); tris.push_back(t0); tris.push_back(t1)
+		tris.push_back(cb); tris.push_back(b1); tris.push_back(b0)
+	return mesh_tris(tris, PackedColorArray())
+
 func _cyl(pos: Vector3, r_bot: float, r_top: float, h: float, col: Color, parent: Node = null, seg := 10, rot := Vector3.ZERO) -> MeshInstance3D:
 	var key := "cyl%.2f_%.2f_%.2f_%d" % [r_bot, r_top, h, seg]
 	if not _mesh_cache.has(key):
-		var c := CylinderMesh.new()
-		c.radius_bottom = r_bot
-		c.radius_top = r_top
-		c.height = h
-		c.radial_segments = seg
-		c.rings = 1
-		_mesh_cache[key] = c
+		_mesh_cache[key] = make_tube(r_bot, r_top, h, seg)
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
 	mi.material_override = mat_std(col)
@@ -1759,7 +1771,7 @@ func update_ennemis(delta: float):
 			else:
 				e.barre.visible = false
 		# Attaque au contact
-		if dist < 1.6 and e.cd <= 0 and not player_dead and not player_protected:
+		if dist < 1.6 and e.cd <= 0 and not player_dead and not player_protected and not cloture_entre(node.global_position, pp):
 			e.cd = 1.2
 			player_pv -= 6
 			spawn_floater(pp + Vector3(0, 1.8, 0), "-6", Color(1, 0.3, 0.2))
@@ -1840,7 +1852,7 @@ func creer_objets():
 	for i in range(6):
 		var x := randf_range(-40, 40)
 		var z := randf_range(-40, 40)
-		var mi := _cyl(Vector3(x, hauteur_terrain(x, z) + 0.10, z), 0.14, 0.14, 0.035, Color(1, 0.84, 0.1), self, 12)
+		var mi := _cyl(Vector3(x, hauteur_terrain(x, z) + 0.12, z), 0.18, 0.18, 0.05, Color(1, 0.84, 0.1), self, 12)
 		mi.material_override = mat_std(Color(1, 0.84, 0.1), false, true)
 		argent_items.append({"node": mi, "gone": false})
 
@@ -1878,6 +1890,16 @@ func spawn_spark(pos: Vector3):
 # ============================================================
 # ACTIONS
 # ============================================================
+# b21 : une clôture de village se trouve-t-elle entre a et b ?
+# (appartenance au village différente ET milieu loin d'un portail ouvert)
+func cloture_entre(a: Vector3, b: Vector3) -> bool:
+	var va := dans_village(a.x, a.z)
+	var vb := dans_village(b.x, b.z)
+	if va == vb:
+		return false
+	var m := Vector2((a.x + b.x) / 2.0, (a.z + b.z) / 2.0)
+	return dist_chemin(m) > 3.4
+
 func attaquer():
 	if player_dead or player_attack_cd > 0:
 		return
@@ -1887,7 +1909,8 @@ func attaquer():
 	for e in enemies:
 		if not e.alive: continue
 		var dist = player_node.global_position.distance_to(e.node.global_position)
-		if dist < 3.5:
+		# b21 : portée corps-à-corps + INTERDIT de taper à travers la clôture
+		if dist < 2.4 and not cloture_entre(player_node.global_position, e.node.global_position):
 			e.pv -= DEGATS
 			spawn_floater(e.node.global_position + Vector3(0, 1.3, 0), str(DEGATS), Color(1, 1, 1))
 			spawn_spark(e.node.global_position + Vector3(0, 0.6, 0))
@@ -1960,7 +1983,7 @@ func ramasser():
 			get_tree().create_timer(20.0).timeout.connect(_respawn_caillou.bind(c))
 	for a in argent_items:
 		if a.gone: continue
-		if player_node.global_position.distance_to(a.node.global_position) < 3.0:
+		if player_node.global_position.distance_to(a.node.global_position) < 3.5:
 			a.gone = true
 			a.node.visible = false
 			player_argent += 0.001

@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b20" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b21" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -423,6 +423,24 @@ pour l'herbe/fleurs/rochers (perf).
 - TRONCS TEXTURÉS « écorce » : cylindre brun + 4 nervures verticales
   sombres autour + cône de collet à la base (pins et arbres ronds) : le
   tronc se lit comme un tronc, pas comme un cylindre nu.
+
+4n) MAJ DU 16/09/2026 (build b21)
+----------------------------------
+- CAUSE RACINE TROUVÉE : le CylinderMesh NATIF de Godot 4.7.2 ne s'affiche
+  PAS chez le dev => manches, troncs, hallebarde, fontaine (« boule qui
+  vole » = seule la sphère s'affichait), pavés et PIÈCES D'OR (invisibles =>
+  « impossibles à ramasser ») étaient absents, et les 4 nervures d'écorce
+  apparaissaient seules (« 4 piquets avec du vide au centre »).
+  CORRECTIF : make_tube(r_bot, r_top, h, seg) construit le tube en ArrayMesh
+  via mesh_tris/SurfaceTool (mêmes primitives que le terrain, qui s'affiche)
+  ; _cyl l'utilise (cache) ; les pavés MultiMesh aussi. Plus AUCUN
+  CylinderMesh dans le jeu. CapsuleMesh/PrismMesh/SphereMesh OK chez lui.
+- CLÔTURE INFRANCHISSABLE AUX COUPS : cloture_entre(a, b) = appartenance
+  au village différente + milieu à >3.4 m de la route (portails ouverts
+  restent combatables). Attaque joueur portée 3.5 -> 2.4 ET bloquée à
+  travers la clôture ; attaque des monstres bloquée pareil. Fini l'abri
+  derrière la barrière pour tuer sans risque.
+- PIÈCES : rayon 0.14->0.18, épaisseur 0.05, ramassage 3.0->3.5.
 
 5) FICHIERS IMPORTANTS
 ----------------------

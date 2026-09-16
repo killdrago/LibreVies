@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b20 : camouflage fiabilisé (40 échantillons, caméra dans la zone élargie = fantôme aussi), bras droit redressé avec manche clair bagué dans le poing, troncs avec écorce (nervures + collet). Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b21 : RACINE du bug des manches/troncs/pièces trouvée (CylinderMesh natif invisible chez le dev) -> tous les cylindres reconstruits en ArrayMesh (make_tube) ; pièces d'or visibles et ramassables ; plus de coup à travers la clôture du village (joueur ET monstres), portée melee 2.4. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "5816d2a4d758b914962d595d82df84f9",
-   "size": 108476
+   "hash": "0434a66e5901ee965b0ca0649204db19",
+   "size": 109930
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "bb25e78d35235f2e95be261ae0b9ad50",
-   "size": 32829
+   "hash": "8232bb3d38f7686259c5158973b4f736",
+   "size": 33981
   }
  }
 }
