@@ -1,13 +1,13 @@
 {
  "launcher_version": "2.8.0",
  "game_version": "0.3.0",
- "notes": "MAJ 0.3.0-b16 : correctif de parse GDScript (tuiles : variables typées explicitement, erreur 'Cannot infer the type' ligne 1048). Contient tout b15 : manche de marteau, monstres à distance, garde qui fend, tuiles + murs texturés, auvents supprimés, fontaine sans boule, porte château bloquée, troncs visibles, HUD ancré, aide touches dans Options, glb/ supprimé. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+ "notes": "MAJ 0.3.0-b17 : tuiles posées sur la pente (plus incurvées), PNJ devant leur porte, manches (marteau/hallebarde) et troncs enfin visibles, HUD ancré par offsets explicites (hotbar bas centre à toutes les résolutions), maisons translucides quand elles gênent la caméra. Launcher 2.8.0 : hashs md5 NORMALISES pour le texte. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
  "files": {
   "main.gd": {
-   "hash": "b2b45d7aa63c26153f042104b7153403",
-   "size": 103661
+   "hash": "e287aeaa44bcff1064935d748ab4701e",
+   "size": 106238
   },
   "main.tscn": {
    "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
    "size": 1348
   },
   "resumer.txt": {
-   "hash": "383109a539fc10ea7e1c8975a661838b",
-   "size": 28357
+   "hash": "25033e3ec02f4c895d0ec443dd83a1a3",
+   "size": 29830
   }
  }
 }

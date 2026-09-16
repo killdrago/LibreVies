@@ -17,7 +17,7 @@ Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
   * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
   * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
 - launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
-- main.gd : const BUILD = "0.3.0-b16" (témoin de build, à incrémenter à chaque push)
+- main.gd : const BUILD = "0.3.0-b17" (témoin de build, à incrémenter à chaque push)
 - version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
   calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
 
@@ -352,6 +352,29 @@ pour l'herbe/fleurs/rochers (perf).
   ternaire alimenté par une variable de boucle non typée ou un champ de
   Dictionary doit être TYPÉ EXPLICITEMENT (« var zm: float = ... »,
   « var tc: Color = ... »). zm/ym/tc typés ; le jeu reparse.
+
+4j) MAJ DU 16/09/2026 (build b17)
+----------------------------------
+- TUILES : signe de rotation corrigé (Vector3(side * ang, 0, 0)) : elles
+  épousent la pente au lieu de piquer vers le haut.
+- PNJ DEVANT LEUR PORTE : Vendeur (-10,-2.1) supermarché, Forgeron
+  (-10,5.65) armurerie, Marchand (10,-3.35) vêtements, Maire (-9,-14.6)
+  devant l'escalier de la mairie (positions = porte + 0.9 m).
+- MANCHES VISIBLES : marteau manche r 0.075 L 1.0 bois clair + pommeau ;
+  hallebarde manche r 0.075 L 2.4 clair ; troncs d'arbres r 0.34/0.36 brun
+  clair, feuillage remonté (cônes 3.3/4.4/5.4, facette 4.2).
+- HUD : ancres EXPLICITES anchor_*/offset_* (les set_anchors_preset+position
+  du b15 ne tenaient pas : hotbar retrouvée en haut à gauche) : hotbar
+  offsets (-156,-68,156,-12) sur ancres (0.5,1)-(0.5,1) = bas centre ;
+  mini-carte (1,0)-(1,0) offsets (-162,14,-14,162) ; bouton options
+  (1,1)-(1,1) ; info et panel options centrés (0.5).
+- CAMOUFLAGE MAISONS : chaque bâtiment a une racine Node3D (broot, pièces
+  captées via _parent_capture dans _box/_prism, matériau d'origine gardé en
+  meta "mat"). maj_camouflage() (appelé après update_camera) teste le
+  segment caméra->joueur (10 échantillons) contre l'emprise XZ Rect2 du
+  bâtiment ; si traversé => matériaux remplacés par mat_fade() (duplicate +
+  TRANSPARENCY_ALPHA, alpha 0.28, émission atténuée), sinon restaurés.
+  La maison entre la caméra et le joueur devient translucide.
 
 5) FICHIERS IMPORTANTS
 ----------------------
