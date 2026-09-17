@@ -61,7 +61,7 @@ PlayerSettings:
   webGLInitialMemorySize: 32
   webGLMaximumMemorySize: 2048
   scriptingBackend:
-    Standalone: 1
+    Standalone: 0
   managedStrippingLevel:
     Standalone: 4
   incrementalIl2cppBuild: {}

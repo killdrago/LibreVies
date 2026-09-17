@@ -38,8 +38,8 @@
       "size": 236
     },
     "unity/Assets/Editor/LibreViesBuild.cs": {
-      "hash": "9904544559b03f30a7e54ac1670963cb",
-      "size": 1307
+      "hash": "f6faa2d1229285997c2789d0e6641a51",
+      "size": 1596
     },
     "unity/Assets/Editor/LibreViesBuild.cs.meta": {
       "hash": "38aee696b84443d94697328a8b35ced3",
@@ -50,7 +50,7 @@
       "size": 1268
     },
     "unity/ProjectSettings/ProjectSettings.asset": {
-      "hash": "1e7ae676bcfcbff5646fb9d24664b716",
+      "hash": "7d561d8f31b174c55d7f59d1523d05d7",
       "size": 2933
     },
     "build_unity_game.bat": {
