@@ -34,24 +34,24 @@
       "size": 34034
     },
     "unity/Assets/Scripts/LibreViesGame.cs.meta": {
-      "hash": "e76d49202769b639962570456c990024",
-      "size": 239
+      "hash": "25ce4d012bee5b7589cfeb549e555552",
+      "size": 236
     },
     "unity/Assets/Editor/LibreViesBuild.cs": {
       "hash": "9904544559b03f30a7e54ac1670963cb",
       "size": 1307
     },
     "unity/Assets/Editor/LibreViesBuild.cs.meta": {
-      "hash": "48e471dd1cce071040800d257dc36e77",
-      "size": 239
+      "hash": "38aee696b84443d94697328a8b35ced3",
+      "size": 236
     },
     "unity/Assets/Scenes/LibreVies.unity": {
-      "hash": "e7043c7c081d08f0c1b21bd203f83b9e",
-      "size": 1270
+      "hash": "4932f4faa35ba27c12d11a801b2cab83",
+      "size": 1268
     },
     "unity/ProjectSettings/ProjectSettings.asset": {
-      "hash": "881bc05b66b8c31e691dff2440e22bcf",
-      "size": 2934
+      "hash": "1e7ae676bcfcbff5646fb9d24664b716",
+      "size": 2933
     }
   },
   "package": {
