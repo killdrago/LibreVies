@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b41 : correctif de compilation de la palissade b40 (Basis(Vector3) n'existe pas dans Godot 4 → .scaled()). Refonte graphique b40 inchangée : toits pentus à tuiles quinconce, tours coniques, palissade à pointes, lance, rat/araignée facettés, fleurs, soleil couchant. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b42 : héros affiné façon image de référence — pantalon brun, bottes à revers et semelle, col et ourlet de tunique, boucle dorée, manchettes, gants, visage complet (sourcils, nez, bouche, oreilles), frange et mèches en couches. Inclut le correctif b41 (Basis.scaled). RAPPEL : fermer jeu + launcher puis rouvrir le launcher pour télécharger. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "e6e082a5034918d16ff66f27c58abc3d",
-      "size": 133192
+      "hash": "e63178f187c4a81f36a73ffb0edf3f7e",
+      "size": 134692
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "b23235ca5370072a791ec337b9c773a3",
-      "size": 57173
+      "hash": "500542186c54e73bc0f3075c721fb588",
+      "size": 58249
     }
   }
 }

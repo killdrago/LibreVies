@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b41"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b42"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1851,14 +1851,20 @@ func creer_joueur():
 	# Jambes (pivots)
 	jambe_gauche = Node3D.new(); jambe_gauche.position = Vector3(-0.12, 0.62, 0); player_node.add_child(jambe_gauche)
 	jambe_droite = Node3D.new(); jambe_droite.position = Vector3(0.12, 0.62, 0); player_node.add_child(jambe_droite)
+	var PANT := Color(0.36, 0.26, 0.16)   # b42 : pantalon brun (image)
 	for j in [jambe_gauche, jambe_droite]:
-		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, TUNIQUE_F, j)
+		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, PANT, j)
+		_box(Vector3(0, -0.44, -0.01), Vector3(0.19, 0.10, 0.28), BOTTE.lightened(0.18), j)  # revers de botte
 		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), BOTTE, j)
+		_box(Vector3(0, -0.62, -0.04), Vector3(0.18, 0.05, 0.28), BOTTE.darkened(0.30), j)  # semelle
 
 	# Torse + tunique
 	_box(Vector3(0, 0.98, 0), Vector3(0.44, 0.52, 0.28), TUNIQUE, player_node)
 	_prism(Vector3(0, 0.66, 0), Vector3(0.52, 0.26, 0.36), TUNIQUE, player_node)
 	_box(Vector3(0, 0.80, 0), Vector3(0.46, 0.10, 0.30), CUIR, player_node)
+	_box(Vector3(0, 0.80, 0.16), Vector3(0.09, 0.09, 0.03), Color(0.85, 0.70, 0.25), player_node)  # b42 : boucle dorée
+	_box(Vector3(0, 1.25, 0), Vector3(0.30, 0.09, 0.24), TUNIQUE_F, player_node)  # b42 : col
+	_box(Vector3(0, 0.55, 0), Vector3(0.50, 0.07, 0.35), TUNIQUE_F, player_node)  # b42 : ourlet de tunique
 	# Baudrier
 	_box(Vector3(0, 1.0, 0), Vector3(0.46, 0.09, 0.30), CUIR, player_node, Vector3(0, 0, deg_to_rad(35)))
 	# Épaules
@@ -1871,6 +1877,7 @@ func creer_joueur():
 	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.31, 1.16, 0); player_node.add_child(bras_droit)
 	for b in [bras_gauche, bras_droit]:
 		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
+		_box(Vector3(0, -0.335, 0), Vector3(0.115, 0.07, 0.115), TUNIQUE_F, b)  # b42 : manchette
 		_box(Vector3(0, -0.43, 0), Vector3(0.14, 0.13, 0.15), CUIR, b)   # b40 : gants
 
 	# Tête + cheveux piquants
@@ -1886,6 +1893,17 @@ func creer_joueur():
 	# Yeux
 	_box(Vector3(-0.07, 0.02, -0.145), Vector3(0.045, 0.05, 0.02), Color(0.12, 0.12, 0.12), tete)
 	_box(Vector3(0.07, 0.02, -0.145), Vector3(0.045, 0.05, 0.02), Color(0.12, 0.12, 0.12), tete)
+	# b42 : visage fin : sourcils, nez, bouche, oreilles
+	_box(Vector3(-0.07, 0.075, -0.145), Vector3(0.06, 0.02, 0.02), CHEVEUX, tete)
+	_box(Vector3(0.07, 0.075, -0.145), Vector3(0.06, 0.02, 0.02), CHEVEUX, tete)
+	_box(Vector3(0, -0.02, -0.15), Vector3(0.04, 0.06, 0.03), PEAU.lightened(0.05), tete)
+	_box(Vector3(0, -0.09, -0.145), Vector3(0.07, 0.025, 0.02), Color(0.55, 0.30, 0.25), tete)
+	_box(Vector3(-0.155, 0.0, 0.0), Vector3(0.03, 0.07, 0.05), PEAU, tete)
+	_box(Vector3(0.155, 0.0, 0.0), Vector3(0.03, 0.07, 0.05), PEAU, tete)
+	# b42 : frange devant + mèches sur les côtés (cheveux en couches)
+	_box(Vector3(0, 0.115, -0.145), Vector3(0.28, 0.07, 0.05), CHEVEUX, tete)
+	_box(Vector3(-0.15, 0.05, 0.02), Vector3(0.04, 0.16, 0.22), CHEVEUX, tete)
+	_box(Vector3(0.15, 0.05, 0.02), Vector3(0.04, 0.16, 0.22), CHEVEUX, tete)
 
 	# Marteau (main droite)
 	var marteau := Node3D.new()

@@ -814,6 +814,23 @@ INTACTS. Changements :
   JAMAIS Basis(Vector3).
 - Rien d'autre changé. BUILD b41.
 
+4ai) MAJ DU 17/09/2026 (build b42) — HÉROS AFFINÉ (style image de réf.)
+------------------------------------------------------------------------
+- Le dev veut le MÊME niveau de finesse sur le personnage : vêtements,
+  chaussures, tête, bras, cheveux.
+- creer_joueur() enrichi (pivots/marteau/lumière INTACTS) :
+  * jambes : pantalon brun (PANT) au lieu de la tunique sombre ; bottes à
+    REVERS clair + SEMELLE foncée ;
+  * torse : col de tunique, ourlet bas, boucle de ceinturon dorée ;
+  * bras : manchettes resserrées au-dessus des gants cuir (b40) ;
+  * tête : sourcils, nez, bouche, oreilles ; frange devant + mèches
+    latérales en couches par-dessus les pointes de cheveux existantes.
+- Face du joueur = côté -Z (yeux à z -0.145) : tous les détails posés là.
+- NOTE DEV (erreur b40 revue chez lui) : son jeu tournait encore sur le
+  main.gd b40 car le launcher ne vérifie les maj qu'AU LANCEMENT du
+  launcher : il faut fermer jeu + launcher puis rouvrir le launcher.
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b42.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
