@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b38"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b39"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1982,7 +1982,7 @@ func update_ennemis(delta: float):
 # ============================================================
 func _detecter_ecran_souris():
 	# b38 : demande du dev — détecter l'écran où est la souris du joueur et
-	# démarrer le jeu sur CET écran. Fait côté jeu car Godot est DPI-aware :
+	# démarrer le jeu sur CET écran (b39 : au MILIEU de cet écran). Fait côté jeu car Godot est DPI-aware :
 	# mouse_get_position() renvoie des coordonnées PHYSIQUES globales,
 	# cohérentes avec screen_get_position/size même si chaque écran a un
 	# scaling différent (le forçage côté launcher échouait à cause de ça).
@@ -1998,13 +1998,13 @@ func _detecter_ecran_souris():
 	var sp2 := DisplayServer.screen_get_position(_ecran_souris)
 	var ss2 := DisplayServer.screen_get_size(_ecran_souris)
 	var win := DisplayServer.window_get_size()
-	var demi := Vector2i(int(win.x * 0.5), int(win.y * 0.5))
+	# b39 : fenêtre AU MILIEU de l'écran de la souris (demande du dev)
 	var x := sp2.x
 	var y := sp2.y
-	if ss2.x > win.x:
-		x = clampi(mp.x - demi.x, sp2.x, sp2.x + ss2.x - win.x)
-	if ss2.y > win.y:
-		y = clampi(mp.y - demi.y, sp2.y, sp2.y + ss2.y - win.y)
+	if ss2.x >= win.x:
+		x = sp2.x + int((ss2.x - win.x) * 0.5)
+	if ss2.y >= win.y:
+		y = sp2.y + int((ss2.y - win.y) * 0.5)
 	_ecran_pos = Vector2i(x, y)
 	_ecran_frames = 45   # ré-applique ~0.75 s contre les resets de fenêtre
 	_placer_sur_ecran_souris()

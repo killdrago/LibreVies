@@ -762,6 +762,23 @@ pour l'herbe/fleurs/rochers (perf).
   local qui téléchargera simplement main.gd b38.
 - Manifeste : 6 entrées, seul le hash main.gd change.
 
+4af) MAJ DU 16/09/2026 (build b39) — JEU AU MILIEU DE L'ÉCRAN
+-------------------------------------------------------------
+- b38 VALIDÉ par le dev (« c'est ok ») : la détection de l'écran de la
+  souris côté jeu fonctionne. Seule demande en plus : que le jeu démarre
+  AU MILIEU de cet écran (et pas centré sur le point de la souris).
+- main.gd b39 : dans _detecter_ecran_souris(), la position calculée est
+  désormais sp2 + (ss2 - win) / 2 (milieu de l'écran, entier), avec repli
+  sp2 si l'écran est plus petit que la fenêtre. La souris ne sert PLUS
+  qu'à CHOISIR l'écran. clampi/demi supprimés. Le reste identique
+  (45 frames de ré-application, launcher inchangé b37).
+- Manifeste : 6 entrées, seul le hash main.gd change (+ resumer).
+- INCIDENT : le sandbox git s'est réinitialisé DEUX fois pendant cette
+  session (HEAD revenu à 921b0d8) — procédure de réparation rodée :
+  sauver les fichiers modifiés dans /tmp, git fetch, git reset --hard
+  FETCH_HEAD, recopier les fichiers, vérifier git diff AVANT commit,
+  ls-remote avant push. Jamais de force-push.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

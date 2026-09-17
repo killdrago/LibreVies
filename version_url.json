@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b38 : le jeu DÉMARRE SUR L'ÉCRAN DE LA SOURIS (idée du dev) — au lancement, la souris est sur le bouton JOUER du launcher ; le jeu détecte l'écran qui la contient (coordonnées physiques DPI-aware, fiables même avec des scalings différents) et s'y place, centré et clampé, pendant 0,75 s. Launcher inchangé (il ne passe aucune position). Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b39 : le jeu démarre AU MILIEU de l'écran où se trouve la souris au lancement (l'écran du launcher). La souris ne sert plus qu'à choisir l'écran ; la fenêtre est centrée sur l'écran (repli en haut-gauche si l'écran est plus petit que la fenêtre). Launcher inchangé. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "c79d5c7f6c1b37b64008bca578bf335f",
-      "size": 127659
+      "hash": "3307091606104b8c69e67feeb491e470",
+      "size": 127671
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "34124fe048b42f380792080a73cae5e9",
-      "size": 53822
+      "hash": "7d6d1139e87c5a80e9c33ca8b16e0b57",
+      "size": 54922
     }
   }
 }
