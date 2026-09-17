@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b44 : tuiles REPOSÉES sur la base b39 du dev — tuiles ajustées au pan avec marge de 6 cm (ne débordent plus), quinconce 6x8, TUILES DE RIVE (colonnes latérales sombres + fascia d'égout). Rien d'autre changé. version_url.json restauré après le revert du dev. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b45 : tuiles de rive rentrées dans le pan (ne débordent plus côté pignon) ; monstres ANIMÉS : pattes sur pivots qui marchent (rat = balancement avant/arrière, araignée = balancement latéral), trottinement du corps ; araignée peaufinée (mandibules + crocs, abdomen et thorax arrondis), rat arrondi. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "52e8b41b19576b509efba09a16a1c029",
-      "size": 128600
+      "hash": "aac341051c8a94ecef49305c7511b8a4",
+      "size": 131061
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "80ca65f469890ace95d7d1edba06358f",
-      "size": 61316
+      "hash": "f362fe238697d51575719075a52d0ad8",
+      "size": 62739
     }
   }
 }

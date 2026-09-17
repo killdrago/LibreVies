@@ -879,6 +879,27 @@ INTACTS. Changements :
   image/ uploadés par le dev : NE PAS les mettre au manifeste, ne pas
   les modifier.
 
+4al) MAJ DU 17/09/2026 (build b45) — RIVES CORRIGÉES + MONSTRES ANIMÉS
+-----------------------------------------------------------------------
+- Dev : tuiles qui dépassent ENCORE côté pignon ; araignées à peaufiner
+  (mandibules + corps) ; monstres qui GLISSENT sans bouger les pattes.
+- TUILES DE RIVE b44 : ma marge était proportionnelle (rive extérieure =
+  W + 0.225*lw > bord du toit). b45 : rive centrée à W - 0.62*lw, largeur
+  0.95*lw => bord extérieur = W - 0.145*lw, TOUJOURS dans le pan.
+- MONSTRES : _construire_rat/_construire_araignee renvoient maintenant un
+  Dictionary {"pattes": [pivots], "mode": ...} stocké dans enemies["anim"].
+  * Rat : corps+tête en sphères étirées (arrondies), mandibule basse,
+    oreilles aplaties roses, queue 3 segments, 4 PATTES SUR PIVOTS.
+  * Araignée : abdomen+thorax sphères arrondies, MANDIBULES (segment +
+    croc cone renversé _cyl r_bot 0 rot 180°), 6 yeux, 8 pattes pivots
+    (fémur -32° / tibia +46°).
+  * update_ennemis : e.t_anim avance à la vitesse de déplacement ;
+    rat = rotation.x des pivots en sin alterné (i*PI) ; araignée =
+    rotation.y = y0 + sin(...)*0.30 ; à l'arrêt retour lerpf vers 0/y0 ;
+    trottinement : +abs(sin)*0.05 en y pendant la marche. FINI le glissement.
+- _respawn_enemy réutilise le même nœud => anim intacte au respawn.
+- Manifeste 6 entrées ; seuls main.gd + resumer.txt changent. BUILD b45.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

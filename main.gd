@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b44"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b45"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1149,7 +1149,7 @@ func creer_ville():
 					var tm2 := (float(ti) + 0.5) / float(NR)
 					var zm2: float = side * tm2 * H
 					var ym2: float = y + b.h + rh * (1.0 - tm2 * H / half) + 0.045
-					_box(Vector3(b.x + ex * (W - lw * 0.35), ym2, b.z + zm2), Vector3(lw * 1.15, 0.09, lr * 1.18), b.roof.darkened(0.18), null, Vector3(side * ang, 0, 0))
+					_box(Vector3(b.x + ex * (W - lw * 0.62), ym2, b.z + zm2), Vector3(lw * 0.95, 0.09, lr * 1.18), b.roof.darkened(0.18), null, Vector3(side * ang, 0, 0))
 			# b44 : rive basse (égout) : fascia de tuiles le long du bord bas
 			_box(Vector3(b.x, y + b.h + 0.06, b.z + side * (H + 0.02)), Vector3(W * 2.0, 0.12, 0.14), b.roof.darkened(0.22), null, Vector3(side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
@@ -1871,10 +1871,11 @@ func creer_ennemis():
 			var pv := 25
 			if zone.t == "rat": pv = 50
 			if zone.t == "araignee": pv = 75
+			var anim: Dictionary
 			if zone.t == "araignee":
-				_construire_araignee(root)
+				anim = _construire_araignee(root)
 			else:
-				_construire_rat(root, zone.t == "rat")
+				anim = _construire_rat(root, zone.t == "rat")
 			# Barre de vie au-dessus
 			var barre := Node3D.new()
 			barre.position = Vector3(0, 1.1 if zone.t == "araignee" else 0.75, 0)
@@ -1887,48 +1888,74 @@ func creer_ennemis():
 				"pv": pv, "max_pv": pv, "alive": true, "sx": x, "sz": z,
 				"name": zone.t, "spd": randf_range(1.2, 2.0),
 				"dir": Vector3.ZERO, "t_wander": 0.0, "cd": 0.0,
+				"anim": anim, "t_anim": randf() * 10.0,
 			})
 
-func _construire_rat(root: Node3D, gros: bool):
+func _construire_rat(root: Node3D, gros: bool) -> Dictionary:
 	var s := 1.25 if gros else 0.9
-	var CORPS := Color(0.32, 0.26, 0.24) if gros else Color(0.36, 0.33, 0.32)
+	var CORPS := Color(0.42, 0.38, 0.36) if gros else Color(0.47, 0.44, 0.42)
 	root.scale = Vector3.ONE * s
-	_facette(Vector3(0, 0.30, 0.05), CORPS, root, Vector3(0.62, 0.44, 0.80))
-	_facette(Vector3(0, 0.34, -0.42), CORPS.lightened(0.08), root, Vector3(0.34, 0.28, 0.36))
-	# Museau
-	_cone(Vector3(0, 0.30, -0.66), 0.10, 0.22, Color(0.85, 0.55, 0.55), root, 5)
-	# Oreilles
-	_sph(Vector3(-0.14, 0.52, -0.34), 0.10, Color(0.55, 0.40, 0.40), root)
-	_sph(Vector3(0.14, 0.52, -0.34), 0.10, Color(0.55, 0.40, 0.40), root)
+	# b45 : corps et tête ARRONDIS (sphères étirées), plus de facettes cubes
+	var corps := _sph(Vector3(0, 0.34, 0.05), 0.34, CORPS, root)
+	corps.scale = Vector3(0.90, 0.80, 1.45)
+	var tete := _sph(Vector3(0, 0.33, -0.46), 0.20, CORPS.lightened(0.06), root)
+	tete.scale = Vector3(1.0, 0.90, 1.10)
+	# Museau rose + mandibule basse
+	_cone(Vector3(0, 0.30, -0.66), 0.09, 0.20, Color(0.85, 0.55, 0.55), root, 5)
+	_box(Vector3(0, 0.20, -0.62), Vector3(0.14, 0.04, 0.16), CORPS.darkened(0.12), root, Vector3(deg_to_rad(-15), 0, 0))
+	# Oreilles rondes aplaties + intérieur rose
+	for ex in [-1.0, 1.0]:
+		var ore := _sph(Vector3(ex * 0.14, 0.52, -0.36), 0.10, CORPS.lightened(0.12), root)
+		ore.scale = Vector3(1.0, 1.0, 0.45)
+		var inn := _sph(Vector3(ex * 0.14, 0.52, -0.40), 0.06, Color(0.85, 0.55, 0.60), root)
+		inn.scale = Vector3(1.0, 1.0, 0.40)
 	# Yeux rouges
-	_sph(Vector3(-0.10, 0.38, -0.55), 0.035, Color(1, 0.05, 0.05), root, true)
-	_sph(Vector3(0.10, 0.38, -0.55), 0.035, Color(1, 0.05, 0.05), root, true)
-	# Pattes
-	for px in [-0.2, 0.2]:
-		for pz in [-0.25, 0.3]:
-			_box(Vector3(px, 0.10, pz), Vector3(0.08, 0.20, 0.08), CORPS.darkened(0.2), root)
-	# Queue
-	_cyl(Vector3(0, 0.26, 0.62), 0.030, 0.012, 0.7, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(100), 0, 0))
+	_sph(Vector3(-0.09, 0.38, -0.56), 0.035, Color(1, 0.05, 0.05), root, true)
+	_sph(Vector3(0.09, 0.38, -0.56), 0.035, Color(1, 0.05, 0.05), root, true)
+	# b45 : PATTES SUR PIVOTS => animées à la marche (update_ennemis)
+	var pattes := []
+	for px in [-0.18, 0.18]:
+		for pz in [-0.26, 0.28]:
+			var piv := Node3D.new()
+			piv.position = Vector3(px, 0.24, pz)
+			root.add_child(piv)
+			_box(Vector3(0, -0.12, 0), Vector3(0.07, 0.24, 0.07), CORPS.darkened(0.22), piv)
+			pattes.append({"n": piv, "y0": 0.0})
+	# Queue rose en 3 segments courbés
+	_cyl(Vector3(0, 0.30, 0.55), 0.035, 0.022, 0.5, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(105), 0, 0))
+	_cyl(Vector3(0, 0.48, 0.78), 0.022, 0.014, 0.4, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(60), 0, 0))
+	_cyl(Vector3(0, 0.68, 0.90), 0.014, 0.008, 0.3, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(25), 0, 0))
+	return {"pattes": pattes, "mode": "rat"}
 
-func _construire_araignee(root: Node3D):
-	var CORPS := Color(0.20, 0.12, 0.10)
-	_facette(Vector3(0, 0.55, 0.25), CORPS, root, Vector3(0.62, 0.52, 0.70))
-	_facette(Vector3(0, 0.50, -0.25), CORPS.lightened(0.1), root, Vector3(0.36, 0.32, 0.36))
-	# Yeux rouges
-	for ex in [-0.10, -0.03, 0.04, 0.11]:
-		_sph(Vector3(ex, 0.55, -0.42), 0.03, Color(1, 0.05, 0.05), root, true)
-	# 8 pattes (2 segments)
+func _construire_araignee(root: Node3D) -> Dictionary:
+	var CORPS := Color(0.23, 0.14, 0.10)
+	# b45 : abdomen + thorax ARRONDIS, MANDIBULES + crocs devant (image réf.)
+	var abd := _sph(Vector3(0, 0.58, 0.26), 0.34, CORPS, root)
+	abd.scale = Vector3(1.0, 0.85, 1.25)
+	var tho := _sph(Vector3(0, 0.52, -0.24), 0.22, CORPS.lightened(0.08), root)
+	tho.scale = Vector3(1.10, 0.80, 1.05)
+	for dx in [-0.07, 0.07]:
+		_box(Vector3(dx, 0.44, -0.42), Vector3(0.07, 0.14, 0.12), CORPS.darkened(0.05), root)
+		_cyl(Vector3(dx, 0.33, -0.47), 0.0, 0.030, 0.13, Color(0.10, 0.06, 0.05), root, 4, Vector3(deg_to_rad(180), 0, 0))
+	# 6 yeux rouges
+	for ep in [Vector3(-0.09, 0.56, -0.40), Vector3(-0.03, 0.58, -0.43), Vector3(0.03, 0.58, -0.43), Vector3(0.09, 0.56, -0.40), Vector3(-0.06, 0.52, -0.45), Vector3(0.06, 0.52, -0.45)]:
+		_sph(ep, 0.028, Color(1, 0.05, 0.05), root, true)
+	# 8 PATTES SUR PIVOTS : fémur levé + tibia descendante => ça MARCHE
+	var pattes := []
 	for cote in [-1, 1]:
 		for k in range(4):
 			var a := deg_to_rad(-50 + k * 33)
 			var hx: float = cos(a) * 0.35 * cote
-			var hz := sin(a) * 0.35 - 0.1
+			var hz: float = sin(a) * 0.35 - 0.1
 			var patte := Node3D.new()
 			patte.position = Vector3(hx * 0.6, 0.5, hz)
-			patte.rotation.y = -atan2(hz, hx * cote) * cote
+			var yaw: float = -atan2(hz, hx * cote) * cote
+			patte.rotation.y = yaw
 			root.add_child(patte)
-			_box(Vector3(0.28 * cote, 0.16, 0), Vector3(0.56, 0.05, 0.05), CORPS.darkened(0.1), patte, Vector3(0, 0, deg_to_rad(-30) * cote))
-			_box(Vector3(0.62 * cote, -0.12, 0), Vector3(0.5, 0.04, 0.04), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(40) * cote))
+			_box(Vector3(0.28 * cote, 0.16, 0), Vector3(0.56, 0.06, 0.06), CORPS.darkened(0.08), patte, Vector3(0, 0, deg_to_rad(-32) * cote))
+			_box(Vector3(0.62 * cote, -0.14, 0), Vector3(0.52, 0.045, 0.045), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(46) * cote))
+			pattes.append({"n": patte, "y0": yaw})
+	return {"pattes": pattes, "mode": "araignee"}
 
 func update_ennemis(delta: float):
 	for e in enemies:
@@ -1977,6 +2004,28 @@ func update_ennemis(delta: float):
 			var lk := node.global_position + ndir
 			node.look_at(Vector3(lk.x, node.global_position.y, lk.z), Vector3.UP)
 		node.global_position.y = hauteur_terrain(node.global_position.x, node.global_position.z)
+		# b45 : PATTES ANIMÉES + trottinement du corps (fini le glissement)
+		var marche := ndir.length() > 0.1
+		if marche:
+			e.t_anim += delta * spd * 2.4
+		var am: Dictionary = e.anim
+		var pattes: Array = am.pattes
+		for i in range(pattes.size()):
+			var pg: Dictionary = pattes[i]
+			var pn: Node3D = pg.n
+			if am.mode == "rat":
+				if marche:
+					pn.rotation.x = sin(e.t_anim * 6.0 + float(i) * PI) * 0.5
+				else:
+					pn.rotation.x = lerpf(pn.rotation.x, 0.0, 0.15)
+			else:
+				var y0: float = pg.y0
+				if marche:
+					pn.rotation.y = y0 + sin(e.t_anim * 6.0 + float(i) * PI * 0.5) * 0.30
+				else:
+					pn.rotation.y = lerpf(pn.rotation.y, y0, 0.15)
+		if marche:
+			node.global_position.y += absf(sin(e.t_anim * 3.0)) * 0.05
 		# Barre de vie orientée caméra + remplissage
 		if is_instance_valid(e.barre):
 			if e.pv < e.max_pv:
