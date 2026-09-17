@@ -16,7 +16,7 @@ public static class LibreViesBuild
 
         // Mono est disponible avec Windows Build Support et ne nécessite pas
         // l'installation séparée du toolchain IL2CPP sur la machine de build.
-        PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono);
+        PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
 
         var scenes = new[] { "Assets/Scenes/LibreVies.unity" };
         var options = new BuildPlayerOptions
