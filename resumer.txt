@@ -805,6 +805,15 @@ INTACTS. Changements :
   (1.0,0.85,0.64), énergie 1.25, ciel haut (0.34,0.45,0.75).
 - Manifeste : 6 entrées, seuls main.gd + resumer.txt changent.
 
+4ah) MAJ DU 17/09/2026 (build b41) — CORRECTIF COMPILE b40
+-----------------------------------------------------------
+- Erreur dev : « No constructor of "Basis" matches Basis(Vector3) »
+  (ligne palissade b40). Godot 4 n'a PAS de constructeur d'échelle :
+  remplacé par Basis(Vector3(0,1,0), yaw).scaled(Vector3(1, sc, 1)).
+  PIEGE À RETENIR : échelle d'une Basis = .scaled() ou Basis().scaled(),
+  JAMAIS Basis(Vector3).
+- Rien d'autre changé. BUILD b41.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b40 : GRANDE REFONTE GRAPHIQUE façon image de référence — toits plus pentus à tuiles quinconce, tours rondes à toit conique, portes cintrées, volets, palissade serrée à pointes (MultiMesh), garde à la lance, rat gueule ouverte et araignée genoux levés, gants du héros, fleurs en bord de route, soleil couchant doré. Gameplay/colliders inchangés. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b41 : correctif de compilation de la palissade b40 (Basis(Vector3) n'existe pas dans Godot 4 → .scaled()). Refonte graphique b40 inchangée : toits pentus à tuiles quinconce, tours coniques, palissade à pointes, lance, rat/araignée facettés, fleurs, soleil couchant. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "85b717bb2bb4c6dee5d89d698a130060",
-      "size": 133193
+      "hash": "e6e082a5034918d16ff66f27c58abc3d",
+      "size": 133192
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "c806206e041ffa963bf5bf187e0c30ca",
-      "size": 56706
+      "hash": "b23235ca5370072a791ec337b9c773a3",
+      "size": 57173
     }
   }
 }

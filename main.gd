@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b40"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b41"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1681,7 +1681,7 @@ func creer_cloture_village():
 		var p = pts[i]
 		var sc: float = rngp.randf_range(0.90, 1.14)
 		var yaw: float = -p[3] + rngp.randf_range(-0.05, 0.05)
-		var bas := Basis(Vector3(0, 1, 0), yaw) * Basis(Vector3(1, sc, 1))
+		var bas := Basis(Vector3(0, 1, 0), yaw).scaled(Vector3(1, sc, 1))
 		mm.set_instance_transform(i, Transform3D(bas, Vector3(p[0], p[2] - 0.05, p[1])))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
