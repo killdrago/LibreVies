@@ -10,16 +10,16 @@
       "size": 632945
     },
     "build_launcher.bat": {
-      "hash": "732442e94ca8edfe40dbd83d1f1eb72b",
-      "size": 4116
+      "hash": "3f21d8c3667db2a61fe345a8e8c37ca9",
+      "size": 4298
     },
     "make_package_manifest.py": {
       "hash": "7f7262e28acbab7c63c473118c6f8764",
       "size": 2685
     },
     "README_RELEASE_FR.md": {
-      "hash": "2f8105a66dd727ede7bcfe0f8d27f651",
-      "size": 3461
+      "hash": "83a077536c0c4c573f53a3c68c255eea",
+      "size": 3838
     },
     "unity/ProjectSettings/ProjectVersion.txt": {
       "hash": "c8465430dc3155802d7c59d003231f6b",
@@ -54,8 +54,12 @@
       "size": 2933
     },
     "build_unity_game.bat": {
-      "hash": "f805f06c882858d1d24f92db964d1b2a",
-      "size": 1873
+      "hash": "d3a013b0860aef513a5f99361cad503a",
+      "size": 2126
+    },
+    "setup_unity_build_tools.bat": {
+      "hash": "0051ba4a1d9062471659459512edfc85",
+      "size": 2709
     }
   },
   "package": {

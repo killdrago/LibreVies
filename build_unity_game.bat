@@ -15,8 +15,17 @@ if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\2022.3.62f1\Edito
 if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe"
 if not defined UNITY if exist "%ProgramFiles(x86)%\Unity\Editor\Unity.exe" set "UNITY=%ProgramFiles(x86)%\Unity\Editor\Unity.exe"
 if not defined UNITY (
-    echo ERREUR : Unity Editor introuvable.
-    echo Definissez LIBREVIES_UNITY avec le chemin complet de Unity.exe.
+    echo Unity Editor absent : lancement de l'installation automatique...
+    call "%~dp0setup_unity_build_tools.bat"
+    if errorlevel 1 (
+        echo ERREUR : installation automatique de Unity impossible.
+        pause
+        exit /b 1
+    )
+    set "UNITY=%LIBREVIES_UNITY%"
+)
+if not defined UNITY (
+    echo ERREUR : Unity Editor introuvable apres l'installation.
     pause
     exit /b 1
 )

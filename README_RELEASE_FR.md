@@ -23,21 +23,23 @@ installé peut quand même être lancé.
 
 ## Fabriquer la distribution
 
-`build_launcher.bat` est le script de fabrication destiné au développeur. Il
-ouvre Unity en mode batch, exporte le projet situé dans `unity/`, compile le
-launcher et produit `release/`. Les outils de développement ne sont pas copiés
-dans `release/`.
+`build_launcher.bat` est le **seul script à lancer** pour fabriquer la
+distribution complète. Il ouvre Unity en mode batch, exporte le projet situé
+dans `unity/`, compile le launcher et produit `release/`. Les outils de
+développement ne sont pas copiés dans `release/`.
 
-La machine de build doit fournir :
+Si Unity Editor n'est pas trouvé, `build_launcher.bat` appelle
+automatiquement `setup_unity_build_tools.bat`. Ce script télécharge Unity Hub
+depuis le site officiel Unity et demande à Unity Hub d'installer Unity 2022.3
+avec le module Windows. Unity Hub peut demander une connexion à un compte Unity
+et l'activation de la licence Personal : cette licence est obligatoire pour
+fabriquer une build, mais jamais pour le joueur.
 
-- Unity Editor 2022.3 LTS avec le module Windows Build Support ; le chemin est
-  fourni par `LIBREVIES_UNITY` ;
-- PyInstaller pour compiler le launcher ;
-- Python uniquement sur la machine de build.
-
-Ces prérequis ne sont pas des prérequis du joueur. Le script ne lance pas de
-`pip install` automatiquement et ne télécharge jamais Unity sur la machine du
-joueur.
+PyInstaller et Python restent nécessaires uniquement sur la machine de build.
+Ces outils et Unity ne sont jamais copiés dans `release/` et ne sont jamais
+installés chez le joueur. `build_unity_game.bat` existe seulement comme étape
+de diagnostic séparée ; dans le cas normal, il faut lancer uniquement
+`build_launcher.bat`.
 
 ## Mise à jour des fichiers
 
