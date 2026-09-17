@@ -10,8 +10,8 @@
       "size": 632945
     },
     "build_launcher.bat": {
-      "hash": "38fe699cc638ac60940c58d931dff84e",
-      "size": 4693
+      "hash": "198f814f303072e0e62eb5480d587043",
+      "size": 4974
     },
     "make_package_manifest.py": {
       "hash": "7f7262e28acbab7c63c473118c6f8764",
@@ -54,8 +54,8 @@
       "size": 2933
     },
     "build_unity_game.bat": {
-      "hash": "f7d54285691be399cc2a8c267c2834bc",
-      "size": 2520
+      "hash": "16d57401b5cab421084c91c4203eccc3",
+      "size": 2747
     },
     "setup_unity_build_tools.bat": {
       "hash": "4123e37dba026ed245c5f211facbd4dd",

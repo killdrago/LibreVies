@@ -1,7 +1,15 @@
 @echo off
 setlocal EnableExtensions
 set "ROOT=%~dp0"
-if not exist "%ROOT%launcher.pyw" if exist "%ROOT%..\launcher.pyw" set "ROOT=%ROOT%..\"
+if not exist "%ROOT%launcher.pyw" (
+    if exist "%ROOT%..\launcher.pyw" for %%R in ("%ROOT%..") do set "ROOT=%%~fR\"
+)
+if not exist "%ROOT%launcher.pyw" (
+    echo ERREUR : launcher.pyw est absent de la racine du projet : %ROOT%
+    echo Placez ce script dans le depot LibreVies complet.
+    pause
+    exit /b 1
+)
 cd /d "%ROOT%"
 
 echo ========================================

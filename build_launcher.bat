@@ -1,7 +1,15 @@
 @echo off
 setlocal EnableExtensions
 set "ROOT=%~dp0"
-if not exist "%ROOT%launcher.pyw" if exist "%ROOT%..\launcher.pyw" set "ROOT=%ROOT%..\"
+if not exist "%ROOT%launcher.pyw" (
+    if exist "%ROOT%..\launcher.pyw" for %%R in ("%ROOT%..") do set "ROOT=%%~fR\"
+)
+if not exist "%ROOT%launcher.pyw" (
+    echo ERREUR : launcher.pyw est absent de la racine du projet : %ROOT%
+    echo Placez ce script dans le depot LibreVies complet.
+    pause
+    exit /b 1
+)
 cd /d "%ROOT%"
 
 echo ========================================
@@ -57,9 +65,9 @@ if exist "build\unity.log" del /q "build\unity.log"
 mkdir "release\game"
 mkdir "build\launcher"
 
-if not exist "icon.ico" (
+if not exist "%ROOT%icon.ico" (
     echo Creation de l'icone...
-    python -c "import importlib.util as u; s=u.spec_from_file_location('lv','launcher.pyw'); m=u.module_from_spec(s); s.loader.exec_module(m); m.export_icon('icon.ico')"
+    python -c "import importlib.util as u; s=u.spec_from_file_location('lv',r'%ROOT%launcher.pyw'); m=u.module_from_spec(s); s.loader.exec_module(m); m.export_icon(r'%ROOT%icon.ico')"
     if errorlevel 1 (
         echo ERREUR : impossible de creer icon.ico
         pause
@@ -83,7 +91,7 @@ if not exist "release\game\LibreViesGame.exe" (
 
 echo.
 echo [2/3] Compilation du launcher autonome...
-python -m PyInstaller --onefile --noconsole --clean --name LibreVies --icon=icon.ico --distpath "release" --workpath "build\launcher" --specpath "build" launcher.pyw
+python -m PyInstaller --onefile --noconsole --clean --name LibreVies --icon="%ROOT%icon.ico" --distpath "release" --workpath "build\launcher" --specpath "%ROOT%build" "%ROOT%launcher.pyw"
 if errorlevel 1 (
     echo ERREUR : compilation du launcher echouee.
     pause
@@ -107,7 +115,7 @@ if errorlevel 1 (
 copy /y "README_RELEASE_FR.md" "release\README.txt" >nul
 
 if exist "build\launcher" rmdir /s /q "build\launcher"
-if exist "icon.ico" del /q "icon.ico"
+if exist "%ROOT%icon.ico" del /q "%ROOT%icon.ico"
 if exist "LibreVies.spec" del /q "LibreVies.spec"
 
 echo.
