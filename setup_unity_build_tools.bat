@@ -2,7 +2,7 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem Installation automatique des outils de fabrication, jamais des outils du joueur.
-set "UNITY_VERSION=2022.3.62f1"
+set "UNITY_VERSION=6000.6.0f1"
 set "HUB=%ProgramFiles%\Unity Hub\Unity Hub.exe"
 if not exist "%HUB%" if exist "%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe"
 if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" set "HUB=%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe"

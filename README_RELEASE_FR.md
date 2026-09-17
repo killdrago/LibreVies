@@ -30,7 +30,7 @@ développement ne sont pas copiés dans `release/`.
 
 Si Unity Editor n'est pas trouvé, `build_launcher.bat` appelle
 automatiquement `setup_unity_build_tools.bat`. Ce script télécharge Unity Hub
-depuis le site officiel Unity et demande à Unity Hub d'installer Unity 2022.3
+depuis le site officiel Unity et demande à Unity Hub d'installer Unity 6.6 (version `6000.6.0f1`)
 avec le module Windows. Unity Hub peut demander une connexion à un compte Unity
 et l'activation de la licence Personal : cette licence est obligatoire pour
 fabriquer une build, mais jamais pour le joueur.
