@@ -13,9 +13,9 @@ deux cas, le fonctionnement est identique :
 4. le jeu Unity démarre.
 
 Il n'y a **aucune installation de Unity Editor, Python, Unity Hub, Unreal ou
-autre composant** chez le joueur. `game/LibreViesGame.exe` est une build Unity
-Windows qui contient son runtime, ses bibliothèques et les données du jeu. Le
-joueur ne lance pas cet exécutable directement : seul le launcher est à utiliser.
+autre composant** chez le joueur. `game/LibreViesGame.exe` est une build Unity Windows accompagnée de ses
+fichiers runtime (`UnityPlayer.dll` et `LibreViesGame_Data/`). Le joueur ne
+lance pas cet exécutable directement : seul le launcher est à utiliser.
 
 Une connexion Internet est uniquement nécessaire pour rechercher et télécharger
 les mises à jour. Si le serveur est momentanément indisponible, le jeu déjà
@@ -46,8 +46,11 @@ choisi :
 
 ```text
 LibreVies.exe
- game/LibreViesGame.exe
- version_url.json
+version_url.json
+game/
+├── LibreViesGame.exe
+├── UnityPlayer.dll
+└── LibreViesGame_Data/   (tout le dossier)
 ```
 
 Avant de lancer le build, définir `LIBREVIES_ASSET_BASE_URL` vers l'URL publique

@@ -34,18 +34,25 @@ def main() -> None:
 
     config = json.loads(args.config.read_text(encoding="utf-8"))
     game_relative = "game/LibreViesGame.exe"
-    wanted = ["LibreVies.exe", game_relative]
-    package_files = {}
+    required = ["LibreVies.exe", game_relative]
     asset_base = args.asset_base_url.rstrip("/")
+    package_files = {}
 
-    for relative in wanted:
-        path = args.release.joinpath(*relative.split("/"))
-        if not path.is_file():
-            raise SystemExit(f"Fichier exporté absent : {path}")
+    # Unity Windows produit plusieurs fichiers indispensables au runtime :
+    # UnityPlayer.dll, *_Data/ et parfois des fichiers de configuration. Ils
+    # doivent tous suivre le même cycle de mise à jour que l'exécutable.
+    for path in sorted(args.release.rglob("*")):
+        if not path.is_file() or path.name == "version_url.json":
+            continue
+        relative = path.relative_to(args.release).as_posix()
         info = {"hash": md5(path), "size": path.stat().st_size}
         if asset_base:
             info["url"] = f"{asset_base}/{quote(relative, safe='/')}"
         package_files[relative] = info
+
+    for relative in required:
+        if relative not in package_files:
+            raise SystemExit(f"Fichier exporté absent : {args.release / relative}")
 
     config["package"] = {
         "game_executable": game_relative,
@@ -59,6 +66,7 @@ def main() -> None:
         newline="\n",
     )
     print(f"Manifeste écrit : {output}")
+    print(f"  {len(package_files)} fichiers runtime suivis")
     for name, info in package_files.items():
         print(f"  {name}: {info['hash']} ({info['size']} octets)")
 

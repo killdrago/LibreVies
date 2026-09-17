@@ -105,7 +105,7 @@ echo   Distribution : %~dp0release\
 echo   Lancez release\LibreVies.exe
 echo ========================================
 echo.
-echo IMPORTANT : publiez les deux exe et version_url.json.
+echo IMPORTANT : publiez LibreVies.exe, tout le dossier game et version_url.json.
 echo Pour les mises a jour, LIBREVIES_ASSET_BASE_URL doit pointer
 echo vers l'URL publique des fichiers de la distribution.
 pause
