@@ -10,7 +10,7 @@ if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" 
 if not exist "%HUB%" (
     echo Unity Hub absent : telechargement depuis le site officiel Unity...
     set "HUB_INSTALLER=%TEMP%\UnityHubSetup.exe"
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $urls=@('https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup-x64.exe','https://public-cdn.cloud.unity3d.com/hub/3.14.3/UnityHubSetup.exe','https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.exe'); $ok=$false; foreach($u in $urls) { try { Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $env:HUB_INSTALLER; if((Get-Item $env:HUB_INSTALLER).Length -gt 1000000) { $ok=$true; break } } catch {} }; if(-not $ok) { exit 1 }"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0download_unity_hub.ps1" -OutputPath "%HUB_INSTALLER%"
     if errorlevel 1 (
         echo ERREUR : impossible de telecharger Unity Hub depuis les URLs officielles.
         echo Consultez https://unity.com/download et relancez ensuite ce script.

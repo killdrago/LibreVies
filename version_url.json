@@ -58,8 +58,12 @@
       "size": 2126
     },
     "setup_unity_build_tools.bat": {
-      "hash": "362863a6d78622f74f6beaddf5fb59ad",
-      "size": 3403
+      "hash": "49367091ebba48f967c9076cd60a1dcd",
+      "size": 2979
+    },
+    "download_unity_hub.ps1": {
+      "hash": "4f6d32a7b3e64bda5c43bcd6e66eecfe",
+      "size": 1052
     }
   },
   "package": {
