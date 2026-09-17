@@ -14,6 +14,13 @@ cd /d "%ROOT%"
 set "PROJECT=%ROOT%unity"
 if exist "%ROOT%Assets\Scripts" set "PROJECT=%ROOT%"
 if exist "%ROOT%unity\unity\Assets\Scripts" set "PROJECT=%ROOT%unity\unity"
+rem Force le backend Mono même si l'installation locale conserve un ancien réglage IL2CPP.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Join-Path $env:PROJECT 'ProjectSettings\ProjectSettings.asset'; if (Test-Path $p) { $c = Get-Content -Raw $p; $c = $c -replace '(?m)^([ \t]*Standalone:[ \t]*)1[ \t]*$', '${1}0'; Set-Content -Path $p -Value $c -Encoding UTF8 }"
+if errorlevel 1 (
+    echo ERREUR : impossible de configurer le backend Mono Unity.
+    pause
+    exit /b 1
+)
 for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if exist "%%~fD" (
     echo Nettoyage de l'ancien package Unity Collab incompatible avec Unity 6.6...
     rmdir /s /q "%PROJECT%\Library"
