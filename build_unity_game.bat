@@ -1,6 +1,8 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
+set "ROOT=%~dp0"
+if not exist "%ROOT%launcher.pyw" if exist "%ROOT%..\launcher.pyw" set "ROOT=%ROOT%..\"
+cd /d "%ROOT%"
 
 echo ========================================
 echo   LibreVies - fabrication du jeu Unity
@@ -42,7 +44,7 @@ if exist "build\unity.log" del /q "build\unity.log"
 if not exist "build" mkdir "build"
 
 echo Export Windows Unity en cours...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%~dp0unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%~dp0release\game\LibreViesGame.exe" -logFile "%~dp0build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%ROOT%unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : Unity a echoue. Consultez build\unity.log
     pause

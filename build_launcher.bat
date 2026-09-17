@@ -1,6 +1,8 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
+set "ROOT=%~dp0"
+if not exist "%ROOT%launcher.pyw" if exist "%ROOT%..\launcher.pyw" set "ROOT=%ROOT%..\"
+cd /d "%ROOT%"
 
 echo ========================================
 echo   LibreVies - build de la distribution Unity
@@ -67,7 +69,7 @@ if not exist "icon.ico" (
 
 echo.
 echo [1/3] Export du jeu Unity avec son runtime integre...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%~dp0unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%~dp0release\game\LibreViesGame.exe" -logFile "%~dp0build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%ROOT%unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : export Unity echoue. Consultez build\unity.log
     pause
@@ -111,7 +113,7 @@ if exist "LibreVies.spec" del /q "LibreVies.spec"
 echo.
 echo ========================================
 echo   TERMINE
-echo   Distribution : %~dp0release\
+echo   Distribution : %ROOT%release\
 echo   Lancez release\LibreVies.exe
 echo ========================================
 echo.
