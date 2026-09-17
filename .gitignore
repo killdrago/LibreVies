@@ -1,0 +1,13 @@
+# Sorties locales de build (la distribution est publiée comme artefact)
+/release/
+/build/
+/dist/
+*.spec
+/icon.ico
+
+# Fichiers temporaires du launcher / de l'export
+__pycache__/
+*.download
+*.new
+*.tmp
+.librevies-update.cmd

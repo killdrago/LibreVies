@@ -3,8 +3,8 @@ LibreVies — Launcher avec auto-update intégré
 Double-clique sur launcher.pyw ou LibreVies.exe pour lancer.
 """
 import tkinter as tk
-import subprocess, threading, os, sys, time, zipfile
-import urllib.request, hashlib, json, shutil
+import subprocess, threading, os, sys, time
+import urllib.request, hashlib, json
 import base64, io, tempfile
 
 # ============================================================
@@ -61,17 +61,23 @@ if getattr(sys, 'frozen', False):
     GAME_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
-GODOT_URL = "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip"
+# Le jeu distribué est déjà exporté avec Godot. Le joueur ne télécharge donc
+# ni Godot, ni Python, ni un autre composant : le runtime est dans le dossier
+# game\ de la distribution, comme pour un jeu Windows classique.
+GAME_EXECUTABLE = "game/LibreViesGame.exe"
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "2.8.0"
+LAUNCHER_VERSION = "3.0.0"
 GAME_VERSION = "0.3.0"
+DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0af3d-librevies"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
 ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
+    {"date": "17/09/2026", "t": "Launcher 3.0.0 — distribution autonome",
+     "d": "Le jeu exporte contient deja son runtime : le joueur ne telecharge plus Godot. Le launcher verifie les MAJ, les telecharge, puis lance directement LibreViesGame.exe. Le launcher peut aussi se mettre a jour et redemarrer seul."},
     {"date": "14/09/2026", "t": "Launcher 2.8.0 — retour aux hashs md5",
      "d": "Le systeme a numeros (2.7.0) est abandonne : retour au hash md5 par fichier, qui detecte et REPARE aussi les fichiers corrompus. Regle imperative inchangee : tout changement de fichier = nouveau hash dans version_url.json ; tout nouveau fichier = nouvelle ligne avec son hash ; toute suppression = ligne retiree."},
     {"date": "14/09/2026", "t": "Launcher 2.6.0 — images integrees",
@@ -100,51 +106,118 @@ NEWS = [
 TEXT_EXTS = ('.gd', '.tscn', '.godot', '.pyw', '.py', '.bat', '.json',
              '.cfg', '.txt', '.md', '.html', '.css', '.js', '.csv')
 
+
 def file_hash(path, normalize=False):
+    """Retourne le MD5 d'un fichier sans faire échouer le launcher."""
     try:
         with open(path, 'rb') as f:
             data = f.read()
         if normalize:
             data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
         return hashlib.md5(data).hexdigest()
-    except:
+    except (OSError, IOError):
         return None
+
 
 def load_local_config():
     if os.path.exists(CONFIG_PATH):
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except (OSError, ValueError):
             pass
     return {"launcher_version": LAUNCHER_VERSION, "game_version": GAME_VERSION,
-            "notes": "", "game_url": "", "raw_url": "", "files": {}}
+            "notes": "", "game_url": "", "raw_url": DEFAULT_RAW_URL,
+            "files": {}, "package": {"game_executable": GAME_EXECUTABLE,
+                                       "files": {}}}
+
 
 def save_local_config(cfg):
-    with open(CONFIG_PATH, 'w') as f:
-        json.dump(cfg, f, indent=2)
+    # Les identifiants facultatifs appartiennent à la machine, pas au
+    # manifeste distant : ne jamais les perdre lorsqu'une MAJ est enregistrée.
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            previous = json.load(f)
+        if isinstance(previous, dict):
+            cfg = dict(cfg)
+            for key in ('saved_pseudo', 'saved_mdp'):
+                if key not in cfg and key in previous:
+                    cfg[key] = previous[key]
+    except (OSError, ValueError):
+        pass
 
-def get_remote_url(fname, raw_url):
-    return f"{raw_url}/{urllib.request.quote(fname)}"
+    # Écriture atomique : une coupure pendant la mise à jour ne doit jamais
+    # laisser un version_url.json vide ou invalide.
+    tmp = CONFIG_PATH + '.tmp'
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+        f.write('\n')
+    os.replace(tmp, CONFIG_PATH)
 
 
 def normalize_raw_url(url):
-    """Accepte les formes 'github.com/.../tree/BRANCHE' ou
-    'raw.githubusercontent.com/.../tree/BRANCHE' et renvoie toujours
-    une URL raw utilisable : https://raw.githubusercontent.com/OWNER/REPO/BRANCHE"""
-    url = (url or "").strip().rstrip("/")
+    """Convertit une URL GitHub/tree en URL raw utilisable."""
+    url = (url or '').strip().rstrip('/')
     if not url:
         return url
-    if "raw.githubusercontent.com" in url:
-        return url.replace("/tree/", "/")
-    if "github.com" in url:
-        parts = url.split("github.com/", 1)[1]
-        seg = [s for s in parts.split("/") if s]
-        if len(seg) >= 4 and seg[2] == "tree":
+    if 'raw.githubusercontent.com' in url:
+        return url.replace('/tree/', '/')
+    if 'github.com' in url:
+        parts = url.split('github.com/', 1)[1]
+        seg = [item for item in parts.split('/') if item]
+        if len(seg) >= 4 and seg[2] == 'tree':
             return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/{'/'.join(seg[3:])}"
         if len(seg) >= 2:
             return f"https://raw.githubusercontent.com/{seg[0]}/{seg[1]}/HEAD"
     return url
+
+
+def get_remote_url(fname, raw_url, info=None):
+    """Utilise une URL d'asset quand le manifeste en fournit une.
+
+    Les binaires exportés sont généralement publiés dans une release GitHub
+    plutôt que dans git. Le champ ``url`` permet donc au launcher de les
+    mettre à jour sans imposer un serveur ou une installation au joueur.
+    """
+    if isinstance(info, dict) and info.get('url'):
+        return info['url']
+    return f"{raw_url}/{urllib.request.quote(fname)}"
+
+
+def _safe_local_path(fname):
+    """Résout un chemin du manifeste en restant dans le dossier du jeu."""
+    relative = (fname or '').replace('\\', '/')
+    if not relative or relative.startswith('/') or ':' in relative.split('/')[0]:
+        raise ValueError('chemin de mise à jour invalide')
+    root = os.path.abspath(GAME_DIR)
+    path = os.path.abspath(os.path.join(root, *relative.split('/')))
+    if os.path.commonpath((root, path)) != root:
+        raise ValueError('chemin de mise à jour invalide')
+    return path
+
+
+def _manifest_files(cfg):
+    """Retourne le manifeste adapté au mode de distribution.
+
+    En développement (launcher.pyw), l'ancien manifeste source reste accepté.
+    Dans le .exe livré au joueur, seuls les artefacts du package sont suivis :
+    jamais les .gd ou l'éditeur Godot.
+    """
+    package = cfg.get('package', {})
+    if getattr(sys, 'frozen', False):
+        if isinstance(package, dict):
+            return package.get('files', {}) or {}
+        return {}
+    return cfg.get('files', {}) or {}
+
+
+def _is_running_launcher(path):
+    if not getattr(sys, 'frozen', False):
+        return False
+    try:
+        return os.path.normcase(os.path.abspath(path)) == os.path.normcase(os.path.abspath(sys.executable))
+    except (OSError, TypeError):
+        return False
 
 
 # ============================================================
@@ -153,137 +226,162 @@ def normalize_raw_url(url):
 
 def check_for_updates(progress_cb):
     local_cfg = load_local_config()
-    raw_url = normalize_raw_url(local_cfg.get("raw_url", ""))
+    raw_url = normalize_raw_url(local_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
     if not raw_url:
         return {"error": "Pas d'URL configuree", "modified": [], "remote_cfg": None}
     try:
-        progress_cb(5, "Connexion a GitHub...")
-        url = get_remote_url("version_url.json", raw_url)
-        req = urllib.request.Request(url, headers={"User-Agent": f"LibreVies/{LAUNCHER_VERSION}"})
-        resp = urllib.request.urlopen(req, timeout=15)
-        remote_cfg = json.loads(resp.read().decode())
+        progress_cb(5, 'Connexion au serveur de mises a jour...')
+        url = get_remote_url('version_url.json', raw_url)
+        req = urllib.request.Request(url, headers={'User-Agent': f'LibreVies/{LAUNCHER_VERSION}'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            remote_cfg = json.loads(resp.read().decode('utf-8'))
     except Exception as e:
-        return {"error": f"Pas de connexion: {e}", "modified": [], "remote_cfg": None}
+        return {"error": f'Pas de connexion: {e}', "modified": [], "remote_cfg": None}
 
-    remote_files = remote_cfg.get("files", {})
+    remote_files = _manifest_files(remote_cfg)
     modified = []
     for fname, info in remote_files.items():
-        # Ne pas mettre a jour le launcher lui-meme (evite la boucle)
-        if fname == "launcher.pyw":
+        # Le script de développement est remplacé par git. Le launcher
+        # compilé, lui, se met à jour via package.files et son .cmd dédié.
+        if not getattr(sys, 'frozen', False) and fname == 'launcher.pyw':
+            continue
+        if not isinstance(info, dict) or not info.get('hash'):
+            continue
+        try:
+            local_path = _safe_local_path(fname)
+        except ValueError:
             continue
         is_text = fname.lower().endswith(TEXT_EXTS)
-        local_h = file_hash(os.path.join(GAME_DIR, fname), normalize=is_text)
+        local_h = file_hash(local_path, normalize=is_text)
         if local_h is None:
-            action = "NOUVEAU"
-        elif local_h != info["hash"]:
-            action = "MODIFIE"
+            action = 'NOUVEAU'
+        elif local_h != info['hash']:
+            action = 'MODIFIE'
         else:
             continue
-        modified.append((fname, local_h, info["hash"], action))
+        modified.append((fname, local_h, info['hash'], action, info))
 
     return {"error": None, "modified": modified, "remote_cfg": remote_cfg}
 
 
+def _stage_or_replace(path, data):
+    """Écrit un fichier temporaire puis le remplace de manière atomique."""
+    tmp = path + '.download'
+    with open(tmp, 'wb') as f:
+        f.write(data)
+    os.replace(tmp, path)
+
+
 def apply_updates(modified, remote_cfg, progress_cb):
-    raw_url = normalize_raw_url(remote_cfg.get("raw_url", ""))
-    errors = []; downloaded = 0; total = len(modified)
-    for i, (fname, _, expected_hash, _) in enumerate(modified):
+    raw_url = normalize_raw_url(remote_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
+    errors = []
+    downloaded = 0
+    pending_launcher = None
+    total = len(modified) or 1
+
+    for i, item in enumerate(modified):
+        # Compatibilité avec l'ancien tuple à 4 champs.
+        fname, _, expected_hash, _ = item[:4]
+        info = item[4] if len(item) > 4 and isinstance(item[4], dict) else {}
         pct = int(20 + (i / total) * 70)
-        progress_cb(pct, f"Telechargement ({i+1}/{total}): {fname}")
+        progress_cb(pct, f'Telechargement ({i + 1}/{total}): {fname}')
         try:
-            local_path = os.path.join(GAME_DIR, fname)
+            local_path = _safe_local_path(fname)
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            req = urllib.request.Request(get_remote_url(fname, raw_url),
-                                         headers={"User-Agent": f"LibreVies/{LAUNCHER_VERSION}"})
-            resp = urllib.request.urlopen(req, timeout=30)
-            data = resp.read()
-            tmp = local_path + ".tmp"
-            with open(tmp, 'wb') as f:
-                f.write(data)
-            if os.path.exists(local_path):
-                os.remove(local_path)
-            os.rename(tmp, local_path)
-            # Vérifier que le hash correspond (normaliser les line endings pour les fichiers texte)
+            req = urllib.request.Request(
+                get_remote_url(fname, raw_url, info),
+                headers={'User-Agent': f'LibreVies/{LAUNCHER_VERSION}'})
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                data = resp.read()
+
+            # Vérifier avant de remplacer l'ancien fichier. Une archive
+            # corrompue ou interrompue ne peut donc pas casser l'installation.
             is_text = fname.lower().endswith(TEXT_EXTS)
-            actual_hash = file_hash(local_path, normalize=is_text)
-            if actual_hash == expected_hash:
-                downloaded += 1
+            actual_hash = hashlib.md5(
+                data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+                if is_text else data).hexdigest()
+            if actual_hash != expected_hash:
+                errors.append(f'{fname}: hash ne correspond pas apres telechargement')
+                continue
+            expected_size = info.get('size')
+            if expected_size is not None and len(data) != int(expected_size):
+                errors.append(f'{fname}: taille inattendue apres telechargement')
+                continue
+
+            if _is_running_launcher(local_path):
+                # Windows verrouille l'exécutable actuellement lancé. On le
+                # remplace après fermeture via un petit script système, puis
+                # on relance automatiquement le launcher.
+                staged = local_path + '.new'
+                with open(staged, 'wb') as f:
+                    f.write(data)
+                pending_launcher = (local_path, staged)
             else:
-                errors.append(f"{fname}: hash ne correspond pas apres telechargement")
+                _stage_or_replace(local_path, data)
+            downloaded += 1
         except Exception as e:
-            errors.append(f"{fname}: {e}")
+            errors.append(f'{fname}: {e}')
         time.sleep(0.05)
-    # Sauvegarder la config seulement si au moins 1 fichier OK
-    if downloaded > 0:
+
+    if downloaded > 0 and not errors:
         save_local_config(remote_cfg)
-    return downloaded, errors
+    return downloaded, errors, pending_launcher
+
+
+def schedule_launcher_restart(target, staged):
+    """Programme le remplacement de LibreVies.exe après sa fermeture."""
+    script = os.path.join(GAME_DIR, '.librevies-update.cmd')
+    try:
+        with open(script, 'w', encoding='utf-8', newline='\r\n') as f:
+            f.write('@echo off\r\n')
+            f.write(':wait\r\n')
+            f.write(f'copy /Y "{staged}" "{target}" >nul 2>&1\r\n')
+            f.write('if errorlevel 1 (timeout /t 1 /nobreak >nul & goto wait)\r\n')
+            f.write(f'del /f /q "{staged}" >nul 2>&1\r\n')
+            f.write(f'start "" "{target}"\r\n')
+            f.write('del /f /q "%~f0" >nul 2>&1\r\n')
+        flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        subprocess.Popen(['cmd.exe', '/d', '/c', script],
+                         cwd=GAME_DIR, creationflags=flags,
+                         close_fds=False)
+        return True
+    except (OSError, IOError):
+        return False
 
 
 # ============================================================
-# GODOT
+# JEU DISTRIBUÉ
 # ============================================================
 
-def find_godot():
-    for d in [os.path.join(GAME_DIR, "tools"), GAME_DIR]:
-        if os.path.isdir(d):
-            for f in os.listdir(d):
-                if f.lower().startswith("godot") and f.endswith(".exe"):
-                    return os.path.join(d, f)
+def find_game():
+    """Cherche uniquement l'export Windows livré avec le launcher."""
+    cfg = load_local_config()
+    package = cfg.get('package', {})
+    relative = package.get('game_executable', GAME_EXECUTABLE) if isinstance(package, dict) else GAME_EXECUTABLE
+    try:
+        configured = _safe_local_path(relative)
+    except ValueError:
+        configured = None
+    candidates = [configured,
+                  os.path.join(GAME_DIR, GAME_EXECUTABLE.replace('/', os.sep)),
+                  os.path.join(GAME_DIR, 'LibreViesGame.exe')]
+    seen = set()
+    for path in candidates:
+        if not path:
+            continue
+        absolute = os.path.abspath(path)
+        if absolute in seen:
+            continue
+        seen.add(absolute)
+        if os.path.isfile(absolute):
+            return absolute
     return None
 
-def download_godot(cb, done):
-    tools = os.path.join(GAME_DIR, "tools"); os.makedirs(tools, exist_ok=True)
-    zp = os.path.join(tools, "godot.zip")
-    try:
-        cb(0, "Telechargement de Godot...")
-        r = urllib.request.urlopen(urllib.request.Request(GODOT_URL, headers={"User-Agent": "LibreVies"}), timeout=180)
-        total = int(r.headers.get('content-length', 0)); dl = 0
-        with open(zp, 'wb') as f:
-            while True:
-                ch = r.read(8192)
-                if not ch: break
-                f.write(ch); dl += len(ch)
-                if total > 0: cb(int(dl / total * 50), f"Telechargement... {int(dl / total * 100)}%")
-        cb(50, "Extraction...")
-        with zipfile.ZipFile(zp) as z: z.extractall(tools)
-        os.remove(zp); cb(100, "Godot installe !"); done(find_godot())
-    except Exception as e:
-        cb(0, f"Erreur : {e}"); done(None)
-
-def preload(path, cb, done):
-    try:
-        godot_cache = os.path.join(GAME_DIR, ".godot")
-        cache_exists = os.path.isdir(godot_cache)
-
-        if not cache_exists:
-            # Premier lancement : import complet nécessaire
-            cb(10, "Premier import des assets (2-3 min)...")
-            p = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            p.wait(timeout=180)
-            # Vérifier que le cache a été créé
-            if not os.path.isdir(godot_cache):
-                cb(70, "Deuxieme tentative...")
-                p2 = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p2.wait(timeout=180)
-        else:
-            # Cache existe : juste vérifier rapidement
-            cb(50, "Verification du cache...")
-            p = subprocess.Popen([path, "--import", "--headless", "--path", GAME_DIR],
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            p.wait(timeout=30)
-
-        cb(90, "Finalisation..."); time.sleep(0.5)
-        cb(100, "Pret !"); done(True)
-    except Exception as e:
-        cb(100, f"Pret ({e})"); done(True)
 
 def launch(path):
-    # b37 : SANS --position ni screen_pref : Windows ouvre naturellement le
-    # jeu sur l'ecran du launcher (fenetre active / souris) — c'etait la
-    # bonne logique depuis le debut (verifie sur le launcher local du dev).
-    subprocess.Popen([path, "--path", GAME_DIR])
+    # L'export contient déjà le runtime Godot et le PCK du jeu : aucun
+    # argument --path et aucun téléchargement ne sont nécessaires au joueur.
+    subprocess.Popen([path], cwd=GAME_DIR, close_fds=False)
 
 
 # ============================================================
@@ -305,7 +403,7 @@ class App(tk.Tk):
             except Exception:
                 pass
 
-        self.godot = None
+        self.game = None
         self.ready = False
         self.build()
         self._load_saved_login()
@@ -562,61 +660,67 @@ class App(tk.Tk):
 
     def _run_update(self):
         result = check_for_updates(self.upd)
-        if result["error"]:
-            self.after(0, lambda: self._upd_bar(100, f"Erreur: {result['error']}"))
-            time.sleep(1); self.after(0, self._check_godot); return
-        modified = result["modified"]
+        if result['error']:
+            # Une panne réseau ne bloque pas un jeu déjà installé : on laisse
+            # le bouton Jouer disponible si l'export local est présent.
+            self.after(0, lambda: self._upd_bar(100, f"Hors ligne: {result['error']}"))
+            time.sleep(0.5)
+            self.after(0, self._check_game)
+            return
+
+        modified = result['modified']
         if not modified:
-            self.after(0, lambda: self._upd_bar(100, "A jour !"))
-            time.sleep(0.5); self.after(0, self._check_godot); return
-        # Mise a jour automatique en arrière-plan
-        self.after(0, lambda: self._upd_bar(10, f"Mise a jour de {len(modified)} fichier(s)..."))
-        downloaded, errors = apply_updates(modified, result["remote_cfg"], self.upd)
+            self.after(0, lambda: self._upd_bar(100, 'A jour !'))
+            time.sleep(0.3)
+            self.after(0, self._check_game)
+            return
+
+        self.after(0, lambda: self._upd_bar(
+            10, f'Mise a jour de {len(modified)} fichier(s)...'))
+        downloaded, errors, pending_launcher = apply_updates(
+            modified, result['remote_cfg'], self.upd)
+        if pending_launcher and not errors:
+            self.after(0, lambda: self._finish_launcher_update(pending_launcher))
+            return
         if errors:
-            err_msg = errors[0][:60]
-            self.after(0, lambda: self._upd_bar(100, f"Erreur: {err_msg}"))
+            err_msg = errors[0][:80]
+            self.after(0, lambda: self._upd_bar(100, f'Erreur: {err_msg}'))
         else:
-            self.after(0, lambda: self._upd_bar(100, f"{downloaded} fichiers mis a jour !"))
-        time.sleep(1)
-        # Pas de redémarrage — on lance directement Godot
-        self.after(0, self._check_godot)
+            self.after(0, lambda: self._upd_bar(
+                100, f'{downloaded} fichier(s) mis a jour !'))
+        time.sleep(0.5)
+        self.after(0, self._check_game)
+
+    def _finish_launcher_update(self, pending):
+        target, staged = pending
+        if schedule_launcher_restart(target, staged):
+            self._upd_bar(100, 'Launcher mis a jour, redemarrage...')
+            self.after(400, self.destroy)
+        else:
+            self._upd_bar(100, 'MAJ du launcher impossible (dossier protege)')
+            self._check_game()
 
     # ============================================================
-    # GODOT
+    # JEU EXPORTÉ
     # ============================================================
 
-    def _check_godot(self):
-        self.godot = find_godot()
-        if self.godot:
-            self.upd(5, "Godot trouve, chargement...")
-            threading.Thread(target=preload, args=(self.godot, self.upd, self.on_ready), daemon=True).start()
+    def _check_game(self):
+        self.game = find_game()
+        if self.game:
+            self._ready(True)
         else:
-            self.upd(0, "Godot non trouve. Telechargement...")
-            threading.Thread(target=download_godot, args=(self.upd, self.on_dl), daemon=True).start()
-
-    def on_dl(self, p):
-        self.after(0, lambda: self._on_dl(p))
-
-    def _on_dl(self, p):
-        if p:
-            self.godot = p
-            self.upd(50, "Chargement des assets...")
-            threading.Thread(target=preload, args=(p, self.upd, self.on_ready), daemon=True).start()
-        else:
-            self._upd_bar(0, "Erreur de telechargement")
-
-    def on_ready(self, ok):
-        self.after(0, lambda: self._ready(ok))
+            self._upd_bar(0, 'Jeu integre absent : executer build_launcher.bat')
 
     def _ready(self, ok):
         if ok:
             self.ready = True
-            self.play_btn.config(state="normal", bg=GREEN)
-            self._upd_bar(100, "Pret !")
+            self.play_btn.config(state='normal', bg=GREEN)
+            self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
 
     def play(self):
-        if self.ready and self.godot:
-            launch(self.godot); self.destroy()
+        if self.ready and self.game:
+            launch(self.game)
+            self.destroy()
 
 
 if __name__ == "__main__":

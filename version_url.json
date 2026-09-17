@@ -1,9 +1,9 @@
 {
-  "launcher_version": "2.8.0",
+  "launcher_version": "3.0.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b47 : tuiles du haut resserrées sous un faîtage épaissi (plus rien ne dépasse en haut) ; rat/souris = UNE seule queue lisse en chaîne de sphères ; araignée = pattes raccourcies et resserrées (plus de pointes qui sortent du sol autour d'elle). Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
-  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
-  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
+  "notes": "MAJ 0.4.0 : distribution Windows autonome. Le launcher ne telecharge plus Godot ; le runtime est integre dans game/LibreViesGame.exe. Mise a jour atomique des fichiers et du launcher.",
+  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0af3d-librevies",
+  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0af3d-librevies",
   "files": {
     "main.gd": {
       "hash": "ed696bda80f8170550cebc5341626245",
@@ -18,16 +18,32 @@
       "size": 5556
     },
     "launcher.pyw": {
-      "hash": "b00fb6c4214e7493c4a20c3ad766c212",
-      "size": 628831
+      "hash": "5a1f850320c5037971187d02499af56e",
+      "size": 632691
     },
     "build_launcher.bat": {
-      "hash": "4db739ba34ca09c06e428cf3e8c64b40",
-      "size": 1300
+      "hash": "7ece7003526d7f71904bf69b534e6906",
+      "size": 3843
     },
     "resumer.txt": {
       "hash": "30b8df758005b073a3d118b026d093c0",
       "size": 65213
+    },
+    "export_presets.cfg": {
+      "hash": "733656658e05721c0b7e0ec637906761",
+      "size": 755
+    },
+    "make_package_manifest.py": {
+      "hash": "dc35d9913fbf46df650539e21cefe7a5",
+      "size": 2223
+    },
+    "README_RELEASE_FR.md": {
+      "hash": "a8d007bd504d3212f9ded7ac7f47b324",
+      "size": 2723
     }
+  },
+  "package": {
+    "game_executable": "game/LibreViesGame.exe",
+    "files": {}
   }
 }
