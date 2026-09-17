@@ -1,1 +1,954 @@
-	
+================================================================================
+LIBREVIES — RESUME DE PROJET (pour une autre IA / prochaine session)
+Dernière mise à jour : 13/09/2026 — branche arena/01a09a4d-librevies (session Arena)
+================================================================================
+
+1) C'EST QUOI
+-------------
+Jeu vidéo 3D "LibreVie" (MMO solo pour l'instant) fait avec GODOT 4, lancé par un
+launcher Python/Tkinter (launcher.pyw) qui télécharge Godot si absent et qui
+fait l'auto-update des fichiers du jeu depuis GitHub.
+Dépôt GitHub : killdrago/LibreVies (branche de travail : main pour le public).
+
+2) VERSIONS ACTUELLES
+---------------------
+- Moteur : GODOT 4.7.2-stable (migration faite le 13/09/2026).
+  * project.godot : config/features=PackedStringArray("4.7")
+  * launcher.pyw : GODOT_URL = .../4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip
+  * Rendu : renderer/rendering_method="gl_compatibility" (volontaire : PC modestes)
+- launcher.pyw : LAUNCHER_VERSION = "2.8.0", GAME_VERSION = "0.3.0"
+- main.gd : const BUILD = "0.3.0-b34" (témoin de build, à incrémenter à chaque push)
+- version_url.json : game_version "0.3.0" (hashs md5 + tailles de chaque fichier,
+  calculés avec normalisation CRLF->LF pour les fichiers texte, comme le launcher).
+
+3) FONCTIONNEMENT DE L'AUTO-UPDATE (IMPORTANT)
+----------------------------------------------
+- launcher.pyw lit son version_url.json LOCAL, puis télécharge le
+  version_url.json DISTANT sur raw_url (branche de travail ou main).
+- SYSTÈME = HASH MD5 par fichier (launcher 2.8.0). Une parenthèse "numéros de
+  version" (2.7.0) a été essayée puis ABANDONNÉE le 14/09/2026 à la demande du
+  dev : avec les numéros, un fichier corrompu n'était pas réparé. Le hash, si.
+  NE PAS revenir aux numéros.
+- Comparaison : hash md5 LOCAL du fichier sur disque (texte .gd,.tscn,.godot,
+  .pyw,.py,.bat,.json,... : md5 après normalisation CRLF->LF ; binaires png/glb/
+  ico : md5 brut) vs hash du manifeste distant. Différent ou fichier absent =>
+  téléchargement depuis raw_url/<fichier>, puis VÉRIFICATION du hash après
+  téléchargement (réparation des fichiers corrompus incluse).
+- Après update, le version_url.json local est remplacé par le distant.
+
+- !!! REGLE IMPERATIVE (décision du dev, À RESPECTER ABSOLUMENT) !!!
+  * TOUT changement dans un fichier listé (même une seule ligne) = NOUVEAU HASH
+    dans version_url.json (pour que la MAJ soit téléchargée).
+  * TOUT nouveau fichier utile au jeu = AJOUTER SA LIGNE dans version_url.json
+    ainsi que SON HASH.
+  * TOUT fichier supprimé = RETIRER SA LIGNE de version_url.json.
+  * Sans ça, la modification n'est PAS distribuée aux joueurs.
+
+- launcher.pyw est volontairement ignoré par l'update (évite la boucle) :
+  on le remplace à la main, ou via le .exe recompilé par build_launcher.bat.
+  (Il est quand même listé avec son hash, pour info/vérification manuelle.)
+- FORMAT raw_url (piège déjà rencontré, 404) : une URL raw NE CONTIENT PAS
+  "/tree/". Bon format : https://raw.githubusercontent.com/killdrago/LibreVies/<BRANCHE>
+  (ex. branche de test : .../LibreVies/arena/01a09a4d-librevies ; prod : .../LibreVies/main).
+  Le launcher 2.5.1+ a une fonction normalize_raw_url() qui répare tout seul
+  les URLs copiées depuis le site (github.com/.../tree/BRANCHE ou
+  raw.githubusercontent.com/.../tree/BRANCHE).
+- DEPUIS LA 2.5.1 : le manifeste distant (version_url.json sur GitHub) donne le
+  raw_url de téléchargement ; le manifeste de la branche de travail pointe vers
+  CETTE branche (auto-référent) pour que les testeurs reçoivent la MAJ de la
+  branche. APRÈS MERGE SUR main : vérifier que le raw_url du manifeste main est
+  bien ".../LibreVies/main" (sinon les joueurs resteraient branchés sur la branche).
+- Script de regénération utilisé (à refaire à chaque MAJ) : parcourir la liste
+  "files" de version_url.json, recalculer md5/taille de chaque fichier présent
+  dans le repo (texte = md5 après CRLF->LF), réécrire le json (indent=2, clés :
+  launcher_version, game_version, notes, game_url, raw_url, files{nom:{hash,size}}).
+- Migration 2.7.0->2.8.0 : un manifeste local au format "numéros" n'a pas de
+  clé "hash" => tous les fichiers sont retéléchargés UNE seule fois au premier
+  lancement en 2.8.0, puis le système à hashs reprend la main.
+
+4) CE QUI A ETE FAIT LE 13/09/2026 (grosse MAJ 0.3.0)
+-----------------------------------------------------
+Objectif : reproduire le rendu de la capture "image/1er image develloppement.png"
+(style low-poly coloré : collines, sapins, château, héros au marteau, rats/
+araignées, HUD moderne) EN MIGRANT TOUT vers PrimitiveMesh / low-poly.
+Réponse à la question du dev : OUI c'est possible avec BoxMesh, SphereMesh,
+CylinderMesh, PrismMesh, CapsuleMesh (+ CylinderMesh radius_top=0 pour les
+cônes) ; le terrain et les rochers/touffes sont des ArrayMesh générés par
+SurfaceTool (triangles + generate_normals = facettes plates), mis en MultiMesh
+pour l'herbe/fleurs/rochers (perf).
+
+- main.gd REECRIT (~1740 lignes, tout en code, un seul fichier pour l'update) :
+  * PLUS AUCUN nœud CSG (avant : CSGBox3D/CSGCylinder3D/CSGSphere3D).
+  * Helpers _box/_cyl/_cone/_sph/_caps/_prism/_facette avec CACHE de meshes et
+    de matériaux (mat_std) => peu de ressources, beaucoup d'instances.
+  * Terrain : fonction hauteur_terrain(x,z) (plat dans TOWN_R=32, collines
+    ensuite, grosse colline au nord en z=-78 pour le château). Le sol, le chemin
+    de terre (CHEMIN = polyline, couleur dirt par face) et les couleurs de face
+    (vertex colors, vertex_color_use_as_albedo) sont un ArrayMesh facetté.
+  * Décor : sapins (cônes empilés), arbres ronds, fleurs, rochers, touffes
+    d'herbe (MultiMesh), nuages box unlit qui dérivent, lampadaires émissifs,
+    barils, caisses, clôtures, bannières (emblème épées croisées), panneaux.
+  * Ville : 9 bâtiments (murs box + toit PrismMesh + porte/fenêtres/auvent/
+    cheminée/escalier) + 4 PNJ capsule/sphère avec Label3D billboard.
+  * Château fort sur la colline nord : enceinte, créneaux, tours cylindriques
+    + toits côniques rouges, donjon, drapeaux.
+  * NOUVEAU PERSONNAGE (remplace glb/perso_voxel.glb, plus chargé du tout) :
+    héros low-poly construit en primitives : jambes/bras = pivots Node3D +
+    CapsuleMesh, torse/tunique/ceinture/baudrier = BoxMesh+PrismMesh, tête box
+    + cheveux piquants (prisms), yeux, marteau (cylindre + box) dans la main
+    droite. Animation marche = rotation des pivots ; animation attaque =
+    rotation du bras droit (player_attack_anim).
+  * Ennemis : souris/rats (corps facetté, oreilles, queue, yeux rouges émissifs)
+    et araignées (8 pattes 2 segments, yeux rouges). IA : errance + poursuite
+    si <10 m + attaque au contact (dégâts au joueur, mort + [R] renaître).
+    Barre de vie rouge au-dessus (billboard look_at caméra) quand blessés.
+  * Combat : dégâts 25 (comme le "25" du screen), dégâts flottants Label3D,
+    étincelles d'impact émissives, respawn des ennemis après 10 s (Timer connect,
+    plus de await dans les boucles => plus de bug de gel).
+  * Ramassage : cailloux (rochers facettés) et pièces d'or (cylindres émissifs
+    qui tournent), respawn par Timer connect.
+  * HUD refait façon capture : portrait rond (shader canvas_item découpe
+    circulaire sur pp_lv_3.png) + barre HP rouge "x HP" ; pilules or/cailloux en
+    haut à droite ; MINI-CARTE ronde custom (_draw : ennemis rouges, objets,
+    château, flèche joueur) ; panneau de quête "PROBLÈME DE RATS" (10 rats /
+    5 araignées, comptage des kills, coche verte) ; HOTBAR 5 slots dessinés en
+    _draw (marteau, potion rouge x5, potion bleue x5, parchemin, vide) avec
+    sélection jaune et touches 1-5 (potions utilisables : soin / boost vitesse) ;
+    barre LVL + XP en bas à gauche (gain d'XP par kill, levels up) ; options et
+    inventaire conservés (O / I) ; label info central avec outline.
+  * Environnement : WorldEnvironment en code (ProceduralSkyMaterial ciel bleu vif,
+    ambient sky, tonemap FILMIC) + soleil DirectionalLight3D chaud avec ombres.
+  * Caméra : orbitale 3e personne (clic droit molette) + vue 1re personne [V],
+    clamp au-dessus du terrain.
+  * Touches : ZQSD/flèches, MAJ courir, ESPACE saut, clic attaque, E ramasser,
+    V vue, I inventaire, O options, R renaître, 1-5 slots, ÉCHAP quitter.
+
+4b) MAJ DU 14/09/2026 (build b8)
+---------------------------------
+- Launcher 2.6.0 : images (bannière/icône/ICO) intégrées en base64 dans le .pyw,
+  le dev a supprimé les images du repo GitHub dans la foulée (plus nécessaires).
+- Launcher 2.7.0 (numéros de version) : ESSAYÉE PUIS ABANDONNÉE le jour même
+  (un fichier corrompu n'était pas réparé). Launcher 2.8.0 = retour aux hashs.
+- VILLAGE PROTÉGÉ (demande du dev) : les monstres (rats/souris/araignées) ne
+  peuvent PLUS entrer dans le village de départ.
+  * const VILLAGE_R = 26.0 + func dans_village(x,z) -> bool (main.gd).
+  * creer_cloture_village() : vraie clôture bois tout autour (96 poteaux,
+    traverses), avec PORTAILS (grands poteaux + linteau + lanterne) uniquement
+    là où la route traverse l'enceinte (dist_chemin < 3.0).
+  * Monstres : spawn repoussé hors du cercle (VILLAGE_R+7), déplacement bloqué
+    à la frontière (ils longent la clôture ; chase = ils attendent dehors),
+    respawn jamais dedans (VILLAGE_R+4), et sécurité frame-par-frame : tout
+    monstre égaré dedans est remis dehors (VILLAGE_R+0.5).
+  * Le JOUEUR reste libre d'entrer/sortir (la clôture n'a pas de collision,
+    c'est une barrière logique pour les monstres uniquement).
+  * Rochers scatterés évités l'anneau de clôture (push radial), pin [0,26]
+    déplacé en [5,29] (il était pile sur le portail sud).
+
+4c) MAJ DU 14/09/2026 (build b9)
+---------------------------------
+- b10 : FIX erreur parseur b9 — dans resoudre_collisions(), le point est un
+  Vector2 : ne JAMAIS écrire p.z sur un Vector2 (c'est p.y). Erreur réelle
+  rencontrée : "Cannot find member z in base Vector2" (413,54).
+- COLLISIONS UNIVERSELLES (demande du dev : "c'est pas normal de passer au
+  travers des objets"). Système maison 2D (X/Z), sans moteur physique :
+  * var colliders: Array[Dictionary] — entrées {"t":"c",x,z,r,g} (cercles) ou
+    {"t":"b",x,z,w,d,g} (boîtes) ; helpers col_cercle()/col_boite().
+  * resoudre_collisions(px,pz,rayon) -> Vector2 : 2 passes de push-out +
+    early-out par "g" (demi-diagonale). Gère AUSSI l'anneau de clôture du
+    village (bloquant partout SAUF où dist_chemin < 3.4 = portails).
+  * Joueur : rayon 0.45, appliqué dans _process (remplace l'ancien check
+    "blocked" sur batiments). Les MONSTRES sont solides pour le joueur
+    (push-out rayon 0.95) et résolvent aussi les collisions statiques (0.35).
+  * Colliders posés : bâtiments, PNJ, château (murs+tours+donjon, porte sud
+    passable), fontaine, pins, arbres ronds, lampadaires, barils, caisses,
+    clôtures de route, bannières, panneaux, rochers scatterés (sauf si sur
+    la route : dist_chemin > 2.8), gardes.
+- GARDES DES PORTAILS (demande du dev) : un garde low-poly à hallebarde
+  (creer_garde()) posté côté village à chaque portail (var portes). Si un
+  monstre vivant approche à MOINS DE 2 m du point milieu du portail :
+  le garde l'attaque (25 dégâts toutes les 0,8 s, floater doré + étincelles,
+  look_at du monstre) jusqu'à le tuer ; respawn normal 10 s ; PAS d'XP/argent
+  pour le joueur (c'est le garde qui tue). Logique dans update_gardes(delta),
+  appelée juste après update_ennemis dans _process.
+- MESSAGE D'ACCUEIL RETIRÉ (demande du dev) : plus de show_info "Bienvenue"
+  au lancement. Le témoin BUILD reste dans le TITRE DE FENÊTRE uniquement.
+- COULEURS ADOUCIES + RÉGLAGES VISUELS (demande du dev : couleurs "trop
+  fortes") : dans creer_environnement(), env.adjustment_enabled = true avec
+  adjustment_saturation = 0.85 par défaut (adoucit tout le jeu), plus
+  adjustment_brightness/contrast pilotés par le MENU OPTIONS :
+  * Deux HSlider 1..100 ("Luminosité", "Contraste") avec valeur affichée,
+    mapping 0.5 + v/100 (50 = neutre 1.0). Défauts actuels : 50/50.
+    => LE DEV DOIT DONNER SES VALEURS PAR DÉFAUT après test (changer opt_lum/
+    opt_con initiaux + defaults dans load_config si besoin).
+  * applying: appliquer_reglages_visuels() ; sauvegardé dans config.cfg
+    (clés options/luminosite, options/contraste) via save_config/load_config.
+
+4d) MAJ DU 14/09/2026 (build b11)
+----------------------------------
+- MENU OPTIONS À ONGLETS (gauche) : "Graphique" (sliders Luminosité +
+  Contraste 1..100) et "Contrôles" (inversion axe Y + TOUTES les touches
+  configurables). Défauts demandés par le dev : LUMINOSITÉ 30, CONTRASTE 100
+  (var opt_lum/opt_con + defaults load_config).
+- TOUCHES CONFIGURABLES : const ACTIONS_REGLABLES (11 actions) +
+  LIBELLES_TOUCHES (libellés français). Cliquer un cadre puis appuyer une
+  touche (ou clic souris) = rebind via InputMap (capture dans _input, var
+  capture_action ; le héros est gelé pendant la capture ; ESC annule).
+  Sauvé dans config.cfg section [touches] (keycode > 0 = clavier,
+  < 0 = -button_index souris). Les anciennes touches codées en dur V/O/I
+  sont devenues les actions custom camera_view / options_menu / inventaire
+  (créées par ajouter_actions_perso() dans _ready AVANT load_config).
+  R/ESC/1-5 restent codés en dur (système).
+- ANTI-SAUT : le saut culmine à 1,6 m (vel 8, g 20) mais chaque collider a
+  une HAUTEUR LOGIQUE (const HAUT_COLLISION = 2.0) → impossible de sauter
+  par-dessus quoi que ce soit (clôture, caisses, barils...). resoudre_collisions
+  a un param pieds (y du joueur) : obstacle ignoré seulement si les pieds
+  sont au-dessus de hauteur_terrain(x,z) + h (jamais en pratique).
+- ROUTE EN COURBES (fini les carrés !) : lisser_chemin() génère chemin_lisse
+  (Catmull-Rom sur CHEMIN, ~2 points/m). dist_chemin() utilise la courbe.
+  Le terrain n'est PLUS coloré en carrés pour la route ; creer_route() pose
+  un RUBAN (3 bandes : bordures sombres + voie 4,8 m, vertex colors avec
+  jitter, material dédié vertex_color_use_as_albedo) + 1020 PAVÉS
+  (CylinderMesh plats, 3 MultiMesh de 340, nuances pierre).
+- LAMPADAIRES : plus au milieu de la route ! poser_lampadaires_route() les
+  aligne le long de la courbe dans le village (tous les ~13 m, en alternance
+  gauche/droite à 3,4 m de l'axe, évite les bâtiments). creer_lampadaire(x,z).
+- FONTAINE RÉNOVÉE : la "boule qui volait dans le vide" au centre du village
+  était l'ornement de la fontaine (sphère au sommet de la colonne). Ajout
+  d'une vasque haute + orbe d'eau lumineux posé dedans + 4 filets d'eau
+  retombant dans le bassin : on comprend maintenant que c'est une fontaine.
+- Piège GDScript re-vérifié : Vector2 = (x, y) JAMAIS de .z sur un Vector2.
+
+4e) MAJ DU 14/09/2026 (build b12)
+----------------------------------
+- SAUT RÉALISTE (le dev a corrigé ma lecture de b11 : il VOULAIT pouvoir
+  sauter par-dessus ce qui est plus bas que le saut) :
+  * Chaque collider a sa HAUTEUR RÉELLE (caisse 0.75, baril 0.95, clôture
+    route 0.85, clôture village HAUT_CLOTURE=1.0, fontaine 0.95, rocher
+    0.45*s+0.2, PNJ/garde 1.8, lampadaire 3.0, pin/arbre 2.2, maison = sa
+    hauteur b.h, château 5/9/12). Saut du héros = 1,6 m max : tout ce qui
+    est < 1,6 se franchit en sautant, le reste bloque.
+  * PERCHAGE : hauteur_support(x,z,pieds) renvoie le sol le plus haut sous
+    le héros (terrain OU sommet d'un objet sous ses pieds, tolérance 0,25).
+    Gravité : on se pose seulement en RETOMBANT (vel_y <= 0) → on peut
+    rester perché sur les caisses/barils/rochers/muret de la fontaine.
+  * Epsilon 0,05 dans resoudre_collisions : debout SUR un objet, il ne
+    pousse plus vers l'extérieur.
+  * Monstres : pieds = 0 par défaut → ne sautent rien, ne franchissent
+    JAMAIS la clôture du village (protection intacte). Le héros en montée
+    de saut passe au-dessus d'un monstre (skip si pieds > 1,0 au-dessus).
+- URBANISME DU VILLAGE :
+  * MAIRIE (toit bleu) DÉCALÉE de (0,-15) à (-9,-20) : elle était À CHEVAL
+    SUR LA ROUTE (demande du dev : "que rien ne gêne la route").
+  * FONTAINE MIGRÉE de (0,0) à (-9,-11.5) : sur la grande place vide devant
+    la mairie (entre mairie au nord et supermarché au sud). creer_fontaine
+    est maintenant paramétrée (x, z).
+  * Supermarché décalé (-10,-6) -> (-10,-5), barils (-8.0,-3.6)/(-8.6,-4.1)
+    -> (-7.0,-1.4)/(-7.7,-1.9), caisse (-12.6,-4.4) -> (-14.2,-6.0),
+    pin [-9,-13] -> [-14,-14] : pour libérer la place de la fontaine.
+- MENU OPTIONS : onglets GAUCHE stylés en COULEUR (onglet actif = OR,
+  inactif = BLEU NUIT, texte clair) via styliser_onglets()/onglet_style() :
+  le dev les confondait avec les cadres de touches (gris) de droite.
+- PANNEAU QUÊTE RÉDUCTIBLE : petit bouton "—" en haut à droite du panneau
+  (quest_toggle) ; cliqué = le panneau se réduit à sa barre de titre
+  (280x42, bouton "+"), recliqué = il se redéploie (280x96). _toggle_quete().
+- BARRE XP/LVL SUPPRIMÉE (demande du dev : "le truc en bas lvl1 0/100
+  retire-le") : classe BarreXP, var barre_xp et sa création dans creer_hud
+  supprimées. Le système d'XP interne (xp/level/xp_need/gagner_xp) reste.
+
+4f) MAJ DU 14/09/2026 (build b13)
+----------------------------------
+- DÉTECTION AZERTY/QWERTY : est_clavier_azerty() via
+  DisplayServer.keyboard_get_layout_language(keyboard_get_current_layout())
+  ("fr"/"be" = AZERTY). texte_touche() affiche la touche TELLE QU'IMPRIMÉE
+  sur le clavier du joueur : keyboard_get_keycode_from_physical(physical)
+  puis préférence locale (AZERTY → Z/Q/S/D, QWERTY → W/A/S/D). Les binds
+  restent en PHYSICAL keycode (indépendants du layout, doubles binds Z+W,
+  Q+A hérités de project.godot). Label "Clavier détecté : AZERTY/QWERTY"
+  dans Options > Contrôles ; le bandeau d'aide du HUD affiche ZQSD ou WASD.
+- CHÂTEAU POSÉ SUR SA COLLINE (bug visuel signalé : seule la pointe de la
+  colline touchait le centre, le château flottait) : hauteur_terrain() ne
+  fait plus un pic (10 - dc*0.22) mais un PLATEAU plat à h=11 sur dc<=20
+  (smoothstep (32-dc)/12 autour), dc = distance à (0,-78). La plateforme
+  34x20 du château (coins à dc 19,7) repose entièrement dans le plat.
+- MAIRE remis DEVANT sa maison : la mairie a bougé en b12 (-9,-20) mais le
+  PNJ Maire était resté en (0,-11) → déplacé en (-5,8,-15,0), à droite de
+  l'escalier de la mairie. Vendeur déplacé (-10,-2.5)->(-10,-1.5) (devant
+  la porte du supermarché déplacé en b12).
+- FONTAINE déménagée de (-9,-11.5) à (9,15) : sur le grand espace vide au
+  SUD du village (le dev ne la voyait pas au nord). Pin [9,13] -> [14,11]
+  pour lui laisser la place. creer_fontaine(x, z) paramétrée depuis b12.
+
+4g) MAJ DU 15/09/2026 (build b14)
+----------------------------------
+- COLLINE DU CHÂTEAU : pente ÉLARGIE (jupe smoothstep de 32 m, dc 20->52, au
+  lieu de 12) : profil de colline étalée, plus d'effet « gros tas de terre ».
+  Plateau plat h=11 sur dc<=20 inchangé (château toujours posé, coins à 11,0).
+- ROUTE DE MONTAGNE RÉPARÉE : ruban relevé à +0,09 au-dessus du terrain (ne
+  perce plus la pente) ; pavés ALIGNÉS SUR LA NORMALE du terrain (transform
+  Basis construite sur la normale + rotation aléatoire autour de celle-ci) :
+  plus de pavés flottants/enfoncés dans la montée.
+- ANIMATION D'ATTAQUE : le bras droit part DEVANT (levé, rotation.x = +2,6)
+  puis redescend à la verticale (smoothstep), au lieu de partir de l'arrière
+  (demande dev).
+- HUD REORGANISÉ : les 3 barres (vie + or + cailloux) empilées EN HAUT À
+  GAUCHE (hp 84,14 ; or 84,46 ; cailloux 84,80) ; mini-carte collée EN HAUT À
+  DROITE (1118,14) ; panneau de quêtes descendu en (14,118).
+- OPTIONS > GRAPHIQUE : liste déroulante RÉSOLUTION (16 choix : 1024x768 ...
+  1680x1050) : const RESOLUTIONS (Array[Vector2i]), appliquer_resolution()
+  (window_set_size + recentrage écran), choix persisté dans user:// config
+  (clef options/resolution), appliqué au démarrage depuis creer_hud().
+- THÈME DE BASE DES MAISONS (image de référence « fond basique.png ») : murs
+  crépis crème (0.85-0.90), toits terracotta (0.64-0.78 de rouge), mairie en
+  ardoise bleue (0.28,0.42,0.60), COLOMBAGES bruns en façade (poteaux +
+  traverse), fenêtres ÉMISSIVES chaudes (1.0,0.72,0.30, mat_std emissive).
+- FONTAINE aux couleurs de l'image : pierre beige claire (0.82,0.76,0.62),
+  degré extérieur ajouté, eau turquoise (0.13,0.62,0.66), filets blancs.
+- AMBIANCE CHAUDE type image : ciel coucher de soleil (horizon 0.98,0.74,
+  0.48), soleil doré (1.0,0.90,0.74, énergie 1.3), saturation 1.0, herbe vert
+  doré (0.40,0.56,0.22), route/pavés sable chaud.
+- CORRECTIF MANIFESTE (post-b14) : le launcher (2.8.0) calcule le hash des
+  fichiers TEXTE (TEXT_EXTS : .gd .tscn .godot .pyw .py .bat .json .cfg .txt
+  .md .html .css .js .csv) APRÈS NORMALISATION CRLF->LF (file_hash(normalize=
+  is_text)). LES HASHS DU MANIFESTE DOIVENT DONC ÊTRE CALCULÉS NORMALISÉS pour
+  ces extensions (md5 du contenu avec \r\n et \r remplacés par \n), et bruts
+  pour les binaires (.glb...). Une régénération raw avait cassé 4 entrées CRLF
+  (build_launcher.bat, glb/generer_tout.py, glb/viewer_perso.py,
+  glb/_viewer.html) => erreur launcher « hash ne correspond pas apres
+  telechargement ». Régénéré avec la méthode exacte du launcher.
+
+4h) MAJ DU 16/09/2026 (build b15)
+----------------------------------
+- MARTEAU : manche épais visible (r 0.05, L 0.85) + tête au bout + pommeau
+  (avant : manche filiforme = « pas de manche »).
+- MONSTRES : s'arrêtent à 1.5 m (ndir = ZERO si dist < 1.5) et attaquent à
+  1.6 m : plus de monstre dans les jambes du joueur.
+- GARDES : hallebarde refaite (Node3D « halle » incliné -14°, manche clair
+  r 0.05, fer + croc + talon) => entière visible ; quand le garde frappe il
+  FEND vers le monstre (p.lunge 0.4 s, offset sinusoïdal 0.7 m vers la cible
+  puis retour à p.bx/p.bz).
+- TOITS : 4 rangs de TUILES inclinés par pan (alternance clair/foncé) +
+  faîtage ; MURS : soubassement pierre + panneaux crépi clair/ombré + appuis
+  de fenêtre (fini l'effet « gros cube uni ») ; AUVENTS supprimés.
+- FONTAINE : orbe émissif SUPPRIMÉ (« boule qui vole ») -> pinacle pierre
+  (cyl + cône) ; filets d'eau recollés au bord de la vasque (r 0.88).
+- CHÂTEAU : porte sud BLOQUÉE (col_boite(0, -69, 4.4, 1.6, 5.0)) : on ne peut
+  plus entrer dedans.
+- ARBRES : troncs épaissis/rehaussés (pin r 0.24 h 2.0, rond r 0.26 h 2.6),
+  feuillage remonté ; arbres ronds (-12,2)/(12,2) -> (-14,7)/(14,7) (ils
+  trempaient dans les maisons).
+- HUD ANCRÉ (anchors) : hotbar PRESET_CENTER_BOTTOM, mini-carte TOP_RIGHT,
+  bouton options BOTTOM_RIGHT, panel options + info CENTER => à TOUTES les
+  résolutions les cadres restent collés aux bords (bug 1600x1200 corrigé).
+- AIDE DES TOUCHES : grande ligne du bas du HUD SUPPRIMÉE ; recopiée en
+  Label 3 lignes dans Options > Contrôles.
+- glb/ SUPPRIMÉ du dépôt + 7 lignes retirées du manifeste (demande du dev).
+
+4i) MAJ DU 16/09/2026 (build b16)
+----------------------------------
+- CORRECTIF PARSE GDScript (erreur dev ligne 1048) : dans la boucle des
+  tuiles, « var zm := side * tm * (b.d + 0.5) / 2.0 » échouait (« Cannot
+  infer the type ») car side vient d'un tableau NON typé ([-1.0, 1.0]) et
+  b.d / b.roof d'un Dictionary => Variant. RÈGLE : toute arithmétique ou
+  ternaire alimenté par une variable de boucle non typée ou un champ de
+  Dictionary doit être TYPÉ EXPLICITEMENT (« var zm: float = ... »,
+  « var tc: Color = ... »). zm/ym/tc typés ; le jeu reparse.
+
+4j) MAJ DU 16/09/2026 (build b17)
+----------------------------------
+- TUILES : signe de rotation corrigé (Vector3(side * ang, 0, 0)) : elles
+  épousent la pente au lieu de piquer vers le haut.
+- PNJ DEVANT LEUR PORTE : Vendeur (-10,-2.1) supermarché, Forgeron
+  (-10,5.65) armurerie, Marchand (10,-3.35) vêtements, Maire (-9,-14.6)
+  devant l'escalier de la mairie (positions = porte + 0.9 m).
+- MANCHES VISIBLES : marteau manche r 0.075 L 1.0 bois clair + pommeau ;
+  hallebarde manche r 0.075 L 2.4 clair ; troncs d'arbres r 0.34/0.36 brun
+  clair, feuillage remonté (cônes 3.3/4.4/5.4, facette 4.2).
+- HUD : ancres EXPLICITES anchor_*/offset_* (les set_anchors_preset+position
+  du b15 ne tenaient pas : hotbar retrouvée en haut à gauche) : hotbar
+  offsets (-156,-68,156,-12) sur ancres (0.5,1)-(0.5,1) = bas centre ;
+  mini-carte (1,0)-(1,0) offsets (-162,14,-14,162) ; bouton options
+  (1,1)-(1,1) ; info et panel options centrés (0.5).
+- CAMOUFLAGE MAISONS : chaque bâtiment a une racine Node3D (broot, pièces
+  captées via _parent_capture dans _box/_prism, matériau d'origine gardé en
+  meta "mat"). maj_camouflage() (appelé après update_camera) teste le
+  segment caméra->joueur (10 échantillons) contre l'emprise XZ Rect2 du
+  bâtiment ; si traversé => matériaux remplacés par mat_fade() (duplicate +
+  TRANSPARENCY_ALPHA, alpha 0.28, émission atténuée), sinon restaurés.
+  La maison entre la caméra et le joueur devient translucide.
+
+4k) MAJ DU 16/09/2026 (build b18)
+----------------------------------
+- MANCHES VRAIMENT VISIBLES : le manche vertical le long du torse était
+  masqué par la silhouette du corps. Marteau : marteau.rotation.z = -28°
+  (porté de biais vers l'extérieur), manche r 0.09 L 1.1 bois très clair
+  (0.82,0.64,0.36). Hallebarde : halle.position (0.55,0.95,0.05), rot z
+  -25°, manche r 0.09 L 2.5 clair (0.85,0.66,0.38).
+- PNJ DÉCALÉS SUR LE CÔTÉ de la porte (le dev implémentera l'entrée dans
+  les bâtiments plus tard) : Vendeur (-8.25,-2.1), Forgeron (-8.6,5.65),
+  Marchand (11.4,-3.35), Maire (-6.0,-15.0) (à côté de l'escalier).
+- TUILES TEXTURÉES : chaque rang = 6 carreaux avec joints (largeur 86 %) et
+  damier clair/foncé (ti+j) : fini l'effet « traits horizontaux ».
+- CAMOUFLAGE ÉTENDU : liste camo_objs = bâtiments (emprise XZ élargie de
+  +0.8 pour les débords de toit : un bout de toit resté entre la caméra et
+  le joueur garde le bâtiment translucide) + ARBRES (pins rx=rz=1.5*s,
+  ronds 1.9). 14 échantillons sur le segment caméra->joueur. meta "mat"
+  posée dans TOUS les helpers (_box _cyl _cone->via _cyl _sph _facette
+  _caps _prism) pour restaurer le matériau d'origine au dé-fondu.
+
+4l) MAJ DU 16/09/2026 (build b19)
+----------------------------------
+- CORRECTIF PARSE (erreur dev ligne 1105) : « var lw := (b.w + 0.55) / ... »
+  et « var xm := ... » typés explicitement (float), « var r: Rect2 » dans
+  maj_camouflage — même piège Variant/Dictionary que b16.
+- MANCHES = PROLONGEMENT DU BRAS (demande dev) : plus de port de biais.
+  Marteau : manche vertical pris DANS le poing (sommet dans la main, tête
+  au bout en bas), marteau.rotation.z = 0 ; c'est le BRAS droit qui est
+  écarté du corps (bras_droit.rotation.z = -10°, l'anim marche/attaque ne
+  touche que rotation.x) => le manche se découpe sur le décor tout en
+  restant dans l'axe du bras. Hallebarde : verticale (rot z 0), tenue dans
+  la main du garde (x 0.34, origine y 1.25, talon au sol).
+
+4m) MAJ DU 16/09/2026 (build b20)
+----------------------------------
+- CAMOUFLAGE FIABILISÉ (bug mairie/maison : le toit restait solide alors
+  qu'il gênait) : 40 échantillons sur le segment caméra->joueur (pas 14) et
+  suppression du garde « caméra hors de la zone » : si la caméra est DANS
+  la zone élargie (dos au bâtiment) et le joueur dehors, le bâtiment passe
+  fantôme quand même. Seul cas sans fondu : caméra ET joueur dans la zone
+  (on longe le mur de près).
+- BRAS DROIT REDRESSÉ (le dev veut un bras droit) : rotation.z -10°
+  supprimée. Manche du marteau DANS le poing : cylindre r 0.11 bois très
+  clair (0.86,0.70,0.44) + BAGUE sombre de contraste sous le poing ; tête
+  au bout en bas. Hallebarde : manche r 0.11 clair + bague sombre.
+- TRONCS TEXTURÉS « écorce » : cylindre brun + 4 nervures verticales
+  sombres autour + cône de collet à la base (pins et arbres ronds) : le
+  tronc se lit comme un tronc, pas comme un cylindre nu.
+
+4n) MAJ DU 16/09/2026 (build b21)
+----------------------------------
+- CAUSE RACINE TROUVÉE : le CylinderMesh NATIF de Godot 4.7.2 ne s'affiche
+  PAS chez le dev => manches, troncs, hallebarde, fontaine (« boule qui
+  vole » = seule la sphère s'affichait), pavés et PIÈCES D'OR (invisibles =>
+  « impossibles à ramasser ») étaient absents, et les 4 nervures d'écorce
+  apparaissaient seules (« 4 piquets avec du vide au centre »).
+  CORRECTIF : make_tube(r_bot, r_top, h, seg) construit le tube en ArrayMesh
+  via mesh_tris/SurfaceTool (mêmes primitives que le terrain, qui s'affiche)
+  ; _cyl l'utilise (cache) ; les pavés MultiMesh aussi. Plus AUCUN
+  CylinderMesh dans le jeu. CapsuleMesh/PrismMesh/SphereMesh OK chez lui.
+- CLÔTURE INFRANCHISSABLE AUX COUPS : cloture_entre(a, b) = appartenance
+  au village différente + milieu à >3.4 m de la route (portails ouverts
+  restent combatables). Attaque joueur portée 3.5 -> 2.4 ET bloquée à
+  travers la clôture ; attaque des monstres bloquée pareil. Fini l'abri
+  derrière la barrière pour tuer sans risque.
+- PIÈCES : rayon 0.14->0.18, épaisseur 0.05, ramassage 3.0->3.5.
+
+4o) MAJ DU 16/09/2026 (build b22)
+----------------------------------
+- TUBES translucides corrigés : les faces latérales de make_tube étaient
+  émises dans le mauvais sens (culled => on voyait à travers le manche).
+  Ordre des triangles latéraux inversé (b0,t1,t0 / b0,b1,t1).
+- SAPINS : ceux SUR la route retirés ([0,15], [0,-15], [0,-50], [5,29]) ;
+  en ville 5 MAXI bien espacés ([-14,-14], [14,-9], [-17,7], [14,11],
+  [-9,13]) + 2 arbres ronds ([-14,7], [14,7]) ; forêt extérieure gardée.
+- TRONCS montent jusqu'au feuillage : pin tronc h 2.6 (sommet 2.6 dans le
+  cône 2.1), rond h 3.6 (sommet 3.6 dans la facette 3.2) ; nervures
+  allongées en conséquence.
+- ÉPAULES : sphères x ±0.33 (effleurent le torse 0.22 au lieu d'y entrer) ;
+  pivots de bras x ±0.31 => mains et arme écartées du corps.
+- MARTEAU : manche commence JUSTE SOUS la main (local -0.05..-0.45, bague
+  à -0.08) ; tête DIVISÉE PAR 2 (0.16/0.16/0.22) et remontée à la cheville
+  (local -0.53 => ~0.19 m du sol, ne touche plus le sol).
+
+4p) MAJ DU 16/09/2026 (build b23)
+----------------------------------
+- FONTAINE : le HAUT est maintenant solide (col_cercle x,z, r 0.55, h 4.4) :
+  le dev grimpait sur le bassin et traversait colonne/vasque haute/jet.
+  Le bas était déjà solide (bassin r 2.6 h 0.95).
+- MANCHES affinés (circonférence /3, « c'était une bûche ») : marteau r
+  0.032/0.028 (bague 0.045), hallebarde du garde r 0.04/0.035 (bague
+  0.055).
+- PIÈCES D'OR plus rares : 6 -> 3 (respawn 60 s inchangé). Les « petites
+  boules jaunes » que le dev voyait = LUCIOLES de nuit (décor, sphères
+  émissives r 0.045) — expliqué, aucun changement.
+- PANCARTES EN BOIS au-dessus des portes : dans creer_ville (liste data
+  avec champ "n") + château. Plaque sombre 2 couches + Label3D (font 64,
+  pixel_size 0.0035 village / 0.0075 château, modulate brun foncé).
+  Texte : NOMS.get(b.n) -> SUPERMARCHÉ, ARMURERIE, VÊTEMENTS, AUBERGE,
+  MAIRIE, MAISON ; château = "CHÂTEAU" au-dessus de la porte sud (z +9).
+  ATTENTION : pas de func maison() ! Les bâtiments sont construits dans
+  la boucle de creer_ville() sur data[] (x,z,w,h,d,c,n,roof).
+
+4q) MAJ DU 16/09/2026 (build b24)
+----------------------------------
+- « Petites boules jaunes » = FLEURS (MultiMesh SphereMesh r 0.09 jaunes +
+  blanches) — PAS des lucioles (il n'y en a jamais eu). Bloc Fleurs
+  SUPPRIMÉ de creer_props.
+- CHÂTEAU : parement de PIERRES (blocs 2.6x0.55 en damier PIERRE
+  lightened/darkened) sur faces EXTÉRIEURES visibles : mur nord (face -z),
+  2 segments sud (face +z), est/ouest (faces ±x), donjon (face +z). ~110
+  boîtes, côté cour non fait (inaccessible, porte bloquée).
+- PIEDS DANS LE SOL SUR LA ROUTE : hauteur_support() ajoute +0.10
+  (lerp sur 0.6 m) quand dist_chemin < 2.9 = sommet des pavés.
+- HUD GAUCHE réaligné sur l'encart de quête (x=14 partout) : portrait
+  (14,12), hp_bar (14,82), pill_or (14,114), pill_cailloux (14,150),
+  quest_panel (14,188).
+- QUÊTES : bouton « ✕ » à côté du « — » (quest_close -> _fermer_quete :
+  masque tout le panneau, var quest_ferme). Touche d'affichage/masquage :
+  action "quest_panel" (project.godot) = position PHYSIQUE de Q
+  (physical_keycode 81) -> QWERTY : touche Q ; AZERTY : touche imprimée A
+  (car le Q imprimé = move_left en ZQSD, conflit). Réglable dans Options >
+  Contrôles (ACTIONS_REGLABLES + LIBELLES_TOUCHES mis à jour) ; texte
+  d'aide affiche texte_touche("quest_panel").
+
+4r) MAJ DU 16/09/2026 (build b25)
+----------------------------------
+- CHÂTEAU : plateforme SUPPRIMÉE (c'était « le grand trait horizontal en
+  bas ») ; enceinte/tours/donjon descendent jusqu'au sol (murs h 6,
+  tours h hh+1, donjon h 11) ; porte+linteau descendus (1.9/3.9) ;
+  collisions montées en conséquence (6/10/13/11).
+- MURS EN BRIQUES APPAREILLÉES (demande photo jointe : tour en briques
+  décalées) : func mur_briques(p0, udir, ndir, length, htop, base, seed,
+  parent) = UN maillage ArrayMesh coloré par face (rangées décalées
+  bw 1.6 / br 0.55, joints 0.12/0.14 = mur derrière, 3 teintes aléatoires,
+  quads saillants ndir*0.07, vertex_color_use_as_albedo). Remplace le
+  damier b24. Faces : nord, 2 segments sud, est, ouest, donjon avant.
+  Règle de winding : udir = droite écran de la face (+Z=>+x, -Z=>-x,
+  +X=>-z, -X=>+z), tris (a,b,c),(a,c,d).
+- HUD : barres HP/or/cailloux EN HAUT à gauche (14,14)/(14,46)/(14,80),
+  encart quête revenu à (14,118) ; portrait ancré en BAS à gauche
+  (anchor_top=1, offsets -76/-14).
+- PNJ QUI TRAVAILLENT : jambes + bras articulés (Node3D pivots) ;
+  Forgeron = marteau en main + enclume, frappe cyclique (update_pnj) ;
+  Vendeur = étal + 4 fruits, bras qui présentent ; Maire = écharpe +
+  parchemin, se tourne lentement ; Marchand = sac à dos + cageot,
+  trottine. pnj_items[] + update_pnj(delta) appelé dans _process.
+
+4s) MAJ DU 16/09/2026 (build b26)
+----------------------------------
+- TEXTURE DU CHÂTEAU = photo de référence (tour en briques) : palette
+  terracotta. Dans creer_chateau : BRIQUE := Color(0.76,0.42,0.28) pour
+  briques/créneaux/tours/donjon ; PIERRE := Color(0.88,0.84,0.76) =
+  joints crème (murs derrière les briques) + encadrement de porte.
+  mur_briques passe en 4 nuances (base, +0.10, -0.08, -0.16).
+- PORTE SUD : encadrement crème comme la photo (2 piédroits 0.7x3.6 +
+  bandeau arche 5.4x0.8) + linteau bois descendu à 3.75 ; 4 meurtrières
+  sombres (0.30x1.0) en saillie z 9.90 sur les segments sud.
+- PNJ validés par le dev (b25) : ne plus y toucher sauf demande.
+
+4t) MAJ DU 16/09/2026 (build b27)
+----------------------------------
+- ROUTE : dernier point CHEMIN (0,-72) -> (0,-64) : la route s'arrête
+  AVANT l'enceinte du château (face sud extérieure = -68.2), elle ne
+  traverse plus la cour.
+- CHÂTEAU = MUR DE PIERRE GRISE (le dev veut des briques GRISES à joints,
+  pas terracotta, pas le motif hexagonal de la route) : BRIQUE :=
+  Color(0.52,0.52,0.55), PIERRE (mortier/joints) := Color(0.66,0.65,0.62),
+  4 nuances (base, +0.12, -0.10, -0.22). Encadrement de porte =
+  PIERRE.darkened(0.12) — PLUS RIEN DE BLANC/CRÈME.
+- 14 faces mur_briques : 6 extérieures (b25/b26) + 8 INTÉRIEURES cour
+  (nord int z-8.2, sud int z8.2 x2, est/ouest int, donjon côtés x±4.5 et
+  arrière z-7.5). Créneaux/tours/donjon = BRIQUE grise.
+
+4u) MAJ DU 16/09/2026 (build b28)
+----------------------------------
+- ROUTE : dernier point CHEMIN (0,-67.5) : elle s'arrête JUSTE SOUS la
+  porte sud du château (sous la pancarte CHÂTEAU), face extérieure du
+  mur = -68.2.
+- COURSE : cadence de marche proportionnelle à la vitesse — sprint :
+  player_walk_time += delta*14 (vs 9) et amplitude swing 0.78 (vs 0.55) :
+  bras/jambes bougent vite en courant.
+- MORT : mourir() couche le perso (player_node.rotation.z = 90°, +0.2 en
+  y pour ne pas s'enfoncer) + mort_label (Label centré plein écran,
+  font 30 rouge contour noir) « 💀 Vous êtes mort — appuie sur R pour
+  renaître » PERSISTANT jusqu'à renaitre() (qui remet rotation 0 et
+  masque le label). Château gris b27 accepté (« on dira que ça ira »).
+
+4v) MAJ DU 16/09/2026 (build b29)
+----------------------------------
+- FONTAINE vasque haute : le col r0.55 h4.4 ne couvrait QUE la colonne ;
+  l'anneau r 0.55..1.1 (vasque haute y 2.14) était traversable. Ajout
+  col_cercle(x, z, 1.15, 2.4) : toute la partie haute est solide (on peut
+  encore se percher dessus en sautant, hauteur_support).
+- VILLAGE SANS RAMASSABLES : cailloux ET pièces ressamplés hors
+  VILLAGE_R+2 (while length < VILLAGE_R+2) dans creer_objets.
+- ROUTE DROITE sur la porte : fin CHEMIN = (0.5,-56), (0,-62), (0,-67.8)
+  (3 points alignés => segment final droit, bout perpendiculaire qui
+  touche le pied du mur sud -68.2 sur toute la largeur : plus de gazon
+  en biais entre porte et route).
+- FORGERON : enclume déplacée SOUS le marteau (x 0.24 = bras droit,
+  z 0.65) et cycle de frappe recalé : angle de frappe -1.15 rad => le
+  marteau tombe PILE sur le sommet de l'enclume (vérifié géométriquement :
+  bout du marteau (0.24, 0.65, 0.63) vs sommet enclume y 0.67).
+
+4w) MAJ DU 16/09/2026 (build b30)
+----------------------------------
+- MARCHES MAIRIE inversées corrigées : y = 0.26 - step*0.1 (la plus haute
+  contre la porte, descend vers l'extérieur).
+- FONTAINE : bague col_cercle(x,z,1.15, 2.9) = sommet de la vasque haute
+  (eau 2.85) : plus AUCUN passage à travers vasque/filets/pinacle ; et on
+  ne peut plus se percher dessus (apex saut 2.55 < 2.9-0.25).
+- ROUTE 100% DÉGAGÉE : touffes (while dist_chemin<3.2), rochers (<4.0),
+  cailloux et pièces (<3.0) ressamplés hors du ruban de route.
+- PNJ = MÊME STYLE QUE LE JOUEUR : tête BOÎTE avec 2 yeux noirs, torse
+  boîte + ceinture, épaules boules, bras/jambes capsules + bottes boîte ;
+  coiffes et habits par métier : Forgeron bandana rouge + barbe + tablier
+  de cuir ; Vendeur béret bleu + panneau clair ; Maire haut-de-forme noir
+  + cheveux blancs + écharpe ; Marchand capuche + sacoche. Enclume posée
+  sur BILLOT (souche 0.5 + enclume 0.72 + table 0.86) = hauteur de frappe
+  du marteau (pivot bras 1.12, angle frappe -1.23 rad). Colliders ajoutés :
+  étal Vendeur, enclume, cageot Marchand (on ne traverse plus).
+
+4x) MAJ DU 16/09/2026 (build b31)
+----------------------------------
+- BUG TROUVÉ (fontaine « toujours pas solide ») : les colliders « haut de
+  fontaine » de b23/b29/b30 étaient PLACÉS DANS creer_pin() (le rep de
+  b23 avait remplacé le collider du TRONC de pin, premier match du
+  fichier) ! => la fontaine n'avait QUE le bassin, et chaque pin avait un
+  mur invisible r1.15 h2.9. Corrigé : creer_pin retrouve col_cercle(x, z,
+  0.4, 2.2) ; creer_fontaine reçoit enfin col_cercle(x, z, 0.6, 4.0)
+  (cylindre central colonne+pinacle) + col_cercle(x, z, 1.2, 3.2)
+  (plateau du haut vasque+eau), spéc exacte du dev.
+- PNJ : bassin boîte (0.36,0.20,0.24) à y 0.66 : les jambes touchent le
+  torse (trou de 10 cm comblé — vu au supermarché/armurerie/forgeron).
+- GARDES lifting style joueur + ARMURE : jambes articulées jambards +
+  solerets, bassin, cuirasse acier + plastron clair + baudrier rouge,
+  spallières boules, bras brassards + mains peau, tête boîte avec yeux +
+  casque + visière + cimier rouge ; label « Garde » monté à 2.05.
+  Hallebarde inchangée (manche fin b23).
+
+4y) MAJ DU 16/09/2026 (build b32)
+----------------------------------
+- LAUNCHER : le jeu s'ouvrait sur l'écran PRIMAIRE quel que soit l'écran
+  du launcher. launch(path, pos) passe maintenant --position x,y (coords
+  virtuelles multi-écrans) = position de la fenêtre tkinter (winfo_x/y)
+  au moment de play(). Le jeu démarre sur le même écran que le launcher.
+- ÉTIQUETTES PNJ (Forgeron/Vendeur/Marchand) SUPPRIMÉES : les Label3D
+  traversaient les têtes. Seul le Maire garde la sienne, à y 1.95
+  (au-dessus du haut-de-forme).
+- GARDES : PATROUILLE à pied le long du portail (offset sinus ±1.6 m sur
+  la tangente de l'anneau du village, lerp doux, y = terrain) + balancier
+  des jambes (jg/jd nommés dans creer_garde, rotation.x sin) ; REGARD :
+  rotation.y = atan2 vers le monstre frappé pendant p.face 0.8 s (sinon
+  vers l'extérieur du village). Champs portes += pt/po/face.
+
+4z) MAJ DU 16/09/2026 (build b33)
+----------------------------------
+- GARDES : patrouille latérale SUPPRIMÉE (« effet crabe » : ils marchaient
+  de gauche à droite en regardant dehors). Nouveau update_gardes : le
+  garde NE BOUGE QUE (a) pour marcher vers une cible DANS SA ZONE (2.5 m
+  autour de SON portail, vitesse 2.6, s'arrête à 1.5 m, frappe 25 dg/0.8 s)
+  ou (b) pour REVENIR à son poste (2.0 m/s). Regard = cible sinon
+  extérieur ; jambes balancent seulement en marche. Champs lunge/tx/tz/
+  face désormais inutilisés (dict portes inchangé).
+- PORTES DE VILLE ×2 PLUS HAUTES : poteaux 5.2 m (0.30²), chapeaux 5.26,
+  linteau 5.2, lanterne 4.86 ; PANCARTE AU MILIEU (plaque 2 couches
+  2.6x0.7) avec le NOM DE LA VILLE = « LIBREVIES » (titre du jeu), deux
+  Label3D dos à dos (yaw radial ±PI) lisibles dedans et dehors.
+- MULTI-ÉCRANS (6 écrans chez le dev) : le launcher écrit sa position de
+  fenêtre dans GAME_DIR/screen_pref.txt ; main.gd placer_ecran_launcher()
+  au _ready : choisit l'écran DONT LE RECT contient ce point
+  (window_set_current_screen) puis window_set_position. Renforce le
+  --position de b32. Fichier runtime, pas au manifest.
+
+4aa) MAJ DU 16/09/2026 (build b34)
+-----------------------------------
+- ÉTIQUETTE « Garde » AU-DESSUS DU CASQUE SUPPRIMÉE.
+- GARDES OVERPOWER (demande dev) : ONE SHOT — cible.pv = 0 direct à chaque
+  touche (floater « -999 »). C'est le boss des boss, il protège bien.
+- MULTI-ÉCRANS (dev : 6 écrans, dispos 1-3-2 / 5-6-4, principal = 6, le
+  jeu partait sur 1) : CAUSE PROBABLE = scalings DPI différents par
+  écran => tkinter (DPI-unaware) rendait des coords virtualisées.
+  FIX launcher : SetProcessDpiAwareness(2) (fallback SetProcessDPIAware)
+  AVANT la création Tk => winfo_x/y en pixels physiques réels.
+  FIX jeu : placer_ecran_launcher() mémorise _place_ecran_pos et
+  _apply_ecran() (choix de l'écran par rect + window_set_position) est
+  RÉ-APPLIQUÉ chaque frame pendant 45 frames (~0.75 s) au démarrage
+  (contre les resets de fenêtre tardifs).
+  RAPPEL ABSOLU : ces correctifs vivent dans launcher.pyw — le dev DOIT
+  recopier launcher.pyw ou reconstruire LibreVies.exe (build_launcher.bat),
+  la maj auto du jeu ne met PAS à jour le launcher.
+
+4ab) MAJ DU 16/09/2026 (build b35) — RÉPARATION DU LAUNCHER DU DEV
+------------------------------------------------------------------
+- DIAGNOSTIC (le dev a collé son launcher.pyw local) : son launcher est
+  ANCIEN (pré-b32 : pas de screen_pref.txt, pas de --position, pas de DPI
+  awareness). Comme apply_updates saute le fichier nommé "launcher.pyw",
+  AUCUN correctif écran ne pouvait jamais l'atteindre => rien ne marchait.
+  Son contenu reste INTÉGRALEMENT conservé : le launcher du dépôt est un
+  SUPERSET du sien (vérifié par grep, toutes ses UI/fonctions présentes).
+- CANAL DE RÉPARATION : version_url.json contient désormais
+  "launcher_update.pyw" (= copie exacte de launcher.pyw). L'ancien launcher
+  le télécharge (le saut ne matche QUE le nom "launcher.pyw"). Au démarrage
+  du jeu, _reparer_launcher() recopie launcher_update.pyw par-dessus
+  launcher.pyw (le launcher est déjà fermé ; res:// est inscriptible en
+  --path non exporté ; garde : taille > 2000 et contenu différent).
+  => Le launcher du dev s'auto-répare au 1er lancement du jeu ; au 2e
+  lancement il écrit screen_pref.txt et l'écran est bon.
+- FILET POUR LE 1er LANCEMENT (vieux launcher, pas de screen_pref.txt) :
+  _restituer_position_fenetre() : (1) l'écran de la souris au démarrage =
+  l'écran où le dev a cliqué JOUER dans le launcher => window_set_current_
+  screen(cet écran) + position centrée sur le clic ; (2) sinon dernière
+  position mémorisée user://winpos.json. _process sauvegarde la position
+  de la fenêtre dans winpos.json toutes les ~2 s si elle a changé
+  (_winpos_last/_winpos_t).
+- LibreVies.exe (binaire figé) est IRREPARABLE à distance : si le dev
+  utilise l'exe, il doit le reconstruire UNE fois (build_launcher.bat)
+  après la maj, ou utiliser launcher.pyw.
+- Manifeste : 7 entrées (ajout launcher_update.pyw). main.gd b35.
+
+4ac) MAJ DU 16/09/2026 (b36 — LAUNCHER SEUL, jeu inchangé)
+----------------------------------------------------------
+- Dev : il lance TOUJOURS par launcher.pyw (jamais l'exe) => le canal
+  launcher_update.pyw de b35 suffit à réparer sa machine, pas besoin de
+  rebuild exe. Demande : corriger le launcher du repo pour que JOUER ouvre
+  le jeu sur le MÊME écran, SANS rien changer d'autre.
+- Audit : play() (ligne ~630) est l'UNIQUE point de lancement ; il écrit
+  déjà screen_pref.txt + passe --position (b32/b33) et SetProcessDpiAware-
+  ness(2) est déjà en tête de fichier (b34). Rien d'autre touché.
+- SEUL AJOUT (b36) : filet dans play() — si winfo_x()/winfo_y() lève une
+  exception (pos None), on prend winfo_pointerx()/winfo_pointery() (la
+  souris est sur le bouton JOUER donc sur l'écran du launcher) =>
+  screen_pref.txt et --position sont TOUJOURS renseignés.
+- launcher_update.pyw recopié à l'identique (canal de réparation b35).
+- main.gd/main.tscn/project.godot/build_launcher.bat INCHANGÉS (hashs
+  identiques à b35). Hashs launcher.pyw + launcher_update.pyw régénérés.
+
+4ad) MAJ DU 16/09/2026 (build b37) — RETOUR ARRIÈRE ÉCRAN (VÉRITÉ DU DEV)
+-------------------------------------------------------------------------
+- FAIT CRUCIAL (constaté par le dev sur sa machine, 6 écrans) : son VIEUX
+  launcher local — celui qui fait simplement subprocess.Popen([godot,
+  "--path", GAME_DIR]) sans rien d'autre — ouvrait le jeu SUR LE MÊME ÉCRAN
+  que le launcher. C'est le comportement NATUREL de Windows (nouvelle
+  fenêtre sur l'écran de la fenêtre active / de la souris).
+- NOS « CORRECTIFS » b32/b33/b34/b36 (--position X,Y + screen_pref.txt +
+  SetProcessDpiAwareness + filet souris) CASSAIENT ce comportement :
+  coordonnées tkinter faussées par les scalings DPI différents => le jeu
+  forcé sur le MAUVAIS écran (et re-forcé 45 frames par _apply_ecran).
+- b37 : TOUT ce système est SUPPRIMÉ, retour à la logique d'avant :
+  * launcher.pyw : bloc DPI retiré ; launch(path) simple (plus de pos) ;
+    play() = launch(self.godot); self.destroy(). Rien d'autre touché.
+  * main.gd : placer_ecran_launcher/_apply_ecran/_place_ecran_*,
+    _reparer_launcher/_restituer_position_fenetre/_winpos_*/winpos.json
+    SUPPRIMÉS (appels + fonctions + vars + blocs _process). BUILD b37.
+  * launcher_update.pyw SUPPRIMÉ du repo ET du manifeste (demande dev :
+    « ça sert à rien, on garde la logique qu'on avait avant »). Le canal
+    de réparation b35 n'a plus lieu d'être — le launcher du repo redevient
+    équivalent (pour le lancement) à celui du dev.
+  * Manifeste : 6 entrées. Hashs régénérés (main.gd, launcher.pyw,
+    resumer.txt changés ; les 3 autres identiques).
+- INTERDICTION de réintroduire CÔTÉ LAUNCHER : --position, screen_pref.txt,
+  SetProcessDpiAwareness. Le launcher ne passe RIEN à Godot. (Côté jeu,
+  voir 4ae : la détection écran de la souris est la méthode VALIDÉE.)
+
+4ae) MAJ DU 16/09/2026 (build b38) — ÉCRAN DE LA SOURIS (IDÉE DU DEV)
+---------------------------------------------------------------------
+- Constat dev : même avec le retour b37 (lancement simple), le jeu ne
+  s'ouvre PAS toujours sur l'écran du launcher (Windows/Godot le met où il
+  veut). IDÉE DU DEV, IMPLÉMENTÉE : détecter l'écran où est la souris du
+  joueur au démarrage (elle est sur le bouton JOUER du launcher) et y
+  placer le jeu.
+- Pourquoi côté JEU et pas launcher : Godot est DPI-aware =>
+  DisplayServer.mouse_get_position() et screen_get_position/size sont des
+  coordonnées PHYSIQUES cohérentes entre elles, même avec des scalings
+  différents par écran. Tkinter dans le launcher renvoie des coordonnées
+  virtualisées => c'est ce qui faisait échouer --position/screen_pref.
+- main.gd b38 : _detecter_ecran_souris() appelé en TOUT DÉBUT de _ready :
+  trouve l'écran contenant la souris, calcule la position fenêtre centrée
+  sur la souris et CLAMPÉE dans l'écran (clampi), puis
+  _placer_sur_ecran_souris() = window_set_current_screen + window_set_
+  position, RÉ-APPLIQUÉ 45 frames (~0.75 s) dans _process (_ecran_frames)
+  contre les resets tardifs de fenêtre. Vars : _ecran_souris, _ecran_pos.
+- Launcher INCHANGÉ (b37) : il ne passe rien ; le dev garde son launcher
+  local qui téléchargera simplement main.gd b38.
+- Manifeste : 6 entrées, seul le hash main.gd change.
+
+4af) MAJ DU 16/09/2026 (build b39) — JEU AU MILIEU DE L'ÉCRAN
+-------------------------------------------------------------
+- b38 VALIDÉ par le dev (« c'est ok ») : la détection de l'écran de la
+  souris côté jeu fonctionne. Seule demande en plus : que le jeu démarre
+  AU MILIEU de cet écran (et pas centré sur le point de la souris).
+- main.gd b39 : dans _detecter_ecran_souris(), la position calculée est
+  désormais sp2 + (ss2 - win) / 2 (milieu de l'écran, entier), avec repli
+  sp2 si l'écran est plus petit que la fenêtre. La souris ne sert PLUS
+  qu'à CHOISIR l'écran. clampi/demi supprimés. Le reste identique
+  (45 frames de ré-application, launcher inchangé b37).
+- Manifeste : 6 entrées, seul le hash main.gd change (+ resumer).
+- INCIDENT : le sandbox git s'est réinitialisé DEUX fois pendant cette
+  session (HEAD revenu à 921b0d8) — procédure de réparation rodée :
+  sauver les fichiers modifiés dans /tmp, git fetch, git reset --hard
+  FETCH_HEAD, recopier les fichiers, vérifier git diff AVANT commit,
+  ls-remote avant push. Jamais de force-push.
+
+4ag) MAJ DU 17/09/2026 (build b40) — GRANDE REFONTE GRAPHIQUE (IMAGE DE RÉF.)
+------------------------------------------------------------------------------
+Le dev a fourni une image low-poly « coucher de soleil » (maisons à tuiles,
+tour conique, palissade à pointes, garde à la lance, rat/araignée facettés)
+et veut la MÊME qualité. Tout est procédural (main.gd), colliders/IA/règles
+INTACTS. Changements :
+- MAISONS : pente de toit 0.42→0.55 ; tuiles 4×6 → 6×8 rangs COLS DÉCALÉS
+  en quinconce (bardeaux) ; porte CINTRÉE (demi-cylindre axe Z, rot X 90°) ;
+  VOLETS verts ; tour d'angle RONDE + cône orange + boule dorée sur
+  Supermarché/Auberge/Armurerie/Vêtements (pièces parentées à broot pour
+  le camouflage).
+- CLÔTURE VILLAGE : poteaux fermiers SUPPRIMÉS → PALISSADE SERRÉE À POINTES
+  make_piquet() (planche 1.05 + pointe 1.32) en UN MultiMesh (~640 instances,
+  1 draw call, trous où passe la route, hauteurs/aléas via RandomNumberGenerator
+  seed 4242, material cull DISABLED). Traverses et portails b33 conservés.
+- RAT : gris chaud, gueule OUVERTE (mandibule + 2 dents blanches), oreilles
+  roses intérieures, queue rose en S (3 segments). ARAIGNÉE : genoux LEVÉS
+  (fémur -38° / tibia +52°), crocs, corps plus gros.
+- GARDE : hallebarde → LANCE (barre transversale + fer losange 2 cônes),
+  jupe tunique bleue (prism), nasal sur casque. Comportement b33/b34 intact.
+- JOUEUR : gants cuir (boîte) au lieu des mains peau, tête de marteau +25 %.
+- DÉCOR : 44 fleurs (4 couleurs) en bord de route (dist_chemin >= 2.3,
+  JAMAIS sur la route) ; soleil couchant : rotation -52°→-40°, couleur
+  (1.0,0.85,0.64), énergie 1.25, ciel haut (0.34,0.45,0.75).
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent.
+
+4ah) MAJ DU 17/09/2026 (build b41) — CORRECTIF COMPILE b40
+-----------------------------------------------------------
+- Erreur dev : « No constructor of "Basis" matches Basis(Vector3) »
+  (ligne palissade b40). Godot 4 n'a PAS de constructeur d'échelle :
+  remplacé par Basis(Vector3(0,1,0), yaw).scaled(Vector3(1, sc, 1)).
+  PIEGE À RETENIR : échelle d'une Basis = .scaled() ou Basis().scaled(),
+  JAMAIS Basis(Vector3).
+- Rien d'autre changé. BUILD b41.
+
+4ai) MAJ DU 17/09/2026 (build b42) — HÉROS AFFINÉ (style image de réf.)
+------------------------------------------------------------------------
+- Le dev veut le MÊME niveau de finesse sur le personnage : vêtements,
+  chaussures, tête, bras, cheveux.
+- creer_joueur() enrichi (pivots/marteau/lumière INTACTS) :
+  * jambes : pantalon brun (PANT) au lieu de la tunique sombre ; bottes à
+    REVERS clair + SEMELLE foncée ;
+  * torse : col de tunique, ourlet bas, boucle de ceinturon dorée ;
+  * bras : manchettes resserrées au-dessus des gants cuir (b40) ;
+  * tête : sourcils, nez, bouche, oreilles ; frange devant + mèches
+    latérales en couches par-dessus les pointes de cheveux existantes.
+- Face du joueur = côté -Z (yeux à z -0.145) : tous les détails posés là.
+- NOTE DEV (erreur b40 revue chez lui) : son jeu tournait encore sur le
+  main.gd b40 car le launcher ne vérifie les maj qu'AU LANCEMENT du
+  launcher : il faut fermer jeu + launcher puis rouvrir le launcher.
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b42.
+
+4aj) MAJ DU 17/09/2026 (build b43) — MAILLAGES ORGANIQUES (réponse au « c'est
+     possible dans Godot ? » : OUI, via lofts procéduraux)
+------------------------------------------------------------------------
+- Le dev : les persos/monstres restent un assemblage de cubes/cylindres ;
+  l'image de réf. a des formes ARRONDIES travaillées, doigts visibles.
+- NOUVEAUX OUTILS (main.gd) :
+  * anneau()/anneau_z() : couronnes de n points (horizontales/verticales) ;
+  * make_loft(rings) : relie les couronnes = VRAI maillage organique
+    (corps fuselés, abdomens, queues) avec bouchons ;
+  * make_membre(p0,p1,r0,r1) : membre FUSELÉ entre 2 points (4 sections) =
+    bras/jambes/pattes arrondis qui rétrécissent (fini les cylindres) ;
+  * make_bboite(size,bev) : boîte OCTOGONALE chanfreinée = « travaillée » ;
+  * _org(key,mesh,pos,col,parent,...) : instance cachée + cull DISABLED.
+- MONSTRES reconstruits en organique : rat = corps lofté 6 sections +
+  queue loftée en S + pattes fuselées ; araignée = abdomen+thorax loftés +
+  8 pattes en 3 segments fuselés (hanche-genou-cheville-sol).
+- PERSOS (joueur, garde, PNJ) : jambes/bras = make_membre fuselés ;
+  têtes/torses = make_bboite chanfreinées ; MAINS = paume + 4 DOIGTS +
+  pouce (joueur) visibles. Pivots/anim/accessoires INTACTS.
+- DIVERS (demandes dev) : FLEURS RETIRÉES ; tuiles de toit AJUSTÉES au pan
+  (ne débordent plus : prism +0.35, facteur 1.15, faîtage +0.45) ;
+  palissade = planches LARGES 0.23 m, h 1.20-1.52, 820 instances,
+  traverses-rondins SUPPRIMÉES.
+- PIEGE GODOT 4 rappelé en b41 : pas de Basis(Vector3) → .scaled().
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b43.
+
+4ak) MAJ DU 17/09/2026 (build b44) — RETOUR BASE b39 + TUILES PROPRES
+-----------------------------------------------------------------------
+- Le dev a REVERTÉ le dépôt sur la base b39 (« version de départ ») via
+  GitHub et a SUPPRIMÉ version_url.json au passage. Les builds b40-b43
+  (refonte graphique organique) sont ABANDONNÉS à sa demande : NE PAS
+  les réappliquer.
+- b44 = SEULEMENT les tuiles, sur SA base b39, rien d'autre touché :
+  * TUILES AJUSTÉES AU PAN : 6 rangs x 8 colonnes en quinconce avec
+    MARGE de 6 cm (H = (b.d+0.5)/2 - 0.06, W = (b.w+0.5)/2 - 0.06) =>
+    elles ne débordent PLUS (l'ancien code posait les tuiles sur une
+    portée b.w+0.55 PLUS LARGE que le toit b.w+0.5 : c'était LE bug).
+  * TUILES DE RIVE : sur chaque pan, colonne de tuiles plus larges et
+    sombres (lw*1.15, roof.darkened(0.18)) le long des 2 bords latéraux
+    + fascia de rive basse (égout) au bord bas de chaque pan.
+  * Faîtage et prisme d'origine b39 CONSERVÉS.
+- version_url.json RESTAURÉ (indispensable : sans lui le launcher ne
+  peut plus vérifier les maj). Manifeste 6 entrées : main.gd, main.tscn,
+  project.godot, launcher.pyw, build_launcher.bat, resumer.txt.
+- Le dépôt contient désormais des dossiers godot/ (cache éditeur) et
+  image/ uploadés par le dev : NE PAS les mettre au manifeste, ne pas
+  les modifier.
+
+5) FICHIERS IMPORTANTS
+----------------------
+- main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
+  Camera3D, le reste est créé par le code).
+- launcher.pyw : launcher Tkinter + auto-update + téléchargement Godot.
+  DEPUIS LA 2.6.0 : TOUTES les images sont INTEGREES en base64 dans le .pyw
+  (BANNER_B64 = banniere 1024x768 palette, ICON_B64 = icone 64x64,
+  ICO_B64 = icon.ico complet). _embedded_photo() decode via Pillow, ou via
+  fichier PNG temporaire si Pillow absent. export_icon()/export_banner()
+  recréent les fichiers si besoin (build_launcher.bat extrait icon.ico tout
+  seul depuis le launcher). CONSÉQUENCE : banniere_v1.png, pp_lv_3.png et
+  icon.ico ne sont plus nécessaires sur disque et ont été RETIRES de la liste
+  "files" de version_url.json (le launcher ne les retélécharge plus).
+  Le jeu (main.gd) affiche le portrait HUD via pp_lv_3.png SI présent,
+  sinon un visage de héros dessiné en vectoriel (ResourceLoader.exists).
+- build_launcher.bat : build exe du launcher (PyInstaller).
+- version_url.json : manifeste d'update (voir §3).
+- resumer.txt : ce fichier.
+- glb/ : SUPPRIMÉ en b15 (à la demande du dev) : anciens personnages voxel +
+  scripts Python. Les 7 lignes correspondantes ont été RETIRÉES de
+  version_url.json. Le launcher ne les retélécharge plus ; le dossier local
+  du joueur peut être effacé à la main.
+- image/ : captures de référence (dont "1er image develloppement.png" = cible
+  visuelle de la 0.3.0), bannières, logos, chapitres, miniatures YouTube.
+- godot/ : cache editor/import du projet (shader_cache etc.), pas touché.
+
+6) REGLES / PIEGES A RETENIR
+----------------------------
+- Le launcher compare les hashs : tout fichier modifié doit être dans
+  version_url.json avec son nouveau hash, sinon les joueurs ne le recevront pas.
+- Tout nouveau fichier .gd ajouté au jeu devrait être ajouté à la liste "files".
+  (Actuellement tout le jeu tient dans main.gd exprès pour simplifier l'update.)
+- Ne pas remettre de nœuds CSG : perf et style low-poly obligent (PrimitiveMesh
+  partagés via _mesh_cache / _mat_cache).
+- Le joueur et les objets sont posés via hauteur_terrain(x,z) : toute nouvelle
+  construction au sol doit utiliser cette fonction (zone plate sous TOWN_R).
+- Collisions bâtiments = liste "batiments" (AABB 2D manuelles), pas de physique.
+- gl_compatibility : pas de SDFGI/voxel ; ciel = ProceduralSkyMaterial OK.
+- Godot 4.7 : API GDScript 2.0 (typed, Signal.connect, queue_redraw,
+  ThemeDB.fallback_font, draw_style_box, MiniMesh non : MultiMesh).
+- PIEGE GDScript TYPAGE (rencontré 13/09/2026) : "var x := <expr>" échoue en
+  compile ("Cannot infer the type") dès que l'expr contient un Variant
+  (valeur lue dans un Dictionary/Array non typé, ex. e.pv, f.t). Solutions
+  appliquées : annoter explicitement ("var x: float = ..."), typer les
+  tableaux ("var CHEMIN: Array[Vector2] = [...]"), ou typer les params
+  ("func _process(delta: float)"). Ne JAMAIS faire "var x := dict.champ".
+  Idem : "$Nom" renvoie un Node statiquement => typer ("var sun:
+  DirectionalLight3D = $DirectionalLight3D").
+- AUTRE PIEGE Godot 4.7 : BaseMaterial3D.ShadingMode ne contient QUE
+  SHADING_MODE_PIXEL et SHADING_MODE_VERTEX. Il n'y a PAS de
+  SHADING_MODE_UNLIT (ni sur StandardMaterial3D). Pour un rendu "unlit"
+  (nuages blancs plats) : emission_enabled + emission = couleur +
+  emission_energy_multiplier = 1.0, ou un vrai ShaderMaterial render_mode
+  unlit. Ne jamais écrire StandardMaterial3D.SHADING_MODE_UNLIT /
+  BaseMaterial3D.SHADING_MODE_UNLIT : erreur de parse garantie.
+
+7) ETAT GIT / LIVRAISON
+-----------------------
+- Session Arena = branche arena/01a09a4d-librevies (commit + push faits).
+- Pour que les joueurs reçoivent la 0.3.0 : merger cette branche sur main
+  (PR ouverte depuis la branche de session).
+- Pas de test de rendu possible dans le sandbox Arena (pas de binaire Godot ni
+  de GL téléchargeable) : le code a été relu ligne à ligne pour l'API Godot 4.7
+  mais UN LANCEMENT REEL DU JEU RESTE A FAIRE par le dev pour validation visuelle.
+
+8) IDEES POUR LA SUITE
+----------------------
+- Ombres portées des nuages / variation heure du jour.
+- Intérieurs des bâtiments, vrais commerces (achat/vente).
+- Sauvegarde de partie (position, XP, quêtes) dans user://.
+- Sons/musique, particules de coup, anim d'attaque des ennemis.
+- Remplacer les Label3D noms de PNJ par des billboards texturés.
+================================================================================
