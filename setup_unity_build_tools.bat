@@ -10,17 +10,17 @@ if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" 
 if not exist "%HUB%" (
     echo Unity Hub absent : telechargement depuis le site officiel Unity...
     set "HUB_INSTALLER=%TEMP%\UnityHubSetup.exe"
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0download_unity_hub.ps1" -OutputPath "%HUB_INSTALLER%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0download_unity_hub.ps1" -OutputPath "!HUB_INSTALLER!"
     if errorlevel 1 (
         echo ERREUR : impossible de telecharger Unity Hub depuis les URLs officielles.
         echo Consultez https://unity.com/download et relancez ensuite ce script.
         exit /b 1
     )
-    start /wait "" "%HUB_INSTALLER%" /S
-    del /q "%HUB_INSTALLER%" 2>nul
+    start /wait "" "!HUB_INSTALLER!" /S
+    del /q "!HUB_INSTALLER!" 2>nul
     if exist "%ProgramFiles%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles%\Unity Hub\Unity Hub.exe"
-    if not exist "%HUB%" if exist "%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe"
-    if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" set "HUB=%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe"
+    if not exist "!HUB!" if exist "%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe"
+    if not exist "!HUB!" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" set "HUB=%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe"
 )
 
 if not exist "%HUB%" (
