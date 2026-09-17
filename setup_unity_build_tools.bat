@@ -5,19 +5,22 @@ rem Installation automatique des outils de fabrication, jamais des outils du jou
 set "UNITY_VERSION=2022.3.62f1"
 set "HUB=%ProgramFiles%\Unity Hub\Unity Hub.exe"
 if not exist "%HUB%" if exist "%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe"
+if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" set "HUB=%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe"
 
 if not exist "%HUB%" (
     echo Unity Hub absent : telechargement depuis le site officiel Unity...
     set "HUB_INSTALLER=%TEMP%\UnityHubSetup.exe"
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri 'https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.exe' -OutFile $env:HUB_INSTALLER"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $urls=@('https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup-x64.exe','https://public-cdn.cloud.unity3d.com/hub/3.14.3/UnityHubSetup.exe','https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.exe'); $ok=$false; foreach($u in $urls) { try { Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $env:HUB_INSTALLER; if((Get-Item $env:HUB_INSTALLER).Length -gt 1000000) { $ok=$true; break } } catch {} }; if(-not $ok) { exit 1 }"
     if errorlevel 1 (
-        echo ERREUR : impossible de telecharger Unity Hub.
+        echo ERREUR : impossible de telecharger Unity Hub depuis les URLs officielles.
+        echo Consultez https://unity.com/download et relancez ensuite ce script.
         exit /b 1
     )
     start /wait "" "%HUB_INSTALLER%" /S
     del /q "%HUB_INSTALLER%" 2>nul
     if exist "%ProgramFiles%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles%\Unity Hub\Unity Hub.exe"
     if not exist "%HUB%" if exist "%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe" set "HUB=%ProgramFiles(x86)%\Unity Hub\Unity Hub.exe"
+    if not exist "%HUB%" if exist "%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe" set "HUB=%LOCALAPPDATA%\Programs\Unity Hub\Unity Hub.exe"
 )
 
 if not exist "%HUB%" (
