@@ -900,6 +900,24 @@ INTACTS. Changements :
 - _respawn_enemy réutilise le même nœud => anim intacte au respawn.
 - Manifeste 6 entrées ; seuls main.gd + resumer.txt changent. BUILD b45.
 
+4am) MAJ DU 17/09/2026 (build b46) — YEUX, PATTES AU SOL, TUILES SYMÉTRIQUES
+-----------------------------------------------------------------------------
+- Dev : souris sans yeux ; pattes d'araignée qui sortent du sol ;
+  Armurerie = côté droit des tuiles OK mais côté gauche ça dépasse ;
+  veut « comme le côté droit partout ».
+- YEUX rat/souris : ils étaient ENTERRÉS dans la tête sphérique b45
+  (tête r0.20 étirée => surface à z -0.64, yeux posés à -0.56 = dedans).
+  b46 : yeux à (±0.09, 0.40, -0.63) = posés SUR la tête, visibles.
+- ARAIGNÉE remontée de +0.12 (abdomen 0.70, thorax 0.64, mandibules/yeux
+  +0.12, hanches 0.62, tibia -0.10 rot 50°) => pointes de pattes ~0.3 au-
+  dessus du sol même en pente ; balancement marche réduit 0.30 -> 0.22.
+- TUILES : le quinconce b44/b45 « enveloppait » la tuile qui dépassait à
+  droite vers la GAUCHE (xm -= 2W) => amas débordant à gauche (Armurerie).
+  b46 : rang décalé = simplement NW-1 colonnes, décalage +0.5lw, AUCUN
+  wrap ; largeur tuile 0.90*lw. Bords symétriques et intérieurs PARTOUT
+  (pair : ±(W-0.05lw) ; impair : -W+0.55lw .. +0.86W). Rives inchangées.
+- Manifeste 6 entrées ; seuls main.gd + resumer.txt changent. BUILD b46.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
