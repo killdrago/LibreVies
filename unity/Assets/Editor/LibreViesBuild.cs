@@ -2,7 +2,6 @@
 using System;
 using System.IO;
 using UnityEditor;
-using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -14,10 +13,9 @@ public static class LibreViesBuild
         output = Path.GetFullPath(output);
         Directory.CreateDirectory(Path.GetDirectoryName(output));
 
-        // Mono est disponible avec Windows Build Support et ne nécessite pas
-        // l'installation séparée du toolchain IL2CPP sur la machine de build.
-        PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
-
+        // Le script build_launcher.bat sélectionne Mono dans ProjectSettings
+        // avant de lancer Unity. Aucune API de backend n'est appelée ici : cela
+        // évite toute différence d'énumération entre versions de Unity.
         var scenes = new[] { "Assets/Scenes/LibreVies.unity" };
         var options = new BuildPlayerOptions
         {
