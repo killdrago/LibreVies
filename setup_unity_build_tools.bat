@@ -39,8 +39,8 @@ echo Unity Hub peut demander une connexion a un compte Unity et l'activation d'u
 echo Cette licence est necessaire uniquement pour fabriquer le jeu, jamais pour le joueur.
 
 rem Les deux syntaxes couvrent les versions recentes de Unity Hub.
-"%HUB%" --headless install --version %UNITY_VERSION% --module windows-mono --module windows-il2cpp --childModules
-if errorlevel 1 "%HUB%" -- --headless install --version %UNITY_VERSION% --module windows-mono --module windows-il2cpp --childModules
+"%HUB%" --headless install --version %UNITY_VERSION% --module windows-mono --childModules
+if errorlevel 1 "%HUB%" -- --headless install --version %UNITY_VERSION% --module windows-mono --childModules
 
 for /r "%ProgramFiles%\Unity\Hub\Editor\%UNITY_VERSION%" %%F in (Unity.exe) do if not defined UNITY set "UNITY=%%F"
 if not defined UNITY for /r "%ProgramFiles(x86)%\Unity\Hub\Editor\%UNITY_VERSION%" %%F in (Unity.exe) do if not defined UNITY set "UNITY=%%F"
