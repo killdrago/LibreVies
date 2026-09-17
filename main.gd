@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b39"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b44"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1117,22 +1117,41 @@ func creer_ville():
 		# Toit en prisme (pignon) + débords
 		var rh: float = b.d * 0.42
 		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.5, rh, b.w + 0.5), b.roof, null, Vector3(0, deg_to_rad(90), 0))
-		# b15 : TUILES visibles : 4 rangs en gradins inclinés par pan + faîtage
-		var NR := 4
-		var ang := atan2(rh, (b.d + 0.5) / 2.0)
+		# b44 : TUILES AJUSTÉES AU PAN : 6 rangs x 8 colonnes en quinconce,
+		# avec MARGE de 6 cm sous les bords du toit => ne débordent PLUS
+		# (avant : portée b.w+0.55 sur un toit de b.w+0.5 = ça dépassait).
+		var NR := 6
+		var NW := 8
+		var half: float = (b.d + 0.5) / 2.0
+		var H: float = half - 0.06
+		var W: float = (b.w + 0.5) / 2.0 - 0.06
+		var ang := atan2(rh, half)
+		var lr: float = H / float(NR)
+		var lw: float = (W * 2.0) / float(NW)
 		for side in [-1.0, 1.0]:
 			for ti in range(NR):
 				var tm := (float(ti) + 0.5) / float(NR)
-				var zm: float = side * tm * (b.d + 0.5) / 2.0
-				var ym: float = y + b.h + rh * (1.0 - tm) + 0.02
+				var zm: float = side * tm * H
+				var ym: float = y + b.h + rh * (1.0 - tm * H / half) + 0.02
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
-				# b18 : TEXTURE de tuiles : 6 carreaux par rang, joints + damier
-				var NW := 6
-				var lw: float = (b.w + 0.55) / float(NW)
 				for j in range(NW):
-					var xm: float = -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
-					var tc2: Color = tc.lightened(0.05) if (ti + j) % 2 == 0 else tc.darkened(0.07)
-					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.86, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc2, null, Vector3(side * ang, 0, 0))
+					var xm: float = -W + (float(j) + 0.5) * lw
+					if ti % 2 == 1:
+						xm += lw * 0.5
+						if xm > W:
+							xm -= W * 2.0
+					var tc2: Color = tc.lightened(0.06) if (ti + j) % 2 == 0 else tc.darkened(0.08)
+					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.92, 0.08, lr * 1.12), tc2, null, Vector3(side * ang, 0, 0))
+			# b44 : TUILES DE RIVE : colonne de tuiles plus larges et sombres
+			# le long des 2 bords latéraux de chaque pan (finition nette)
+			for ex in [-1.0, 1.0]:
+				for ti in range(NR):
+					var tm2 := (float(ti) + 0.5) / float(NR)
+					var zm2: float = side * tm2 * H
+					var ym2: float = y + b.h + rh * (1.0 - tm2 * H / half) + 0.045
+					_box(Vector3(b.x + ex * (W - lw * 0.35), ym2, b.z + zm2), Vector3(lw * 1.15, 0.09, lr * 1.18), b.roof.darkened(0.18), null, Vector3(side * ang, 0, 0))
+			# b44 : rive basse (égout) : fascia de tuiles le long du bord bas
+			_box(Vector3(b.x, y + b.h + 0.06, b.z + side * (H + 0.02)), Vector3(W * 2.0, 0.12, 0.14), b.roof.darkened(0.22), null, Vector3(side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))

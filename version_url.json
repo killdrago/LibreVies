@@ -1,0 +1,33 @@
+{
+  "launcher_version": "2.8.0",
+  "game_version": "0.3.0",
+  "notes": "MAJ 0.3.0-b44 : tuiles REPOSÉES sur la base b39 du dev — tuiles ajustées au pan avec marge de 6 cm (ne débordent plus), quinconce 6x8, TUILES DE RIVE (colonnes latérales sombres + fascia d'égout). Rien d'autre changé. version_url.json restauré après le revert du dev. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
+  "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
+  "files": {
+    "main.gd": {
+      "hash": "52e8b41b19576b509efba09a16a1c029",
+      "size": 128600
+    },
+    "main.tscn": {
+      "hash": "0652db0411d434377ceff6c191db7c1e",
+      "size": 602
+    },
+    "project.godot": {
+      "hash": "52f5571046d13d8a5491eb4f9db8fa1e",
+      "size": 5556
+    },
+    "launcher.pyw": {
+      "hash": "b00fb6c4214e7493c4a20c3ad766c212",
+      "size": 628831
+    },
+    "build_launcher.bat": {
+      "hash": "4db739ba34ca09c06e428cf3e8c64b40",
+      "size": 1300
+    },
+    "resumer.txt": {
+      "hash": "80ca65f469890ace95d7d1edba06358f",
+      "size": 61316
+    }
+  }
+}

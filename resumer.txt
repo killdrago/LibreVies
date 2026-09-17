@@ -857,6 +857,28 @@ INTACTS. Changements :
 - PIEGE GODOT 4 rappelé en b41 : pas de Basis(Vector3) → .scaled().
 - Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b43.
 
+4ak) MAJ DU 17/09/2026 (build b44) — RETOUR BASE b39 + TUILES PROPRES
+-----------------------------------------------------------------------
+- Le dev a REVERTÉ le dépôt sur la base b39 (« version de départ ») via
+  GitHub et a SUPPRIMÉ version_url.json au passage. Les builds b40-b43
+  (refonte graphique organique) sont ABANDONNÉS à sa demande : NE PAS
+  les réappliquer.
+- b44 = SEULEMENT les tuiles, sur SA base b39, rien d'autre touché :
+  * TUILES AJUSTÉES AU PAN : 6 rangs x 8 colonnes en quinconce avec
+    MARGE de 6 cm (H = (b.d+0.5)/2 - 0.06, W = (b.w+0.5)/2 - 0.06) =>
+    elles ne débordent PLUS (l'ancien code posait les tuiles sur une
+    portée b.w+0.55 PLUS LARGE que le toit b.w+0.5 : c'était LE bug).
+  * TUILES DE RIVE : sur chaque pan, colonne de tuiles plus larges et
+    sombres (lw*1.15, roof.darkened(0.18)) le long des 2 bords latéraux
+    + fascia de rive basse (égout) au bord bas de chaque pan.
+  * Faîtage et prisme d'origine b39 CONSERVÉS.
+- version_url.json RESTAURÉ (indispensable : sans lui le launcher ne
+  peut plus vérifier les maj). Manifeste 6 entrées : main.gd, main.tscn,
+  project.godot, launcher.pyw, build_launcher.bat, resumer.txt.
+- Le dépôt contient désormais des dossiers godot/ (cache éditeur) et
+  image/ uploadés par le dev : NE PAS les mettre au manifeste, ne pas
+  les modifier.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
