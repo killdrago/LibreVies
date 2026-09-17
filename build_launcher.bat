@@ -1,15 +1,21 @@
 @echo off
 setlocal EnableExtensions
 set "ROOT=%~dp0"
-if not exist "%ROOT%launcher.pyw" (
-    if exist "%ROOT%..\launcher.pyw" for %%R in ("%ROOT%..") do set "ROOT=%%~fR\"
+set "LAUNCHER=%ROOT%launcher.pyw"
+if not exist "%LAUNCHER%" if exist "%ROOT%..\launcher.pyw" (
+    for %%R in ("%ROOT%..") do set "ROOT=%%~fR\" & set "LAUNCHER=%%~fR\launcher.pyw"
 )
-if not exist "%ROOT%launcher.pyw" (
-    echo ERREUR : launcher.pyw est absent de la racine du projet : %ROOT%
-    echo Placez ce script dans le depot LibreVies complet.
+if not exist "%LAUNCHER%" if exist "%ROOT%unity\launcher.pyw" set "LAUNCHER=%ROOT%unity\launcher.pyw"
+if not exist "%LAUNCHER%" (
+    echo ERREUR : launcher.pyw est absent. Chemins essayes :
+    echo   %ROOT%launcher.pyw
+    echo   %ROOT%unity\launcher.pyw
+    echo Placez le depot LibreVies complet, pas seulement le dossier unity.
     pause
     exit /b 1
 )
+set "PROJECT=%ROOT%unity"
+if exist "%ROOT%Assets\Scripts" set "PROJECT=%ROOT%"
 cd /d "%ROOT%"
 
 echo ========================================
@@ -67,7 +73,7 @@ mkdir "build\launcher"
 
 if not exist "%ROOT%icon.ico" (
     echo Creation de l'icone...
-    python -c "import importlib.util as u; s=u.spec_from_file_location('lv',r'%ROOT%launcher.pyw'); m=u.module_from_spec(s); s.loader.exec_module(m); m.export_icon(r'%ROOT%icon.ico')"
+    python -c "import importlib.util as u; s=u.spec_from_file_location('lv',r'%LAUNCHER%'); m=u.module_from_spec(s); s.loader.exec_module(m); m.export_icon(r'%ROOT%icon.ico')"
     if errorlevel 1 (
         echo ERREUR : impossible de creer icon.ico
         pause
@@ -77,7 +83,7 @@ if not exist "%ROOT%icon.ico" (
 
 echo.
 echo [1/3] Export du jeu Unity avec son runtime integre...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%ROOT%unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : export Unity echoue. Consultez build\unity.log
     pause
@@ -91,7 +97,7 @@ if not exist "release\game\LibreViesGame.exe" (
 
 echo.
 echo [2/3] Compilation du launcher autonome...
-python -m PyInstaller --onefile --noconsole --clean --name LibreVies --icon="%ROOT%icon.ico" --distpath "release" --workpath "build\launcher" --specpath "%ROOT%build" "%ROOT%launcher.pyw"
+python -m PyInstaller --onefile --noconsole --clean --name LibreVies --icon="%ROOT%icon.ico" --distpath "release" --workpath "build\launcher" --specpath "%ROOT%build" "%LAUNCHER%"
 if errorlevel 1 (
     echo ERREUR : compilation du launcher echouee.
     pause
