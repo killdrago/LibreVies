@@ -146,10 +146,19 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Material MakeMaterial(string name, Color color, bool emission = false)
     {
+        // Runtime-generated materials are not referenced by an asset. Keep a
+        // fallback chain so shader stripping cannot abort Awake in a player.
         Shader shader = Shader.Find("Standard");
+        if (shader == null) shader = Shader.Find("Unlit/Color");
+        if (shader == null)
+        {
+            Debug.LogWarning("LibreVies : aucun shader intégré disponible pour " + name);
+            materials.Add(null);
+            return null;
+        }
         var material = new Material(shader) { name = name };
         material.color = color;
-        if (emission)
+        if (emission && material.HasProperty("_EmissionColor"))
         {
             material.EnableKeyword("_EMISSION");
             material.SetColor("_EmissionColor", color * 0.7f);
@@ -161,8 +170,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private Material Mat(string name)
     {
         for (int i = 0; i < materials.Count; i++)
-            if (materials[i].name == name) return materials[i];
-        return materials[0];
+            if (materials[i] != null && materials[i].name == name) return materials[i];
+        for (int i = 0; i < materials.Count; i++)
+            if (materials[i] != null) return materials[i];
+        return null;
     }
 
     private void CreateEnvironment()
@@ -229,7 +240,9 @@ public sealed class LibreViesGame : MonoBehaviour
         mesh.RecalculateNormals();
         var terrain = new GameObject("Terrain_Unity");
         terrain.AddComponent<MeshFilter>().sharedMesh = mesh;
-        terrain.AddComponent<MeshRenderer>().sharedMaterial = Mat("Terrain");
+        var terrainRenderer = terrain.AddComponent<MeshRenderer>();
+        var terrainMaterial = Mat("Terrain");
+        if (terrainMaterial != null) terrainRenderer.sharedMaterial = terrainMaterial;
         terrain.AddComponent<MeshCollider>().sharedMesh = mesh;
     }
 
@@ -242,7 +255,8 @@ public sealed class LibreViesGame : MonoBehaviour
         obj.transform.localPosition = position;
         obj.transform.localScale = scale;
         var renderer = obj.GetComponent<Renderer>();
-        renderer.sharedMaterial = Mat(material);
+        var sharedMaterial = Mat(material);
+        if (sharedMaterial != null) renderer.sharedMaterial = sharedMaterial;
         if (!collider)
         {
             var currentCollider = obj.GetComponent<Collider>();
@@ -287,6 +301,10 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(14, 0, -12), new Vector3(9, 4, 7), "Auberge");
         CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
         CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
+        // Bâtiments supplémentaires du village de départ Godot.
+        CreateBuilding(new Vector3(-3, 0, 21), new Vector3(7, 4, 6), "Mairie");
+        CreateBuilding(new Vector3(-19, 0, 13), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
         CreateFountain(new Vector3(9, 0, 15));
         CreateGuard(new Vector3(-12, 0, 26));
         CreateGuard(new Vector3(12, 0, 26));
@@ -409,7 +427,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreatePlayer()
     {
         player = new GameObject("Joueur").transform;
-        player.position = new Vector3(0, TerrainHeight(0, 30) + 0.05f, 30);
+        // Même point de départ que la scène Godot : la caméra voit le village.
+        player.position = new Vector3(0, TerrainHeight(0, 6) + 0.05f, 6);
         cameraPivot = new GameObject("CameraPivot").transform;
         cameraPivot.SetParent(player, false);
         var body = new GameObject("Heros_LowPoly").transform;
@@ -579,7 +598,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         Quaternion orbit = Quaternion.Euler(cameraPitch, cameraYaw, 0);
         Vector3 target = player.position + Vector3.up * 1.1f;
-        gameCamera.transform.position = target + orbit * (Vector3.back * cameraDistance);
+        // Caméra placée au nord comme dans la scène Godot d'origine.
+        gameCamera.transform.position = target + orbit * (Vector3.forward * cameraDistance);
         gameCamera.transform.LookAt(target);
     }
 
@@ -688,7 +708,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void Respawn()
     {
-        dead = false; hp = MaxHp; player.position = new Vector3(0, TerrainHeight(0, 30), 30); ShowInfo("Vous êtes revenu à la vie");
+        dead = false; hp = MaxHp; player.position = new Vector3(0, TerrainHeight(0, 6), 6); ShowInfo("Vous êtes revenu à la vie");
     }
 
     private void CollectNearby()
