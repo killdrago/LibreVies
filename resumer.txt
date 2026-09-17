@@ -831,6 +831,32 @@ INTACTS. Changements :
   launcher : il faut fermer jeu + launcher puis rouvrir le launcher.
 - Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b42.
 
+4aj) MAJ DU 17/09/2026 (build b43) — MAILLAGES ORGANIQUES (réponse au « c'est
+     possible dans Godot ? » : OUI, via lofts procéduraux)
+------------------------------------------------------------------------
+- Le dev : les persos/monstres restent un assemblage de cubes/cylindres ;
+  l'image de réf. a des formes ARRONDIES travaillées, doigts visibles.
+- NOUVEAUX OUTILS (main.gd) :
+  * anneau()/anneau_z() : couronnes de n points (horizontales/verticales) ;
+  * make_loft(rings) : relie les couronnes = VRAI maillage organique
+    (corps fuselés, abdomens, queues) avec bouchons ;
+  * make_membre(p0,p1,r0,r1) : membre FUSELÉ entre 2 points (4 sections) =
+    bras/jambes/pattes arrondis qui rétrécissent (fini les cylindres) ;
+  * make_bboite(size,bev) : boîte OCTOGONALE chanfreinée = « travaillée » ;
+  * _org(key,mesh,pos,col,parent,...) : instance cachée + cull DISABLED.
+- MONSTRES reconstruits en organique : rat = corps lofté 6 sections +
+  queue loftée en S + pattes fuselées ; araignée = abdomen+thorax loftés +
+  8 pattes en 3 segments fuselés (hanche-genou-cheville-sol).
+- PERSOS (joueur, garde, PNJ) : jambes/bras = make_membre fuselés ;
+  têtes/torses = make_bboite chanfreinées ; MAINS = paume + 4 DOIGTS +
+  pouce (joueur) visibles. Pivots/anim/accessoires INTACTS.
+- DIVERS (demandes dev) : FLEURS RETIRÉES ; tuiles de toit AJUSTÉES au pan
+  (ne débordent plus : prism +0.35, facteur 1.15, faîtage +0.45) ;
+  palissade = planches LARGES 0.23 m, h 1.20-1.52, 820 instances,
+  traverses-rondins SUPPRIMÉES.
+- PIEGE GODOT 4 rappelé en b41 : pas de Basis(Vector3) → .scaled().
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent. BUILD b43.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b42 : héros affiné façon image de référence — pantalon brun, bottes à revers et semelle, col et ourlet de tunique, boucle dorée, manchettes, gants, visage complet (sourcils, nez, bouche, oreilles), frange et mèches en couches. Inclut le correctif b41 (Basis.scaled). RAPPEL : fermer jeu + launcher puis rouvrir le launcher pour télécharger. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b43 : formes ORGANIQUES comme un vrai jeu 3D — maillages loftés procéduraux (corps/abdomens/queues fuselés), membres arrondis qui rétrécissent, boîtes chanfreinées, mains avec doigts et pouce ; monstres reconstruits (rat lofté, araignée 3 segments par patte) ; fleurs retirées ; tuiles ajustées au toit ; palissade en planches larges sans rondins. RAPPEL : fermer jeu + launcher puis rouvrir le launcher pour télécharger. Règle : tout changement = nouveau hash.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "e63178f187c4a81f36a73ffb0edf3f7e",
-      "size": 134692
+      "hash": "e2e108d476ac1a5c16c1323e1732a1f1",
+      "size": 138960
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "500542186c54e73bc0f3075c721fb588",
-      "size": 58249
+      "hash": "31dd48e80039b1438688c6f44ed14c71",
+      "size": 59954
     }
   }
 }

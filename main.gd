@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b42"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b43"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -887,13 +887,117 @@ func make_touffe() -> ArrayMesh:
 			tris.push_back(apex)
 	return mesh_tris(tris, PackedColorArray())
 
+# b43 : anneau horizontal de n points (ellipse) autour de c
+func anneau(c: Vector3, rx: float, rz: float, n: int) -> Array:
+	var r := []
+	for i in range(n):
+		var a := float(i) / float(n) * TAU
+		r.push_back(c + Vector3(cos(a) * rx, 0, sin(a) * rz))
+	return r
+
+# b43 : anneau VERTICAL (perpendiculaire à Z) : corps allongés horizontaux
+func anneau_z(c: Vector3, rx: float, ry: float, n: int) -> Array:
+	var r := []
+	for i in range(n):
+		var a := float(i) / float(n) * TAU
+		r.push_back(c + Vector3(cos(a) * rx, sin(a) * ry, 0))
+	return r
+
+# b43 : LOFT : relie des anneaux consécutifs = forme organique arrondie
+# (le vrai maillage d'un modèle 3D, pas un assemblage de cubes)
+func make_loft(rings: Array, cap_deb := true, cap_fin := true) -> ArrayMesh:
+	var tris := PackedVector3Array()
+	for k in range(rings.size() - 1):
+		var a: Array = rings[k]
+		var b: Array = rings[k + 1]
+		var n: int = a.size()
+		for i in range(n):
+			var j := (i + 1) % n
+			tris.push_back(a[i]); tris.push_back(b[i]); tris.push_back(b[j])
+			tris.push_back(a[i]); tris.push_back(b[j]); tris.push_back(a[j])
+	if cap_deb and rings.size() > 0:
+		var a0: Array = rings[0]
+		for i in range(1, a0.size() - 1):
+			tris.push_back(a0[0]); tris.push_back(a0[i + 1]); tris.push_back(a0[i])
+	if cap_fin and rings.size() > 0:
+		var a1: Array = rings[rings.size() - 1]
+		for i in range(1, a1.size() - 1):
+			tris.push_back(a1[0]); tris.push_back(a1[i]); tris.push_back(a1[i + 1])
+	return mesh_tris(tris, PackedColorArray())
+
+# b43 : MEMBRE FUSELE entre 2 points (bras, jambe, patte, queue) :
+# section ronde qui rétrécit => forme arrondie vivante, pas un cylindre droit
+func make_membre(p0: Vector3, p1: Vector3, r0: float, r1: float, n := 7) -> ArrayMesh:
+	var d := p1 - p0
+	var L := d.length()
+	if L < 0.001:
+		p1 = p0 + Vector3(0, 0.02, 0)
+		d = p1 - p0
+		L = d.length()
+	var up := d / L
+	var ax: Vector3
+	if absf(up.y) < 0.9:
+		ax = up.cross(Vector3(0, 1, 0)).normalized()
+	else:
+		ax = up.cross(Vector3(1, 0, 0)).normalized()
+	var az := up.cross(ax).normalized()
+	var rings := []
+	for t in [0.0, 0.35, 0.7, 1.0]:
+		var c := p0.lerp(p1, t)
+		var r: float = lerpf(r0, r1, t)
+		var ring := []
+		for i in range(n):
+			var a := float(i) / float(n) * TAU
+			ring.push_back(c + ax * (cos(a) * r) + az * (sin(a) * r))
+		rings.push_back(ring)
+	return make_loft(rings)
+
+# b43 : rectangle à coins coupés (8 pts) pour boîtes chanfreinées
+func _ring_rect(c: Vector3, hx: float, hz: float, b: float) -> Array:
+	return [
+		c + Vector3(-hx + b, 0, -hz), c + Vector3(hx - b, 0, -hz),
+		c + Vector3(hx, 0, -hz + b), c + Vector3(hx, 0, hz - b),
+		c + Vector3(hx - b, 0, hz), c + Vector3(-hx + b, 0, hz),
+		c + Vector3(-hx, 0, hz - b), c + Vector3(-hx, 0, -hz + b),
+	]
+
+# b43 : BOÎTE TRAVAILLÉE : octogonale, chanfreins haut/bas (plus de cube sec)
+func make_bboite(size: Vector3, bev := 0.06) -> ArrayMesh:
+	var hx := size.x / 2.0
+	var hy := size.y / 2.0
+	var hz := size.z / 2.0
+	var b := minf(bev, minf(hx, minf(hy, hz)) * 0.45)
+	var rings := [
+		_ring_rect(Vector3(0, -hy, 0), hx - b, hz - b, b),
+		_ring_rect(Vector3(0, -hy + b, 0), hx, hz, b),
+		_ring_rect(Vector3(0, hy - b, 0), hx, hz, b),
+		_ring_rect(Vector3(0, hy, 0), hx - b, hz - b, b),
+	]
+	return make_loft(rings)
+
+# b43 : instance de maillage organique (cache + double face)
+func _org(key: String, m: ArrayMesh, pos: Vector3, col: Color, parent: Node = null, rot := Vector3.ZERO, scale := Vector3.ONE) -> MeshInstance3D:
+	if not _mesh_cache.has(key):
+		_mesh_cache[key] = m
+	var mi := MeshInstance3D.new()
+	mi.mesh = _mesh_cache[key]
+	var mat := mat_std(col)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = mat
+	mi.set_meta("mat", mat)
+	mi.position = pos
+	mi.rotation = rot
+	mi.scale = scale
+	(parent if parent else (_parent_capture if _parent_capture else self)).add_child(mi)
+	return mi
+
 # b40 : piquet de palissade : planche + pointe pyramidale
 func make_piquet() -> ArrayMesh:
 	var tris := PackedVector3Array()
-	var w := 0.085
-	var d := 0.045
-	var y1 := 1.05
-	var apex := 1.32
+	var w := 0.115
+	var d := 0.05
+	var y1 := 1.20
+	var apex := 1.52
 	var b: Array[Vector3] = [Vector3(-w, 0, -d), Vector3(w, 0, -d), Vector3(w, 0, d), Vector3(-w, 0, d)]
 	var m: Array[Vector3] = [Vector3(-w, y1, -d), Vector3(w, y1, -d), Vector3(w, y1, d), Vector3(-w, y1, d)]
 	for k in range(4):
@@ -1132,29 +1236,28 @@ func creer_ville():
 		_box(Vector3(b.x, y + 0.1, b.z), Vector3(b.w + 0.25, 0.25, b.d + 0.25), PIERRE)
 		# Toit en prisme (pignon) + débords
 		var rh: float = b.d * 0.55   # b40 : pente PLUS raide (image de réf.)
-		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.5, rh, b.w + 0.5), b.roof, null, Vector3(0, deg_to_rad(90), 0))
+		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.35, rh, b.w + 0.35), b.roof, null, Vector3(0, deg_to_rad(90), 0))
 		# b15 : TUILES visibles : 4 rangs en gradins inclinés par pan + faîtage
 		var NR := 6
-		var ang := atan2(rh, (b.d + 0.5) / 2.0)
+		var ang := atan2(rh, (b.d + 0.35) / 2.0)
 		for side in [-1.0, 1.0]:
 			for ti in range(NR):
 				var tm := (float(ti) + 0.5) / float(NR)
-				var zm: float = side * tm * (b.d + 0.5) / 2.0
+				var zm: float = side * tm * (b.d + 0.35) / 2.0 * 0.94
 				var ym: float = y + b.h + rh * (1.0 - tm) + 0.02
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
-				# b40 : 8 tuiles par rang, rangs DÉCALÉS en quinconce (comme
-				# les bardeaux arrondis de l'image de référence)
+				# b43 : tuiles AJUSTÉES au pan (ne débordent plus du toit)
 				var NW := 8
-				var lw: float = (b.w + 0.55) / float(NW)
+				var lw: float = (b.w + 0.35) / float(NW)
 				for j in range(NW):
-					var xm: float = -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
+					var xm: float = -((b.w + 0.35) / 2.0) + (float(j) + 0.5) * lw
 					if ti % 2 == 1:
 						xm += lw * 0.5
-						if xm > (b.w + 0.55) / 2.0:
-							xm -= (b.w + 0.55)
+						if xm > (b.w + 0.35) / 2.0:
+							xm -= (b.w + 0.35)
 					var tc2: Color = tc.lightened(0.06) if (ti + j) % 2 == 0 else tc.darkened(0.08)
-					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.92, 0.10, (b.d + 0.5) / 2.0 / float(NR) * 1.45), tc2, null, Vector3(side * ang, 0, 0))
-		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
+					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.92, 0.08, (b.d + 0.35) / 2.0 / float(NR) * 1.15), tc2, null, Vector3(side * ang, 0, 0))
+		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.45, 0.12, 0.26), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
 		# b40 : porte CINTRÉE (demi-cylindre au sommet, comme l'image)
@@ -1235,9 +1338,9 @@ func creer_ville():
 		var jambe_g := Node3D.new(); jambe_g.position = Vector3(-0.11, 0.60, 0); root.add_child(jambe_g)
 		var jambe_d := Node3D.new(); jambe_d.position = Vector3(0.11, 0.60, 0); root.add_child(jambe_d)
 		for j in [jambe_g, jambe_d]:
-			_caps(Vector3(0, -0.25, 0), 0.09, 0.50, d.c.darkened(0.30), j)
+			_org("jambe_pnj", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.48, 0), 0.10, 0.07), Vector3.ZERO, d.c.darkened(0.30), j)
 			_box(Vector3(0, -0.53, -0.03), Vector3(0.16, 0.15, 0.24), Color(0.30, 0.22, 0.12), j)
-		_box(Vector3(0, 0.95, 0), Vector3(0.42, 0.50, 0.27), d.c, root)
+		_org("torse_pnj", make_bboite(Vector3(0.42, 0.50, 0.27)), Vector3(0, 0.95, 0), d.c, root)
 		_box(Vector3(0, 0.74, 0), Vector3(0.44, 0.10, 0.29), Color(0.35, 0.24, 0.13), root)
 		# b31 : bassin : les jambes touchent le torse (plus de trou)
 		_box(Vector3(0, 0.66, 0), Vector3(0.36, 0.20, 0.24), d.c.darkened(0.15), root)
@@ -1246,10 +1349,13 @@ func creer_ville():
 		var bras_g := Node3D.new(); bras_g.position = Vector3(-0.29, 1.12, 0); root.add_child(bras_g)
 		var bras_d := Node3D.new(); bras_d.position = Vector3(0.29, 1.12, 0); root.add_child(bras_d)
 		for b in [bras_g, bras_d]:
-			_caps(Vector3(0, -0.19, 0), 0.07, 0.38, d.c, b)
-			_sph(Vector3(0, -0.40, 0), 0.07, PEAU, b)
+			_org("bras_pnj", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.34, 0), 0.08, 0.055), Vector3.ZERO, d.c, b)
+			# b43 : main avec doigts
+			_box(Vector3(0, -0.40, 0), Vector3(0.10, 0.10, 0.12), PEAU, b)
+			for fg in range(4):
+				_box(Vector3(-0.036 + fg * 0.024, -0.48, -0.01), Vector3(0.02, 0.07, 0.02), PEAU, b)
 		var tete := Node3D.new(); tete.position = Vector3(0, 1.38, 0); root.add_child(tete)
-		_box(Vector3(0, 0, 0), Vector3(0.28, 0.28, 0.26), PEAU, tete)
+		_org("tete_pnj", make_bboite(Vector3(0.28, 0.28, 0.26), 0.05), Vector3.ZERO, PEAU, tete)
 		_box(Vector3(-0.07, 0.03, 0.135), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 		_box(Vector3(0.07, 0.03, 0.135), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 		if d.n == "Forgeron":
@@ -1533,26 +1639,6 @@ func creer_arbre_rond(x: float, z: float):
 func creer_props():
 	# Lampadaires alignés le long de la route du village (plus au milieu de la route !)
 	poser_lampadaires_route()
-	# b40 : fleurs colorées en bord de route (comme l'image) — JAMAIS sur la
-	# route elle-même (dist_chemin >= 2.3) ni gêner les colliders existants.
-	var COLS := [Color(0.85, 0.15, 0.15), Color(0.60, 0.25, 0.65), Color(0.95, 0.75, 0.10), Color(0.95, 0.92, 0.85)]
-	if chemin_lisse.size() > 4:
-		for i in range(44):
-			var p: Vector2 = chemin_lisse[(i * 7) % chemin_lisse.size()]
-			var q: Vector2 = chemin_lisse[(i * 7 + 3) % chemin_lisse.size()]
-			var tang := q - p
-			if tang.length() < 0.01:
-				tang = Vector2(1, 0)
-			var perp := Vector2(-tang.y, tang.x).normalized()
-			var side := 1.0 if i % 2 == 0 else -1.0
-			var off := randf_range(2.4, 3.6) * side
-			var fx := p.x + perp.x * off
-			var fz := p.y + perp.y * off
-			if dist_chemin(Vector2(fx, fz)) < 2.3:
-				continue
-			var fy := hauteur_terrain(fx, fz)
-			_cyl(Vector3(fx, fy + 0.14, fz), 0.02, 0.02, 0.28, Color(0.25, 0.45, 0.20), self, 5)
-			_sph(Vector3(fx, fy + 0.32, fz), 0.08, COLS[i % 4], self)
 	# Barils + caisses près de l'auberge et du supermarché
 	for p in [[8.2, 5.6], [8.7, 6.2], [-7.0, -1.4], [-7.7, -1.9], [12.4, 1.0]]:
 		var y := hauteur_terrain(p[0], p[1])
@@ -1647,16 +1733,6 @@ func creer_cloture_village():
 			en_trou = false
 			if a0_trou < 1e8:
 				trous.append({"a0": a0_trou, "a1": a})
-		# Traverses entre deux poteaux consécutifs
-		if absf(a - dernier_angle - step) < 0.001:
-			var ap := a - step
-			var mx := (cos(ap) + cos(a)) * 0.5 * VILLAGE_R
-			var mz := (sin(ap) + sin(a)) * 0.5 * VILLAGE_R
-			var my := hauteur_terrain(mx, mz)
-			var ry := atan2(-(sin(a) - sin(ap)), cos(a) - cos(ap))
-			var long := step * VILLAGE_R + 0.14
-			_box(Vector3(mx, my + 0.72, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
-			_box(Vector3(mx, my + 0.38, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
 		dernier_angle = a
 	# b40 : PALISSADE SERRÉE À POINTES (comme l'image) : ~640 piquets en UN
 	# seul MultiMesh (1 draw call), trous laissés là où passe la route.
@@ -1666,7 +1742,7 @@ func creer_cloture_village():
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = _mesh_cache["piquet"]
 	var pts := []
-	var np := 700
+	var np := 820
 	for i in range(np):
 		var a := float(i) / float(np) * TAU
 		var px := cos(a) * VILLAGE_R
@@ -1749,10 +1825,10 @@ func creer_garde(x: float, z: float) -> Node3D:
 	var jambe_g := Node3D.new(); jambe_g.name = "jg"; jambe_g.position = Vector3(-0.12, 0.62, 0); root.add_child(jambe_g)
 	var jambe_d := Node3D.new(); jambe_d.name = "jd"; jambe_d.position = Vector3(0.12, 0.62, 0); root.add_child(jambe_d)
 	for j in [jambe_g, jambe_d]:
-		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, ACIER.darkened(0.30), j)   # jambards
+		_org("jambe_gd", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.50, 0), 0.105, 0.075), Vector3.ZERO, ACIER.darkened(0.30), j)   # jambards
 		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), ACIER.darkened(0.45), j)  # solerets
 	_box(Vector3(0, 0.70, 0), Vector3(0.38, 0.20, 0.26), ACIER.darkened(0.20), root)  # bassin
-	_box(Vector3(0, 0.98, 0), Vector3(0.44, 0.52, 0.28), ACIER, root)       # cuirasse
+	_org("torse_gd", make_bboite(Vector3(0.44, 0.52, 0.28)), Vector3(0, 0.98, 0), ACIER, root)  # cuirasse
 	_prism(Vector3(0, 0.64, 0), Vector3(0.48, 0.26, 0.34), TUNIQUE, root)   # b40 : jupe tunique
 	_box(Vector3(0, 0.80, 0), Vector3(0.46, 0.10, 0.30), Color(0.30, 0.22, 0.12), root)  # ceinturon
 	_box(Vector3(0, 1.02, 0.15), Vector3(0.30, 0.30, 0.05), ACIER.lightened(0.25), root)  # plastron
@@ -1762,12 +1838,15 @@ func creer_garde(x: float, z: float) -> Node3D:
 	var bras_g := Node3D.new(); bras_g.position = Vector3(-0.31, 1.16, 0); root.add_child(bras_g)
 	var bras_d := Node3D.new(); bras_d.position = Vector3(0.31, 1.16, 0); root.add_child(bras_d)
 	for b in [bras_g, bras_d]:
-		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, ACIER.darkened(0.10), b)   # brassards
-		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
+		_org("bras_gd", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.36, 0), 0.085, 0.06), Vector3.ZERO, ACIER.darkened(0.10), b)   # brassards
+		# b43 : main gantée avec doigts
+		_box(Vector3(0, -0.42, 0), Vector3(0.11, 0.11, 0.13), PEAU, b)
+		for fg in range(4):
+			_box(Vector3(-0.039 + fg * 0.026, -0.51, -0.01), Vector3(0.021, 0.08, 0.021), PEAU.darkened(0.10), b)
 	var tete := Node3D.new()
 	tete.position = Vector3(0, 1.42, 0)
 	root.add_child(tete)
-	_box(Vector3(0, 0, 0), Vector3(0.30, 0.30, 0.28), PEAU, tete)           # visage
+	_org("tete_gd", make_bboite(Vector3(0.30, 0.30, 0.28), 0.05), Vector3.ZERO, PEAU, tete)  # visage
 	_box(Vector3(-0.07, 0.03, 0.145), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 	_box(Vector3(0.07, 0.03, 0.145), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 	_box(Vector3(0, 0.17, 0), Vector3(0.34, 0.16, 0.32), ACIER, tete)       # casque
@@ -1853,13 +1932,13 @@ func creer_joueur():
 	jambe_droite = Node3D.new(); jambe_droite.position = Vector3(0.12, 0.62, 0); player_node.add_child(jambe_droite)
 	var PANT := Color(0.36, 0.26, 0.16)   # b42 : pantalon brun (image)
 	for j in [jambe_gauche, jambe_droite]:
-		_caps(Vector3(0, -0.26, 0), 0.095, 0.52, PANT, j)
+		_org("jambe_p", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.50, 0), 0.105, 0.075), Vector3.ZERO, PANT, j)
 		_box(Vector3(0, -0.44, -0.01), Vector3(0.19, 0.10, 0.28), BOTTE.lightened(0.18), j)  # revers de botte
 		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), BOTTE, j)
 		_box(Vector3(0, -0.62, -0.04), Vector3(0.18, 0.05, 0.28), BOTTE.darkened(0.30), j)  # semelle
 
 	# Torse + tunique
-	_box(Vector3(0, 0.98, 0), Vector3(0.44, 0.52, 0.28), TUNIQUE, player_node)
+	_org("torse_p", make_bboite(Vector3(0.44, 0.52, 0.28)), Vector3(0, 0.98, 0), TUNIQUE, player_node)
 	_prism(Vector3(0, 0.66, 0), Vector3(0.52, 0.26, 0.36), TUNIQUE, player_node)
 	_box(Vector3(0, 0.80, 0), Vector3(0.46, 0.10, 0.30), CUIR, player_node)
 	_box(Vector3(0, 0.80, 0.16), Vector3(0.09, 0.09, 0.03), Color(0.85, 0.70, 0.25), player_node)  # b42 : boucle dorée
@@ -1876,15 +1955,19 @@ func creer_joueur():
 	bras_gauche = Node3D.new(); bras_gauche.position = Vector3(-0.31, 1.16, 0); player_node.add_child(bras_gauche)
 	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.31, 1.16, 0); player_node.add_child(bras_droit)
 	for b in [bras_gauche, bras_droit]:
-		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
+		_org("bras_p", make_membre(Vector3(0, -0.02, 0), Vector3(0, -0.36, 0), 0.085, 0.06), Vector3.ZERO, TUNIQUE, b)
 		_box(Vector3(0, -0.335, 0), Vector3(0.115, 0.07, 0.115), TUNIQUE_F, b)  # b42 : manchette
-		_box(Vector3(0, -0.43, 0), Vector3(0.14, 0.13, 0.15), CUIR, b)   # b40 : gants
+		# b43 : MAIN avec DOIGTS : paume + 4 doigts + pouce devant
+		_box(Vector3(0, -0.42, 0), Vector3(0.11, 0.11, 0.13), CUIR, b)
+		for fg in range(4):
+			_box(Vector3(-0.039 + fg * 0.026, -0.51, -0.01), Vector3(0.021, 0.08, 0.021), CUIR.lightened(0.10), b)
+		_box(Vector3(0, -0.46, -0.09), Vector3(0.022, 0.06, 0.022), CUIR.lightened(0.10), b)
 
 	# Tête + cheveux piquants
 	var tete := Node3D.new()
 	tete.position = Vector3(0, 1.42, 0)
 	player_node.add_child(tete)
-	_box(Vector3(0, 0, 0), Vector3(0.30, 0.30, 0.28), PEAU, tete)
+	_org("tete_p", make_bboite(Vector3(0.30, 0.30, 0.28), 0.05), Vector3.ZERO, PEAU, tete)
 	_box(Vector3(0, 0.16, 0.02), Vector3(0.32, 0.14, 0.30), CHEVEUX, tete)
 	_box(Vector3(0, 0.10, -0.14), Vector3(0.30, 0.12, 0.06), CHEVEUX, tete)
 	_prism(Vector3(-0.09, 0.28, 0.04), Vector3(0.12, 0.18, 0.12), CHEVEUX, tete, Vector3(0, 0, deg_to_rad(15)))
@@ -1978,57 +2061,92 @@ func creer_ennemis():
 
 func _construire_rat(root: Node3D, gros: bool):
 	var s := 1.25 if gros else 0.9
-	# b40 : gris chaud facetté comme l'image de référence
 	var CORPS := Color(0.42, 0.38, 0.36) if gros else Color(0.47, 0.44, 0.42)
 	root.scale = Vector3.ONE * s
-	# Corps + arrière en facettes (dos bombé)
-	_facette(Vector3(0, 0.34, 0.10), CORPS, root, Vector3(0.66, 0.50, 0.85))
-	_facette(Vector3(0, 0.36, -0.34), CORPS.lightened(0.06), root, Vector3(0.40, 0.36, 0.45))
-	# Tête + GUEULE OUVERTE : mâchoire haute + mandibule basse + dents
-	_facette(Vector3(0, 0.34, -0.62), CORPS.lightened(0.10), root, Vector3(0.30, 0.26, 0.34))
-	_box(Vector3(0, 0.20, -0.74), Vector3(0.16, 0.05, 0.20), CORPS.darkened(0.10), root, Vector3(deg_to_rad(-18), 0, 0))
+	# b43 : CORPS LOFTÉ = vrai maillage organique (anneaux qui gonflent puis
+	# rétrécissent le long du dos), comme le rat de l'image de référence
+	var rings := []
+	var prof := [
+		[Vector3(0, 0.28, 0.52), 0.09, 0.09],
+		[Vector3(0, 0.33, 0.30), 0.24, 0.25],
+		[Vector3(0, 0.38, 0.00), 0.33, 0.35],
+		[Vector3(0, 0.37, -0.28), 0.29, 0.30],
+		[Vector3(0, 0.33, -0.50), 0.19, 0.20],
+		[Vector3(0, 0.29, -0.64), 0.11, 0.11],
+	]
+	for pr in prof:
+		rings.push_back(anneau_z(pr[0], pr[1], pr[2], 8))
+	_org("rat_corps_%d" % (1 if gros else 0), make_loft(rings), Vector3.ZERO, CORPS, root)
+	# Gueule ouverte : mandibule + dents + museau rose
+	_box(Vector3(0, 0.18, -0.72), Vector3(0.17, 0.05, 0.22), CORPS.darkened(0.12), root, Vector3(deg_to_rad(-20), 0, 0))
 	for dx in [-0.05, 0.05]:
-		_cone(Vector3(dx, 0.27, -0.80), 0.020, 0.07, Color(0.95, 0.93, 0.85), root, 4)
-	_cone(Vector3(0, 0.30, -0.86), 0.055, 0.12, Color(0.80, 0.50, 0.52), root, 5)
-	# Oreilles rondes roses intérieures
-	for ex in [-0.16, 0.16]:
-		_sph(Vector3(ex, 0.56, -0.42), 0.11, CORPS.lightened(0.12), root)
-		_sph(Vector3(ex, 0.56, -0.46), 0.06, Color(0.85, 0.55, 0.60), root)
+		_cone(Vector3(dx, 0.26, -0.80), 0.020, 0.08, Color(0.95, 0.93, 0.85), root, 4)
+	_cone(Vector3(0, 0.30, -0.84), 0.055, 0.12, Color(0.80, 0.50, 0.52), root, 5)
+	# Oreilles rondes aplaties + intérieur rose
+	for ex in [-0.15, 0.15]:
+		_sph(Vector3(ex, 0.55, -0.40), 0.11, CORPS.lightened(0.12), root)
+		_sph(Vector3(ex, 0.55, -0.44), 0.06, Color(0.85, 0.55, 0.60), root)
 	# Yeux rouges
-	_sph(Vector3(-0.10, 0.40, -0.60), 0.035, Color(1, 0.05, 0.05), root, true)
-	_sph(Vector3(0.10, 0.40, -0.60), 0.035, Color(1, 0.05, 0.05), root, true)
-	# Pattes
-	for px in [-0.22, 0.22]:
-		for pz in [-0.30, 0.32]:
-			_box(Vector3(px, 0.10, pz), Vector3(0.09, 0.20, 0.09), CORPS.darkened(0.22), root)
-	# Queue rose en S : 3 segments relevés comme l'image
-	_cyl(Vector3(0, 0.30, 0.62), 0.035, 0.022, 0.55, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(105), 0, 0))
-	_cyl(Vector3(0, 0.50, 0.86), 0.022, 0.016, 0.45, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(60), 0, 0))
-	_cyl(Vector3(0, 0.72, 1.00), 0.016, 0.010, 0.35, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(20), 0, 0))
+	_sph(Vector3(-0.10, 0.40, -0.58), 0.035, Color(1, 0.05, 0.05), root, true)
+	_sph(Vector3(0.10, 0.40, -0.58), 0.035, Color(1, 0.05, 0.05), root, true)
+	# Pattes fuselées (membre organique, pas un cube)
+	for px in [-0.20, 0.20]:
+		for pz in [-0.28, 0.30]:
+			_org("rat_patte", make_membre(Vector3(px, 0.24, pz), Vector3(px * 1.25, 0.02, pz), 0.07, 0.05), Vector3.ZERO, CORPS.darkened(0.20), root)
+	# Queue rose en S : loft courbé qui s'effile
+	var qr := []
+	var qprof := [
+		[Vector3(0, 0.30, 0.50), 0.040],
+		[Vector3(0, 0.38, 0.75), 0.032],
+		[Vector3(0, 0.55, 0.92), 0.024],
+		[Vector3(0, 0.75, 0.98), 0.016],
+		[Vector3(0, 0.92, 0.92), 0.010],
+	]
+	for qp in qprof:
+		qr.push_back(anneau(qp[0], qp[1], qp[1], 6))
+	_org("rat_queue", make_loft(qr), Vector3.ZERO, Color(0.85, 0.55, 0.60), root)
 
 func _construire_araignee(root: Node3D):
-	# b40 : brun foncé facetté, GENOUX LEVÉS au-dessus du corps (image)
 	var CORPS := Color(0.23, 0.14, 0.10)
-	_facette(Vector3(0, 0.58, 0.28), CORPS, root, Vector3(0.66, 0.56, 0.74))
-	_facette(Vector3(0, 0.52, -0.26), CORPS.lightened(0.10), root, Vector3(0.38, 0.34, 0.38))
-	# Crocs devant
+	# b43 : ABDOMEN lofté en oeuf facetté + thorax plus petit devant
+	var ab := []
+	for pr in [
+		[Vector3(0, 0.55, 0.62), 0.10, 0.10],
+		[Vector3(0, 0.60, 0.40), 0.26, 0.28],
+		[Vector3(0, 0.62, 0.15), 0.33, 0.34],
+		[Vector3(0, 0.58, -0.05), 0.24, 0.25],
+		[Vector3(0, 0.54, -0.18), 0.13, 0.13],
+	]:
+		ab.push_back(anneau_z(pr[0], pr[1], pr[2], 8))
+	_org("arai_abdomen", make_loft(ab), Vector3.ZERO, CORPS, root)
+	var th := []
+	for pr in [
+		[Vector3(0, 0.52, -0.16), 0.12, 0.12],
+		[Vector3(0, 0.54, -0.30), 0.20, 0.20],
+		[Vector3(0, 0.52, -0.44), 0.15, 0.15],
+		[Vector3(0, 0.50, -0.52), 0.08, 0.08],
+	]:
+		th.push_back(anneau_z(pr[0], pr[1], pr[2], 8))
+	_org("arai_thorax", make_loft(th), Vector3.ZERO, CORPS.lightened(0.08), root)
+	# Crocs
 	for dx in [-0.07, 0.07]:
-		_cone(Vector3(dx, 0.40, -0.46), 0.035, 0.14, Color(0.10, 0.06, 0.05), root, 4)
+		_cone(Vector3(dx, 0.42, -0.56), 0.035, 0.14, Color(0.10, 0.06, 0.05), root, 4)
 	# Yeux rouges
 	for ex in [-0.10, -0.03, 0.04, 0.11]:
-		_sph(Vector3(ex, 0.56, -0.42), 0.03, Color(1, 0.05, 0.05), root, true)
-	# 8 pattes coudées : fémur montant + tibia descendant
+		_sph(Vector3(ex, 0.58, -0.48), 0.03, Color(1, 0.05, 0.05), root, true)
+	# 8 PATTES organiques : hanche->genou levé, genou->cheville, cheville->sol
 	for cote in [-1, 1]:
 		for k in range(4):
 			var a := deg_to_rad(-50 + k * 33)
-			var hx: float = cos(a) * 0.35 * cote
-			var hz: float = sin(a) * 0.35 - 0.1
-			var patte := Node3D.new()
-			patte.position = Vector3(hx * 0.6, 0.52, hz)
-			patte.rotation.y = -atan2(hz, hx * cote) * cote
-			root.add_child(patte)
-			_box(Vector3(0.30 * cote, 0.22, 0), Vector3(0.62, 0.07, 0.07), CORPS.darkened(0.08), patte, Vector3(0, 0, deg_to_rad(-38) * cote))
-			_box(Vector3(0.68 * cote, -0.16, 0), Vector3(0.58, 0.05, 0.05), CORPS.darkened(0.20), patte, Vector3(0, 0, deg_to_rad(52) * cote))
+			var hx: float = cos(a) * 0.30 * cote
+			var hz: float = sin(a) * 0.30 - 0.25
+			var genou := Vector3(hx * 2.2, 0.95, hz * 1.5)
+			var chev := Vector3(hx * 3.4, 0.45, hz * 2.1)
+			var pied := Vector3(hx * 4.0, 0.02, hz * 2.5)
+			var hanche := Vector3(hx, 0.55, hz)
+			_org("arai_p1", make_membre(hanche, genou, 0.065, 0.05), Vector3.ZERO, CORPS.darkened(0.05), root)
+			_org("arai_p2", make_membre(genou, chev, 0.05, 0.038), Vector3.ZERO, CORPS.darkened(0.12), root)
+			_org("arai_p3", make_membre(chev, pied, 0.038, 0.015), Vector3.ZERO, CORPS.darkened(0.20), root)
 
 func update_ennemis(delta: float):
 	for e in enemies:
