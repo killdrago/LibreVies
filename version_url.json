@@ -1,45 +1,57 @@
 {
-  "launcher_version": "3.0.0",
-  "game_version": "0.3.0",
-  "notes": "MAJ 0.4.0 : distribution Windows autonome. Le launcher ne telecharge plus Godot ; le runtime est integre dans game/LibreViesGame.exe. Mise a jour atomique des fichiers et du launcher.",
+  "launcher_version": "3.1.0",
+  "game_version": "0.4.0-unity",
+  "notes": "Migration Unity : build Windows autonome, runtime Unity integre, aucune installation chez le joueur. Le launcher verifie et telecharge les mises a jour avant de lancer game/LibreViesGame.exe.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0af3d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0af3d-librevies",
   "files": {
-    "main.gd": {
-      "hash": "ed696bda80f8170550cebc5341626245",
-      "size": 131544
-    },
-    "main.tscn": {
-      "hash": "0652db0411d434377ceff6c191db7c1e",
-      "size": 602
-    },
-    "project.godot": {
-      "hash": "52f5571046d13d8a5491eb4f9db8fa1e",
-      "size": 5556
-    },
     "launcher.pyw": {
-      "hash": "5a1f850320c5037971187d02499af56e",
-      "size": 632691
+      "hash": "4babb3b7adda344bf5bf955ffeb6043b",
+      "size": 632589
     },
     "build_launcher.bat": {
-      "hash": "7ece7003526d7f71904bf69b534e6906",
-      "size": 3843
-    },
-    "resumer.txt": {
-      "hash": "30b8df758005b073a3d118b026d093c0",
-      "size": 65213
-    },
-    "export_presets.cfg": {
-      "hash": "733656658e05721c0b7e0ec637906761",
-      "size": 755
+      "hash": "fb0be476e9a86038f1f8dd174350a554",
+      "size": 4093
     },
     "make_package_manifest.py": {
       "hash": "dc35d9913fbf46df650539e21cefe7a5",
       "size": 2223
     },
     "README_RELEASE_FR.md": {
-      "hash": "a8d007bd504d3212f9ded7ac7f47b324",
-      "size": 2723
+      "hash": "6c3eed06ad5ef108806d2f7d5c53b714",
+      "size": 2875
+    },
+    "unity/ProjectSettings/ProjectVersion.txt": {
+      "hash": "c8465430dc3155802d7c59d003231f6b",
+      "size": 85
+    },
+    "unity/Packages/manifest.json": {
+      "hash": "464f7d406138501b8302e0eaca3019dd",
+      "size": 496
+    },
+    "unity/Assets/Scripts/LibreViesGame.cs": {
+      "hash": "bed5f8e46646b8ecf868f2a5f2209669",
+      "size": 34034
+    },
+    "unity/Assets/Scripts/LibreViesGame.cs.meta": {
+      "hash": "e76d49202769b639962570456c990024",
+      "size": 239
+    },
+    "unity/Assets/Editor/LibreViesBuild.cs": {
+      "hash": "9904544559b03f30a7e54ac1670963cb",
+      "size": 1307
+    },
+    "unity/Assets/Editor/LibreViesBuild.cs.meta": {
+      "hash": "48e471dd1cce071040800d257dc36e77",
+      "size": 239
+    },
+    "unity/Assets/Scenes/LibreVies.unity": {
+      "hash": "e7043c7c081d08f0c1b21bd203f83b9e",
+      "size": 1270
+    },
+    "unity/ProjectSettings/ProjectSettings.asset": {
+      "hash": "881bc05b66b8c31e691dff2440e22bcf",
+      "size": 2934
     }
   },
   "package": {

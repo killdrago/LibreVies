@@ -1,0 +1,92 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 26
+  productGUID: 6f9a4a6b2c5f4f7fa3b2d1c9e8a70124
+  AndroidProfiler: 0
+  AndroidFilterTouchesWhenObscured: 0
+  AndroidEnableSustainedPerformanceMode: 0
+  defaultScreenOrientation: 4
+  targetDevice: 2
+  useOnDemandResources: 0
+  accelerometerFrequency: 60
+  companyName: LibreVies
+  productName: LibreVies
+  defaultCursor: {fileID: 0}
+  cursorHotspot: {x: 0, y: 0}
+  m_SplashScreenBackgroundColor: {r: 0.102, g: 0.102, b: 0.180, a: 1}
+  m_ShowUnitySplashScreen: 0
+  m_ShowUnitySplashLogo: 0
+  m_SplashScreenOverlayOpacity: 1
+  m_SplashScreenAnimation: 1
+  m_SplashScreenLogoStyle: 1
+  m_SplashScreenDrawMode: 0
+  m_SplashScreenBackgroundAnimationZoom: 1
+  m_SplashScreenLogoAnimationZoom: 1
+  m_SplashScreenBackgroundLandscapeAspect: 1
+  m_SplashScreenBackgroundPortraitAspect: 1
+  m_SplashScreenBackgroundLandscapeUvs: {x: 0, y: 0, width: 1, height: 1}
+  m_SplashScreenBackgroundPortraitUvs: {x: 0, y: 0, width: 1, height: 1}
+  m_SpriteBatchVertexThreshold: 300
+  m_MTRendering: 1
+  mipStripping: 0
+  numberOfMipsStripped: 0
+  m_StackTraceTypes: 010000000100000001000000010000000100000001000000
+  iosShowActivityIndicatorOnLoading: -1
+  androidShowActivityIndicatorOnLoading: -1
+  displayResolutionDialog: 1
+  runInBackground: 1
+  captureSingleScreen: 0
+  muteOtherAudioSources: 0
+  allowFullscreenSwitch: 1
+  forceSingleInstance: 0
+  useFlipModelSwapchain: 1
+  resizableWindow: 1
+  useMacAppStoreValidation: 0
+  macAppStoreCategory: public.app-category.games
+  gpuSkinning: 0
+  xboxOneDisableEsram: 0
+  xboxOneEnableTypeOptimization: 0
+  xboxOnePresentImmediateThreshold: 0
+  switchQueueCommandMemoryPoolSize: 1048576
+  switchQueueControlMemoryPoolSize: 16384
+  switchQueueComputeMemoryPoolSize: 262144
+  switchNVNShaderPoolsGranularity: 33554432
+  switchNVNDefaultPoolsGranularity: 16777216
+  switchNVNOtherPoolsGranularity: 16777216
+  switchGpuScratchPoolGranularity: 2097152
+  switchMaxWorkerMultiple: 8
+  webGLInitialMemorySize: 32
+  webGLMaximumMemorySize: 2048
+  scriptingBackend:
+    Standalone: 1
+  managedStrippingLevel:
+    Standalone: 4
+  incrementalIl2cppBuild: {}
+  suppressCommonWarnings: 1
+  allowUnsafeCode: 0
+  useDeterministicCompilation: 1
+  additionalIl2CppArgs:
+  scriptingRuntimeVersion: 1
+  gcIncremental: 1
+  gcWBarrierValidation: 0
+  apiCompatibilityLevelPerPlatform: {}
+  activeInputHandler: 0
+  bundleVersion: 0.4
+  metroPackageVersion: 1.0.0.0
+  m_ActiveColorSpace: 0
+  m_ActiveColorSpaceAndroid: 0
+  m_ActiveColorSpaceWebGL: 0
+  m_ActiveColorSpaceNintendoSwitch: 0
+  m_ActiveColorSpacePS4: 0
+  m_ActiveColorSpacePS5: 0
+  m_ActiveColorSpaceXboxOne: 0
+  m_ActiveColorSpaceGameCoreScarlett: 0
+  m_ActiveColorSpaceGameCoreXboxOne: 0
+  m_ActiveColorSpaceVisionOS: 0
+  m_ActiveColorSpaceEmbeddedLinux: 0
+  m_ActiveColorSpaceLinux: 0
+  m_ActiveColorSpaceWindows: 0
+  m_ActiveColorSpaceMacOS: 0

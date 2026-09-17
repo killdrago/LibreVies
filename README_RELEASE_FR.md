@@ -1,4 +1,4 @@
-# Distribution LibreVies — fonctionnement joueur
+# Distribution LibreVies — Unity
 
 ## Ce que voit le joueur
 
@@ -8,12 +8,12 @@ La distribution Windows est autonome :
 2. le launcher vérifie le manifeste et télécharge uniquement les fichiers de
    mise à jour nécessaires ;
 3. clic sur **JOUER** ;
-4. le jeu démarre.
+4. le jeu Unity démarre.
 
-Il n'y a **aucune installation de Godot, Python, Unity, Unreal ou autre
-composant** chez le joueur. `game/LibreViesGame.exe` contient le runtime Godot
-et le PCK du jeu. Le joueur ne lance pas cet exécutable directement : seul le
-launcher est à utiliser.
+Il n'y a **aucune installation de Unity Editor, Python, Unity Hub, Unreal ou
+autre composant** chez le joueur. `game/LibreViesGame.exe` est une build Unity
+Windows qui contient son runtime, ses bibliothèques et les données du jeu. Le
+joueur ne lance pas cet exécutable directement : seul le launcher est à utiliser.
 
 Une connexion Internet est uniquement nécessaire pour rechercher et télécharger
 les mises à jour. Si le serveur est momentanément indisponible, le jeu déjà
@@ -21,23 +21,26 @@ installé peut quand même être lancé.
 
 ## Fabriquer la distribution
 
-`build_launcher.bat` est un script de fabrication destiné au développeur. Il
-exporte le projet Godot, compile le launcher et produit `release/`. Les outils
-utilisés pour fabriquer le jeu ne sont pas copiés dans `release/`.
+`build_launcher.bat` est le script de fabrication destiné au développeur. Il
+ouvre Unity en mode batch, exporte le projet situé dans `unity/`, compile le
+launcher et produit `release/`. Les outils de développement ne sont pas copiés
+dans `release/`.
 
 La machine de build doit fournir :
 
-- un exécutable portable de l'éditeur Godot 4.7 compatible Windows dans
-  `tools/`, ou le chemin dans la variable `LIBREVIES_GODOT` ;
+- Unity Editor 2022.3 LTS avec le module Windows Build Support ; le chemin est
+  fourni par `LIBREVIES_UNITY` ;
 - PyInstaller pour compiler le launcher ;
 - Python uniquement sur la machine de build.
 
-Ces prérequis ne sont pas des prérequis du joueur. Le script ne lance plus de
-`pip install` automatiquement et ne télécharge jamais Godot sur la machine du
+Ces prérequis ne sont pas des prérequis du joueur. Le script ne lance pas de
+`pip install` automatiquement et ne télécharge jamais Unity sur la machine du
 joueur.
 
-Pour que les mises à jour des binaires fonctionnent, publier les fichiers
-suivants sur l'hébergement choisi :
+## Mise à jour des fichiers
+
+Pour publier une version, publier les fichiers suivants sur l'hébergement
+choisi :
 
 ```text
 LibreVies.exe
@@ -55,11 +58,18 @@ Le launcher remplace son propre `.exe` après sa fermeture, puis se relance
 automatiquement. Les téléchargements sont vérifiés avant remplacement afin
 qu'une mise à jour interrompue ne casse pas l'installation existante.
 
-## À propos d'Unity et Unreal
+## Migration Unity
 
-Unity et Unreal ne sont pas des thèmes graphiques que l'on peut brancher sur un
-projet Godot : ce sont d'autres moteurs et un portage demanderait de réécrire
-le jeu. Pour obtenir exactement le comportement demandé sans installation
-joueur, le projet reste donc exporté en Godot mais le runtime est embarqué dans
-l'exécutable du jeu. Le rendu peut continuer à évoluer dans Godot sans changer
-le parcours `launcher → mise à jour → jouer`.
+Le nouveau projet Unity se trouve dans `unity/`. Le jeu est construit sans
+asset externe obligatoire : le monde low-poly, les bâtiments, le château, le
+personnage, les ennemis, le combat, les objets, la caméra et le HUD sont créés
+par `Assets/Scripts/LibreViesGame.cs`.
+
+La version Unity conserve le parcours demandé :
+
+```text
+launcher → mises à jour → jouer → LibreViesGame.exe
+```
+
+Aucun éditeur ni projet de développement n'est copié dans la distribution
+finale : seul le launcher et la build Windows Unity sont nécessaires au joueur.

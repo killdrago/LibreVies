@@ -5,6 +5,14 @@
 *.spec
 /icon.ico
 
+# Unity génère ces dossiers localement lors de l'ouverture/build
+/unity/Library/
+/unity/Temp/
+/unity/Logs/
+/unity/obj/
+/unity/UserSettings/
+/unity/Builds/
+
 # Fichiers temporaires du launcher / de l'export
 __pycache__/
 *.download

@@ -61,14 +61,14 @@ if getattr(sys, 'frozen', False):
     GAME_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
-# Le jeu distribué est déjà exporté avec Godot. Le joueur ne télécharge donc
-# ni Godot, ni Python, ni un autre composant : le runtime est dans le dossier
-# game\ de la distribution, comme pour un jeu Windows classique.
+# Le jeu distribué est déjà exporté avec Unity. Le joueur ne télécharge donc
+# ni Unity, ni Python, ni un autre composant : le runtime est intégré à la
+# build Windows située dans le dossier game\ de la distribution.
 GAME_EXECUTABLE = "game/LibreViesGame.exe"
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 
-LAUNCHER_VERSION = "3.0.0"
-GAME_VERSION = "0.3.0"
+LAUNCHER_VERSION = "3.1.0"
+GAME_VERSION = "0.4.0-unity"
 DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0af3d-librevies"
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
@@ -76,8 +76,8 @@ ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
-    {"date": "17/09/2026", "t": "Launcher 3.0.0 — distribution autonome",
-     "d": "Le jeu exporte contient deja son runtime : le joueur ne telecharge plus Godot. Le launcher verifie les MAJ, les telecharge, puis lance directement LibreViesGame.exe. Le launcher peut aussi se mettre a jour et redemarrer seul."},
+    {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
+     "d": "Le jeu Unity exporte contient deja son runtime : le joueur ne telecharge pas Unity. Le launcher verifie les MAJ, les telecharge, puis lance directement LibreViesGame.exe. Le launcher peut aussi se mettre a jour et redemarrer seul."},
     {"date": "14/09/2026", "t": "Launcher 2.8.0 — retour aux hashs md5",
      "d": "Le systeme a numeros (2.7.0) est abandonne : retour au hash md5 par fichier, qui detecte et REPARE aussi les fichiers corrompus. Regle imperative inchangee : tout changement de fichier = nouveau hash dans version_url.json ; tout nouveau fichier = nouvelle ligne avec son hash ; toute suppression = ligne retiree."},
     {"date": "14/09/2026", "t": "Launcher 2.6.0 — images integrees",
@@ -86,8 +86,6 @@ NEWS = [
      "d": "Monde entier reconstruit en PrimitiveMesh (Box/Sphere/Cylinder/Prism/Capsule) : collines facettees, sapins, chateau, nuages. Fidèle à la capture de référence."},
     {"date": "13/09/2026", "t": "Nouveau personnage + HUD complet",
      "d": "Héros low-poly au marteau (remplace perso_voxel.glb), rats/araignées, dégâts flottants, mini-carte, quêtes, hotbar, barre d'XP."},
-    {"date": "13/09/2026", "t": "Migration Godot 4.7.2",
-     "d": "Projet et launcher migrés vers Godot 4.7.2-stable (dernière version)."},
     {"date": "31/07/2026", "t": "Auto-Update v2.0",
      "d": "Le launcher se met a jour automatiquement. Aucune action requise."},
     {"date": "31/07/2026", "t": "Version bump integre",
@@ -103,8 +101,8 @@ NEWS = [
 # OUTILS
 # ============================================================
 
-TEXT_EXTS = ('.gd', '.tscn', '.godot', '.pyw', '.py', '.bat', '.json',
-             '.cfg', '.txt', '.md', '.html', '.css', '.js', '.csv')
+TEXT_EXTS = ('.pyw', '.py', '.bat', '.json', '.cfg', '.txt', '.md',
+             '.html', '.css', '.js', '.csv', '.cs', '.meta', '.unity')
 
 
 def file_hash(path, normalize=False):
@@ -201,7 +199,7 @@ def _manifest_files(cfg):
 
     En développement (launcher.pyw), l'ancien manifeste source reste accepté.
     Dans le .exe livré au joueur, seuls les artefacts du package sont suivis :
-    jamais les .gd ou l'éditeur Godot.
+    jamais les sources du projet ou l'éditeur Unity.
     """
     package = cfg.get('package', {})
     if getattr(sys, 'frozen', False):
@@ -379,8 +377,8 @@ def find_game():
 
 
 def launch(path):
-    # L'export contient déjà le runtime Godot et le PCK du jeu : aucun
-    # argument --path et aucun téléchargement ne sont nécessaires au joueur.
+    # La build Unity contient déjà ses bibliothèques et ses données : aucun
+    # argument spécial et aucun téléchargement ne sont nécessaires au joueur.
     subprocess.Popen([path], cwd=GAME_DIR, close_fds=False)
 
 

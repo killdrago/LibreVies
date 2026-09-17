@@ -3,32 +3,30 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 echo ========================================
-echo   LibreVies - build de la distribution
+echo   LibreVies - build de la distribution Unity
 echo ========================================
 echo.
 echo Le dossier release contiendra uniquement :
 echo   LibreVies.exe       = launcher autonome
-echo   game\LibreViesGame.exe = jeu exporte avec son runtime Godot
+echo   game\LibreViesGame.exe = jeu Unity exporte
 echo   version_url.json    = manifeste des mises a jour
 echo.
 
-rem Le runtime Godot n'est JAMAIS telecharge par le joueur. Cette recherche
-rem sert seulement a la machine qui fabrique la distribution.
-set "GODOT=%LIBREVIES_GODOT%"
-if not defined GODOT if exist "%~dp0tools\godot.exe" set "GODOT=%~dp0tools\godot.exe"
-if not defined GODOT if exist "%~dp0tools\Godot_v4.7.2-stable_win64.exe" set "GODOT=%~dp0tools\Godot_v4.7.2-stable_win64.exe"
-if not defined GODOT (
-    for /r "%~dp0tools" %%G in (godot*.exe) do if not defined GODOT set "GODOT=%%G"
-)
-if not defined GODOT (
-    echo ERREUR : Godot exportable introuvable.
-    echo Placez l'editeur portable Godot dans tools\ ou definissez LIBREVIES_GODOT.
+rem Unity est requis uniquement sur la machine qui fabrique la build.
+rem Il n'est jamais installe ou telecharge chez le joueur.
+set "UNITY=%LIBREVIES_UNITY%"
+if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe"
+if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe"
+if not defined UNITY if exist "%ProgramFiles(x86)%\Unity\Editor\Unity.exe" set "UNITY=%ProgramFiles(x86)%\Unity\Editor\Unity.exe"
+if not defined UNITY (
+    echo ERREUR : Unity Editor introuvable.
+    echo Definissez LIBREVIES_UNITY avec le chemin de Unity.exe.
     echo Cette etape est reservee au build, elle n'est pas demandee au joueur.
     pause
     exit /b 1
 )
-if not exist "%GODOT%" (
-    echo ERREUR : GODOT pointe vers un fichier inexistant : %GODOT%
+if not exist "%UNITY%" (
+    echo ERREUR : UNITY pointe vers un fichier inexistant : %UNITY%
     pause
     exit /b 1
 )
@@ -36,13 +34,14 @@ if not exist "%GODOT%" (
 python -c "import PyInstaller" >nul 2>&1
 if errorlevel 1 (
     echo ERREUR : PyInstaller manque sur la machine de build.
-    echo Installez-le une seule fois sur la machine du developpeur, pas chez les joueurs.
+    echo Il est necessaire uniquement pour fabriquer LibreVies.exe.
     pause
     exit /b 1
 )
 
 if exist "release" rmdir /s /q "release"
 if exist "build\launcher" rmdir /s /q "build\launcher"
+if exist "build\unity.log" del /q "build\unity.log"
 mkdir "release\game"
 mkdir "build\launcher"
 
@@ -57,15 +56,15 @@ if not exist "icon.ico" (
 )
 
 echo.
-echo [1/3] Export du jeu Godot avec runtime integre...
-"%GODOT%" --headless --path "%~dp0" --export-release "Windows Desktop" "%~dp0release\game\LibreViesGame.exe"
+echo [1/3] Export du jeu Unity avec son runtime integre...
+"%UNITY%" -batchmode -nographics -quit -projectPath "%~dp0unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%~dp0release\game\LibreViesGame.exe" -logFile "%~dp0build\unity.log"
 if errorlevel 1 (
-    echo ERREUR : export Godot echoue.
+    echo ERREUR : export Unity echoue. Consultez build\unity.log
     pause
     exit /b 1
 )
 if not exist "release\game\LibreViesGame.exe" (
-    echo ERREUR : l'export n'a pas produit LibreViesGame.exe
+    echo ERREUR : Unity n'a pas produit LibreViesGame.exe
     pause
     exit /b 1
 )
@@ -106,7 +105,7 @@ echo   Distribution : %~dp0release\
 echo   Lancez release\LibreVies.exe
 echo ========================================
 echo.
-echo IMPORTANT : pour les MAJ du jeu, publiez les deux exe et
-echo version_url.json, puis configurez LIBREVIES_ASSET_BASE_URL
-echo vers l'URL publique de ces fichiers.
+echo IMPORTANT : publiez les deux exe et version_url.json.
+echo Pour les mises a jour, LIBREVIES_ASSET_BASE_URL doit pointer
+echo vers l'URL publique des fichiers de la distribution.
 pause
