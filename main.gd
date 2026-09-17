@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b46"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b47"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -1131,8 +1131,10 @@ func creer_ville():
 		for side in [-1.0, 1.0]:
 			for ti in range(NR):
 				var tm := (float(ti) + 0.5) / float(NR)
-				var zm: float = side * tm * H
-				var ym: float = y + b.h + rh * (1.0 - tm * H / half) + 0.02
+				# b47 : les rangs s'arrêtent SOUS le faîtage (0.06H..0.92H) :
+				# le coin haut des tuiles inclinées ne dépasse plus en haut
+				var zm: float = side * (0.06 * H + tm * 0.86 * H)
+				var ym: float = y + b.h + rh * (1.0 - absf(zm) / half) + 0.02
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
 				# b46 : rangs décalés SANS enveloppement : le rang décalé a
 				# juste une colonne de moins => bords symétriques PARTOUT
@@ -1147,12 +1149,12 @@ func creer_ville():
 			for ex in [-1.0, 1.0]:
 				for ti in range(NR):
 					var tm2 := (float(ti) + 0.5) / float(NR)
-					var zm2: float = side * tm2 * H
-					var ym2: float = y + b.h + rh * (1.0 - tm2 * H / half) + 0.045
+					var zm2: float = side * (0.06 * H + tm2 * 0.86 * H)
+					var ym2: float = y + b.h + rh * (1.0 - absf(zm2) / half) + 0.045
 					_box(Vector3(b.x + ex * (W - lw * 0.62), ym2, b.z + zm2), Vector3(lw * 0.95, 0.09, lr * 1.18), b.roof.darkened(0.18), null, Vector3(side * ang, 0, 0))
 			# b44 : rive basse (égout) : fascia de tuiles le long du bord bas
 			_box(Vector3(b.x, y + b.h + 0.06, b.z + side * (H + 0.02)), Vector3(W * 2.0, 0.12, 0.14), b.roof.darkened(0.22), null, Vector3(side * ang, 0, 0))
-		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
+		_box(Vector3(b.x, y + b.h + rh + 0.06, b.z), Vector3(b.w + 0.5, 0.26, 0.44), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
 		_box(Vector3(b.x, y + b.h * 0.56, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.28, 0.08, 0.16), Color(0.38, 0.22, 0.09))
@@ -1922,10 +1924,12 @@ func _construire_rat(root: Node3D, gros: bool) -> Dictionary:
 			root.add_child(piv)
 			_box(Vector3(0, -0.12, 0), Vector3(0.07, 0.24, 0.07), CORPS.darkened(0.22), piv)
 			pattes.append({"n": piv, "y0": 0.0})
-	# Queue rose en 3 segments courbés
-	_cyl(Vector3(0, 0.30, 0.55), 0.035, 0.022, 0.5, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(105), 0, 0))
-	_cyl(Vector3(0, 0.48, 0.78), 0.022, 0.014, 0.4, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(60), 0, 0))
-	_cyl(Vector3(0, 0.68, 0.90), 0.014, 0.008, 0.3, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(25), 0, 0))
+	# b47 : UNE SEULE queue : chaîne de sphères le long d'une courbe lisse
+	# (les 3 cylindres cassés d'avant semblaient faire 2 queues)
+	var qpts := [Vector3(0, 0.30, 0.50), Vector3(0, 0.36, 0.72), Vector3(0, 0.50, 0.88), Vector3(0, 0.68, 0.94), Vector3(0, 0.86, 0.90)]
+	var qrr := [0.045, 0.036, 0.028, 0.020, 0.012]
+	for qi in range(5):
+		_sph(qpts[qi], qrr[qi], Color(0.85, 0.55, 0.60), root)
 	return {"pattes": pattes, "mode": "rat"}
 
 func _construire_araignee(root: Node3D) -> Dictionary:
@@ -1946,15 +1950,15 @@ func _construire_araignee(root: Node3D) -> Dictionary:
 	for cote in [-1, 1]:
 		for k in range(4):
 			var a := deg_to_rad(-50 + k * 33)
-			var hx: float = cos(a) * 0.35 * cote
-			var hz: float = sin(a) * 0.35 - 0.1
+			var hx: float = cos(a) * 0.30 * cote
+			var hz: float = sin(a) * 0.30 - 0.1
 			var patte := Node3D.new()
-			patte.position = Vector3(hx * 0.6, 0.62, hz)
+			patte.position = Vector3(hx * 0.55, 0.66, hz)
 			var yaw: float = -atan2(hz, hx * cote) * cote
 			patte.rotation.y = yaw
 			root.add_child(patte)
-			_box(Vector3(0.28 * cote, 0.18, 0), Vector3(0.56, 0.06, 0.06), CORPS.darkened(0.08), patte, Vector3(0, 0, deg_to_rad(-32) * cote))
-			_box(Vector3(0.62 * cote, -0.10, 0), Vector3(0.52, 0.045, 0.045), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(50) * cote))
+			_box(Vector3(0.22 * cote, 0.16, 0), Vector3(0.45, 0.06, 0.06), CORPS.darkened(0.08), patte, Vector3(0, 0, deg_to_rad(-32) * cote))
+			_box(Vector3(0.50 * cote, -0.10, 0), Vector3(0.42, 0.045, 0.045), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(50) * cote))
 			pattes.append({"n": patte, "y0": yaw})
 	return {"pattes": pattes, "mode": "araignee"}
 

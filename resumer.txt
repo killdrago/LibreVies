@@ -918,6 +918,24 @@ INTACTS. Changements :
   (pair : ±(W-0.05lw) ; impair : -W+0.55lw .. +0.86W). Rives inchangées.
 - Manifeste 6 entrées ; seuls main.gd + resumer.txt changent. BUILD b46.
 
+4ao) MAJ DU 17/09/2026 (build b47) — FAÎTAGE, QUEUE UNIQUE, PATTES COURTES
+----------------------------------------------------------------------------
+- Dev : tuiles du HAUT qui débordent ; souris à 2 queues ; autour de
+  l'araignée des bouts de pattes qui sortent du sol vers le haut.
+- TUILES HAUTES : le coin haut d'une tuile inclinée monte de sin(ang)*
+  demi-longueur AU-DESSUS du pan => au dernier rang ça passait au-dessus
+  de la faîtière (trop fine : 0.14 d'épais). b47 : rangs mappés sur
+  0.06H..0.92H (zm = side*(0.06H + tm*0.86H), ym suit absf(zm)) ET
+  faîtière épaissie/élargie (0.26 d'épais, 0.44 de large, centrée +0.06)
+  => elle coiffe tous les coins hauts. Rives mappées pareil.
+- QUEUE rat/souris : les 3 cylindres coudés semblaient 2 queues => UNE
+  seule chaîne de 5 sphères rayon décroissant le long d'une courbe lisse.
+- ARAIGNÉE : pattes trop longues => pointes plantées dans les pentes
+  autour d'elle (les genoux ressortaient du sol). b47 : hanches resserrées
+  (0.30 au lieu de 0.35, pivot x0.55, y 0.66), fémur 0.45, tibia 0.42 =>
+  envergure ~0.63 au lieu de ~0.85, pointes ~0.35 au-dessus du sol.
+- Manifeste 6 entrées ; seuls main.gd + resumer.txt changent. BUILD b47.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +
