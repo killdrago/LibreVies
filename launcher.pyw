@@ -202,10 +202,15 @@ def _manifest_files(cfg):
     jamais les sources du projet ou l'éditeur Unity.
     """
     package = cfg.get('package', {})
+    if isinstance(package, dict) and package.get('files'):
+        # Même lancé depuis launcher.pyw, le client doit télécharger la build
+        # Unity publiée avant d'afficher JOUER. Le mode source ne doit donc
+        # pas remplacer le jeu par les fichiers du projet Unity.
+        return package.get('files', {})
     if getattr(sys, 'frozen', False):
-        if isinstance(package, dict):
-            return package.get('files', {}) or {}
         return {}
+    # Compatibilité avec un ancien manifeste de développement qui ne contient
+    # pas encore de package Unity.
     return cfg.get('files', {}) or {}
 
 
@@ -707,7 +712,7 @@ class App(tk.Tk):
         if self.game:
             self._ready(True)
         else:
-            self._upd_bar(0, 'Jeu integre absent : executer build_launcher.bat')
+            self._upd_bar(0, 'Jeu Unity absent : build non publiee dans le manifeste')
 
     def _ready(self, ok):
         if ok:

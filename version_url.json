@@ -6,8 +6,8 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0af3d-librevies",
   "files": {
     "launcher.pyw": {
-      "hash": "4babb3b7adda344bf5bf955ffeb6043b",
-      "size": 632589
+      "hash": "584955bef2aab002546c2ec330afa2bc",
+      "size": 632945
     },
     "build_launcher.bat": {
       "hash": "fb0be476e9a86038f1f8dd174350a554",
@@ -18,8 +18,8 @@
       "size": 2223
     },
     "README_RELEASE_FR.md": {
-      "hash": "6c3eed06ad5ef108806d2f7d5c53b714",
-      "size": 2875
+      "hash": "bce0a46b7be631968b30c0364feb4ea6",
+      "size": 3362
     },
     "unity/ProjectSettings/ProjectVersion.txt": {
       "hash": "c8465430dc3155802d7c59d003231f6b",

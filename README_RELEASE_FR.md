@@ -2,9 +2,11 @@
 
 ## Ce que voit le joueur
 
-La distribution Windows est autonome :
+Le client peut être lancé directement avec `launcher.pyw` pendant le
+développement, ou avec `LibreVies.exe` dans la distribution finale. Dans les
+deux cas, le fonctionnement est identique :
 
-1. double-clic sur `LibreVies.exe` ;
+1. double-clic sur `launcher.pyw` ou `LibreVies.exe` ;
 2. le launcher vérifie le manifeste et télécharge uniquement les fichiers de
    mise à jour nécessaires ;
 3. clic sur **JOUER** ;
@@ -57,6 +59,11 @@ sans mettre un gros binaire dans l'historique git.
 Le launcher remplace son propre `.exe` après sa fermeture, puis se relance
 automatiquement. Les téléchargements sont vérifiés avant remplacement afin
 qu'une mise à jour interrompue ne casse pas l'installation existante.
+
+Pour que `launcher.pyw` puisse jouer sans rien fabriquer localement, le champ
+`package.files` du `version_url.json` publié doit contenir le hash, la taille et
+l'URL de `game/LibreViesGame.exe`. Le launcher téléchargera alors cette build
+comme n'importe quelle mise à jour, puis activera automatiquement JOUER.
 
 ## Migration Unity
 
