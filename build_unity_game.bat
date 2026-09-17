@@ -11,6 +11,14 @@ if not exist "%ROOT%launcher.pyw" (
     exit /b 1
 )
 cd /d "%ROOT%"
+set "PROJECT=%ROOT%unity"
+if exist "%ROOT%Assets\Scripts" set "PROJECT=%ROOT%"
+if exist "%ROOT%unity\unity\Assets\Scripts" set "PROJECT=%ROOT%unity\unity"
+for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if exist "%%~fD" (
+    echo Nettoyage de l'ancien package Unity Collab incompatible avec Unity 6.6...
+    rmdir /s /q "%PROJECT%\Library"
+    if exist "%PROJECT%\Packages\packages-lock.json" del /q "%PROJECT%\Packages\packages-lock.json"
+)
 
 echo ========================================
 echo   LibreVies - fabrication du jeu Unity
@@ -52,7 +60,7 @@ if exist "build\unity.log" del /q "build\unity.log"
 if not exist "build" mkdir "build"
 
 echo Export Windows Unity en cours...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%ROOT%unity" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : Unity a echoue. Consultez build\unity.log
     pause

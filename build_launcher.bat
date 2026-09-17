@@ -16,6 +16,12 @@ if not exist "%LAUNCHER%" (
 )
 set "PROJECT=%ROOT%unity"
 if exist "%ROOT%Assets\Scripts" set "PROJECT=%ROOT%"
+if exist "%ROOT%unity\unity\Assets\Scripts" set "PROJECT=%ROOT%unity\unity"
+for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if exist "%%~fD" (
+    echo Nettoyage de l'ancien package Unity Collab incompatible avec Unity 6.6...
+    rmdir /s /q "%PROJECT%\Library"
+    if exist "%PROJECT%\Packages\packages-lock.json" del /q "%PROJECT%\Packages\packages-lock.json"
+)
 cd /d "%ROOT%"
 
 echo ========================================

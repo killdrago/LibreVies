@@ -10,8 +10,8 @@
       "size": 632945
     },
     "build_launcher.bat": {
-      "hash": "04b51d8e9c421dcfa6db5c25f01d4021",
-      "size": 5261
+      "hash": "d8e3174ea72f4495a60e8d357192d1ef",
+      "size": 5654
     },
     "make_package_manifest.py": {
       "hash": "7f7262e28acbab7c63c473118c6f8764",
@@ -26,8 +26,8 @@
       "size": 68
     },
     "unity/Packages/manifest.json": {
-      "hash": "464f7d406138501b8302e0eaca3019dd",
-      "size": 496
+      "hash": "5de4e9f471f0a855b8792263c072c870",
+      "size": 193
     },
     "unity/Assets/Scripts/LibreViesGame.cs": {
       "hash": "bed5f8e46646b8ecf868f2a5f2209669",
@@ -54,8 +54,8 @@
       "size": 2933
     },
     "build_unity_game.bat": {
-      "hash": "16d57401b5cab421084c91c4203eccc3",
-      "size": 2747
+      "hash": "edf7f04267e0a86304cd1bd96bc7e630",
+      "size": 3217
     },
     "setup_unity_build_tools.bat": {
       "hash": "4123e37dba026ed245c5f211facbd4dd",
