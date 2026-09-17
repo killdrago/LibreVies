@@ -1,13 +1,13 @@
 {
   "launcher_version": "2.8.0",
   "game_version": "0.3.0",
-  "notes": "MAJ 0.3.0-b39 : le jeu démarre AU MILIEU de l'écran où se trouve la souris au lancement (l'écran du launcher). La souris ne sert plus qu'à choisir l'écran ; la fenêtre est centrée sur l'écran (repli en haut-gauche si l'écran est plus petit que la fenêtre). Launcher inchangé. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
+  "notes": "MAJ 0.3.0-b40 : GRANDE REFONTE GRAPHIQUE façon image de référence — toits plus pentus à tuiles quinconce, tours rondes à toit conique, portes cintrées, volets, palissade serrée à pointes (MultiMesh), garde à la lance, rat gueule ouverte et araignée genoux levés, gants du héros, fleurs en bord de route, soleil couchant doré. Gameplay/colliders inchangés. Règle : tout changement = nouveau hash ; nouveau fichier = nouvelle ligne ; suppression = ligne retirée.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a09a4d-librevies",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a09a4d-librevies",
   "files": {
     "main.gd": {
-      "hash": "3307091606104b8c69e67feeb491e470",
-      "size": 127671
+      "hash": "85b717bb2bb4c6dee5d89d698a130060",
+      "size": 133193
     },
     "main.tscn": {
       "hash": "0652db0411d434377ceff6c191db7c1e",
@@ -26,8 +26,8 @@
       "size": 1300
     },
     "resumer.txt": {
-      "hash": "7d6d1139e87c5a80e9c33ca8b16e0b57",
-      "size": 54922
+      "hash": "c806206e041ffa963bf5bf187e0c30ca",
+      "size": 56706
     }
   }
 }

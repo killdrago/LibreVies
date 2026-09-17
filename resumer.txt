@@ -779,6 +779,32 @@ pour l'herbe/fleurs/rochers (perf).
   FETCH_HEAD, recopier les fichiers, vérifier git diff AVANT commit,
   ls-remote avant push. Jamais de force-push.
 
+4ag) MAJ DU 17/09/2026 (build b40) — GRANDE REFONTE GRAPHIQUE (IMAGE DE RÉF.)
+------------------------------------------------------------------------------
+Le dev a fourni une image low-poly « coucher de soleil » (maisons à tuiles,
+tour conique, palissade à pointes, garde à la lance, rat/araignée facettés)
+et veut la MÊME qualité. Tout est procédural (main.gd), colliders/IA/règles
+INTACTS. Changements :
+- MAISONS : pente de toit 0.42→0.55 ; tuiles 4×6 → 6×8 rangs COLS DÉCALÉS
+  en quinconce (bardeaux) ; porte CINTRÉE (demi-cylindre axe Z, rot X 90°) ;
+  VOLETS verts ; tour d'angle RONDE + cône orange + boule dorée sur
+  Supermarché/Auberge/Armurerie/Vêtements (pièces parentées à broot pour
+  le camouflage).
+- CLÔTURE VILLAGE : poteaux fermiers SUPPRIMÉS → PALISSADE SERRÉE À POINTES
+  make_piquet() (planche 1.05 + pointe 1.32) en UN MultiMesh (~640 instances,
+  1 draw call, trous où passe la route, hauteurs/aléas via RandomNumberGenerator
+  seed 4242, material cull DISABLED). Traverses et portails b33 conservés.
+- RAT : gris chaud, gueule OUVERTE (mandibule + 2 dents blanches), oreilles
+  roses intérieures, queue rose en S (3 segments). ARAIGNÉE : genoux LEVÉS
+  (fémur -38° / tibia +52°), crocs, corps plus gros.
+- GARDE : hallebarde → LANCE (barre transversale + fer losange 2 cônes),
+  jupe tunique bleue (prism), nasal sur casque. Comportement b33/b34 intact.
+- JOUEUR : gants cuir (boîte) au lieu des mains peau, tête de marteau +25 %.
+- DÉCOR : 44 fleurs (4 couleurs) en bord de route (dist_chemin >= 2.3,
+  JAMAIS sur la route) ; soleil couchant : rotation -52°→-40°, couleur
+  (1.0,0.85,0.64), énergie 1.25, ciel haut (0.34,0.45,0.75).
+- Manifeste : 6 entrées, seuls main.gd + resumer.txt changent.
+
 5) FICHIERS IMPORTANTS
 ----------------------
 - main.gd + main.tscn : tout le jeu (main.tscn = Node3D + DirectionalLight3D +

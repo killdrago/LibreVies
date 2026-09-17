@@ -14,7 +14,7 @@ const SPD := 5.0
 const RUN := 9.0
 const PV_MAX := 100
 const DEGATS := 25           # dégâts du marteau (comme le "25" du screen)
-const BUILD := "0.3.0-b39"    # témoin de build : titre de fenêtre + message d'accueil
+const BUILD := "0.3.0-b40"    # témoin de build : titre de fenêtre + message d'accueil
 const VILLAGE_R := 26.0      # village protégé : clôture + zone interdite aux monstres
 const HAUT_COLLISION := 2.0  # hauteur logique PAR DÉFAUT d'un collider
 const HAUT_CLOTURE := 1.0    # hauteur clôture village : sautable par le héros (saut 1,6 m), jamais par les monstres
@@ -887,6 +887,22 @@ func make_touffe() -> ArrayMesh:
 			tris.push_back(apex)
 	return mesh_tris(tris, PackedColorArray())
 
+# b40 : piquet de palissade : planche + pointe pyramidale
+func make_piquet() -> ArrayMesh:
+	var tris := PackedVector3Array()
+	var w := 0.085
+	var d := 0.045
+	var y1 := 1.05
+	var apex := 1.32
+	var b: Array[Vector3] = [Vector3(-w, 0, -d), Vector3(w, 0, -d), Vector3(w, 0, d), Vector3(-w, 0, d)]
+	var m: Array[Vector3] = [Vector3(-w, y1, -d), Vector3(w, y1, -d), Vector3(w, y1, d), Vector3(-w, y1, d)]
+	for k in range(4):
+		tris.push_back(b[k]); tris.push_back(b[(k + 1) % 4]); tris.push_back(m[(k + 1) % 4])
+		tris.push_back(b[k]); tris.push_back(m[(k + 1) % 4]); tris.push_back(m[k])
+	for k in range(4):
+		tris.push_back(m[k]); tris.push_back(m[(k + 1) % 4]); tris.push_back(Vector3(0, apex, 0))
+	return mesh_tris(tris, PackedColorArray())
+
 # Rocher low-poly : hexaèdre jitteré
 func make_roche() -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
@@ -911,7 +927,7 @@ func creer_environnement():
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.30, 0.46, 0.78)
+	sm.sky_top_color = Color(0.34, 0.45, 0.75)
 	sm.sky_horizon_color = Color(0.98, 0.74, 0.48)
 	sm.ground_bottom_color = Color(0.45, 0.50, 0.26)
 	sm.ground_horizon_color = Color(0.98, 0.74, 0.48)
@@ -929,9 +945,9 @@ func creer_environnement():
 
 	# Soleil (le DirectionalLight3D de main.tscn)
 	var sun: DirectionalLight3D = $DirectionalLight3D
-	sun.rotation = Vector3(deg_to_rad(-52), deg_to_rad(-32), 0)
-	sun.light_color = Color(1.0, 0.90, 0.74)
-	sun.light_energy = 1.3
+	sun.rotation = Vector3(deg_to_rad(-40), deg_to_rad(-32), 0)
+	sun.light_color = Color(1.0, 0.85, 0.64)
+	sun.light_energy = 1.25
 	sun.shadow_enabled = true
 
 # ============================================================
@@ -1115,10 +1131,10 @@ func creer_ville():
 		# Fondations pierre
 		_box(Vector3(b.x, y + 0.1, b.z), Vector3(b.w + 0.25, 0.25, b.d + 0.25), PIERRE)
 		# Toit en prisme (pignon) + débords
-		var rh: float = b.d * 0.42
+		var rh: float = b.d * 0.55   # b40 : pente PLUS raide (image de réf.)
 		_prism(Vector3(b.x, y + b.h + rh / 2.0 - 0.05, b.z), Vector3(b.d + 0.5, rh, b.w + 0.5), b.roof, null, Vector3(0, deg_to_rad(90), 0))
 		# b15 : TUILES visibles : 4 rangs en gradins inclinés par pan + faîtage
-		var NR := 4
+		var NR := 6
 		var ang := atan2(rh, (b.d + 0.5) / 2.0)
 		for side in [-1.0, 1.0]:
 			for ti in range(NR):
@@ -1126,16 +1142,23 @@ func creer_ville():
 				var zm: float = side * tm * (b.d + 0.5) / 2.0
 				var ym: float = y + b.h + rh * (1.0 - tm) + 0.02
 				var tc: Color = b.roof.lightened(0.07) if ti % 2 == 0 else b.roof.darkened(0.10)
-				# b18 : TEXTURE de tuiles : 6 carreaux par rang, joints + damier
-				var NW := 6
+				# b40 : 8 tuiles par rang, rangs DÉCALÉS en quinconce (comme
+				# les bardeaux arrondis de l'image de référence)
+				var NW := 8
 				var lw: float = (b.w + 0.55) / float(NW)
 				for j in range(NW):
 					var xm: float = -((b.w + 0.55) / 2.0) + (float(j) + 0.5) * lw
-					var tc2: Color = tc.lightened(0.05) if (ti + j) % 2 == 0 else tc.darkened(0.07)
-					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.86, 0.09, (b.d + 0.5) / 2.0 / float(NR) * 1.3), tc2, null, Vector3(side * ang, 0, 0))
+					if ti % 2 == 1:
+						xm += lw * 0.5
+						if xm > (b.w + 0.55) / 2.0:
+							xm -= (b.w + 0.55)
+					var tc2: Color = tc.lightened(0.06) if (ti + j) % 2 == 0 else tc.darkened(0.08)
+					_box(Vector3(b.x + xm, ym, b.z + zm), Vector3(lw * 0.92, 0.10, (b.d + 0.5) / 2.0 / float(NR) * 1.45), tc2, null, Vector3(side * ang, 0, 0))
 		_box(Vector3(b.x, y + b.h + rh + 0.02, b.z), Vector3(b.w + 0.6, 0.14, 0.3), b.roof.darkened(0.15))
 		# Porte + linteau
 		_box(Vector3(b.x, y + b.h * 0.28, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.22, b.h * 0.52, 0.14), Color(0.25, 0.14, 0.06))
+		# b40 : porte CINTRÉE (demi-cylindre au sommet, comme l'image)
+		_cyl(Vector3(b.x, y + b.h * 0.54, b.z + b.d / 2.0 + 0.06), b.w * 0.11, b.w * 0.11, 0.14, Color(0.25, 0.14, 0.06), broot, 8, Vector3(deg_to_rad(90), 0, 0))
 		_box(Vector3(b.x, y + b.h * 0.56, b.z + b.d / 2.0 + 0.06), Vector3(b.w * 0.28, 0.08, 0.16), Color(0.38, 0.22, 0.09))
 		# b23 : belle pancarte en bois au-dessus de la porte, avec le nom du lieu
 		var NOMS := {"Supermarche": "SUPERMARCHÉ", "Armurerie": "ARMURERIE", "Vetements": "VÊTEMENTS", "Auberge": "AUBERGE", "Mairie": "MAIRIE", "Maison": "MAISON"}
@@ -1158,6 +1181,9 @@ func creer_ville():
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(b.w * 0.13, 0.03, 0.03), Color(0.32, 0.21, 0.10))
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60, b.z + b.d / 2.0 + 0.10), Vector3(0.03, b.h * 0.14, 0.03), Color(0.32, 0.21, 0.10))
 			_box(Vector3(b.x + b.w * fx, y + b.h * 0.60 - b.h * 0.10 - 0.05, b.z + b.d / 2.0 + 0.10), Vector3(b.w * 0.20, 0.07, 0.16), PIERRE.lightened(0.22))
+			# b40 : volets verts de part et d'autre (détail de l'image)
+			_box(Vector3(b.x + b.w * fx - b.w * 0.115, y + b.h * 0.60, b.z + b.d / 2.0 + 0.09), Vector3(b.w * 0.05, b.h * 0.17, 0.05), Color(0.20, 0.38, 0.34), broot)
+			_box(Vector3(b.x + b.w * fx + b.w * 0.115, y + b.h * 0.60, b.z + b.d / 2.0 + 0.09), Vector3(b.w * 0.05, b.h * 0.17, 0.05), Color(0.20, 0.38, 0.34), broot)
 		# Fenêtres côtés
 		for fz in [-0.28, 0.28]:
 			var v2 := _box(Vector3(b.x + b.w / 2.0 + 0.06, y + b.h * 0.60, b.z + b.d * fz), Vector3(0.12, b.h * 0.16, b.d * 0.13), Color(1.0, 0.72, 0.30))
@@ -1170,6 +1196,15 @@ func creer_ville():
 		if b.n == "Maison":
 			_box(Vector3(b.x + b.w * 0.3, y + b.h + rh * 0.5, b.z + b.d * 0.3), Vector3(0.4, 0.9, 0.4), Color(0.62, 0.32, 0.16))
 			_box(Vector3(b.x + b.w * 0.3, y + b.h + rh * 0.5 + 0.5, b.z + b.d * 0.3), Vector3(0.52, 0.1, 0.52), Color(0.52, 0.26, 0.12))
+		# b40 : tour d'angle RONDE + toit conique orange (comme l'image)
+		if b.n in ["Supermarche", "Auberge", "Armurerie", "Vetements"]:
+			var tx: float = b.x + b.w * 0.5 - 0.55
+			var tz: float = b.z + b.d * 0.5 - 0.55
+			var th: float = b.h + 1.1
+			_cyl(Vector3(tx, y + th * 0.5, tz), 0.72, 0.66, th, b.c.lightened(0.06), broot, 10)
+			_cone(Vector3(tx, y + th + 0.75, tz), 0.95, 1.5, Color(0.86, 0.42, 0.10), broot, 10)
+			_box(Vector3(tx, y + th * 0.62, tz + 0.68), Vector3(0.22, 0.30, 0.06), Color(0.32, 0.21, 0.10), broot)
+			_sph(Vector3(tx, y + th + 1.52, tz), 0.09, Color(0.85, 0.70, 0.30), broot)
 		# Escalier de la Mairie
 		if b.n == "Mairie":
 			for step in range(3):
@@ -1498,6 +1533,26 @@ func creer_arbre_rond(x: float, z: float):
 func creer_props():
 	# Lampadaires alignés le long de la route du village (plus au milieu de la route !)
 	poser_lampadaires_route()
+	# b40 : fleurs colorées en bord de route (comme l'image) — JAMAIS sur la
+	# route elle-même (dist_chemin >= 2.3) ni gêner les colliders existants.
+	var COLS := [Color(0.85, 0.15, 0.15), Color(0.60, 0.25, 0.65), Color(0.95, 0.75, 0.10), Color(0.95, 0.92, 0.85)]
+	if chemin_lisse.size() > 4:
+		for i in range(44):
+			var p: Vector2 = chemin_lisse[(i * 7) % chemin_lisse.size()]
+			var q: Vector2 = chemin_lisse[(i * 7 + 3) % chemin_lisse.size()]
+			var tang := q - p
+			if tang.length() < 0.01:
+				tang = Vector2(1, 0)
+			var perp := Vector2(-tang.y, tang.x).normalized()
+			var side := 1.0 if i % 2 == 0 else -1.0
+			var off := randf_range(2.4, 3.6) * side
+			var fx := p.x + perp.x * off
+			var fz := p.y + perp.y * off
+			if dist_chemin(Vector2(fx, fz)) < 2.3:
+				continue
+			var fy := hauteur_terrain(fx, fz)
+			_cyl(Vector3(fx, fy + 0.14, fz), 0.02, 0.02, 0.28, Color(0.25, 0.45, 0.20), self, 5)
+			_sph(Vector3(fx, fy + 0.32, fz), 0.08, COLS[i % 4], self)
 	# Barils + caisses près de l'auberge et du supermarché
 	for p in [[8.2, 5.6], [8.7, 6.2], [-7.0, -1.4], [-7.7, -1.9], [12.4, 1.0]]:
 		var y := hauteur_terrain(p[0], p[1])
@@ -1592,9 +1647,6 @@ func creer_cloture_village():
 			en_trou = false
 			if a0_trou < 1e8:
 				trous.append({"a0": a0_trou, "a1": a})
-		var y := hauteur_terrain(x, z)
-		# Poteau
-		_box(Vector3(x, y + 0.45, z), Vector3(0.12, 0.9, 0.12), BOIS)
 		# Traverses entre deux poteaux consécutifs
 		if absf(a - dernier_angle - step) < 0.001:
 			var ap := a - step
@@ -1606,6 +1658,39 @@ func creer_cloture_village():
 			_box(Vector3(mx, my + 0.72, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
 			_box(Vector3(mx, my + 0.38, mz), Vector3(long, 0.09, 0.07), BOIS_CLAIR, null, Vector3(0, ry, 0))
 		dernier_angle = a
+	# b40 : PALISSADE SERRÉE À POINTES (comme l'image) : ~640 piquets en UN
+	# seul MultiMesh (1 draw call), trous laissés là où passe la route.
+	if not _mesh_cache.has("piquet"):
+		_mesh_cache["piquet"] = make_piquet()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _mesh_cache["piquet"]
+	var pts := []
+	var np := 700
+	for i in range(np):
+		var a := float(i) / float(np) * TAU
+		var px := cos(a) * VILLAGE_R
+		var pz := sin(a) * VILLAGE_R
+		if dist_chemin(Vector2(px, pz)) < 3.4:
+			continue
+		pts.append([px, pz, hauteur_terrain(px, pz), a])
+	mm.instance_count = pts.size()
+	var rngp := RandomNumberGenerator.new()
+	rngp.seed = 4242
+	for i in range(pts.size()):
+		var p = pts[i]
+		var sc: float = rngp.randf_range(0.90, 1.14)
+		var yaw: float = -p[3] + rngp.randf_range(-0.05, 0.05)
+		var bas := Basis(Vector3(0, 1, 0), yaw) * Basis(Vector3(1, sc, 1))
+		mm.set_instance_transform(i, Transform3D(bas, Vector3(p[0], p[2] - 0.05, p[1])))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	var matp := mat_std(BOIS)
+	matp.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mmi.material_override = matp
+	mmi.set_meta("mat", matp)
+	add_child(mmi)
+
 	# Portails : grands poteaux + linteau + lanterne au-dessus de la route
 	for trou in trous:
 		var a0: float = trou.a0
@@ -1668,6 +1753,7 @@ func creer_garde(x: float, z: float) -> Node3D:
 		_box(Vector3(0, -0.55, -0.03), Vector3(0.17, 0.16, 0.26), ACIER.darkened(0.45), j)  # solerets
 	_box(Vector3(0, 0.70, 0), Vector3(0.38, 0.20, 0.26), ACIER.darkened(0.20), root)  # bassin
 	_box(Vector3(0, 0.98, 0), Vector3(0.44, 0.52, 0.28), ACIER, root)       # cuirasse
+	_prism(Vector3(0, 0.64, 0), Vector3(0.48, 0.26, 0.34), TUNIQUE, root)   # b40 : jupe tunique
 	_box(Vector3(0, 0.80, 0), Vector3(0.46, 0.10, 0.30), Color(0.30, 0.22, 0.12), root)  # ceinturon
 	_box(Vector3(0, 1.02, 0.15), Vector3(0.30, 0.30, 0.05), ACIER.lightened(0.25), root)  # plastron
 	_box(Vector3(0, 1.0, 0), Vector3(0.46, 0.09, 0.30), Color(0.75, 0.15, 0.15), root, Vector3(0, 0, deg_to_rad(35)))  # baudrier
@@ -1686,6 +1772,7 @@ func creer_garde(x: float, z: float) -> Node3D:
 	_box(Vector3(0.07, 0.03, 0.145), Vector3(0.05, 0.05, 0.02), Color(0.10, 0.10, 0.12), tete)
 	_box(Vector3(0, 0.17, 0), Vector3(0.34, 0.16, 0.32), ACIER, tete)       # casque
 	_box(Vector3(0, 0.07, 0.16), Vector3(0.26, 0.05, 0.06), ACIER.darkened(0.25), tete)  # visière
+	_box(Vector3(0, 0.05, 0.155), Vector3(0.045, 0.17, 0.05), ACIER, tete)  # b40 : nasal
 	_box(Vector3(0, 0.32, 0), Vector3(0.06, 0.18, 0.32), Color(0.75, 0.15, 0.15), tete)  # cimier rouge
 	# b15 : hallebarde ENTIÈREMENT visible : manche clair épais tenu de biais,
 	# fer + croc latéral + talon (avant : fin manche sombre = on ne voyait que le haut).
@@ -1695,9 +1782,10 @@ func creer_garde(x: float, z: float) -> Node3D:
 	root.add_child(halle)
 	_cyl(Vector3(0, 0, 0), 0.04, 0.035, 2.5, Color(0.86, 0.70, 0.44), halle, 8)
 	_cyl(Vector3(0, 0.55, 0), 0.055, 0.055, 0.05, Color(0.22, 0.22, 0.26), halle, 8)
-	_box(Vector3(0, 1.10, 0), Vector3(0.12, 0.50, 0.20), Color(0.78, 0.80, 0.84), halle)
-	_cone(Vector3(0, 1.50, 0), 0.10, 0.32, Color(0.84, 0.86, 0.90), halle, 6)
-	_box(Vector3(-0.16, 0.90, 0), Vector3(0.22, 0.32, 0.07), Color(0.78, 0.80, 0.84), halle)
+	# b40 : LANCE comme l'image : barre transversale + fer en feuille (losange)
+	_box(Vector3(0, 1.02, 0), Vector3(0.22, 0.05, 0.06), Color(0.70, 0.72, 0.78), halle)
+	_cyl(Vector3(0, 1.10, 0), 0.0, 0.085, 0.18, Color(0.84, 0.86, 0.90), halle, 6)
+	_cone(Vector3(0, 1.34, 0), 0.085, 0.36, Color(0.84, 0.86, 0.90), halle, 6)
 	_box(Vector3(0, -1.20, 0), Vector3(0.10, 0.14, 0.10), Color(0.45, 0.50, 0.58), halle)
 	# b34 : étiquette « Garde » RETIRÉE (au-dessus du casque)
 	col_cercle(x, z, 0.4, 1.8)
@@ -1783,7 +1871,7 @@ func creer_joueur():
 	bras_droit = Node3D.new(); bras_droit.position = Vector3(0.31, 1.16, 0); player_node.add_child(bras_droit)
 	for b in [bras_gauche, bras_droit]:
 		_caps(Vector3(0, -0.20, 0), 0.075, 0.40, TUNIQUE, b)
-		_sph(Vector3(0, -0.42, 0), 0.075, PEAU, b)
+		_box(Vector3(0, -0.43, 0), Vector3(0.14, 0.13, 0.15), CUIR, b)   # b40 : gants
 
 	# Tête + cheveux piquants
 	var tete := Node3D.new()
@@ -1811,8 +1899,8 @@ func creer_joueur():
 	# tête DIVISÉE PAR 2 et remontée à la cheville (~0.19 m du sol).
 	_cyl(Vector3(0, -0.25, 0), 0.032, 0.028, 0.40, Color(0.86, 0.70, 0.44), marteau, 8)
 	_cyl(Vector3(0, -0.08, 0), 0.045, 0.045, 0.05, Color(0.22, 0.22, 0.26), marteau, 8)
-	_box(Vector3(0, -0.53, 0), Vector3(0.16, 0.16, 0.22), Color(0.55, 0.55, 0.58), marteau)
-	_box(Vector3(0, -0.53, 0), Vector3(0.18, 0.07, 0.24), Color(0.35, 0.24, 0.12), marteau)
+	_box(Vector3(0, -0.55, 0), Vector3(0.20, 0.20, 0.26), Color(0.55, 0.55, 0.58), marteau)
+	_box(Vector3(0, -0.55, 0), Vector3(0.22, 0.09, 0.28), Color(0.35, 0.24, 0.12), marteau)
 
 	# Lumière douce autour du joueur
 	var light := OmniLight3D.new()
@@ -1872,44 +1960,57 @@ func creer_ennemis():
 
 func _construire_rat(root: Node3D, gros: bool):
 	var s := 1.25 if gros else 0.9
-	var CORPS := Color(0.32, 0.26, 0.24) if gros else Color(0.36, 0.33, 0.32)
+	# b40 : gris chaud facetté comme l'image de référence
+	var CORPS := Color(0.42, 0.38, 0.36) if gros else Color(0.47, 0.44, 0.42)
 	root.scale = Vector3.ONE * s
-	_facette(Vector3(0, 0.30, 0.05), CORPS, root, Vector3(0.62, 0.44, 0.80))
-	_facette(Vector3(0, 0.34, -0.42), CORPS.lightened(0.08), root, Vector3(0.34, 0.28, 0.36))
-	# Museau
-	_cone(Vector3(0, 0.30, -0.66), 0.10, 0.22, Color(0.85, 0.55, 0.55), root, 5)
-	# Oreilles
-	_sph(Vector3(-0.14, 0.52, -0.34), 0.10, Color(0.55, 0.40, 0.40), root)
-	_sph(Vector3(0.14, 0.52, -0.34), 0.10, Color(0.55, 0.40, 0.40), root)
+	# Corps + arrière en facettes (dos bombé)
+	_facette(Vector3(0, 0.34, 0.10), CORPS, root, Vector3(0.66, 0.50, 0.85))
+	_facette(Vector3(0, 0.36, -0.34), CORPS.lightened(0.06), root, Vector3(0.40, 0.36, 0.45))
+	# Tête + GUEULE OUVERTE : mâchoire haute + mandibule basse + dents
+	_facette(Vector3(0, 0.34, -0.62), CORPS.lightened(0.10), root, Vector3(0.30, 0.26, 0.34))
+	_box(Vector3(0, 0.20, -0.74), Vector3(0.16, 0.05, 0.20), CORPS.darkened(0.10), root, Vector3(deg_to_rad(-18), 0, 0))
+	for dx in [-0.05, 0.05]:
+		_cone(Vector3(dx, 0.27, -0.80), 0.020, 0.07, Color(0.95, 0.93, 0.85), root, 4)
+	_cone(Vector3(0, 0.30, -0.86), 0.055, 0.12, Color(0.80, 0.50, 0.52), root, 5)
+	# Oreilles rondes roses intérieures
+	for ex in [-0.16, 0.16]:
+		_sph(Vector3(ex, 0.56, -0.42), 0.11, CORPS.lightened(0.12), root)
+		_sph(Vector3(ex, 0.56, -0.46), 0.06, Color(0.85, 0.55, 0.60), root)
 	# Yeux rouges
-	_sph(Vector3(-0.10, 0.38, -0.55), 0.035, Color(1, 0.05, 0.05), root, true)
-	_sph(Vector3(0.10, 0.38, -0.55), 0.035, Color(1, 0.05, 0.05), root, true)
+	_sph(Vector3(-0.10, 0.40, -0.60), 0.035, Color(1, 0.05, 0.05), root, true)
+	_sph(Vector3(0.10, 0.40, -0.60), 0.035, Color(1, 0.05, 0.05), root, true)
 	# Pattes
-	for px in [-0.2, 0.2]:
-		for pz in [-0.25, 0.3]:
-			_box(Vector3(px, 0.10, pz), Vector3(0.08, 0.20, 0.08), CORPS.darkened(0.2), root)
-	# Queue
-	_cyl(Vector3(0, 0.26, 0.62), 0.030, 0.012, 0.7, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(100), 0, 0))
+	for px in [-0.22, 0.22]:
+		for pz in [-0.30, 0.32]:
+			_box(Vector3(px, 0.10, pz), Vector3(0.09, 0.20, 0.09), CORPS.darkened(0.22), root)
+	# Queue rose en S : 3 segments relevés comme l'image
+	_cyl(Vector3(0, 0.30, 0.62), 0.035, 0.022, 0.55, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(105), 0, 0))
+	_cyl(Vector3(0, 0.50, 0.86), 0.022, 0.016, 0.45, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(60), 0, 0))
+	_cyl(Vector3(0, 0.72, 1.00), 0.016, 0.010, 0.35, Color(0.85, 0.55, 0.60), root, 5, Vector3(deg_to_rad(20), 0, 0))
 
 func _construire_araignee(root: Node3D):
-	var CORPS := Color(0.20, 0.12, 0.10)
-	_facette(Vector3(0, 0.55, 0.25), CORPS, root, Vector3(0.62, 0.52, 0.70))
-	_facette(Vector3(0, 0.50, -0.25), CORPS.lightened(0.1), root, Vector3(0.36, 0.32, 0.36))
+	# b40 : brun foncé facetté, GENOUX LEVÉS au-dessus du corps (image)
+	var CORPS := Color(0.23, 0.14, 0.10)
+	_facette(Vector3(0, 0.58, 0.28), CORPS, root, Vector3(0.66, 0.56, 0.74))
+	_facette(Vector3(0, 0.52, -0.26), CORPS.lightened(0.10), root, Vector3(0.38, 0.34, 0.38))
+	# Crocs devant
+	for dx in [-0.07, 0.07]:
+		_cone(Vector3(dx, 0.40, -0.46), 0.035, 0.14, Color(0.10, 0.06, 0.05), root, 4)
 	# Yeux rouges
 	for ex in [-0.10, -0.03, 0.04, 0.11]:
-		_sph(Vector3(ex, 0.55, -0.42), 0.03, Color(1, 0.05, 0.05), root, true)
-	# 8 pattes (2 segments)
+		_sph(Vector3(ex, 0.56, -0.42), 0.03, Color(1, 0.05, 0.05), root, true)
+	# 8 pattes coudées : fémur montant + tibia descendant
 	for cote in [-1, 1]:
 		for k in range(4):
 			var a := deg_to_rad(-50 + k * 33)
 			var hx: float = cos(a) * 0.35 * cote
-			var hz := sin(a) * 0.35 - 0.1
+			var hz: float = sin(a) * 0.35 - 0.1
 			var patte := Node3D.new()
-			patte.position = Vector3(hx * 0.6, 0.5, hz)
+			patte.position = Vector3(hx * 0.6, 0.52, hz)
 			patte.rotation.y = -atan2(hz, hx * cote) * cote
 			root.add_child(patte)
-			_box(Vector3(0.28 * cote, 0.16, 0), Vector3(0.56, 0.05, 0.05), CORPS.darkened(0.1), patte, Vector3(0, 0, deg_to_rad(-30) * cote))
-			_box(Vector3(0.62 * cote, -0.12, 0), Vector3(0.5, 0.04, 0.04), CORPS.darkened(0.2), patte, Vector3(0, 0, deg_to_rad(40) * cote))
+			_box(Vector3(0.30 * cote, 0.22, 0), Vector3(0.62, 0.07, 0.07), CORPS.darkened(0.08), patte, Vector3(0, 0, deg_to_rad(-38) * cote))
+			_box(Vector3(0.68 * cote, -0.16, 0), Vector3(0.58, 0.05, 0.05), CORPS.darkened(0.20), patte, Vector3(0, 0, deg_to_rad(52) * cote))
 
 func update_ennemis(delta: float):
 	for e in enemies:
