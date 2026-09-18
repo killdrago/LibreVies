@@ -99,7 +99,8 @@ DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
 NOM_DOSSIER_TMP = "game.install"
 NOM_DOSSIER_ANCIEN = "game.ancien"
-NOMS_EXE_JEU = ("LibreViesGame.exe", "LibreVies.exe")
+# Le jeu est une compilation Unity : son executable s'appelle LibreViesGame.exe.
+NOMS_EXE_JEU = ("LibreViesGame.exe",)
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
 ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
@@ -107,7 +108,7 @@ GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
     {"date": "18/09/2026", "t": "Launcher 4.0.0 — le jeu complet se telecharge tout seul",
-     "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive du jeu publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
+     "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unity publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
     {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
      "d": "Le jeu Unity exporte contient deja son runtime : le joueur ne telecharge pas Unity. Le launcher verifie les MAJ, les telecharge, puis lance directement LibreViesGame.exe. Le launcher peut aussi se mettre a jour et redemarrer seul."},
     {"date": "14/09/2026", "t": "Launcher 2.8.0 — retour aux hashs md5",
@@ -485,7 +486,7 @@ def _trouver_exe_jeu(dossier, profondeur=2):
 def build_a_installer(build):
     """Le jeu doit-il etre (re)telecharge ? Renvoie (bool, raison lisible)."""
     if not isinstance(build, dict) or not build.get('url') or not build.get('hash'):
-        return False, 'aucune compilation publiee pour le moment'
+        return False, 'aucune compilation Unity publiee pour le moment'
     etat = lire_etat_jeu()
     if etat.get('hash') != build.get('hash'):
         return True, 'nouvelle compilation disponible'

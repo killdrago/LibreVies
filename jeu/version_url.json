@@ -1,17 +1,9 @@
 {
   "launcher_version": "4.0.0",
   "game_version": "0.4.0",
-  "notes": "Le joueur ne recoit que le launcher : au premier lancement il telecharge l'archive du jeu publiee dans la release GitHub, verifie son md5, l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules (jeu et launcher). L'archive ci-dessous est la derniere compilation publiee ; publier_jeu.py la remplace par la nouvelle build.",
+  "notes": "Version Unity uniquement. Le joueur ne recoit que le launcher : au premier lancement il telecharge l'archive de la compilation Unity publiee dans la release GitHub, verifie son md5, l'installe dans game/ puis active JOUER. Les mises a jour suivantes (jeu et launcher) se font toutes seules. Pour publier une compilation : compilation\\outils\\publier_jeu.bat (qui remplit automatiquement le bloc game_build ci-dessous).",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
-  "game_build": {
-    "moteur": "godot",
-    "version": "0.4.0",
-    "dossier": "game",
-    "exe": "",
-    "url": "https://github.com/killdrago/LibreVies/releases/download/derniere/LibreVies_Windows_d2711b00.zip",
-    "size": 39269570,
-    "hash": "d2711b0023e2fea89df4a58a900c305e"
-  }
+  "game_build": {}
 }

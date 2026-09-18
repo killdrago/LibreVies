@@ -301,7 +301,7 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(14, 0, -12), new Vector3(9, 4, 7), "Auberge");
         CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
         CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
-        // Bâtiments supplémentaires du village de départ Godot.
+        // Bâtiments supplémentaires du village de départ.
         CreateBuilding(new Vector3(-3, 0, 21), new Vector3(7, 4, 6), "Mairie");
         CreateBuilding(new Vector3(-19, 0, 13), new Vector3(5, 3.5f, 5), "Maison_Nord");
         CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
@@ -427,7 +427,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreatePlayer()
     {
         player = new GameObject("Joueur").transform;
-        // Même point de départ que la scène Godot : la caméra voit le village.
+        // Point de départ choisi pour que la caméra voie le village.
         player.position = new Vector3(0, TerrainHeight(0, 6) + 0.05f, 6);
         cameraPivot = new GameObject("CameraPivot").transform;
         cameraPivot.SetParent(player, false);
@@ -598,7 +598,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         Quaternion orbit = Quaternion.Euler(cameraPitch, cameraYaw, 0);
         Vector3 target = player.position + Vector3.up * 1.1f;
-        // Caméra placée au nord comme dans la scène Godot d'origine.
+        // Caméra placée au nord du village.
         gameCamera.transform.position = target + orbit * (Vector3.forward * cameraDistance);
         gameCamera.transform.LookAt(target);
     }

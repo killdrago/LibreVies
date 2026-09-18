@@ -32,7 +32,8 @@ RACINE = Path(__file__).resolve().parents[2]      # racine du depot
 MANIFESTE = RACINE / "jeu" / "version_url.json"
 LAUNCHER = RACINE / "jeu" / "launcher.pyw"
 DOSSIER_BUILD = RACINE / "compilation" / "build"
-NOMS_EXE = ("LibreViesGame.exe", "LibreVies.exe")
+# Le jeu est une compilation Unity : son executable s'appelle LibreViesGame.exe.
+NOMS_EXE = ("LibreViesGame.exe",)
 
 
 def md5_fichier(chemin: Path) -> str:
@@ -65,10 +66,6 @@ def trouver_exe(dossier: Path) -> Path | None:
                 if candidat.is_file():
                     return candidat
     return None
-
-
-def deviner_moteur(exe: Path) -> str:
-    return "unity" if exe.name.lower().startswith("libreviesgame") else "godot"
 
 
 def creer_archive(dossier_jeu: Path, destination: Path) -> tuple[int, str]:
@@ -116,7 +113,6 @@ def main() -> int:
     parseur.add_argument("--notes", default="", help="texte affiche dans le launcher")
     parseur.add_argument("--exe", type=Path, default=None,
                          help="launcher compile (release/LibreVies.exe) a publier aussi")
-    parseur.add_argument("--moteur", default="", help="unity ou godot (devine sinon)")
     parseur.add_argument("--tag", default="derniere", help="release GitHub (defaut : derniere)")
     parseur.add_argument("--depot", default="killdrago/LibreVies", help="depot GitHub")
     parseur.add_argument("--sans-upload", action="store_true",
@@ -131,9 +127,10 @@ def main() -> int:
         return 1
     exe = trouver_exe(dossier_jeu)
     if not exe:
-        print("ERREUR : aucun %s dans %s" % (" / ".join(NOMS_EXE), dossier_jeu))
+        print("ERREUR : aucun LibreViesGame.exe dans %s (export Unity manquant ?)"
+              % dossier_jeu)
         return 1
-    moteur = args.moteur or deviner_moteur(exe)
+    moteur = "unity"
 
     print("== 1. archive du jeu ==")
     provisoire = DOSSIER_BUILD / "jeu_tmp.zip"
@@ -208,7 +205,7 @@ def main() -> int:
 
     print()
     print("== resume ==")
-    print("   jeu     : %s (%s, %s Mo)" % (args.version, moteur, "%.1f" % (taille / 1048576.0)))
+    print("   jeu     : %s (Unity, %s Mo)" % (args.version, "%.1f" % (taille / 1048576.0)))
     print("   archive : %s" % nom_archive)
     print("   url     : %s" % url_archive)
     if not envoye:

@@ -48,6 +48,12 @@ nécessaires pour fabriquer une build, jamais pour jouer).
 
 ## 2. Publier la compilation (les joueurs la reçoivent)
 
+> **Première fois : cette étape est obligatoire.** Tant qu'aucune compilation
+> n'a été publiée, le manifeste contient `"game_build": {}` et le launcher
+> affiche « aucune compilation Unity publiee » (le bouton JOUER reste grisé).
+> Dès la première publication, tout s'enchaîne : le launcher télécharge le jeu,
+> puis se met à jour tout seul à chaque nouvelle publication.
+
 Double-clic sur `outils\publier_jeu.bat` (ou lance-le avec la version en
 paramètre). Le script :
 

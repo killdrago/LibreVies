@@ -20,9 +20,13 @@ Un jeu déjà installé se lance même hors ligne.
 
 ## Publier une mise à jour (côté auteur)
 
-1. `compilation\build_launcher.bat` — exporte le jeu et fabrique `LibreVies.exe`.
+1. `compilation\build_launcher.bat` — exporte le jeu Unity et fabrique `LibreVies.exe`.
 2. `compilation\outils\publier_jeu.bat` — met l'archive dans la release GitHub
    et met à jour `jeu/version_url.json`.
 3. `git push` — les joueurs reçoivent la mise à jour au prochain lancement.
+
+La **première** publication est obligatoire : avant elle, le launcher affiche
+« aucune compilation Unity publiee » et le bouton JOUER reste grisé. Le jeu est
+une compilation Unity (`LibreViesGame.exe`) : aucun autre moteur n'est utilisé.
 
 Détails, commandes et dépannage : [`compilation/GUIDE-COMPILATION.md`](compilation/GUIDE-COMPILATION.md)

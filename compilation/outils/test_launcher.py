@@ -224,6 +224,18 @@ def main() -> int:
     verifier(appels.get("cwd") == os.path.dirname(exe),
              "le jeu demarre dans son propre dossier")
 
+    print("== 10. aucune compilation publiee (avant la premiere publication) ==")
+    manifeste = json.loads((publication / "version_url.json").read_text(encoding="utf-8"))
+    manifeste["game_build"] = {}
+    (publication / "version_url.json").write_text(
+        json.dumps(manifeste, indent=2, ensure_ascii=False), encoding="utf-8")
+    resultat = launcher.check_for_updates(cb)
+    verifier(resultat["error"] is None, "manifeste sans compilation lu sans erreur")
+    a_installer, raison = launcher.build_a_installer(resultat["build"])
+    verifier(not a_installer, "rien a installer (%s)" % raison)
+    verifier("aucune compilation Unity" in raison,
+             "le joueur voit un message clair (pas d'erreur technique)")
+
     serveur.arreter()
     print()
     if echecs:
