@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 20 : toits triangulaires visibles
+Derniere mise a jour : 18/09/2026 - MAJ 21 : build plus rapide
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1091,6 +1091,19 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le sens des triangles des deux pignons a ete corrige : les faces sont
     visibles des deux cotes dans le rendu Unity (plus de pignon noir/invisible
     a cause du culling).
+
+================================================================================
+8.10 MAJ 21 - BUILD PLUS RAPIDE
+================================================================================
+
+  - Apres synchronisation differentielle des sources, build_launcher.bat ne
+    relance plus PyInstaller si compilation/amorce/amorce_launcher.py n'a pas
+    change et si jeu/LibreVies.exe existe deja. Le hash SHA-256 de l'amorce est
+    conserve dans compilation/build/amorce.sha256.
+  - Une modification du C# ou des shaders continue de declencher l'export Unity
+    complet du dossier jeu/game : c'est necessaire pour obtenir un ensemble
+    coherent de fichiers Unity. Le gain concerne le telechargement des sources
+    et la compilation inutile de l'amorce, pas le temps de build Unity lui-meme.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

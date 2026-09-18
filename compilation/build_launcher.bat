@@ -117,15 +117,27 @@ if not exist "%AMORCE%" (
 rem Les modules exclus ne sont pas utilises par le launcher : sans cela,
 rem PyInstaller embarque pygame/numpy s'ils sont installes sur la machine
 rem de build, ce qui gonfle LibreVies.exe pour rien.
-if exist "%BUILD%\LibreVies.spec" del /q "%BUILD%\LibreVies.spec"
-"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --add-data "%LAUNCHER%;." --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%JEU%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%AMORCE%"
-if errorlevel 1 (
-    echo ERREUR : compilation du launcher echouee.
-    goto :echec
-)
-if not exist "%JEU%\LibreVies.exe" (
-    echo ERREUR : l'executable du launcher est absent.
-    goto :echec
+rem L'amorce ne change presque jamais : ne relance pas PyInstaller pour
+rem chaque virgule du jeu. Le hash est conserve dans build\amorce.sha256.
+set "LV_AMORCE=%AMORCE%"
+set "LV_AMORCE_HASH=%BUILD%\amorce.sha256"
+set "RECOMPILER_AMORCE=non"
+if not exist "%JEU%\LibreVies.exe" set "RECOMPILER_AMORCE=oui"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $h=(Get-FileHash -LiteralPath $env:LV_AMORCE -Algorithm SHA256).Hash; $f=$env:LV_AMORCE_HASH; $ancien=''; if(Test-Path $f){$ancien=(Get-Content -Raw $f).Trim()}; Set-Content -Path $f -Value $h -Encoding ASCII; if($ancien -ne $h){exit 1}else{exit 0}"
+if errorlevel 1 set "RECOMPILER_AMORCE=oui"
+if "%RECOMPILER_AMORCE%"=="oui" (
+    if exist "%BUILD%\LibreVies.spec" del /q "%BUILD%\LibreVies.spec"
+    "%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --add-data "%LAUNCHER%;." --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%JEU%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%AMORCE%"
+    if errorlevel 1 (
+        echo ERREUR : compilation du launcher echouee.
+        goto :echec
+    )
+    if not exist "%JEU%\LibreVies.exe" (
+        echo ERREUR : l'executable du launcher est absent.
+        goto :echec
+    )
+) else (
+    echo        Amorce inchangee : PyInstaller ignore, executable conserve.
 )
 
 if exist "%BUILD%\launcher" rmdir /s /q "%BUILD%\launcher"
