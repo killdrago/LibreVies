@@ -1,7 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 30 : fontaine, PNJ et terrain corriges
+Derniere mise a jour : 18/09/2026 - MAJ 31 : rendu PBR, textures et
+                        migration visuelle realiste Unity
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1273,6 +1274,44 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     Windows pour confirmer les positions et la profondeur des panneaux.
 
 ================================================================================
+8.20 MAJ 31 - RENDU PBR, TEXTURES ORIGINALES ET FORMES BATIES
+================================================================================
+
+  - Nouveau shader `Assets/Resources/LVShaders/LVRealistic.shader`, compatible
+    avec le pipeline Built-in utilise par le projet : surface Standard PBR,
+    eclairage fullforwardshadows, metallic, smoothness, occlusion et emission.
+    Son mapping triplanaire utilise les coordonnees monde ; les maillages
+    proceduraux sans UV (terrain, route, rochers, murs et toits) recoivent donc
+    bien une texture repetee sans casser leurs collisions.
+  - Les cinq textures originales generees pour ce lot ont ete deplacees dans
+    `Assets/Resources/LVTextures/` afin que `Resources.Load` les embarque dans
+    l'export : LV_PlasterWall, LV_TerracottaRoof, LV_ConcretePaving, LV_Wood et
+    LV_Ground. Des .meta stables ont ete ajoutes pour eviter une regeneration
+    des GUID a l'import Unity.
+  - `LibreViesGame.cs` choisit automatiquement la texture par famille : murs
+    en platre, toits en terre cuite (teintes mairie/forge conservees), route et
+    pierres en beton, portes/poutres en bois, terrain/terre/herbe en texture
+    de sol. Les reglages de repetition, metallic et brillance sont appliques
+    au moment de la creation des materiaux. LVColor reste le repli si le
+    shader PBR manque, ce qui conserve le filet anti-magenta des MAJ precedentes.
+  - Le rendu global passe en espace de couleur lineaire. Le ciel, la lumiere
+    ambiante, le brouillard et les reflets sont regles pour le shader PBR ; le
+    soleil conserve ses ombres douces et beneficie de cascades haute resolution
+    sur 100 m.
+  - Les fenetres utilisent maintenant un materiau Glass distinct. Les maisons
+    gardent strictement leurs positions et emprises de collision, mais recoivent
+    un soubassement, des chainages d'angle, des rives de toit et des cheminees.
+    Le mur principal est un maillage procedural biseaute au lieu d'un cube brut;
+    son MeshCollider, les collisions mathematiques, le toit sans jour et les
+    textes occlus sont conserves.
+  - Aucun asset GTA ou modele externe n'a ete ajoute : la migration reste
+    Unity-only et les formes restent generees par le code du projet.
+  - Controle effectue dans le bac a sable : verifier_cs_syntaxe.py OK,
+    git diff --check OK. La compilation et le rendu Unity Windows restent a
+    confirmer avec `compilation\build_launcher.bat`, Unity n'etant pas installe
+    dans cet environnement.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
@@ -1286,7 +1325,9 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
               verifier_cs_syntaxe.py la signalera).
           Le plateau de depart doit afficher l'ecran "Chargement du monde..."
           puis le village : c'est la premiere fois que le jeu demarrera en
-          entier depuis la MAJ 8.
+          entier depuis la MAJ 8. La Console doit maintenant afficher
+          "LibreVies : shader utilisé = LibreVies/RealistePBR" (ou LVColor en
+          repli).
 
   [ ] 1. UTILISATEUR : lancer build_launcher.bat (celui qu'il a deja).
           - S'il affiche "une nouvelle version de build_launcher.bat a ete
@@ -1302,8 +1343,8 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
             (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...) +
             jeu\launcher.pyw (le code, a cote de l'exe).
           - Pendant la compilation Unity, la Console doit afficher
-            "LibreVies : shader utilise = LVColor" (ou "Standard" en repli). Si elle
-            affiche autre chose, le dire plutot que de publier.
+          "LibreVies : shader utilise = LibreVies/RealistePBR" (ou "LVColor" en
+            repli). Si elle affiche autre chose, le dire plutot que de publier.
 
   [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
           compilation\outils\publier_jeu.bat --version 0.5.0 --pousser.
@@ -1440,6 +1481,17 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     Shader.Find seul, sinon le jeu sort en magenta dans l'exe compile.
     Depuis la MAJ 24, CreateBuilding() ajoute aussi un MeshCollider aux toits
     pour que RendreObstaclesTranslucides() les detecte par raycast.
+
+  compilation/unity/Assets/Resources/LVShaders/LVRealistic.shader
+    Shader de materiau principal de la MAJ 31 : PBR Standard, mapping
+    triplanaire monde pour les proceduraux sans UV, ombres avant et reglages
+    metallic/smoothness/occlusion. Son .meta est versionne avec lui.
+
+  compilation/unity/Assets/Resources/LVTextures/
+    Cinq textures originales chargees par Resources.Load : platre des murs,
+    tuiles terre cuite, beton des routes/pierres, bois et sol herbeux/terre.
+    Les fichiers PNG et leurs .meta sont distribues avec le projet de
+    compilation, pas avec un dossier joueur separe.
 
   compilation/unity/Assets/Resources/LVShaders/LVColor.shader
     Shader d'eclairage du projet (Lambert : _Color + _EmissionColor) utilise

@@ -76,7 +76,7 @@ PlayerSettings:
   activeInputHandler: 0
   bundleVersion: 0.4
   metroPackageVersion: 1.0.0.0
-  m_ActiveColorSpace: 0
+  m_ActiveColorSpace: 1
   m_ActiveColorSpaceAndroid: 0
   m_ActiveColorSpaceWebGL: 0
   m_ActiveColorSpaceNintendoSwitch: 0
@@ -88,5 +88,5 @@ PlayerSettings:
   m_ActiveColorSpaceVisionOS: 0
   m_ActiveColorSpaceEmbeddedLinux: 0
   m_ActiveColorSpaceLinux: 0
-  m_ActiveColorSpaceWindows: 0
+  m_ActiveColorSpaceWindows: 1
   m_ActiveColorSpaceMacOS: 0

@@ -437,6 +437,7 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Spider", new Color(0.12f, 0.08f, 0.07f));
         MakeMaterial("Gold", new Color(1f, 0.65f, 0.08f), true);
         MakeMaterial("Water", new Color(0.08f, 0.45f, 0.85f), true);
+        MakeMaterial("Glass", new Color(0.28f, 0.58f, 0.82f), true);
         MakeMaterial("Red", new Color(0.80f, 0.06f, 0.04f), true);
         MakeMaterial("White", Color.white);
         // --- Decor (portage de la reference) ---
@@ -461,6 +462,17 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Vie_Rouge", new Color(0.90f, 0.12f, 0.12f));
     }
 
+    private Texture2D TextureRealiste(string nom)
+    {
+        string chemin = null;
+        if (nom == "Wall") chemin = "LVTextures/LV_PlasterWall";
+        else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
+        else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
+        else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
+        else if (nom == "Stone" || nom.StartsWith("Roche")) chemin = "LVTextures/LV_ConcretePaving";
+        return chemin == null ? null : Resources.Load<Texture2D>(chemin);
+    }
+
     private Material MakeMaterial(string name, Color color, bool emission = false)
     {
         // Les materiaux sont crees en code : aucun n'est reference par un asset,
@@ -477,6 +489,24 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         var material = new Material(shader) { name = name };
         if (material.HasProperty("_Color")) material.color = color;
+        Texture2D texture = TextureRealiste(name);
+        if (texture != null && material.HasProperty("_MainTex")) material.SetTexture("_MainTex", texture);
+        if (material.HasProperty("_Tiling"))
+        {
+            float echelle = name == "Terrain" || name == "Dirt" ? 0.08f
+                : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f : 0.28f));
+            material.SetFloat("_Tiling", echelle);
+        }
+        if (material.HasProperty("_BumpStrength"))
+        {
+            float relief = name == "Terrain" || name == "Dirt" ? 0.20f
+                : (name.Contains("Roof") ? 0.16f : 0.11f);
+            material.SetFloat("_BumpStrength", relief);
+        }
+        if (material.HasProperty("_Metallic"))
+            material.SetFloat("_Metallic", name == "Metal" ? 0.82f : (name == "Gold" ? 0.72f : 0f));
+        if (material.HasProperty("_Smoothness"))
+            material.SetFloat("_Smoothness", name == "Metal" || name == "Gold" ? 0.76f : (name == "Water" ? 0.90f : 0.32f));
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -494,10 +524,11 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (cachedShader != null) return cachedShader;
 
-        // Le shader du projet est choisi en premier : il est toujours embarque,
-        // eclaire en Lambert et ajoute un micro-motif procedural doux (platre,
-        // pierre et bois), sans texture externe ni surface magenta.
-        cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
+        // Le shader PBR avec textures est choisi en premier : les primitives
+        // existantes recoivent des surfaces realistes par mapping triplanaire.
+        // LVColor reste le secours procedural si le shader PBR ne se charge pas.
+        cachedShader = Resources.Load<Shader>("LVShaders/LVRealistic");
+        if (cachedShader == null) cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
 
         // Repli Standard dans l'editeur et dans les builds qui le conservent.
         if (cachedShader == null) cachedShader = Shader.Find("Standard");
@@ -529,6 +560,11 @@ public sealed class LibreViesGame : MonoBehaviour
         RenderSettings.fog = true;
         RenderSettings.fogColor = new Color(0.68f, 0.77f, 0.88f);
         RenderSettings.fogDensity = 0.0022f;
+        RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Skybox;
+        RenderSettings.reflectionIntensity = 0.7f;
+        QualitySettings.shadowDistance = 100f;
+        QualitySettings.shadowCascades = 4;
+        QualitySettings.shadowResolution = ShadowResolution.High;
         CreateSky();
         var sunObject = new GameObject("Soleil");
         var sun = sunObject.AddComponent<Light>();
@@ -924,6 +960,40 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(tournes[1], tournes[5], tournes[7], tournes[3]);
         }
 
+        // Boite de mur avec angles legerement chanfreines : la facade n'est
+        // plus un cube mathematiquement parfait, tout en gardant exactement
+        // la meme emprise de collision en dehors du maillage.
+        public void BoiteBiseautee(float largeur, float profondeur, float hauteur, float chanfrein)
+        {
+            float x = largeur * 0.5f;
+            float z = profondeur * 0.5f;
+            float c = Mathf.Min(chanfrein, Mathf.Min(x, z) * 0.45f);
+            Vector2[] contour =
+            {
+                new Vector2(-x + c, -z), new Vector2(-x, -z + c),
+                new Vector2(-x, z - c), new Vector2(-x + c, z),
+                new Vector2(x - c, z), new Vector2(x, z - c),
+                new Vector2(x, -z + c), new Vector2(x - c, -z)
+            };
+            var bas = new Vector3[contour.Length];
+            var haut = new Vector3[contour.Length];
+            for (int i = 0; i < contour.Length; i++)
+            {
+                bas[i] = new Vector3(contour[i].x, 0f, contour[i].y);
+                haut[i] = new Vector3(contour[i].x, hauteur, contour[i].y);
+            }
+            for (int i = 0; i < contour.Length; i++)
+            {
+                int suivant = (i + 1) % contour.Length;
+                Quad(bas[i], bas[suivant], haut[suivant], haut[i]);
+            }
+            for (int i = 1; i < contour.Length - 1; i++)
+            {
+                Triangle(bas[0], bas[i + 1], bas[i]);
+                Triangle(haut[0], haut[i], haut[i + 1]);
+            }
+        }
+
         public void ToitTriangle(float largeur, float profondeur, float hauteur)
         {
             float x = largeur * 0.5f;
@@ -1064,9 +1134,36 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         var root = new GameObject(name).transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
-        Box(Vector3.up * (size.y * 0.5f), size, "Wall", root, "Murs", true);
+        var murMaillage = new Maillage();
+        murMaillage.BoiteBiseautee(size.x, size.z, size.y, 0.22f);
+        var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
+        var murCollider = murs.AddComponent<MeshCollider>();
+        murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
+        murs.transform.SetParent(root, false);
+        // Socle, chaînages d'angle et poutres de rive donnent une silhouette
+        // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
+        Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
+            "Stone", root, "Soubassement");
+        for (int sx = -1; sx <= 1; sx += 2)
+        {
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                Box(new Vector3(sx * (size.x * 0.5f - 0.12f), size.y * 0.5f,
+                    sz * (size.z * 0.5f - 0.12f)), new Vector3(0.24f, size.y - 0.30f, 0.24f),
+                    "Bois_Clair", root, "Chaine_Angle");
+            }
+        }
         string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
         CreerToitTriangle(root, size, materiauToit, "Toit_" + name);
+        Box(new Vector3(0f, size.y - 0.10f, (size.z + 0.72f) * 0.5f),
+            new Vector3(size.x + 0.95f, 0.18f, 0.20f), "Wood", root, "Rive_Avant");
+        Box(new Vector3(0f, size.y - 0.10f, -(size.z + 0.72f) * 0.5f),
+            new Vector3(size.x + 0.95f, 0.18f, 0.20f), "Wood", root, "Rive_Arriere");
+        if (name == "Forge" || name == "Auberge" || name == "Mairie")
+        {
+            Box(new Vector3(size.x * 0.24f, size.y + 2.05f, 0f), new Vector3(0.48f, 1.05f, 0.48f),
+                "Stone", root, "Cheminee");
+        }
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
         ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
         batiments.Add(new Batiment
@@ -1078,7 +1175,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
         for (int side = -1; side <= 1; side += 2)
         {
-            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Water", root, "Fenetre");
+            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Glass", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
     }
