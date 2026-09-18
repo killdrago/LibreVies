@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 28 : village recentre et endurance corrigee
+Derniere mise a jour : 18/09/2026 - MAJ 29 : village 40 m, toits et textes corriges
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1234,6 +1234,27 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     permettre de courir a nouveau.
   - Controle C# statique et scripts BAT reussis. Un nouvel export Unity Windows
     doit confirmer les distances finales, la mairie et le comportement HUD.
+
+================================================================================
+8.18 MAJ 29 - VILLAGE 40 M, TOITS ET TEXTES OCCLUS
+================================================================================
+
+  - Le rayon du village est maintenant de 40 m et la route a ete etendue au
+    nord pour conserver les deux portiques. Les maisons sont reparties dans
+    cet espace et la mairie est proche du centre, hors de l'axe de la route.
+  - La mini-carte suit maintenant cameraYaw : elle pivote quand la camera
+    tourne, et ses reperes cardinaux pivotent avec elle.
+  - Les textes des maisons sont masques par un raycast d'occlusion lorsqu'un
+    mur ou un autre batiment se trouve entre la camera et l'affiche. Ils ne
+    passent plus au travers des maisons.
+  - Le panneau des portiques est devenu epais et opaque. Les textes interieur
+    et exterieur sont poses en haut, de part et d'autre de la plaque, et un
+    seul cote est visible selon la position de la camera.
+  - La transparence camera ne cible plus le sol, la route ou la fontaine :
+    seuls les objets nommes Murs et Toit_* peuvent recevoir LVFade. Le toit
+    recouvre maintenant legerement le haut du mur pour supprimer le jour.
+  - Controle C# statique et scripts BAT reussis. L'export Unity Windows doit
+    etre relance pour verifier les distances, l'occlusion et la transparence.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

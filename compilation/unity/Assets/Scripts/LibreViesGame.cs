@@ -13,10 +13,10 @@ using UnityEngine;
 public sealed class LibreViesGame : MonoBehaviour
 {
     private const float WorldSize = 90f;
-    // Rayon ramene a la moitie du village agrandi : les maisons restent
-    // decalees intelligemment, mais les portiques reviennent pres du centre.
-    private const float TownRadius = 32f;
-    private const float VillageRadius = 26f;
+    // Le village occupe maintenant un rayon de 40 m : assez large pour
+    // respirer, sans revenir a la taille excessive de la MAJ 27.
+    private const float TownRadius = 40f;
+    private const float VillageRadius = 40f;
     private const float PlayerSpeed = 5f;
     private const float RunSpeed = 9f;
     private const int MaxHp = 100;
@@ -54,7 +54,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // collisions de la cloture (on passe par les portails) et au pave.
     private static readonly Vector2[] RoutePoints =
     {
-        new Vector2(0, 30), new Vector2(3, 18), new Vector2(-2, 6), new Vector2(1, -8),
+        new Vector2(0, 44), new Vector2(4, 28), new Vector2(-2, 6), new Vector2(1, -8),
         new Vector2(4, -20), new Vector2(-1, -34), new Vector2(1, -48), new Vector2(0, -67)
     };
 
@@ -1035,26 +1035,25 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateTown()
     {
-        // Le village revient a la moitie du diametre precedent. Les maisons
-        // restent espacees et Maison_Nord ne chevauche plus Maison_Ouest.
-        CreateBuilding(new Vector3(-14, 0, 10), new Vector3(8, 4, 7), "Maison_Ouest");
-        CreateBuilding(new Vector3(15, 0, 8), new Vector3(8, 5, 8), "Maison_Est");
-        CreateBuilding(new Vector3(-13, 0, -11), new Vector3(7, 3.5f, 7), "Atelier");
-        CreateBuilding(new Vector3(14, 0, -12), new Vector3(9, 4, 7), "Auberge");
-        CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
-        CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
-        // La mairie est au centre-est, hors de l'axe de la route.
-        CreateBuilding(new Vector3(8, 0, 16), new Vector3(7, 4, 6), "Mairie");
-        CreateBuilding(new Vector3(-21.5f, 0, 14), new Vector3(5, 3.5f, 5), "Maison_Nord");
-        CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
+        // Les maisons sont etalees dans le nouveau rayon de 40 m.
+        CreateBuilding(new Vector3(-18, 0, 13), new Vector3(8, 4, 7), "Maison_Ouest");
+        CreateBuilding(new Vector3(19, 0, 10), new Vector3(8, 5, 8), "Maison_Est");
+        CreateBuilding(new Vector3(-17, 0, -14), new Vector3(7, 3.5f, 7), "Atelier");
+        CreateBuilding(new Vector3(18, 0, -15), new Vector3(9, 4, 7), "Auberge");
+        CreateBuilding(new Vector3(-28, 0, -1), new Vector3(6, 3, 6), "Entrepot");
+        CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3, 6), "Forge");
+        // La mairie est proche du centre, mais decalee de la route.
+        CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
+        CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        CreateBuilding(new Vector3(-4, 0, -26), new Vector3(7, 4, 6), "Maison_Sud");
         // Espace libre au sud-est de la ville, loin de l'Auberge et de la route.
-        CreateFountain(new Vector3(7, 0, -20));
+        CreateFountain(new Vector3(10, 0, -25));
         // Les portes sont sur la facade sud (+z) : les PNJ restent sur le cote.
-        CreerPnj(new Vector3(19.2f, 0, 1.8f), "Forgeron");
+        CreerPnj(new Vector3(24.5f, 0, 1.0f), "Forgeron");
         // Le vendeur inutile devant une maison a ete retire. Le marchand reste
         // a droite de l'entrepot, derriere son etal.
-        CreerPnj(new Vector3(-18.2f, 0, 2.8f), "Marchand");
-        CreerPnj(new Vector3(12.2f, 0, 19.5f), "Maire");
+        CreerPnj(new Vector3(-22.2f, 0, 2.8f), "Marchand");
+        CreerPnj(new Vector3(-3.8f, 0, 17.5f), "Maire");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1124,7 +1123,9 @@ public sealed class LibreViesGame : MonoBehaviour
         var collisionToit = toit.AddComponent<MeshCollider>();
         collisionToit.sharedMesh = toit.GetComponent<MeshFilter>().sharedMesh;
         toit.transform.SetParent(parent, false);
-        toit.transform.localPosition = new Vector3(0f, taille.y + 0.10f, 0f);
+        // La base du toit recouvre legerement le haut du mur : aucun jour
+        // lumineux entre la maison et sa toiture.
+        toit.transform.localPosition = new Vector3(0f, taille.y - 0.02f, 0f);
     }
 
     private void CreateFountain(Vector3 position)
@@ -1267,8 +1268,10 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(mx, my + 5.35f, mz), new Vector3(longueur + 0.25f, 0.22f, 0.38f), "Bois_Clair", null, "Linteau", false, rotation);
             // Panneau en bois portant le nom du village : texte petit et pose
             // sur sa face, pas en plein milieu du passage.
-            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.12f), "Bois_Clair", null, "Panneau_Fond", false, rotation);
-            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.14f), "Wood", null, "Panneau_Bois", false, rotation);
+            // Plaque centrale opaque et epaisse : elle separe vraiment les
+            // inscriptions interieure et exterieure.
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.34f), "Bois_Clair", null, "Panneau_Fond", false, rotation);
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.30f), "Wood", null, "Panneau_Bois", false, rotation);
             AjouterTextePanneau(new Vector3(mx, my + 4.45f, mz), rotation);
         }
 
@@ -1287,20 +1290,28 @@ public sealed class LibreViesGame : MonoBehaviour
         // l'autre depuis l'interieur. Elles sont legerement remontees et
         // decalees de la planche pour ne jamais depasser par dessous.
         Vector3 normale = rotation * Vector3.forward;
-        float hauteur = position.y + 0.10f;
-        Vector3 faceExterieure = new Vector3(position.x, hauteur, position.z) + normale * 0.085f;
-        Vector3 faceInterieure = new Vector3(position.x, hauteur, position.z) - normale * 0.085f;
+        float hauteur = position.y + 0.14f;
+        Vector3 faceExterieure = new Vector3(position.x, hauteur, position.z) + normale * 0.22f;
+        Vector3 faceInterieure = new Vector3(position.x, hauteur, position.z) - normale * 0.22f;
         GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.09f);
         GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.09f);
         if (exterieur != null)
         {
             exterieur.name = "Texte_Portail_Exterieur";
             exterieur.transform.rotation = rotation * Quaternion.Euler(0f, 180f, 0f);
+            textesFacades.Add(new FacadeTextState
+            {
+                Root = exterieur, Position = faceExterieure, DirectionFacade = normale.normalized
+            });
         }
         if (interieur != null)
         {
             interieur.name = "Texte_Portail_Interieur";
             interieur.transform.rotation = rotation;
+            textesFacades.Add(new FacadeTextState
+            {
+                Root = interieur, Position = faceInterieure, DirectionFacade = (-normale).normalized
+            });
         }
     }
 
@@ -2258,6 +2269,14 @@ public sealed class LibreViesGame : MonoBehaviour
             // propre facade : le cube opaque de la maison ne laisse plus son
             // envers apparaitre quand on regarde depuis l'arriere.
             bool visible = Vector3.Dot(cameraPosition - affiche.Position, affiche.DirectionFacade) > 0.02f;
+            if (visible)
+            {
+                Vector3 versAffiche = affiche.Position - cameraPosition;
+                float distance = versAffiche.magnitude;
+                if (distance > 0.05f && Physics.Raycast(cameraPosition, versAffiche.normalized,
+                    out RaycastHit obstruction, distance - 0.02f, ~0, QueryTriggerInteraction.Ignore))
+                    visible = false;
+            }
             rendu.enabled = visible;
         }
     }
@@ -2303,6 +2322,9 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Transform touche = touches[i].collider.transform;
             if (touche == player || touche.IsChildOf(player)) continue;
+            // Le sol, la route et la fontaine ne doivent jamais recevoir le
+            // materiau fade : seuls les murs et toits des maisons sont vises.
+            if (touche.name != "Murs" && !touche.name.StartsWith("Toit_")) continue;
             Renderer rendu = touche.GetComponent<Renderer>();
             if (rendu == null) rendu = touche.GetComponentInParent<Renderer>();
             if (rendu != null) RendreTranslucide(rendu, 0.30f);
@@ -2759,7 +2781,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         Vector2 centreMonde = player == null ? Vector2.zero : new Vector2(player.position.x, player.position.z);
-        miniCarteOrientation = player == null ? cameraYaw : player.eulerAngles.y;
+        // La carte suit la camera, pas la rotation automatique du joueur.
+        miniCarteOrientation = cameraYaw;
         float rayonMonde = WorldSize / miniCarteZoom;
         for (int i = 0; i < 120; i++)
         {
