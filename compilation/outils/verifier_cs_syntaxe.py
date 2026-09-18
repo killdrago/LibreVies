@@ -8,9 +8,12 @@ decouvre donc seulement chez l'utilisateur, apres une compilation Unity de
 plusieurs minutes. Ce script parse le fichier avec la grammaire C# de
 tree-sitter et signale les erreurs de syntaxe AVANT la compilation.
 
-Il ne remplace PAS un compilateur : il ne verifie pas les types, les methodes
-appelees ni les references Unity. Il attrape en revanche les accolades, les
-points-virgules, les parentheses et les constructions mal ecrites.
+Il ne remplace PAS un compilateur : il ne verifie pas les types ni les
+references Unity. Il attrape en revanche les accolades, les points-virgules,
+les parentheses, les constructions mal ecrites, les APPELS a des methodes qui
+n'existent pas, les BOUCLES INFINIES (une boucle qui ajoute dans la liste
+qu'elle parcourt : incident 19, un gel du jeu sans aucun message) et les
+variables locales qui masquent un champ de la classe (meme incident).
 
 Installation (une seule fois, dans le bac a sable) :
     pip install --break-system-packages tree_sitter tree_sitter_c_sharp
@@ -19,6 +22,7 @@ Usage :
     python compilation/outils/verifier_cs_syntaxe.py
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -88,6 +92,141 @@ def appels_inconnus(chemin):
     return sorted(set(suspects))
 
 
+def _sans_commentaires(chemin):
+    """Source sans commentaires : evite les faux positifs des analyses."""
+    import re
+
+    source = chemin.read_text(encoding="utf-8")
+    source = re.sub(r"//([^\n]*)", "", source)
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    return source
+
+
+def _corps_boucle(lignes, depart):
+    """Texte du corps de la boucle qui commence a la ligne 'depart'."""
+    texte = []
+    profondeur = 0
+    ouvert = False
+    for ligne in lignes[depart:]:
+        for caractere in ligne:
+            if caractere == "{":
+                profondeur += 1
+                ouvert = True
+            elif caractere == "}":
+                profondeur -= 1
+        texte.append(ligne)
+        if ouvert and profondeur <= 0:
+            break
+        if not ouvert and len(texte) >= 2:
+            break            # corps d'une seule instruction, sans accolade
+    return "\n".join(texte)
+
+
+def boucles_qui_gonflent(chemin):
+    """Boucles qui AJOUTENT dans la liste qu'elles parcourent.
+
+    C'est l'incident 19 (gel du jeu au demarrage) : une boucle du genre
+
+        for (int g = 0; g < portails.Count; g++)
+            portails.Add(new Vector2(...));
+
+    ne s'arrete JAMAIS : la liste grandit d'un element a chaque tour, donc la
+    condition reste vraie. Le jeu se fige sans aucun message. Aucun compilateur
+    ne signale cette faute : elle est donc controlee ici.
+    """
+    import re
+
+    lignes = _sans_commentaires(chemin).split("\n")
+    suspects = []
+    for i, ligne in enumerate(lignes):
+        trouve = re.search(
+            r"\bfor\s*\([^;]*;\s*[^;]*?([A-Za-z_]\w*)\s*\.\s*Count", ligne)
+        if not trouve:
+            continue
+        nom = trouve.group(1)
+        corps = _corps_boucle(lignes, i)
+        if re.search(r"\b%s\s*\.\s*(Add|Insert)\s*\(" % re.escape(nom), corps):
+            suspects.append((i + 1, nom))
+    return suspects
+
+
+MOTS_CLES_CS = set("""
+else if return while for foreach switch case using lock yield throw new
+var int float double bool string void true false null this base
+get set public private protected internal static readonly const class struct
+""".split())
+
+
+def _profondeurs(lignes):
+    """Profondeur d'accolades de chaque ligne, et plages des classes imbriquees.
+
+    Une classe imbriquee (Maillage, EnemyState...) a ses propres champs : le
+    masquage y est sans consequence, et ses champs ne doivent pas etre compares
+    a ceux de la classe principale. On repere donc les plages a ignorer.
+    """
+    profondeur = 0
+    niveaux = []
+    apres = []
+    for ligne in lignes:
+        niveaux.append(profondeur)
+        profondeur += ligne.count("{") - ligne.count("}")
+        apres.append(profondeur)
+
+    imbrique = [False] * len(lignes)
+    i = 0
+    while i < len(lignes):
+        if niveaux[i] == 1 and re.search(r"\bclass\s+\w+", lignes[i]):
+            j = i + 1
+            while j < len(lignes) and apres[j] > 1:
+                imbrique[j] = True
+                j += 1
+            if j < len(lignes):
+                imbrique[j] = True        # accolade fermante de la classe
+            i = j + 1
+        else:
+            i += 1
+    return niveaux, imbrique
+
+
+def champs_masques(chemin):
+    """Variables locales qui portent le NOM d'un champ de la classe.
+
+    Incident 19 : 'var portails = new List<Vector2>()' dans une methode masquait
+    le champ 'portails'. Tout ce qui suivait travaillait sur la copie locale :
+    la boucle de construction tournait a l'infini et les gardes ne recevaient
+    plus aucun portail. Un avertissement ici evite de refaire la faute.
+
+    Seuls les champs de la classe principale sont consideres : les classes
+    imbriquees (Maillage...) ont leurs propres noms et n'ont pas d'effet ici.
+    """
+    lignes = _sans_commentaires(chemin).split("\n")
+    niveaux, imbrique = _profondeurs(lignes)
+
+    champs = set()
+    for i, ligne in enumerate(lignes):
+        if niveaux[i] != 1 or imbrique[i]:
+            continue
+        trouve = re.match(
+            r"\s*(?:private|public|protected|internal)\s+[^;{}=()]*?\s(\w+)\s*(?:=|;)", ligne)
+        if trouve:
+            champs.add(trouve.group(1))
+
+    suspects = []
+    for i, ligne in enumerate(lignes):
+        if niveaux[i] < 2 or imbrique[i]:
+            continue
+        trouve = re.match(r"\s*(?:var|(?:[A-Za-z_][\w<>,.\[\]]*))\s+(\w+)\s*=", ligne)
+        if not trouve:
+            continue
+        mot = re.match(r"\s*(?:var|([A-Za-z_]\w*))", ligne)
+        if mot and mot.group(1) in MOTS_CLES_CS:
+            continue
+        nom = trouve.group(1)
+        if nom in champs:
+            suspects.append((i + 1, nom))
+    return suspects
+
+
 def verifier(parseur, chemin):
     source = chemin.read_bytes()
     arbre = parseur.parse(source)
@@ -127,6 +266,17 @@ def main():
             print("APPELS A VERIFIER : %s" % nom)
             for appel in suspects:
                 print("      %s(...) n'est ni declare ici ni connu de l'API" % appel)
+        for ligne, nom_liste in boucles_qui_gonflent(chemin):
+            total += 1
+            print("BOUCLE INFINIE : %s" % nom)
+            print("      ligne %d : la boucle qui parcourt '%s.Count' AJOUTE dans "
+                  "'%s'" % (ligne, nom_liste, nom_liste))
+            print("      -> elle ne s'arretera jamais (le jeu se figera). "
+                  "Utiliser une seconde liste.")
+        for ligne, nom_champ in champs_masques(chemin):
+            print("A VERIFIER : %s" % nom)
+            print("      ligne %d : la variable locale '%s' masque le champ du "
+                  "meme nom" % (ligne, nom_champ))
         if erreurs:
             total += len(erreurs)
             print("SYNTAXE KO : %s" % nom)

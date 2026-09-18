@@ -948,7 +948,14 @@ public sealed class LibreViesGame : MonoBehaviour
         // 1) Ou la route traverse l'enceinte, il y a un PORTAIL (deux trous
         //    dans cet anneau : au nord et au sud). On les repere d'abord, pour
         //    que le dessin et les collisions soient d'accord.
-        var portails = new List<Vector2>();   // (angle de debut, angle de fin)
+        //
+        //    ATTENTION (incident 19, gel au demarrage) : cette liste contient
+        //    les INTERVALLES D'ANGLE (debut, fin). Elle ne doit surtout pas
+        //    s'appeler 'portails' : ce nom est celui du CHAMP qui garde la
+        //    position des portails pour les gardes. En le masquant, la boucle
+        //    de construction ajoutait dans la liste qu'elle parcourait :
+        //    boucle infinie, et aucun garde a l'arrivee.
+        var intervalles = new List<Vector2>();   // (angle de debut, angle de fin)
         const int pas = 720;
         bool dansTrou = false;
         float debut = 0f;
@@ -960,7 +967,7 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (!trou && dansTrou)
             {
                 dansTrou = false;
-                portails.Add(new Vector2(debut, a));
+                intervalles.Add(new Vector2(debut, a));
             }
         }
 
@@ -986,10 +993,10 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         // 3) Les portails : grands poteaux, linteau et panneau LIBREVIES.
-        for (int g = 0; g < portails.Count; g++)
+        for (int g = 0; g < intervalles.Count; g++)
         {
-            float a0 = portails[g].x;
-            float a1 = portails[g].y;
+            float a0 = intervalles[g].x;
+            float a1 = intervalles[g].y;
             foreach (float a in new[] { a0, a1 })
             {
                 float gx = Mathf.Cos(a) * VillageRadius;
@@ -1002,7 +1009,9 @@ public sealed class LibreViesGame : MonoBehaviour
             float mx = Mathf.Cos(am) * VillageRadius;
             float mz = Mathf.Sin(am) * VillageRadius;
             float my = TerrainHeight(mx, mz);
-            // Memorise : les gardes se postent a l'interieur de chaque portail.
+            // Memorise la position du portail dans le CHAMP 'portails' :
+            // c'est lui que lisent les gardes (un garde par portail). La boucle
+            // ci-dessus parcourt 'intervalles', donc cet ajout est sans danger.
             portails.Add(new Vector2(mx, mz));
             // Longueur du linteau = corde entre les deux poteaux.
             float longueur = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0)).magnitude * VillageRadius + 0.2f;
@@ -2271,14 +2280,16 @@ public sealed class LibreViesGame : MonoBehaviour
                 continue;
             }
             effet.Age += dt;
-            float avancement = effet.Age / 0.25f;
-            if (avancement >= 1f)
+            // 'progression' et non 'avancement' : ce dernier est le nom du
+            // champ qui suit le chargement du monde (outil de controle).
+            float progression = effet.Age / 0.25f;
+            if (progression >= 1f)
             {
                 Destroy(effet.Root);
                 etincelles.RemoveAt(i);
                 continue;
             }
-            effet.Root.transform.localScale = Vector3.one * (0.6f + avancement * 1.2f);
+            effet.Root.transform.localScale = Vector3.one * (0.6f + progression * 1.2f);
             effet.Root.SetActive(((int)(effet.Age * 30f)) % 2 == 0);
         }
     }

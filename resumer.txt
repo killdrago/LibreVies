@@ -1,8 +1,9 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - launcher 4.1.0 / amorce (plus besoin
-                        de recompiler le launcher)
+Derniere mise a jour : 18/09/2026 - GEL AU DEMARRAGE CORRIGE (incident 19)
+                        launcher 4.1.0 / amorce (plus besoin de recompiler
+                        le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
@@ -173,7 +174,31 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - hash identique mais jeu absent/casse -> "fichiers du jeu a reparer" ;
     - sinon -> "jeu a jour".
 
-3.5 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
+3.5 Le deroulement attendu par l'utilisateur (sa description, mot pour mot)
+  "Je le mets en route, il telecharge le fichier version sur GitHub, il le
+   compare a celui en local : si des hash changent, il y a eu une maj sur tel
+   ou tel fichier ; dans ce cas il telecharge le ou les nouveaux fichiers,
+   remplace les vieux en local par les nouveaux, pareil pour le fichier
+   version, et redemarre le launcher qui va a nouveau verifier : si tout
+   correspond, il rend le bouton JOUER disponible et on demarre le jeu."
+  C'EST EXACTEMENT CE QUE FAIT LE LAUNCHER (voir 3.1 a 3.4). Une seule nuance,
+  qui compte pour ne pas se tromper :
+    - les PETITS FICHIERS (launcher.pyw, textes, exe du launcher) arrivent un
+      par un, par hash, exactement comme il le decrit ;
+    - le JEU lui-meme (le dossier game/) arrive en UNE SEULE archive .zip
+      publiee dans la release GitHub, controlee par son md5 (cle game_build).
+      C'est voulu : des milliers de fichiers Unity un par un seraient beaucoup
+      plus lents et fragiles.
+  CONSEQUENCE A DIRE A L'UTILISATEUR : il n'a plus jamais besoin de recompiler
+  le LAUNCHER (MAJ 12), mais quelqu'un doit compiler le JEU quand le code du
+  jeu change : seul son PC a Unity. Donc quand une correction touche
+  LibreViesGame.cs, il lance build_launcher.bat une fois (ou seulement l'export
+  Unity) puis publie ; tous les launchers, y compris le sien, se mettent a jour
+  tout seuls ensuite. La seule facon de supprimer aussi cette etape serait une
+  compilation automatique sur GitHub (GitHub Actions + licence Unity) : a
+  proposer seulement s'il le demande.
+
+3.6 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
   Aujourd'hui jeu/version_url.json a "game_build": {} et "files": {}.
   Cela veut dire : AUCUNE compilation n'a encore ete publiee. Le launcher
   affiche donc "aucune compilation Unity publiee" et le bouton JOUER reste
@@ -615,6 +640,43 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       sable) - a confirmer sur la capture de l'utilisateur.
 
 
+  MAJ 15 - GEL DU JEU CORRIGE : boucle infinie dans la cloture du village
+    C'est LA panne qui empechait l'utilisateur de jouer depuis le lot de la
+    cloture (MAJ 8). Mystere resolu grace au journal [LV] ajoute en MAJ 13 :
+    son journal s'arretait sur :
+        [LV] 0,41 s  debut : cloture et portails
+    ...sans jamais ecrire "fin : cloture et portails". Le gel etait donc dans
+    CreateFence(), et nulle part ailleurs.
+    CAUSE (incident 19) : la methode declarait une variable locale nommee
+    'portails' -- le meme nom que le CHAMP 'portails' de la classe. Ce champ
+    garde la position des portails pour les gardes (un garde par portail).
+    Deux consequences :
+      1. la liste des intervalles d'angle masquait le champ : CreateGuards()
+         n'aurait recu AUCUN portail (donc aucun garde) ;
+      2. la boucle de construction des portails faisait
+         'for (int g = 0; g < portails.Count; g++)' en AJOUTANT dans
+         'portails' : la liste grandissait a chaque tour, la condition restait
+         vraie -> boucle infinie. Unity ne dit rien, aucun journal, aucune
+         erreur : la fenetre reste figee. L'utilisateur a du la fermer a la
+         main (le journal s'arrete net, sans arret propre).
+    CORRECTION : la liste des intervalles s'appelle maintenant 'intervalles' et
+    ne masque plus rien ; les positions sont bien ajoutees au CHAMP 'portails'.
+    Verifie par simulation : 2 portails (nord 6,35 m a (0,9 ; 26) et sud
+    6,58 m a (2,2 ; -25,9)), 88 poteaux sur 96, donc 2 gardes (un par portail).
+    PROTECTIONS AJOUTEES (pour que cette faute ne revienne jamais) :
+      - verifier_cs_syntaxe.py signale maintenant les BOUCLES INFINIES :
+        toute boucle 'for (... ; i < X.Count ; ...)' qui contient 'X.Add(' ou
+        'X.Insert(' est une erreur bloquante. Teste sur une copie ou le bug a
+        ete reintroduit volontairement : detecte.
+      - il signale aussi les variables locales qui MASQUENT un champ de la
+        classe principale (meme incident), en ignorant les classes imbriquees
+        (Maillage, EnemyState...) ou le masquage est sans consequence.
+      - une variable locale 'avancement' d'UpdateEffects a ete renommee
+        'progression' pour la meme raison.
+    - A FAIRE COTE UTILISATEUR : recompiler (build_launcher.bat) et relancer.
+      C'est la premiere fois depuis la MAJ 8 que le jeu doit demarrer en entier.
+
+
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
    (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
@@ -820,6 +882,33 @@ INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
   qu'il a bien compile les bonnes sources (MAJ 7 a 11) et demander QUOI il a
   lance : jeu\LibreVies.exe (le launcher) ou jeu\game\LibreViesGame.exe (le jeu).
 
+INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
+  qu'elle parcourt (le plus grave de tous : il bloquait le jeu entier)
+  Symptome (18/09/2026) : "mon jeu crash au demarrage" ; la fenetre affichait
+  "Chargement du monde..." puis plus rien, barre figee, aucun message, aucun
+  fichier de plantage. Deux journaux strictement identiques, sans aucune
+  exception : ce n'etait donc ni un plantage C# ni un plantage natif.
+  Comment on l'a trouve : le journal [LV] de la MAJ 13 entoure chaque etape de
+  construction d'un "debut :" et d'un "fin :". Le dernier "debut : cloture et
+  portails" sans "fin" -> le gel etait dans CreateFence(). Sans ce journal, on
+  cherchait a l'aveugle dans 2000 lignes de code (et on ne pouvait pas
+  reproduire : pas d'Unity ni de Windows dans le bac a sable).
+  Cause : une variable locale nommee 'portails' masquait le champ 'portails', et
+  la boucle qui construisait les portails parcourait 'portails.Count' tout en
+  ajoutant dans 'portails' -> boucle infinie (la liste grandit d'un element par
+  tour, la condition reste toujours vraie) et, accessoirement, plus aucun
+  portail transmis aux gardes.
+  Quand a-t-elle ete introduite : dans le lot de la cloture (MAJ 8, commit
+  8e75875). Toutes les compilations depuis ce lot etaient donc injouables : le
+  jeu se figeait ~0,4 s apres le lancement, en plein chargement.
+  Correction : MAJ 15 (deux listes distinctes).
+  Regle a retenir : un compilateur NE SIGNALE PAS cette faute, et Unity ne dit
+  rien a l'execution. C'est pour cela que verifier_cs_syntaxe.py controle
+  maintenant les boucles qui gonflent la liste qu'elles parcourent, ainsi que
+  les variables locales qui masquent un champ.
+  A retenir aussi : un journal d'etapes coute 20 lignes de code et fait gagner
+  des heures. Toute etape construite par code doit avoir son "debut"/"fin".
+
 ================================================================================
 7. REGLES TECHNIQUES A RESPECTER (pour ne pas reproduire les incidents)
 ================================================================================
@@ -863,6 +952,15 @@ INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
       launcher.pyw doit etre ajoute aussi dans l'amorce, sinon l'exe compile ne
       le contiendra pas (le .pyw est charge dynamiquement : PyInstaller ne peut
       pas deviner ses imports).
+  R15 bis. Un compilateur ne voit PAS une boucle qui ajoute dans la liste
+      qu'elle parcourt (incident 19 : gel total du jeu). Avant TOUT commit qui
+      touche du C# : python compilation/outils/verifier_cs_syntaxe.py, qui
+      signale maintenant aussi les boucles infinies et les variables locales
+      masquant un champ. Corollaire de style : ne JAMAIS nommer une variable
+      locale comme un champ de la classe (ex. 'portails', 'gardes', 'enemies').
+  R15 ter. Toute etape de construction d'un monde doit etre entouree d'un
+      "debut"/"fin" dans le journal [LV] : c'est ce qui permet de trouver un
+      gel a distance, sans pouvoir reproduire (voir MAJ 13 et incident 19).
   R15. Ne jamais demander a l'utilisateur de remplacer un fichier a la main.
       Tout ce qui peut se mettre a jour par hash doit le faire : launcher.pyw
       (cle "files"), le jeu (cle "game_build") et build_launcher.bat (SHA de la
@@ -919,29 +1017,17 @@ INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
-  [ ] 0. PRIORITE ABSOLUE : le plantage au demarrage (incident 18 + MAJ 13).
-          Etat au 18/09/2026 : les journaux recus montrent qu'il n'y a NI
-          exception NI plantage natif ; le demarrage s'arrete pendant la
-          construction du monde (voir MAJ 13). Le jeu est desormais instrumente.
-          A FAIRE :
-            1. faire recompiler les sources actuelles par l'utilisateur
-               (build_launcher.bat) ;
-            2. lui demander la DERNIERE ligne "[LV]" de son journal
-               (%USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log
-               ou jeu\game\logs\LibreVies.log avec un launcher a jour) ;
-            3. questions a lui poser en meme temps :
-               - voit-il l'ecran "Chargement du monde..." ? jusqu'a quelle
-                 etape va la barre ?
-               - la fenetre se fige-t-elle ("ne repond pas") ou disparait-elle ?
-               - y a-t-il un dossier
-                 %TEMP%\LibreVies\LibreVies\Crashes\... ?
-               - quel exe exactement (jeu\LibreVies.exe ou
-                 jeu\game\LibreViesGame.exe) et quelle taille fait
-                 jeu\game\ (dossier LibreViesGame_Data) ?
-          Le dernier "debut :" sans "fin :" du journal designera l'etape
-          exacte ; si le journal contient "premiere image affichee" et les
-          battements, le jeu tourne et le probleme est ailleurs (affichage,
-          fenetre hors ecran, carte graphique).
+  [ ] 0. GEL AU DEMARRAGE : CORRIGE en MAJ 15 (boucle infinie de CreateFence,
+          incident 19). Il reste a faire CONFIRMER par l'utilisateur :
+            - recompiler avec build_launcher.bat puis lancer ;
+            - le journal doit maintenant montrer TOUTES les etapes du demarrage
+              jusqu'a "[LV] demarrage termine : N objets, ..." ;
+            - s'il se fige encore : la derniere ligne "[LV] debut :" sans
+              "fin :" designe la methode a corriger (et si c'est une boucle,
+              verifier_cs_syntaxe.py la signalera).
+          Le plateau de depart doit afficher l'ecran "Chargement du monde..."
+          puis le village : c'est la premiere fois que le jeu demarrera en
+          entier depuis la MAJ 8.
 
   [ ] 1. UTILISATEUR : lancer build_launcher.bat (celui qu'il a deja).
           - S'il affiche "une nouvelle version de build_launcher.bat a ete
