@@ -651,15 +651,22 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
-  [ ] 1. UTILISATEUR : relancer compilation\build_launcher.bat.
-          C'EST LA PRIORITE : les MAJ 7 et 8 (magenta, camera, collisions) ne
-          sont pas encore dans l'exe que possede le joueur.
-          ATTENTION : le script lui-meme a change (MAJ 9). Au premier
-          lancement, il doit afficher une sauvegarde, se mettre a jour tout
-          seul, puis dire a la fin "renomme build_launcher.bat.maj en
-          build_launcher.bat puis relance". Il faut le faire et relancer une
-          2e fois : ce 2e lancement compile pour de bon (et il est rapide, le
-          projet etant deja a jour).
+  [ ] 1. UTILISATEUR : recuperer la NOUVELLE version de build_launcher.bat,
+          puis la lancer. C'EST LA PRIORITE : les MAJ 7, 8 et 9 (magenta,
+          camera, collisions, mise a jour automatique) ne sont pas encore dans
+          l'exe que possede le joueur.
+          POURQUOI UNE ACTION MANUELLE ICI : le script installe sur son PC est
+          encore l'ancien, et l'ancien se contente de dire "projet deja
+          complet, rien a telecharger". Il ne peut pas se mettre a jour tout
+          seul, il faut donc le remplacer une fois a la main :
+            - page GitHub du depot -> compilation -> build_launcher.bat ->
+              bouton "Download raw file" -> remplacer le fichier local ;
+            - OU, si le dossier est un depot git : git pull.
+          Ensuite, chaque lancement se debrouille tout seul (MAJ 9).
+          Ce premier lancement telecharge l'archive (72 Mo) et compile deja le
+          jeu corrige. A la fin, s'il affiche "renomme build_launcher.bat.maj
+          en build_launcher.bat puis relance", le faire et relancer : ce 2e
+          lancement est rapide (rien a telecharger) et compile pour de bon.
           Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
           (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...).
           Pendant la compilation Unity, ouvrir la Console : elle doit afficher
