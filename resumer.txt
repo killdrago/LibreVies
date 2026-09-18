@@ -1,7 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - launcher 4.0.0 / depot reorganise
+Derniere mise a jour : 18/09/2026 - launcher 4.1.0 / amorce (plus besoin
+                        de recompiler le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
@@ -29,7 +30,8 @@ LibreVies est un jeu (MMO open world low-poly) developpe par l'utilisateur
 ("Dragonus" sur GitHub : killdrago). Le jeu est une application UNITY :
 une seule scene (compilation/unity/Assets/Scenes/LibreVies.unity) et tout le
 jeu construit par code C# dans compilation/unity/Assets/Scripts/LibreViesGame.cs
-(~35 Ko) : village, chateau, personnage, ennemis, combat, HUD, sauvegarde.
+(~95 Ko, 2000 lignes : village, chateau, personnage, ennemis, combat, gardes,
+decor, HUD, sauvegarde).
 Version du jeu : 0.5.0 en preparation (Unity, export Windows 64 bits Mono).
 Derniere MAJ livree : 0.4.0. La 0.5.0 corrige le monde magenta, la camera sous
 le sol et la souris molle (MAJ 7) : elle doit encore etre compilee et publiee.
@@ -87,21 +89,36 @@ REGLES :
 
 
 ================================================================================
-3. COMMENT FONCTIONNE LE LAUNCHER (jeu/launcher.pyw, version 4.0.0)
+3. COMMENT FONCTIONNE LE LAUNCHER (jeu/launcher.pyw, version 4.1.0)
 ================================================================================
 
-Le launcher est un fichier Python unique de ~650 Ko : ~1080 lignes + les
+3.0 AMORCE ET CODE (a comprendre avant tout le reste, MAJ 12)
+  Le launcher est en DEUX morceaux :
+    - jeu\LibreVies.exe : une AMORCE de ~200 lignes, compilee depuis
+      compilation\amorce\amorce_launcher.py. Elle ne fait que trois choses :
+      recuperer launcher.pyw a cote d'elle (au premier lancement elle recopie
+      la copie que PyInstaller a embarquee avec --add-data), l'executer comme
+      un programme, et ecrire journal_launcher.txt + une boite d'alerte si le
+      launcher plante.
+    - jeu\launcher.pyw : TOUT le launcher (interface, telechargements, mise a
+      jour). Il est publie avec son hash dans version_url.json.
+  POURQUOI : quand on change une phrase du launcher, seul launcher.pyw change ;
+  le hash change, le launcher le telecharge et redemarre tout seul. Il n'y a
+  donc PLUS JAMAIS de PyInstaller a relancer pour modifier le launcher. Seule
+  une modification de l'amorce elle-meme demanderait de recompiler l'exe.
+
+3.1 Suite : launcher.pyw est un fichier Python unique de ~650 Ko : ~1150 lignes + les
 images (banniere, icone, ICO) integrees en base64. Il n'a besoin d'AUCUNE
 bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
 (facultatif : sans lui, les PNG integres passent par tk.PhotoImage).
 
-3.1 Au lancement (1er passage)
+3.2 Au lancement (1er passage)
   - GAME_DIR = dossier du .exe (ou du .pyw en developpement).
   - Il lit jeu/version_url.json recopie a cote de lui. S'il n'existe pas, il
     utilise DEFAULT_RAW_URL ecrit en dur (valeur de secours).
   - Il lit le manifeste distant (raw_url) : URL GitHub "raw".
 
-3.2 Mise a jour des petits fichiers (cle "files" du manifeste)
+3.3 Mise a jour des petits fichiers (cle "files" du manifeste)
   - Uniquement des fichiers TEXTE (md5 calcule sur le contenu normalise LF/CRLF).
   - Quand on developpe avec launcher.pyw, les entrees launcher.pyw et
     LibreVies.exe sont ignorees (sinon on ecraserait ses propres sources).
@@ -111,8 +128,12 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
   - Le launcher compile (LibreVies.exe) ne peut pas se remplacer pendant qu'il
     tourne : il depose .new puis un .cmd remplace le fichier apres fermeture et
     relance le launcher.
+  - launcher.pyw (le CODE du launcher, celui qui est en train de tourner) fait
+    partie de cette liste : si son hash change, il est telecharge puis le
+    launcher se contente de REDEMARRER (l'amorce relit le fichier a chaque
+    lancement). C'est ce qui rend toute recompilation inutile.
 
-3.3 Mise a jour du JEU COMPLET (cle "game_build" du manifeste)
+3.4 Mise a jour du JEU COMPLET (cle "game_build" du manifeste)
   C'est le coeur de la distribution. Le jeu n'est PAS telecharge fichier par
   fichier : il arrive en UNE SEULE archive .zip.
 
@@ -152,7 +173,7 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - hash identique mais jeu absent/casse -> "fichiers du jeu a reparer" ;
     - sinon -> "jeu a jour".
 
-3.4 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
+3.5 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
   Aujourd'hui jeu/version_url.json a "game_build": {} et "files": {}.
   Cela veut dire : AUCUNE compilation n'a encore ete publiee. Le launcher
   affiche donc "aucune compilation Unity publiee" et le bouton JOUER reste
@@ -467,6 +488,50 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       CreateGuard() alors que la methode avait ete remplacee.
 
 
+  MAJ 12 - Le launcher se met a jour tout seul (demande de l'utilisateur)
+    Demande exacte de l'utilisateur : "j'allume le launcher, il regarde le
+    fichier version, il regarde les hash, si ca a change il dl le nouveau
+    fichier version et les nouveaux fichiers avec les nouveaux hash. Je vais
+    pas a chaque fois refaire le build launcher."
+    Le probleme etait reel : LibreVies.exe contenait tout le launcher, donc
+    changer une phrase de l'interface obligeait a relancer PyInstaller.
+    Solution (voir section 3.0) : l'exe devient une AMORCE qui execute
+    launcher.pyw ; c'est launcher.pyw qui est publie avec son hash et se met a
+    jour tout seul. Plus aucune compilation du launcher n'est necessaire pour
+    le modifier.
+    a) jeu\launcher.pyw 4.1.0 : constante CORE_PATH (le fichier en cours
+       d'execution), mise a jour par hash + redemarrage automatique,
+       _relancer(), _finish_launcher_update() qui sait redemarrer sans
+       remplacer d'exe.
+    b) JOURNAL DU JEU : launch() ajoute -logFile
+       jeu\game\logs\LibreVies.log. Le journal du jeu est donc TOUJOURS a
+       cote du jeu (AppData\LocalLow n'est plus la seule piste). C'est la
+       reponse a l'incident 18 (plantage au demarrage sans trace).
+    c) Deux boutons en bas a droite : RAPPORT (ouvre le dossier des journaux
+       et celui des rapports de plantage Unity ; si aucun journal n'existe,
+       affiche les chemins a copier) et DOSSIER DU JEU.
+    d) compilation/amorce/amorce_launcher.py : l'amorce (execution du .pyw,
+       copie embarquee au 1er lancement, journal_launcher.txt + alerte si le
+       launcher plante, SystemExit conserve).
+    e) build_launcher.bat : compile l'amorce avec --add-data "launcher.pyw;."
+       au lieu du fichier complet, et applique SA PROPRE mise a jour tout seul
+       (intermediaire build\maj_launcher.bat : copie du .maj puis relance) :
+       plus de renommage manuel du script a chaque nouvelle version.
+    f) publier_jeu.py publie launcher.pyw (hash + taille) a chaque
+       publication : c'est ce qui declenche la mise a jour du launcher chez
+       les joueurs.
+    g) Recettes : test_launcher.py passe de 31 a 40 controles (dont -logFile et
+       la mise a jour du code par hash) ; NOUVEAU test_amorce.py (13 controles :
+       execution du .pyw, copie embarquee, message clair si le code manque,
+       journal en cas de plantage, SystemExit). tester_launcher.bat lance les
+       deux.
+    - VERIFIE ici : py_compile, recette launcher (40/40), recette amorce
+      (13/13), verifier_bat.py (7 scripts OK), aucune trace de l'ancien moteur.
+    - NON VERIFIE ici : la compilation PyInstaller de l'amorce et l'execution
+      de l'exe sous Windows (pas de Windows dans le bac a sable). Le premier
+      lancement chez l'utilisateur est le vrai test.
+
+
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
    (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
@@ -563,7 +628,7 @@ INCIDENT 9 - choix [O/N] avec une logique inversee
   (seul un O explicite lance la publication).
 
 INCIDENT 10 - Tester le launcher sans tkinter (bac a sable Linux)
-  Cause : tkinter n'est pas installable/installé dans l'environnement de
+  Cause : tkinter n'est pas installable/installe dans l'environnement de
   developpement de l'IA.
   Solution : la recette (outils/test_launcher.py) injecte un faux module
   tkinter dans sys.modules et charge le launcher avec SourceFileLoader. On
@@ -648,6 +713,30 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 
 
 
+INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
+  Symptome (18/09/2026) : "mon jeu crash au demarrage", sans autre detail : ni
+  message, ni fichier. Impossible de diagnostiquer a distance.
+  Cause du silence : rien ne garantissait qu'un journal soit ecrit, et l'endroit
+  ou Unity l'ecrit d'habitude (AppData\LocalLow\LibreVies\LibreVies) n'est
+  pas un endroit qu'un joueur connait.
+  Solution (MAJ 12) : le launcher lance le jeu avec -logFile
+  jeu\game\logs\LibreVies.log, donc le journal est TOUJOURS a cote du jeu, et
+  le bouton RAPPORT ouvre directement les dossiers utiles.
+  Fichiers a demander (ou ouverts par RAPPORT) :
+    - jeu\game\logs\LibreVies.log : notre journal, le plus direct ;
+    - %USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log et
+      Player-prev.log : journal standard Unity (Player-prev = lancement d'avant) ;
+    - %USERPROFILE%\AppData\Local\Temp\LibreVies\LibreVies\Crashes\
+      <horodatage>\error.log (+ crash.dmp) : ecrit par le gestionnaire de
+      plantage d'Unity, c'est LUI qui donne la pile d'appels ;
+    - jeu\journal_launcher.txt : si c'est le LAUNCHER qui plante (l'amorce).
+  Ordre de lecture : error.log d'abord (pile d'appels), sinon la fin de
+  LibreVies.log. A savoir : une exception C# n'arrete PAS un jeu Unity, elle
+  s'ecrit dans le journal ; un vrai plantage vient plutot d'un module natif, du
+  Graphics API, ou d'un plantage du gestionnaire de plantage. Verifier aussi
+  qu'il a bien compile les bonnes sources (MAJ 7 a 11) et demander QUOI il a
+  lance : jeu\LibreVies.exe (le launcher) ou jeu\game\LibreViesGame.exe (le jeu).
+
 ================================================================================
 7. REGLES TECHNIQUES A RESPECTER (pour ne pas reproduire les incidents)
 ================================================================================
@@ -655,7 +744,9 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
   R1. Ne jamais modifier launcher.pyw par regex multi-lignes. Remplacement
       ligne par ligne + compile() de controle (voir incident 7).
   R2. Apres TOUTE modification du launcher, lancer :
-        python compilation/outils/test_launcher.py     (31 controles, local)
+        python compilation/outils/test_launcher.py     (40 controles, local)
+        python compilation/outils/test_amorce.py      (13 controles, local)
+      (ou compilation\outils\tester_launcher.bat qui lance les deux)
       et verifier python -m py_compile jeu/launcher.pyw.
   R3. Les .bat sont ecrits en ASCII, sans accents, et doivent passer le
       controleur de blocs/parentheses/labels (incident 8). On ne peut pas les
@@ -683,6 +774,18 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
       par code doit vivre dans Assets/Resources/ pour survivre a la compilation.
   R13. Une correction de rendu ne se valide QUE dans l'exe compile, jamais dans
       l'editeur Unity (le magenta n'apparaissait pas dans Play, incident 15).
+  R14. Le launcher vit dans jeu/launcher.pyw et NULLE PART ailleurs. L'amorce
+      (compilation/amorce/amorce_launcher.py) ne doit contenir que le lancement
+      du .pyw, le journal et les messages d'erreur. Tout import ajoute a
+      launcher.pyw doit etre ajoute aussi dans l'amorce, sinon l'exe compile ne
+      le contiendra pas (le .pyw est charge dynamiquement : PyInstaller ne peut
+      pas deviner ses imports).
+  R15. Ne jamais demander a l'utilisateur de remplacer un fichier a la main.
+      Tout ce qui peut se mettre a jour par hash doit le faire : launcher.pyw
+      (cle "files"), le jeu (cle "game_build") et build_launcher.bat (SHA de la
+      branche, qu'il applique desormais tout seul). Exception historique :
+      la toute premiere mise a jour de build_launcher.bat sur sa machine, dont
+      l'ancienne version ne savait que poser un .maj.
 
 
 ================================================================================
@@ -697,9 +800,21 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
     0e1da6d  build_launcher.bat : tout se telecharge tout seul
     +        correctif icone PyInstaller, exclusions, resumer.txt (ce fichier)
 
+  Suite de la refonte (chaque commit = un lot, la branche est poussee) :
+    1e14528 / 9bc6405  rendu corrige (monde magenta, camera, souris) = MAJ 7
+    8e75875            collisions et IA des monstres = MAJ 8
+    31eadc7 / 6a57f7d  build_launcher.bat auto-mis a jour, verifier_bat = MAJ 9
+    2db7fa1            verifier_cs_syntaxe.py (controle du C#) = outil
+    5bdbe7d            decor du village = MAJ 10
+    5c56645            gardes des portails + degats flottants = MAJ 11
+    (a venir)          amorce + journal du jeu + bouton RAPPORT = MAJ 12
+
   Publie sur GitHub (verifie via gh api) :
     jeu/version_url.json   -> game_build: {}  (aucune compilation publiee)
-    jeu/launcher.pyw       -> launcher 4.0.0
+    jeu/launcher.pyw       -> launcher 4.1.0 (le code complet du launcher)
+    jeu/LibreVies.exe      -> amorce : l'utilisateur doit le reconstruire UNE
+                              FOIS avec build_launcher.bat pour passer au
+                              nouveau systeme (ensuite, plus jamais)
 
   Release GitHub "derniere" : 3 archives de l'ancien moteur - a nettoyer
   Ulterieurement si l'utilisateur le demande.
@@ -721,28 +836,36 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
-  [ ] 1. UTILISATEUR : recuperer la NOUVELLE version de build_launcher.bat,
-          puis la lancer. C'EST LA PRIORITE : les MAJ 7, 8 et 9 (magenta,
-          camera, collisions, mise a jour automatique) ne sont pas encore dans
-          l'exe que possede le joueur.
-          POURQUOI UNE ACTION MANUELLE ICI : le script installe sur son PC est
-          encore l'ancien, et l'ancien se contente de dire "projet deja
-          complet, rien a telecharger". Il ne peut pas se mettre a jour tout
-          seul, il faut donc le remplacer une fois a la main :
-            - page GitHub du depot -> compilation -> build_launcher.bat ->
-              bouton "Download raw file" -> remplacer le fichier local ;
-            - OU, si le dossier est un depot git : git pull.
-          Ensuite, chaque lancement se debrouille tout seul (MAJ 9).
-          Ce premier lancement telecharge l'archive (72 Mo) et compile deja le
-          jeu corrige. A la fin, s'il affiche "renomme build_launcher.bat.maj
-          en build_launcher.bat puis relance", le faire et relancer : ce 2e
-          lancement est rapide (rien a telecharger) et compile pour de bon.
-          Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
-          (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...).
-          Pendant la compilation Unity, ouvrir la Console : elle doit afficher
-          "LibreVies : shader utilise = Standard" (ou "LVColor"). Si elle
-          affiche autre chose, le dire plutot que de publier.
-          Si l'icone pose encore probleme, lancer outils\creer_icone.bat.
+  [ ] 0. PRIORITE ABSOLUE : comprendre pourquoi le jeu plante au demarrage
+          chez l'utilisateur (incident 18). Il faut SON journal, dans cet ordre :
+            - s'il a un launcher a jour : bouton RAPPORT, puis envoyer
+              jeu\game\logs\LibreVies.log ;
+            - sinon aller a la main dans
+              %USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log
+              et dans %USERPROFILE%\AppData\Local\Temp\LibreVies\LibreVies\
+              Crashes\<horodatage>\error.log ;
+            - lui demander aussi QUOI il a lance (jeu\LibreVies.exe ou
+              jeu\game\LibreViesGame.exe) et si les sources avaient bien ete
+              rafraichies avant la compilation Unity.
+          Ne rien "corriger au hasard" sans ce fichier : le jeu n'est pas
+          reproductible ici (pas de Windows, pas d'Unity, pas de compilateur C#).
+
+  [ ] 1. UTILISATEUR : lancer build_launcher.bat (celui qu'il a deja).
+          - S'il affiche "une nouvelle version de build_launcher.bat a ete
+            telechargee", c'est la TRANSITION : renommer une derniere fois
+            build_launcher.bat.maj en build_launcher.bat puis relancer. Apres
+            cette fois, le script s'installe tout seul (MAJ 12) et il n'y aura
+            plus jamais rien a remplacer a la main.
+          - Ce lancement construit la nouvelle AMORCE (jeu\LibreVies.exe) et
+            le jeu corrige (MAJ 7 a 11). C'est la seule reconstruction du
+            launcher qui restera : ensuite, les modifications du launcher
+            arrivent par hash, sans recompilation.
+          - Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
+            (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...) +
+            jeu\launcher.pyw (le code, a cote de l'exe).
+          - Pendant la compilation Unity, la Console doit afficher
+            "LibreVies : shader utilise = Standard" (ou "LVColor"). Si elle
+            affiche autre chose, le dire plutot que de publier.
 
   [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
           compilation\outils\publier_jeu.bat --version 0.5.0 --pousser.
@@ -796,8 +919,16 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
     normalize_raw_url, _safe_local_path, _manifest_files, check_for_updates,
     apply_updates, schedule_launcher_restart, _telecharger_archive,
     _extraire_zip, installer_build_jeu, build_a_installer, find_game, launch.
-    Constantes : LAUNCHER_VERSION 4.0.0, GAME_VERSION 0.4.0,
-    DEFAULT_RAW_URL, DOSSIER_JEU_DEFAUT "game", NOMS_EXE_JEU.
+    Constantes : LAUNCHER_VERSION 4.1.0, GAME_VERSION 0.4.0, CORE_PATH (le
+    fichier en cours d'execution : c'est lui qui declenche le redemarrage
+    apres une mise a jour), DEFAULT_RAW_URL, DOSSIER_JEU_DEFAUT "game",
+    NOMS_EXE_JEU.
+    Fonctions d'aide aux joueurs : dossier_journaux_jeu (dossier logs a cote
+    du jeu), _dossiers_journaux, _ouvrir_dossier, ouvrir_dossier_jeu, rapport
+    et _montrer_chemins (bouton RAPPORT). launch() ajoute -logFile pour que le
+    journal du jeu soit toujours dans jeu\game\logs\LibreVies.log.
+    La version affichee dans la fenetre vient de LAUNCHER_VERSION, et publier
+    une nouvelle version de ce fichier suffit a mettre a jour le launcher.
 
   jeu/version_url.json
     Manifeste lu par le launcher. "files" = petits fichiers texte a mettre a
@@ -805,18 +936,39 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 
   compilation/outils/publier_jeu.py / .bat
     Archive jeu\game -> LibreVies_jeu_<md5>.zip, envoi dans la release,
-    mise a jour du manifeste, publication du launcher compile, notation de
-    l'installation locale (jeu\etat_jeu.json), option --pousser pour git.
+    mise a jour du manifeste (game_build + launcher.pyw + LibreVies.exe),
+    publication du launcher compile, notation de l'installation locale
+    (jeu\etat_jeu.json), option --pousser pour git.
     Chemins par defaut : --jeu jeu\game et --exe jeu\LibreVies.exe.
+    Depuis la MAJ 12, il publie aussi launcher.pyw avec son hash : c'est ce qui
+    fait arriver les nouveautes du launcher chez les joueurs SANS recompiler.
 
   compilation/outils/definir_url_publication.py / .bat
     Change la branche publiee dans les 3 endroits, avec garde-fous.
 
+  compilation/amorce/amorce_launcher.py
+    L'AMORCE : c'est ce fichier qui est compile en jeu\LibreVies.exe (voir
+    section 3.0). Elle execute jeu\launcher.pyw, recopie la copie embarquee
+    (--add-data) au premier lancement, et ecrit journal_launcher.txt + une
+    boite d'alerte si le launcher plante. Ne JAMAIS y remettre de logique du
+    launcher. Les imports du haut (tkinter, urllib, zipfile, subprocess...)
+    servent a les faire EMBARQUER par PyInstaller : tout nouvel import de
+    launcher.pyw doit etre ajoute ici, sinon l'exe compile ne le contiendra pas.
+
+  compilation/outils/test_amorce.py
+    Recette de l'amorce (13 controles) : le code du launcher est bien execute
+    comme un programme, la copie embarquee est recopiee au premier lancement,
+    un message clair s'affiche si le code manque, un plantage du launcher
+    laisse un journal exploitable, et SystemExit traverse l'amorce.
+        python compilation/outils/test_amorce.py
+
   compilation/outils/test_launcher.py / tester_launcher.bat
-    Recette complete, hors ligne, sans tkinter. 31 controles :
+    Recette complete, hors ligne, sans tkinter. 40 controles :
     premiere installation, mise a jour, reprise apres coupure, archive
     corrompue (refusee sans casser l'installation), archive piegee (../),
-    chemins interdits du manifeste, lancement du jeu, cas "rien de publie".
+    chemins interdits du manifeste, lancement du jeu (avec -logFile), mise a
+    jour du code du launcher par hash, cas "rien de publie".
+    tester_launcher.bat lance test_launcher.py PUIS test_amorce.py.
 
   compilation/outils/creer_icone.py / creer_icone.bat
     Reextrait icon.ico depuis les octets integres au launcher.
@@ -863,7 +1015,9 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 
   - Verifier l'etat :        git log --oneline -5 ; git status --short
   - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
-  - Lancer la recette :      python compilation/outils/test_launcher.py
+  - Lancer les recettes :    python compilation/outils/test_launcher.py
+                             python compilation/outils/test_amorce.py
+                             (ou compilation\outils\tester_launcher.bat)
   - Verifier les .bat :      python compilation/outils/verifier_bat.py
   - Verifier le C# :         python compilation/outils/verifier_cs_syntaxe.py
                              (installer d'abord : pip install
@@ -874,6 +1028,10 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
     nom dans tout le depot (option -i, insensible a la casse, hors .git) doit
     ne RIEN afficher. Oui, y compris dans ce fichier et dans les
     commentaires du code : ne jamais ecrire le nom du moteur abandonne.
+  - Verifier que le launcher est bien en deux morceaux (MAJ 12) :
+        jeu/launcher.pyw = tout le launcher ; compilation/amorce/
+        amorce_launcher.py = l'exe qui l'execute. Un changement de launcher
+        ne doit JAMAIS obliger a relancer PyInstaller.
   - Verifier les shaders du jeu :
         ls compilation/unity/Assets/Resources/LVShaders/   (4 fichiers : 2
         .shader + 2 .meta ; les .meta sont obligatoires, sinon Unity regenere

@@ -220,11 +220,56 @@ def main() -> int:
         {"args": args, "cwd": k.get("cwd")})
     launcher.launch(exe)
     launcher.subprocess.Popen = vrai_popen
-    verifier(appels.get("args") == [exe], "le jeu est lance par son chemin complet")
+    arguments = appels.get("args") or []
+    verifier(bool(arguments) and arguments[0] == exe,
+             "le jeu est lance par son chemin complet")
+    # Le journal du jeu est force a cote de son executable : c'est ce fichier
+    # qui permet de comprendre un plantage (bouton RAPPORT du launcher).
+    verifier(len(arguments) == 3 and arguments[1] == "-logFile",
+             "le jeu est lance avec -logFile (journal du jeu)")
+    journal = arguments[2] if len(arguments) > 2 else ""
+    verifier(journal.replace("\\", "/").endswith("logs/LibreVies.log"),
+             "le journal est ecrit dans logs/LibreVies.log")
+    verifier(os.path.isdir(os.path.dirname(journal)),
+             "le dossier des journaux est cree au lancement")
+    verifier(appels.get("cwd") == os.path.dirname(exe),
+             "le jeu demarre dans son propre dossier")
     verifier(appels.get("cwd") == os.path.dirname(exe),
              "le jeu demarre dans son propre dossier")
 
-    print("== 10. aucune compilation publiee (avant la premiere publication) ==")
+    print("== 10. mise a jour du code du launcher (sans reconstruction) ==")
+    # Tout le launcher est dans launcher.pyw : quand son hash change, le
+    # fichier est telecharge puis applique par un simple redemarrage. Aucune
+    # reconstruction de LibreVies.exe n'est donc necessaire.
+    VIEUX = b"# ancien code du launcher\n"
+    NEUF = b"# nouveau code du launcher\n"
+    (publication / "launcher.pyw").write_bytes(NEUF)
+    (jeu / "launcher.pyw").write_bytes(VIEUX)
+    manifeste = ecrire_manifeste(publication, archive2, "2.0.0")
+    manifeste["files"]["launcher.pyw"] = {
+        "hash": hashlib.md5(NEUF).hexdigest(), "size": len(NEUF)}
+    for dossier in (publication, jeu):   # cote serveur ET cote joueur
+        (dossier / "version_url.json").write_text(
+            json.dumps(manifeste, ensure_ascii=False), encoding="utf-8")
+    launcher.sys.frozen = True
+    try:
+        resultat = launcher.check_for_updates(cb)
+        noms = [m[0] for m in resultat["modified"]]
+        verifier("launcher.pyw" in noms,
+                 "le code du launcher est detecte comme modifie")
+        _, erreurs, pending = launcher.apply_updates(
+            resultat["modified"], resultat["remote_cfg"], cb)
+        verifier(not erreurs, "telechargement du code du launcher sans erreur")
+        verifier(pending is not None and pending[0] is None,
+                 "le code du launcher demande un redemarrage (pas de .exe a remplacer)")
+        verifier((jeu / "launcher.pyw").read_bytes() == NEUF,
+                 "launcher.pyw est bien remplace sur le disque")
+        resultat = launcher.check_for_updates(cb)
+        verifier(not resultat["modified"], "plus rien a mettre a jour ensuite")
+    finally:
+        launcher.sys.frozen = False
+
+    print("== 11. aucune compilation publiee (avant la premiere publication) ==")
     manifeste = json.loads((publication / "version_url.json").read_text(encoding="utf-8"))
     manifeste["game_build"] = {}
     (publication / "version_url.json").write_text(

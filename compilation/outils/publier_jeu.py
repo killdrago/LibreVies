@@ -220,7 +220,19 @@ def main() -> int:
         fichiers = {}
         manifeste["files"] = fichiers
 
-    # Le launcher compile : celui demande, sinon jeu/LibreVies.exe s'il existe.
+    # Le code du launcher : c'est LUI qui porte les nouveautes (boutons,
+    # textes, logique). Publie avec son hash, il se met a jour tout seul chez
+    # le joueur sans jamais reconstruire LibreVies.exe.
+    code_launcher = RACINE / "jeu" / "launcher.pyw"
+    if code_launcher.is_file():
+        fichiers["launcher.pyw"] = {
+            "hash": md5_fichier(code_launcher),
+            "size": code_launcher.stat().st_size,
+        }
+        print("   launcher.pyw publie (hash %s, version %s)"
+              % (fichiers["launcher.pyw"]["hash"], lire_version_launcher()))
+
+    # L'amorce compilee : celui demande, sinon jeu/LibreVies.exe s'il existe.
     exe_launcher = args.exe.resolve() if args.exe else RACINE / "jeu" / "LibreVies.exe"
     if exe_launcher.is_file() or args.exe:
         if not exe_launcher.is_file():

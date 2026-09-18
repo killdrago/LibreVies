@@ -1,5 +1,5 @@
 """
-LibreVies — Launcher joueur (version 4.0.0)
+LibreVies — Launcher joueur (version 4.1.0)
 
 Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
   1. il lit version_url.json publie sur GitHub ;
@@ -7,6 +7,11 @@ Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
   3. il telecharge le jeu complet en une archive, verifie son md5 et
      l'installe dans game/ (avec reprise si la connexion coupe) ;
   4. il active JOUER.
+
+Ce fichier CONTIENT le launcher : LibreVies.exe n'est qu'une petite amorce
+qui l'execute. C'est donc ici que se trouve le code, et ce fichier se met a
+jour tout seul par son hash (voir version_url.json) : le launcher n'a plus
+jamais besoin d'etre reconstruit.
 
 Le dossier compilation/ (projet Unity, scripts, images de travail) ne part
 JAMAIS chez le joueur.
@@ -88,9 +93,13 @@ else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
+# Le fichier en cours d'execution. Quand son hash change dans version_url.json,
+# le launcher telecharge la nouvelle version puis redemarre : aucune
+# reconstruction de LibreVies.exe n'est necessaire.
+CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.0.0"
+LAUNCHER_VERSION = "4.1.0"
 GAME_VERSION = "0.4.0"
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
                    "arena/01a0b32c-librevies/jeu")
@@ -107,6 +116,10 @@ ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
+    {"date": "18/09/2026", "t": "Launcher 4.1.0 — mise a jour sans rien recompiler",
+     "d": "LibreVies.exe n'est plus qu'une petite amorce : tout le launcher est dans launcher.pyw. Des que ce fichier change, son hash change dans version_url.json : le launcher le telecharge et redemarre tout seul. Plus jamais besoin de reconstruire le launcher."},
+    {"date": "18/09/2026", "t": "Launcher 4.1.0 — bouton RAPPORT (plantages)",
+     "d": "Le jeu est lance avec son journal dans jeu\\game\\logs\\LibreVies.log. Le bouton RAPPORT ouvre le dossier des journaux et celui des rapports de plantage Unity : un plantage devient un fichier a envoyer, plus une devinette."},
     {"date": "18/09/2026", "t": "Launcher 4.0.0 — le jeu complet se telecharge tout seul",
      "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unity publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
     {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
@@ -374,6 +387,12 @@ def apply_updates(modified, remote_cfg, progress_cb):
                 pending_launcher = (local_path, staged)
             else:
                 _stage_or_replace(local_path, data)
+                if (pending_launcher is None
+                        and os.path.normcase(os.path.abspath(local_path)) == CORE_PATH):
+                    # C'est le code du launcher qui vient de changer : il
+                    # suffit de redemarrer pour l'appliquer (le fichier n'est
+                    # pas verrouille, l'amorce le relit a chaque lancement).
+                    pending_launcher = (None, local_path)
             downloaded += 1
         except Exception as e:
             errors.append('%s : %s' % (fname, e))
@@ -703,10 +722,25 @@ def find_game():
     return None
 
 
+def dossier_journaux_jeu(exe_path):
+    """Dossier des journaux du jeu (a cote de son executable)."""
+    try:
+        dossier = os.path.join(os.path.dirname(os.path.abspath(exe_path)), 'logs')
+        os.makedirs(dossier, exist_ok=True)
+        return dossier
+    except (OSError, TypeError):
+        return None
+
+
 def launch(path):
-    # La build du jeu contient deja son runtime : aucun argument special et
-    # aucun telechargement ne sont necessaires au joueur.
-    subprocess.Popen([path], cwd=os.path.dirname(path), close_fds=False)
+    # La build du jeu contient deja son runtime : aucun telechargement et
+    # aucun runtime a installer. -logFile sert uniquement a retrouver le
+    # journal du jeu (et donc la cause d'un plantage) sans chercher partout.
+    args = [path]
+    journaux = dossier_journaux_jeu(path)
+    if journaux:
+        args += ['-logFile', os.path.join(journaux, 'LibreVies.log')]
+    subprocess.Popen(args, cwd=os.path.dirname(path), close_fds=False)
 # ============================================================
 # APPLICATION
 # ============================================================
@@ -852,6 +886,14 @@ class App(tk.Tk):
         tk.Button(self, text="QUITTER", font=("Segoe UI", 14, "bold"),
                   fg=TEXT, bg="#aa3333", relief="flat", cursor="hand2",
                   width=10, command=self.destroy).place(x=886, y=698, height=42)
+
+        # ====== AIDE : journaux et dossier du jeu ======
+        tk.Button(self, text="RAPPORT", font=("Segoe UI", 10, "bold"),
+                  fg=TEXT, bg="#2f6fa8", relief="flat", cursor="hand2",
+                  width=11, command=self.rapport).place(x=750, y=744, height=20)
+        tk.Button(self, text="DOSSIER DU JEU", font=("Segoe UI", 10, "bold"),
+                  fg=TEXT, bg="#3d6b52", relief="flat", cursor="hand2",
+                  width=16, command=self.ouvrir_dossier_jeu).place(x=850, y=744, height=20)
 
     # ============================================================
     # ACTUALITES — rotation auto
@@ -1050,8 +1092,28 @@ class App(tk.Tk):
         time.sleep(0.4)
         self.after(0, self._check_game)
 
+    def _relancer(self):
+        """Relance le launcher (apres mise a jour de son code)."""
+        if not getattr(sys, 'frozen', False):
+            return False
+        try:
+            subprocess.Popen([sys.executable], cwd=GAME_DIR, close_fds=False)
+            return True
+        except (OSError, IOError):
+            return False
+
     def _finish_launcher_update(self, pending):
         target, staged = pending
+        if target is None:
+            # Nouveau code du launcher : l'amorce relit launcher.pyw a chaque
+            # lancement, un simple redemarrage suffit.
+            if self._relancer():
+                self._upd_bar(100, 'Launcher mis a jour, redemarrage...')
+                self.after(600, self.destroy)
+            else:
+                self._upd_bar(100, 'Launcher mis a jour (actif au prochain lancement)')
+                self._check_game()
+            return
         if schedule_launcher_restart(target, staged):
             self._upd_bar(100, 'Launcher mis a jour, redemarrage...')
             self.after(600, self.destroy)
@@ -1076,6 +1138,100 @@ class App(tk.Tk):
             self.ready = True
             self.play_btn.config(state='normal', bg=GREEN)
             self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
+
+    # ============================================================
+    # JOURNAUX — comprendre un plantage en un clic
+    # ============================================================
+
+    def _dossiers_journaux(self):
+        """Dossiers ou chercher le journal du jeu et les rapports de plantage.
+
+        L'ordre compte : les premiers trouves sont ceux qu'on ouvre.
+        """
+        dossiers = []
+        if self.game:
+            dossier = dossier_journaux_jeu(self.game)
+            if dossier:
+                dossiers.append(dossier)
+        profil = os.environ.get('USERPROFILE') or os.path.expanduser('~')
+        if profil:
+            # Emplacement standard d'Unity pour companyName/productName.
+            dossiers.append(os.path.join(profil, 'AppData', 'LocalLow',
+                                         'LibreVies', 'LibreVies'))
+        temp = os.environ.get('TEMP') or os.environ.get('TMP')
+        if temp:
+            dossiers.append(os.path.join(temp, 'LibreVies', 'LibreVies', 'Crashes'))
+        return dossiers
+
+    def _ouvrir_dossier(self, path):
+        try:
+            if os.path.isdir(path):
+                if hasattr(os, 'startfile'):
+                    os.startfile(path)
+                else:
+                    subprocess.Popen(['explorer', os.path.normpath(path)])
+                return True
+        except Exception:
+            pass
+        return False
+
+    def ouvrir_dossier_jeu(self):
+        if self.game and self._ouvrir_dossier(os.path.dirname(self.game)):
+            self._upd_bar(100, 'Dossier du jeu ouvert')
+            return
+        self._upd_bar(0, 'Dossier du jeu introuvable : installez le jeu d abord')
+
+    def rapport(self):
+        """Ouvre les journaux : un plantage devient un fichier a envoyer."""
+        dossiers = self._dossiers_journaux()
+        ouverts = 0
+        for dossier in dossiers:
+            if os.path.isdir(dossier) and self._ouvrir_dossier(dossier):
+                ouverts += 1
+                if ouverts >= 2:
+                    break
+        if ouverts:
+            self._upd_bar(100, 'Journaux ouverts : envoyez LibreVies.log si le jeu a plante')
+            return
+        self._montrer_chemins(dossiers)
+
+    def _montrer_chemins(self, dossiers):
+        """Aucun journal trouve : on affiche les chemins, prets a copier."""
+        fenetre = tk.Toplevel(self)
+        fenetre.title("Rapport de plantage")
+        fenetre.configure(bg=BG)
+        fenetre.geometry("680x330")
+        fenetre.resizable(False, False)
+        tk.Label(fenetre, text="Aucun journal trouve pour le moment.",
+                 font=("Segoe UI", 11, "bold"), fg=ACCENT, bg=BG).pack(
+                     anchor="w", padx=14, pady=(14, 2))
+        tk.Label(fenetre, text="Lancez le jeu une fois (meme s'il plante), puis recliquez\n"
+                              "sur RAPPORT. Chemins a verifier :",
+                 font=("Segoe UI", 9), fg=TEXT2, bg=BG, justify="left").pack(
+                     anchor="w", padx=14, pady=(0, 8))
+        zone = tk.Text(fenetre, height=8, bg="#111122", fg=TEXT, relief="flat",
+                       font=("Consolas", 9), wrap="none")
+        zone.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+        zone.insert("1.0", "\n".join(dossiers))
+        zone.configure(state="disabled")
+        barre = tk.Frame(fenetre, bg=BG)
+        barre.pack(fill="x", padx=14, pady=(0, 14))
+
+        def copier():
+            try:
+                self.clipboard_clear()
+                self.clipboard_append("\n".join(dossiers))
+                self._upd_bar(100, 'Chemins copies dans le presse-papiers')
+            except Exception:
+                pass
+            fenetre.destroy()
+
+        tk.Button(barre, text="COPIER", font=("Segoe UI", 10, "bold"),
+                  fg=TEXT, bg="#2f6fa8", relief="flat", cursor="hand2",
+                  width=12, command=copier).pack(side="left")
+        tk.Button(barre, text="FERMER", font=("Segoe UI", 10, "bold"),
+                  fg=TEXT, bg="#555555", relief="flat", cursor="hand2",
+                  width=12, command=fenetre.destroy).pack(side="right")
 
     def play(self):
         if not (self.ready and self.game):

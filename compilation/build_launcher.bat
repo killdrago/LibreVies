@@ -26,6 +26,7 @@ if not "%~1"=="" set "BRANCHE=%~1"
 
 set "ROOT=%~dp0"
 set "LAUNCHER=%ROOT%..\jeu\launcher.pyw"
+set "AMORCE=%ROOT%amorce\amorce_launcher.py"
 set "PROJECT=%ROOT%unity"
 set "JEU=%ROOT%..\jeu"
 set "BUILD=%ROOT%build"
@@ -98,12 +99,26 @@ if not exist "%JEU%\game\LibreViesGame.exe" (
 )
 
 echo.
-echo [6/6] Compilation du launcher autonome...
+echo [6/6] Compilation de l'amorce du launcher...
+rem LibreVies.exe n'est plus qu'une AMORCE : elle contient le minimum
+rem (runtime Python + tkinter) et execute le fichier launcher.pyw place a
+rem cote d'elle. Consequences :
+rem   * tout le launcher est dans launcher.pyw, qui se met a jour tout seul
+rem     par son hash (version_url.json) : plus besoin de reconstruire
+rem     l'executable quand le launcher change ;
+rem   * cette compilation n'est necessaire que si l'amorce elle-meme change.
+rem --add-data embarque launcher.pyw : s'il manque a cote de l'executable
+rem (premier lancement), l'amorce le recopie.
+if not exist "%AMORCE%" (
+    echo ERREUR : l'amorce est introuvable : %AMORCE%
+    echo Elle doit venir de compilation\amorce\amorce_launcher.py.
+    goto :echec
+)
 rem Les modules exclus ne sont pas utilises par le launcher : sans cela,
 rem PyInstaller embarque pygame/numpy s'ils sont installes sur la machine
 rem de build, ce qui gonfle LibreVies.exe pour rien.
 if exist "%BUILD%\LibreVies.spec" del /q "%BUILD%\LibreVies.spec"
-"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%JEU%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%LAUNCHER%"
+"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --add-data "%LAUNCHER%;." --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%JEU%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%AMORCE%"
 if errorlevel 1 (
     echo ERREUR : compilation du launcher echouee.
     goto :echec
@@ -152,6 +167,27 @@ exit /b 0
 
 
 rem ==========================================================================
+rem  MISE A JOUR DU SCRIPT LUI-MEME (aucune action manuelle)
+rem  Un .bat ne peut pas se remplacer pendant qu'il tourne : on passe par un
+rem  petit intermediaire qui attend la fin, copie la nouvelle version, efface
+rem  le .maj puis relance la compilation avec le script neuf.
+rem ==========================================================================
+:appliquer_maj
+set "LV_RELANCE=%BUILD%\maj_launcher.bat"
+> "%LV_RELANCE%" echo @echo off
+>> "%LV_RELANCE%" echo rem Intermediaire : applique build_launcher.bat.maj puis relance.
+>> "%LV_RELANCE%" echo :attente
+>> "%LV_RELANCE%" echo timeout /t 1 /nobreak ^>nul
+>> "%LV_RELANCE%" echo copy /Y "%ROOT%build_launcher.bat.maj" "%ROOT%build_launcher.bat" ^>nul 2^>^&1
+>> "%LV_RELANCE%" echo if errorlevel 1 goto attente
+>> "%LV_RELANCE%" echo del /f /q "%ROOT%build_launcher.bat.maj" ^>nul 2^>^&1
+>> "%LV_RELANCE%" echo start "" "%ROOT%build_launcher.bat"
+>> "%LV_RELANCE%" echo del /f /q "%%~f0" ^>nul 2^>^&1
+start "" /min cmd.exe /d /c "%LV_RELANCE%"
+exit /b 0
+
+
+rem ==========================================================================
 rem  ETAPE 1 - le projet (sources) : MISE A JOUR depuis GitHub
 rem  Les fichiers sont mis a jour a chaque lancement (le depot est la
 rem  reference). Avant tout remplacement, l'ancienne version est copiee dans
@@ -173,6 +209,7 @@ if exist "%LV_SAUVE%" rmdir /s /q "%LV_SAUVE%"
 mkdir "%LV_SAUVE%" 2>nul
 robocopy "%ROOT%unity" "%LV_SAUVE%\unity" /E /XD Library Temp Logs obj Build build .vs /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 robocopy "%ROOT%outils" "%LV_SAUVE%\outils" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%ROOT%amorce" "%LV_SAUVE%\amorce" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 robocopy "%JEU%" "%LV_SAUVE%\jeu" /E /XF *.exe /XD game game.ancien game.install /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 for %%F in (build_launcher.bat build_unity_game.bat setup_unity_build_tools.bat) do if exist "%ROOT%%%F" copy /y "%ROOT%%%F" "%LV_SAUVE%\%%F" >nul 2>&1
 echo        Sauvegarde de l'ancienne version : build\sauvegarde_locale
@@ -189,12 +226,15 @@ echo        Projet a jour.
 
 if exist "%ROOT%build\script_recu.txt" (
     del /q "%ROOT%build\script_recu.txt" >nul 2>&1
-    echo.
-    echo IMPORTANT : une nouvelle version de build_launcher.bat a ete telechargee.
-    echo Elle est posee sous le nom : build_launcher.bat.maj
-    echo Renomme-la en build_launcher.bat ^(en remplacant le fichier^) puis relance.
-    echo Cette compilation-ci finit avec l'ancienne version : c'est normal.
-    echo.
+    if exist "%ROOT%build_launcher.bat.maj" (
+        echo.
+        echo Une nouvelle version de build_launcher.bat a ete telechargee :
+        echo elle s'installe toute seule et la compilation redemarre.
+        echo Rien a renommer, rien a remplacer a la main.
+        echo.
+        call :appliquer_maj
+        exit /b 0
+    )
 )
 
 if not exist "%PROJECT%\Assets" (

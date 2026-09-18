@@ -18,16 +18,28 @@ Documents, ou une clé USB), pas dans C:\Program Files : le jeu s'installe
 Où sont mes fichiers ?
 ----------------------
 Tout reste dans ce dossier :
+  launcher.pyw       le launcher lui-même (il se met à jour tout seul)
   game\              le jeu téléchargé (LibreViesGame.exe ou LibreVies.exe)
+  game\logs\         le journal du jeu (LibreVies.log) : utile en cas de plantage
   etat_jeu.json      l'état de l'installation (version, date)
   jeu.download.part  téléchargement en cours (reprise automatique)
+
+Les deux boutons en bas du launcher
+-----------------------------------
+* RAPPORT     ouvre le dossier des journaux (jeu et plantages). Si ton jeu
+              plante, ouvre-le et envoie le fichier LibreVies.log : c'est lui
+              qui explique ce qui s'est passé.
+* DOSSIER DU JEU  ouvre le dossier où le jeu est installé.
 
 En cas de souci
 ---------------
 * « Hors ligne » : vérifie ta connexion puis relance le launcher.
 * Le téléchargement échoue en boucle : supprime jeu.download.part et
   relance le launcher.
-* Le jeu ne démarre pas : supprime le dossier game\ puis relance le
-  launcher, il le retéléchargera entièrement.
+* Le jeu ne démarre pas : clique sur RAPPORT et envoie le journal, ou
+  supprime le dossier game\ puis relance le launcher : il le
+  retéléchargera entièrement.
+* Le launcher lui-même plante : un fichier journal_launcher.txt apparaît à
+  côté de LibreVies.exe, il contient la cause.
 
 LibreVies est distribué gratuitement. Bon jeu !
