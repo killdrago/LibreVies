@@ -69,19 +69,39 @@ if not exist "%UNITY%" (
     exit /b 1
 )
 
-if not exist "%JEU%\game" mkdir "%JEU%\game"
 if not exist "%ROOT%build" mkdir "%ROOT%build"
+set "EXPORT=%ROOT%build\unity_export"
+if exist "%EXPORT%" rmdir /s /q "%EXPORT%"
+if exist "%EXPORT%" (
+    echo ERREUR : dossier temporaire d'export verrouille : %EXPORT%
+    pause
+    exit /b 1
+)
+mkdir "%EXPORT%"
 if exist "%ROOT%build\unity.log" del /q "%ROOT%build\unity.log"
 
 echo Export Windows Unity en cours...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%JEU%\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%EXPORT%\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : Unity a echoue. Consultez build\unity.log
     pause
     exit /b 1
 )
-if not exist "%JEU%\game\LibreViesGame.exe" (
+if not exist "%EXPORT%\LibreViesGame.exe" (
     echo ERREUR : LibreViesGame.exe n'a pas ete cree.
+    pause
+    exit /b 1
+)
+if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
+if exist "%JEU%\game" (
+    echo ERREUR : fermez LibreViesGame.exe avant de remplacer jeu\game.
+    echo Le nouvel export reste dans %EXPORT%
+    pause
+    exit /b 1
+)
+move /Y "%EXPORT%" "%JEU%\game" >nul
+if errorlevel 1 (
+    echo ERREUR : remplacement de jeu\game impossible.
     pause
     exit /b 1
 )

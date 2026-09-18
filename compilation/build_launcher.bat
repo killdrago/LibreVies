@@ -73,10 +73,17 @@ for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if 
 
 rem On supprime UNIQUEMENT l'ancien export du jeu : le dossier jeu\ contient
 rem aussi le launcher, le manifeste et LIS-MOI, qui ne doivent jamais partir.
-if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
+rem Export dans un dossier temporaire : un ancien jeu verrouille ne doit pas
+rem empecher Unity de compiler les nouveaux fichiers.
+set "EXPORT=%BUILD%\unity_export"
+if exist "%EXPORT%" rmdir /s /q "%EXPORT%"
+if exist "%EXPORT%" (
+    echo ERREUR : le dossier temporaire d'export est encore verrouille : %EXPORT%
+    goto :echec
+)
 if exist "%BUILD%\launcher" rmdir /s /q "%BUILD%\launcher"
 if exist "%BUILD%\unity.log" del /q "%BUILD%\unity.log"
-mkdir "%JEU%\game"
+mkdir "%EXPORT%"
 mkdir "%BUILD%\launcher"
 
 echo Creation de l'icone du launcher...
@@ -88,13 +95,30 @@ if not exist "%ROOT%icon.ico" "%PYTHON%" "%ROOT%outils\creer_icone.py" "%LAUNCHE
 if not exist "%ROOT%icon.ico" set "ICONE_ARG="
 if not defined ICONE_ARG echo AVERTISSEMENT : icone indisponible, compilation sans icone.
 
-"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%JEU%\game\LibreViesGame.exe" -logFile "%BUILD%\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%EXPORT%\LibreViesGame.exe" -logFile "%BUILD%\unity.log"
 if errorlevel 1 (
     echo ERREUR : export Unity echoue. Consultez build\unity.log
     goto :echec
 )
-if not exist "%JEU%\game\LibreViesGame.exe" (
+if not exist "%EXPORT%\LibreViesGame.exe" (
     echo ERREUR : Unity n'a pas produit LibreViesGame.exe
+    goto :echec
+)
+rem Remplacement seulement apres un export complet reussi. Si le jeu actuel
+rem tourne encore, on arrete proprement ici avec un message explicite.
+if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
+if exist "%JEU%\game" (
+    echo ERREUR : impossible de remplacer jeu\game : fermez LibreViesGame.exe
+    echo puis relancez build_launcher.bat. Le nouvel export reste dans : %EXPORT%
+    goto :echec
+)
+move /Y "%EXPORT%" "%JEU%\game" >nul
+if errorlevel 1 (
+    echo ERREUR : impossible de mettre en place le nouvel export dans jeu\game.
+    goto :echec
+)
+if not exist "%JEU%\game\LibreViesGame.exe" (
+    echo ERREUR : le nouvel export a ete deplace mais son executable manque.
     goto :echec
 )
 

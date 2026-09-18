@@ -143,7 +143,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private string toucheEnCours = "";
     private int resolutionIndex;
     private float endurance = 100f;
-    private float energie = 100f;
 
     private int toucheAvant = (int)KeyCode.Z;
     private int toucheArriere = (int)KeyCode.S;

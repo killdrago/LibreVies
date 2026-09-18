@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 31 : rendu PBR, textures et
-                        migration visuelle realiste Unity
+Derniere mise a jour : 18/09/2026 - MAJ 32 : export protege contre les fichiers
+                        verrouilles et nettoyage du warning energie
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1310,6 +1310,26 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     git diff --check OK. La compilation et le rendu Unity Windows restent a
     confirmer avec `compilation\build_launcher.bat`, Unity n'etant pas installe
     dans cet environnement.
+
+================================================================================
+8.21 MAJ 32 - EXPORT PBR ROBUSTE ET WARNING NETTOYE
+================================================================================
+
+  - Le log Windows du 18/09/2026 confirmait la compilation C# et l'export des
+    assemblies, puis echouait uniquement pendant la copie de resources.assets,
+    unity_builtin_extra et des fichiers *_Data avec "Acces refuse".
+  - Cause probable : l'ancien LibreViesGame.exe ou un fichier de jeu etait
+    encore verrouille pendant que Unity exportait directement dans jeu\game.
+  - build_launcher.bat et build_unity_game.bat exportent maintenant dans
+    build\unity_export (dossier temporaire), puis remplacent jeu\game seulement
+    apres un export complet. Si l'ancien dossier est verrouille, le message
+    indique clairement de fermer LibreViesGame.exe et conserve le nouvel export.
+  - La variable energie devenue inutilisee apres la modification du HUD a ete
+    retiree : le warning CS0414 n'apparait plus.
+  - MAJ 31 reste le lot du rendu PBR : RealistePBR, textures mur/toit/sol/bois,
+    formes de batiments biseautees, soubassements, chainages, rives et cheminees.
+  - Controle C# statique, scripts BAT et diff Git propres. Relancer
+    build_launcher.bat pour produire la nouvelle build visuelle.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
