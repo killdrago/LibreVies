@@ -100,7 +100,7 @@ CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.1.0"
-GAME_VERSION = "0.5.40"
+GAME_VERSION = "0.5.41"
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
                    "arena/01a0b32c-librevies/jeu")
 

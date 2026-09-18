@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.40";
+    private const string VersionJeu = "0.5.41";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -635,20 +635,23 @@ public sealed class LibreViesGame : MonoBehaviour
     private Shader ResoudreShaderRoute()
     {
         if (routeShader != null) return routeShader;
-        routeShader = ChargerShader("LVShaders/LVRealistic");
+        // Le log 0.5.40 a confirme que RealistePBR etait bien charge mais
+        // produisait une route noire sur l'AMD R7 200. On conserve ce shader
+        // dans le projet, mais le test route passe a un chemin vertex/fragment
+        // stable et eclaire, sans surface shader Standard.
+        routeShader = ChargerShader("LVShaders/LVRouteStable");
         if (routeShader != null)
         {
             routePbrActif = true;
-            Debug.Log("[LV_SHADER_ROUTE] PBR applique a la route : " + routeShader.name);
+            Debug.Log("[LV_SHADER_ROUTE] PBR stable applique a la route : " + routeShader.name);
         }
         else
         {
-            // Une route noire ne doit pas masquer le diagnostic. Elle revient
-            // temporairement au shader historique, et le journal conserve la
-            // raison exacte de l'echec PBR.
+            // Une route noire ne doit jamais masquer le diagnostic : repli
+            // final sur le shader historique, avec cause conservee dans le log.
             routeShader = ResoudreShader();
             routePbrActif = false;
-            Debug.LogError("[LV_SHADER_ROUTE] PBR indisponible : route repassee sur "
+            Debug.LogError("[LV_SHADER_ROUTE] RoutePBRStable indisponible : route repassee sur "
                 + (routeShader == null ? "AUCUN SHADER" : routeShader.name));
         }
         return routeShader;

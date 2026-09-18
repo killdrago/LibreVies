@@ -1518,6 +1518,29 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     connus.
 
 ================================================================================
+8.30 MAJ 41 - CORRECTION ROUTE NOIRE SUR AMD R7 200
+================================================================================
+
+  - Le journal 0.5.40 a donne la cause exploitable : le shader
+    `LibreVies/RealistePBR` etait bien charge, la texture
+    `LVTextures/LV_ConcretePaving` etait bien associee, et Route_PBR etait
+    bien construit. Le probleme n'etait donc ni l'absence du materiau ni la
+    creation de la route.
+  - Sur la carte AMD Radeon R7 200 / Direct3D11, son surface shader Standard
+    produisait toutefois une sortie noire.
+  - MAJ 41 ajoute `LVRouteStable.shader`, un shader vertex/fragment triplanaire
+    avec lumiere diffuse, ambiance, reflet metallique leger et plancher de
+    luminosite. Il evite la variante surface shader qui posait probleme.
+  - Route_PBR utilise maintenant RoutePBRStable en priorite et garde
+    RealistePBR dans le projet pour une comparaison future. Si le nouveau
+    shader est indisponible, la route revient au shader historique au lieu de
+    devenir noire.
+  - Version de la build : 0.5.41. Les lignes `[LV_SHADER_ROUTE]` du journal
+    doivent afficher `PBR stable applique a la route`.
+  - Controle BAT/Python propre. Le parseur C# n'est pas installe dans ce
+    sandbox, mais les modifications restent sur des API deja utilisees.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
