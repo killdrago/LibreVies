@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 23 : HUD et portails corriges
+Derniere mise a jour : 18/09/2026 - MAJ 24 : camera, PNJ, mort et transparence
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1132,6 +1132,35 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     restent visibles dans la build Windows.
 
 ================================================================================
+8.13 MAJ 24 - CAMERA, HUD, DECOR, MORT ET PNJ
+================================================================================
+
+  - Options > Controle contient maintenant un curseur de vitesse camera lie a
+    cameraSensitivity (0,5 a 10) ; la valeur continue d'etre sauvegardee dans
+    la configuration JSON persistante et dans le secours PlayerPrefs.
+  - Le cadre de quete est maintenant sous le cadre PV/ENDURANCE/EXPERIENCE ;
+    son bouton X et le bouton de reouverture restent au meme endroit.
+  - Les trois cones de feuillage des sapins ont ete rapproches du tronc pour
+    supprimer l'espace visible entre le tronc et le feuillage superieur.
+  - L'orientation des panneaux/linteaux de portique a recu la rotation locale
+    de 90 degres necessaire pour que leur largeur suive les poteaux.
+  - Les deux lignes informatives Luminosite par defaut et Contraste par defaut
+    ont ete retirees de l'onglet Graphique.
+  - A la mort, le corps du heros est couche au sol et son collider est desactive
+    jusqu'a la renaissance. Respawn remet le corps debout et active 30 secondes
+    d'invincibilite contre les degats.
+  - Chaque toit triangulaire recoit maintenant un MeshCollider : le raycast
+    camera peut donc le toucher et LVFade le rendre translucide quand il cache
+    le heros, sans retirer sa collision de gameplay.
+  - Les PNJ ont ete decales sur le cote des passages. Une affiche indiquant le
+    nom ou le type est creee au-dessus de chaque porte du village.
+  - Le forgeron dispose d'une enclume et frappe un marteau, le maire tient une
+    feuille animee, et les vendeur/marchand disposent d'un etal anime avec
+    marchandises visibles.
+  - Controle statique C# et scripts BAT passes. Aucun export Unity Windows reel
+    n'a encore ete relance apres cette MAJ : a confirmer sur le PC de l'auteur.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
@@ -1175,6 +1204,12 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
           vide sur un autre PC (ou un dossier vide sur le meme PC), le lancer,
           verifier : telechargement, barre de progression, JOUER qui s'active,
           le jeu qui demarre. Puis relancer pour verifier "A jour !".
+
+  [x] 3 quater. Demandes de la MAJ 24 codees : curseur camera, disposition
+          quete/barres, arbres, panneaux, suppression des valeurs graphiques,
+          mort couchee, invincibilite 30 s, colliders de toits, PNJ decales,
+          affiches et accessoires/animations contextualises. Reste la validation
+          visuelle dans un export Unity Windows.
 
   [x] 3 bis. Parite principale codee en MAJ 16-17 : controles/resolution,
           configuration, route pavee courbe, mairie/fontaine, toits triangulaires,
@@ -1291,6 +1326,8 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     MISE EN GARDE (incident 15) : tous les materiaux 3D sont crees a
     l'execution. Ils DOIVENT passer par ResoudreShader() et jamais par un
     Shader.Find seul, sinon le jeu sort en magenta dans l'exe compile.
+    Depuis la MAJ 24, CreateBuilding() ajoute aussi un MeshCollider aux toits
+    pour que RendreObstaclesTranslucides() les detecte par raycast.
 
   compilation/unity/Assets/Resources/LVShaders/LVColor.shader
     Shader d'eclairage du projet (Lambert : _Color + _EmissionColor) utilise

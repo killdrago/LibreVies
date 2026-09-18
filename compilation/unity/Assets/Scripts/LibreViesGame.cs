@@ -78,7 +78,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Transform player;
     private Transform cameraPivot;
+    private Transform heroBody;
     private Transform brasAttaque;
+    private Collider joueurCollider;
     private Camera gameCamera;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
@@ -97,6 +99,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private float attackAnimation;
     private float regenClock;
     private float playerProtection;
+    private float invincibility;
     private float speedBoost;
     private int hp = MaxHp;
     private int coins;
@@ -229,6 +232,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public Transform Corps;
         public Transform BrasG;
         public Transform BrasD;
+        public Transform Feuille;
+        public Transform Marteau;
+        public Transform Etal;
         public float Phase;
         public string Metier;
     }
@@ -1027,10 +1033,10 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
         // Terrain vide au sud du village : la fontaine est enfin visible.
         CreateFountain(new Vector3(9, 0, -15));
-        CreerPnj(new Vector3(22, 0, -6), "Forgeron");
-        CreerPnj(new Vector3(15, 0, 3), "Vendeur");
-        CreerPnj(new Vector3(10, 0, 16), "Maire");
-        CreerPnj(new Vector3(-22, 0, -5), "Marchand");
+        CreerPnj(new Vector3(21.5f, 0, -6), "Forgeron");
+        CreerPnj(new Vector3(19.2f, 0, 3.5f), "Vendeur");
+        CreerPnj(new Vector3(14.2f, 0, 16), "Maire");
+        CreerPnj(new Vector3(-19.2f, 0, -5), "Marchand");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1053,6 +1059,29 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Box(new Vector3(side * size.x * 0.27f, 1.8f, -size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Water", root, "Fenetre");
         }
+        CreerAfficheMaison(root, size, name);
+    }
+
+    private string LibelleMaison(string nom)
+    {
+        if (nom == "Forge") return "FORGE";
+        if (nom == "Atelier") return "ATELIER";
+        if (nom == "Auberge") return "AUBERGE";
+        if (nom == "Entrepot") return "ENTREPOT";
+        if (nom == "Mairie") return "MAIRIE";
+        if (nom == "Maison_Nord") return "MAISON";
+        if (nom == "Maison_Sud") return "MAISON";
+        return "MAISON";
+    }
+
+    private void CreerAfficheMaison(Transform parent, Vector3 taille, string nom)
+    {
+        float z = -taille.z * 0.525f;
+        Box(new Vector3(0f, 2.62f, z), new Vector3(2.8f, 0.48f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
+        Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z - 0.06f));
+        GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), 0.12f);
+        if (texte != null)
+            texte.transform.rotation = parent.rotation * Quaternion.Euler(0f, 180f, 0f);
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
@@ -1060,6 +1089,10 @@ public sealed class LibreViesGame : MonoBehaviour
         var maillage = new Maillage();
         maillage.ToitTriangle(taille.x + 0.8f, taille.z + 0.8f, 2.2f);
         var toit = ObjetMaillage(nom, maillage.VersMesh(nom), materiau);
+        // Un collider est necessaire au rayon camera : il pourra rendre le toit
+        // translucide comme les autres murs quand il passe devant le joueur.
+        var collisionToit = toit.AddComponent<MeshCollider>();
+        collisionToit.sharedMesh = toit.GetComponent<MeshFilter>().sharedMesh;
         toit.transform.SetParent(parent, false);
         toit.transform.localPosition = new Vector3(0f, taille.y + 0.10f, 0f);
     }
@@ -1196,7 +1229,8 @@ public sealed class LibreViesGame : MonoBehaviour
             float longueur = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0)).magnitude * VillageRadius + 0.2f;
             // L'axe du linteau suit la corde (donc la route qui passe dessous).
             var corde = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0));
-            var rotation = Quaternion.LookRotation(new Vector3(corde.x, 0f, corde.y).normalized);
+            var rotation = Quaternion.LookRotation(new Vector3(corde.x, 0f, corde.y).normalized)
+                * Quaternion.Euler(0f, 90f, 0f);
             // Le portique est ferme en haut : un panneau plein relie les deux
             // poteaux, puis un linteau epais termine la couverture.
             Box(new Vector3(mx, my + 4.78f, mz), new Vector3(longueur, 1.05f, 0.30f), "Wood", null, "Fermeture_Superieure", false, rotation);
@@ -1406,6 +1440,43 @@ public sealed class LibreViesGame : MonoBehaviour
         pnj.BrasD = Primitive(PrimitiveType.Capsule, new Vector3(0.38f, 1.0f, 0.05f), new Vector3(0.16f, 0.38f, 0.16f), "Skin", root, "BrasD").transform;
         string couleur = metier == "Maire" ? "RoofBlue" : (metier == "Forgeron" ? "Metal" : "Player");
         Box(new Vector3(0f, 1.05f, 0.28f), new Vector3(0.34f, 0.45f, 0.05f), couleur, root, "Insigne");
+
+        if (metier == "Forgeron")
+        {
+            // Enclume et marteau : le marteau est un pivot independant anime
+            // dans UpdatePnj, pour que le geste soit lisible de loin.
+            Box(new Vector3(0f, 0.72f, 0.58f), new Vector3(0.90f, 0.22f, 0.54f), "Metal", root, "Enclume");
+            Box(new Vector3(0f, 0.92f, 0.58f), new Vector3(0.42f, 0.25f, 0.34f), "Metal", root, "Enclume_Tete");
+            pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
+            pnj.Marteau.SetParent(root, false);
+            pnj.Marteau.localPosition = new Vector3(0.34f, 1.45f, 0.50f);
+            Box(new Vector3(0f, -0.30f, 0f), new Vector3(0.09f, 0.62f, 0.09f), "Bois_Clair", pnj.Marteau, "Manche_Marteau");
+            Box(new Vector3(0f, 0.04f, 0f), new Vector3(0.40f, 0.16f, 0.18f), "Metal", pnj.Marteau, "Tete_Marteau");
+        }
+        else if (metier == "Maire")
+        {
+            // La feuille est tenue devant le maire et bouge legerement comme
+            // une presentation au public.
+            pnj.Feuille = new GameObject("Feuille_Maire").transform;
+            pnj.Feuille.SetParent(root, false);
+            pnj.Feuille.localPosition = new Vector3(0f, 1.33f, 0.47f);
+            Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
+            Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
+        }
+        else if (metier == "Vendeur" || metier == "Marchand")
+        {
+            // Un petit etal complet rend le geste du vendeur comprehensible,
+            // meme sans texte : plateau, pieds et marchandises colorees.
+            pnj.Etal = new GameObject("Etal_" + metier).transform;
+            pnj.Etal.SetParent(root, false);
+            pnj.Etal.localPosition = new Vector3(0f, 0f, 0.72f);
+            Box(new Vector3(0f, 0.83f, 0f), new Vector3(1.45f, 0.16f, 0.72f), "Wood", pnj.Etal, "Plateau_Etal");
+            Box(new Vector3(-0.58f, 0.40f, 0f), new Vector3(0.12f, 0.80f, 0.12f), "Wood", pnj.Etal, "Pied_Etal");
+            Box(new Vector3(0.58f, 0.40f, 0f), new Vector3(0.12f, 0.80f, 0.12f), "Wood", pnj.Etal, "Pied_Etal");
+            Primitive(PrimitiveType.Sphere, new Vector3(-0.38f, 1.02f, 0f), new Vector3(0.22f, 0.22f, 0.22f), "RoofRed", pnj.Etal, "Marchandise");
+            Primitive(PrimitiveType.Sphere, new Vector3(0f, 1.04f, 0.05f), new Vector3(0.22f, 0.18f, 0.22f), "RoofBlue", pnj.Etal, "Marchandise");
+            Primitive(PrimitiveType.Sphere, new Vector3(0.38f, 1.02f, 0f), new Vector3(0.20f, 0.25f, 0.20f), "Lanterne", pnj.Etal, "Marchandise");
+        }
         ColCercle(position.x, position.z, 0.42f, 2.2f);
         pnjs.Add(pnj);
     }
@@ -1441,6 +1512,20 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, 1.0f + hauteur, 0f);
             if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
             if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+            if (pnj.Marteau != null)
+            {
+                float frappe = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f));
+                pnj.Marteau.localRotation = Quaternion.Euler(-18f - frappe * 72f, 0f, 0f);
+            }
+            if (pnj.Feuille != null)
+            {
+                pnj.Feuille.localRotation = Quaternion.Euler(4f + Mathf.Sin(pnj.Phase * 0.8f) * 7f,
+                    Mathf.Sin(pnj.Phase * 0.6f) * 5f, Mathf.Sin(pnj.Phase * 0.9f) * 4f);
+            }
+            if (pnj.Etal != null)
+            {
+                pnj.Etal.localRotation = Quaternion.Euler(0f, Mathf.Sin(pnj.Phase * 0.7f) * 2f, 0f);
+            }
         }
     }
 
@@ -1486,9 +1571,11 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(Mathf.Cos(a) * 0.30f, 1.3f, Mathf.Sin(a) * 0.30f), new Vector3(0.10f, 2.4f, 0.10f),
                 "Wood", root, "Renfort", false, Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f));
         }
-        CreateCone(root, new Vector3(0f, 3.3f, 0f), 1.35f, 2.4f, "Sapin_Bas", "Feuillage_Bas");
-        CreateCone(root, new Vector3(0f, 4.4f, 0f), 1.05f, 2.1f, "Sapin_Milieu", "Feuillage_Milieu");
-        CreateCone(root, new Vector3(0f, 5.4f, 0f), 0.72f, 1.8f, "Sapin_Haut", "Feuillage_Haut");
+        // Le premier cone commence a 2,55 m : il recouvre le sommet du tronc
+        // (2,60 m) au lieu de laisser un espace visible.
+        CreateCone(root, new Vector3(0f, 2.55f, 0f), 1.35f, 2.4f, "Sapin_Bas", "Feuillage_Bas");
+        CreateCone(root, new Vector3(0f, 3.75f, 0f), 1.05f, 2.1f, "Sapin_Milieu", "Feuillage_Milieu");
+        CreateCone(root, new Vector3(0f, 4.80f, 0f), 0.72f, 1.8f, "Sapin_Haut", "Feuillage_Haut");
         ColCercle(x, z, 0.4f * taille, 2.2f);   // tronc
     }
 
@@ -1785,8 +1872,9 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(0, TerrainHeight(0, 6) + 0.05f, 6);
         cameraPivot = new GameObject("CameraPivot").transform;
         cameraPivot.SetParent(player, false);
-        var body = new GameObject("Heros_LowPoly").transform;
-        body.SetParent(player, false);
+        heroBody = new GameObject("Heros_LowPoly").transform;
+        heroBody.SetParent(player, false);
+        var body = heroBody;
         Primitive(PrimitiveType.Capsule, new Vector3(0, 1.15f, 0), new Vector3(0.55f, 1.15f, 0.55f), "Player", body, "Tunique");
         Primitive(PrimitiveType.Cube, new Vector3(0, 2.25f, 0), new Vector3(0.62f, 0.62f, 0.62f), "Skin", body, "Tete");
         Box(new Vector3(-0.26f, 0.35f, 0), new Vector3(0.25f, 0.7f, 0.3f), "Stone", body, "JambeG");
@@ -1798,10 +1886,10 @@ public sealed class LibreViesGame : MonoBehaviour
         // Marteau sans manche : seule la tete massive est visible.
         Box(new Vector3(0f, -0.78f, 0.10f), new Vector3(0.62f, 0.30f, 0.38f), "Metal", brasAttaque, "Tete_Marteau");
         Box(new Vector3(-0.75f, 1.35f, 0), new Vector3(0.22f, 0.85f, 0.22f), "Skin", body, "BrasG");
-        var collider = player.gameObject.AddComponent<CapsuleCollider>();
-        collider.center = new Vector3(0, 1.15f, 0);
-        collider.height = 2.3f;
-        collider.radius = 0.48f;
+        joueurCollider = player.gameObject.AddComponent<CapsuleCollider>();
+        joueurCollider.center = new Vector3(0, 1.15f, 0);
+        joueurCollider.height = 2.3f;
+        joueurCollider.radius = 0.48f;
     }
 
     private void CreateEnemies()
@@ -1978,6 +2066,7 @@ public sealed class LibreViesGame : MonoBehaviour
             brasAttaque.localRotation = Quaternion.Euler(angle, Mathf.Lerp(-35f, 0f, phaseAttaque), 0f);
         }
         if (playerProtection > 0) playerProtection -= dt;
+        if (invincibility > 0) invincibility -= dt;
         if (speedBoost > 0) speedBoost -= dt;
         regenClock += dt;
         if (regenClock > 3f)
@@ -2343,7 +2432,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DamagePlayer(int amount)
     {
-        if (playerProtection > 0 || dead) return;
+        if (playerProtection > 0 || invincibility > 0 || dead) return;
         hp = Mathf.Max(0, hp - amount);
         playerProtection = 0.45f;
         // Le nombre de degats s'affiche au-dessus du heros (en rouge).
@@ -2354,12 +2443,33 @@ public sealed class LibreViesGame : MonoBehaviour
     private void Die()
     {
         dead = true;
-        ShowInfo("Vous êtes mort — appuyez sur R pour renaître");
+        playerVelocity = Vector3.zero;
+        playerGrounded = true;
+        if (joueurCollider != null) joueurCollider.enabled = false;
+        // Le corps se couche sur le cote au sol au lieu de rester debout.
+        if (heroBody != null)
+        {
+            heroBody.localPosition = new Vector3(0f, 0.45f, 0f);
+            heroBody.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        }
+        ShowInfo("Vous êtes mort — appuyez sur " + NomTouche(toucheRenaître) + " pour renaître");
     }
 
     private void Respawn()
     {
-        dead = false; hp = MaxHp; player.position = new Vector3(0, TerrainHeight(0, 6), 6); ShowInfo("Vous êtes revenu à la vie");
+        dead = false;
+        hp = MaxHp;
+        invincibility = 30f;
+        playerProtection = 0.45f;
+        player.position = new Vector3(0, TerrainHeight(0, 6), 6);
+        player.rotation = Quaternion.identity;
+        if (joueurCollider != null) joueurCollider.enabled = true;
+        if (heroBody != null)
+        {
+            heroBody.localPosition = Vector3.zero;
+            heroBody.localRotation = Quaternion.identity;
+        }
+        ShowInfo("Vous êtes revenu à la vie — invincibilité 30 s");
     }
 
     private void CollectNearby()
@@ -2438,25 +2548,25 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         DessinerCorrectionCouleur();
-        // La quete est le premier panneau en haut a gauche ; les barres et les
-        // compteurs restent colles juste dessous, sans titre HUD superflu.
-        if (questOpen)
-        {
-            GUI.Box(new Rect(20, 18, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
-            if (GUI.Button(new Rect(262, 22, 24, 24), "X", buttonStyle))
-                questOpen = false;
-        }
-        else if (GUI.Button(new Rect(20, 18, 112, 26), "QUÊTE  +", buttonStyle))
-        {
-            questOpen = true;
-        }
-        GUI.Box(new Rect(20, questOpen ? 146 : 52, 270, 124), "", boxStyle);
-        float hudY = questOpen ? 157f : 63f;
+        // Les barres restent le premier encadre en haut a gauche. La fenetre
+        // de quete vient juste SOUS ce cadre, avec une croix pour la fermer.
+        GUI.Box(new Rect(20, 18, 270, 124), "", boxStyle);
+        float hudY = 29f;
         DessinerBarre(new Rect(32, hudY, 230, 14), hp / (float)MaxHp, "PV");
         DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
         DessinerBarre(new Rect(32, hudY + 56f, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
         GUI.Label(new Rect(32, hudY + 82f, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
         GUI.Label(new Rect(32, hudY + 103f, 250, 22), "Energie : " + Mathf.RoundToInt(energie) + " / 100", smallStyle);
+        if (questOpen)
+        {
+            GUI.Box(new Rect(20, 150, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
+            if (GUI.Button(new Rect(262, 154, 24, 24), "X", buttonStyle))
+                questOpen = false;
+        }
+        else if (GUI.Button(new Rect(20, 150, 112, 26), "QUÊTE  +", buttonStyle))
+        {
+            questOpen = true;
+        }
         DessinerMiniCarte();
         for (int i = 0; i < 5; i++)
         {
@@ -2589,7 +2699,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 }
             }
         }
-        GUI.Label(new Rect(0, 300, 390, 55), "Luminosite par defaut : 30 %\nContraste par defaut : 100 %", smallStyle);
     }
 
     private void DessinerControle()
@@ -2601,20 +2710,23 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(0, 57, 190, 24), "Inverser axe vertical", smallStyle);
         inverserAxeY = GUI.Toggle(new Rect(205, 57, 24, 24), inverserAxeY, "");
         GUI.Label(new Rect(245, 57, 150, 24), inverserAxeY ? "Oui" : "Non", smallStyle);
-        GUI.Label(new Rect(0, 84, 390, 24), "Clique une touche, puis appuie sur la nouvelle touche.", smallStyle);
-        DemanderTouche("avant", "Avancer", ref toucheAvant, 0, 116);
-        DemanderTouche("arriere", "Reculer", ref toucheArriere, 0, 145);
-        DemanderTouche("gauche", "Gauche", ref toucheGauche, 0, 174);
-        DemanderTouche("droite", "Droite", ref toucheDroite, 0, 203);
-        DemanderTouche("saut", "Sauter", ref toucheSaut, 0, 232);
-        DemanderTouche("courir", "Courir", ref toucheCourir, 0, 261);
-        DemanderTouche("ramasser", "Ramasser", ref toucheRamasser, 205, 116);
-        DemanderTouche("attaque", "Attaquer", ref toucheAttaque, 205, 145);
-        DemanderTouche("inventaire", "Inventaire", ref toucheInventaire, 205, 174);
-        DemanderTouche("options", "Options", ref toucheOptions, 205, 203);
-        DemanderTouche("quete", "Quete", ref toucheQuete, 205, 232);
-        DemanderTouche("camera", "Camera", ref toucheCamera, 205, 261);
-        DemanderTouche("renaitre", "Renaitre", ref toucheRenaître, 205, 290);
+        GUI.Label(new Rect(0, 84, 125, 24), "Vitesse camera", smallStyle);
+        cameraSensitivity = GUI.HorizontalSlider(new Rect(135, 92, 220, 18), cameraSensitivity, 0.5f, 10f);
+        GUI.Label(new Rect(360, 84, 55, 24), cameraSensitivity.ToString("0.0"), smallStyle);
+        GUI.Label(new Rect(0, 112, 390, 24), "Clique une touche, puis appuie sur la nouvelle touche.", smallStyle);
+        DemanderTouche("avant", "Avancer", ref toucheAvant, 0, 140);
+        DemanderTouche("arriere", "Reculer", ref toucheArriere, 0, 169);
+        DemanderTouche("gauche", "Gauche", ref toucheGauche, 0, 198);
+        DemanderTouche("droite", "Droite", ref toucheDroite, 0, 227);
+        DemanderTouche("saut", "Sauter", ref toucheSaut, 0, 256);
+        DemanderTouche("courir", "Courir", ref toucheCourir, 0, 285);
+        DemanderTouche("ramasser", "Ramasser", ref toucheRamasser, 205, 140);
+        DemanderTouche("attaque", "Attaquer", ref toucheAttaque, 205, 169);
+        DemanderTouche("inventaire", "Inventaire", ref toucheInventaire, 205, 198);
+        DemanderTouche("options", "Options", ref toucheOptions, 205, 227);
+        DemanderTouche("quete", "Quete", ref toucheQuete, 205, 256);
+        DemanderTouche("camera", "Camera", ref toucheCamera, 205, 285);
+        DemanderTouche("renaitre", "Renaitre", ref toucheRenaître, 205, 314);
     }
 
     private void EnsureStyles()
