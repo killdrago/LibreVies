@@ -29,7 +29,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
     private float cameraYaw;
-    // Sensibilite de la souris (comme la version Godot : reglable). Unity
+    // Sensibilite de la souris, reglable comme dans les options du jeu.
     // lisse GetAxis("Mouse X") : on utilise GetAxisRaw pour une reponse
     // immediate, sinon la camera parait "longue a la detente".
     private float cameraSensitivity = 3f;
@@ -100,7 +100,7 @@ public sealed class LibreViesGame : MonoBehaviour
             cameraObject.tag = "MainCamera";
         }
         gameCamera.clearFlags = CameraClearFlags.Skybox;
-        // Champ de vision de la version Godot (55), pour le meme cadrage.
+        // Champ de vision 55 : le cadrage de la reference de jeu.
         gameCamera.fieldOfView = 55f;
         LoadOptions();
         CreateMaterials();
@@ -218,7 +218,7 @@ public sealed class LibreViesGame : MonoBehaviour
         var sunObject = new GameObject("Soleil");
         var sun = sunObject.AddComponent<Light>();
         sun.type = LightType.Directional;
-        sun.intensity = 1.3f;                       // energie du soleil Godot
+        sun.intensity = 1.3f;                 // energie du soleil de la reference
         sun.color = new Color(1f, 0.90f, 0.74f);
         sun.shadows = LightShadows.Soft;
         sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
@@ -227,7 +227,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreateSky()
     {
         // Ciel bleu vif avec un horizon chaud, comme Creer_environnement() de
-        // la version Godot. Repli en cascade : aucun de ces shaders ne peut
+        // de la reference de jeu. Repli en cascade : aucun de ces shaders ne peut
         // laisser le ciel noir, et le dernier laisse simplement le ciel Unity.
         Shader procedural = Shader.Find("Skybox/Procedural");
         if (procedural != null)
@@ -658,7 +658,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (firstPerson)
         {
             // Vue 1re personne : on regarde dans l'axe de la caméra (pitch
-            // inclus), comme le look_at() de la version Godot.
+            // inclus), comme la visee libre de la reference de jeu.
             gameCamera.transform.position = player.position + Vector3.up * 1.55f;
             gameCamera.transform.rotation = Quaternion.Euler(-cameraPitch, cameraYaw, 0f);
             return;
@@ -669,7 +669,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Avec Vector3.forward elle passait SOUS le terrain (c'était le bug
         // "caméra sous le sol" : pitch +18° envoyait la caméra vers le bas).
         Vector3 position = target + orbit * (Vector3.back * cameraDistance);
-        // Filet de sécurité identique à Godot : jamais sous le terrain.
+        // Filet de sécurité identique à la référence : jamais sous le terrain.
         float sol = TerrainHeight(position.x, position.z) + 0.6f;
         if (position.y < sol) position.y = sol;
         gameCamera.transform.position = position;

@@ -9,7 +9,11 @@ public static class LibreViesBuild
 {
     public static void BuildWindows()
     {
-        string output = GetArgument("-buildPath", Path.GetFullPath("../release/game/LibreViesGame.exe"));
+        // Chemin de secours uniquement : build_launcher.bat et
+        // build_unity_game.bat passent toujours -buildPath (jeu\game\). On
+        // garde le meme dossier par defaut pour ne jamais recreer de dossier
+        // release\ (regle : le joueur recoit tout dans jeu\).
+        string output = GetArgument("-buildPath", Path.GetFullPath("../jeu/game/LibreViesGame.exe"));
         output = Path.GetFullPath(output);
         Directory.CreateDirectory(Path.GetDirectoryName(output));
 

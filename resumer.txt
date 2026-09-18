@@ -30,7 +30,9 @@ LibreVies est un jeu (MMO open world low-poly) developpe par l'utilisateur
 une seule scene (compilation/unity/Assets/Scenes/LibreVies.unity) et tout le
 jeu construit par code C# dans compilation/unity/Assets/Scripts/LibreViesGame.cs
 (~35 Ko) : village, chateau, personnage, ennemis, combat, HUD, sauvegarde.
-Version du jeu : 0.4.0 (moteur Unity, export Windows 64 bits Mono).
+Version du jeu : 0.5.0 en preparation (Unity, export Windows 64 bits Mono).
+Derniere MAJ livree : 0.4.0. La 0.5.0 corrige le monde magenta, la camera sous
+le sol et la souris molle (MAJ 7) : elle doit encore etre compilee et publiee.
 
 Le but de la refonte terminee ici est la DISTRIBUTION :
   - l'utilisateur ne veut plus envoyer le projet entier aux joueurs ;
@@ -212,13 +214,13 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - etat_jeu.json pour savoir ce qui est installe.
     - Message clair quand rien n'est publie ; JOUER grise.
 
-  MAJ 3 - Unity uniquement, plus aucune trace de Godot (commit d14c200)
+  MAJ 3 - Unity uniquement, plus aucune trace de l'ancien moteur (d14c200)
     - game_build remis a {} : l'ancien manifeste pointait vers une archive
-      Godot publiee par une CI d'une autre branche.
+      l'ancien moteur publiee par une CI d'une autre branche.
     - NOMS_EXE_JEU = ("LibreViesGame.exe",) : le launcher ne cherche plus
       LibreVies.exe comme jeu (c'est le nom du launcher).
     - publier_jeu.py : moteur "unity" en dur, option --moteur supprimee.
-    - Commentaires C# du jeu nettoyes (plus de reference a Godot).
+    - Commentaires C# du jeu nettoyes (plus de reference a l'ancien moteur).
     - README + guide : Unity uniquement, premiere publication obligatoire.
 
   MAJ 4 - build_launcher.bat : tout se telecharge tout seul (commit 0e1da6d)
@@ -256,20 +258,86 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - VERIFIE : le launcher charge depuis jeu\ annonce bien "jeu a jour" et
       trouve jeu\game\LibreViesGame.exe. La recette (31 controles) passe.
 
+  MAJ 7 - Monde magenta, camera sous le sol, souris molle : corriges
+    C'est la MAJ qui repond aux 3 bugs signales par l'utilisateur avec la
+    capture d'ecran du monde entier en rose fluo (upload image-1.png), puis
+    "fait moi pareil mais en unity" (reprendre le jeu de la branche de
+    reference arena/01a09a4d-librevies).
+
+    a) MONDE MAGENTA. Cause : le jeu cree TOUS ses materiaux par code avec
+       Shader.Find("Standard"). Unity supprime de la build les shaders
+       integres qu'aucun materiau du projet ne reference ; dans l'exe compile
+       Shader.Find renvoyait donc null, et Unity affiche en magenta tout objet
+       dont le materiau n'a pas de shader valide. Correctif : nouveau shader
+       du projet Assets/Resources/LVShaders/LVColor.shader (tout ce qui est
+       dans un dossier Resources est TOUJOURS embarque dans la build) et
+       chaine de secours dans ResoudreShader() :
+         Standard -> Resources LVColor -> Unlit/Color -> Sprites/Default ->
+         UI/Default -> (echec total : Debug.LogError + materiau null)
+       Le shader retenu est ecrit dans la console (Debug.Log) pour diagnostiquer
+       en une ligne chez le joueur. Les .meta des deux shaders sont ecrits a la
+       main avec des GUID fixes (a1b2c3d4e5f60718293a4b5c6d7e8f90 et
+       0f1e2d3c4b5a69788796a5b4c3d2e1f0) : Unity les importe tels quels.
+
+    b) CAMERA QUI DEMARRE SOUS LE SOL. Cause : la camera orbitait avec
+       Quaternion.Euler(cameraPitch = +18) * Vector3.forward, ce qui envoie la
+       camera VERS LE BAS (a l'ouverture : y = -0,85, donc sous le village,
+       d'ou l'ecran qui part du sol et remonte). Correctif : Vector3.back
+       (la camera se place derriere ET AU-DESSUS du heros) + filet de securite
+       identique a celui de la reference : jamais a moins de 0,6 au-dessus de
+       TerrainHeight(x, z). La vue 1re personne regarde desormais dans l'axe
+       du pitch (Quaternion.Euler(-pitch, yaw, 0)) au lieu de la rotation du
+       personnage.
+
+    c) SOURIS "LONGUE A LA DETENTE". Deux causes cumulees : Input.GetAxis
+       lisse les mouvements, et la sensibilite valait 0,3 alors que la
+       reference utilise 0,3 degre par pixel, soit 3 avec le facteur 0,1 que
+       Unity applique a Mouse X/Y (10 fois trop lent). Correctif :
+       Input.GetAxisRaw + sensibilite 3, reglable avec [ et ], memorisee dans
+       PlayerPrefs ("cameraSensitivity") et affichee dans le panneau Options.
+       Le clic droit pour tourner la camera est conserve (comme la reference).
+
+    d) RENDU ALIGNE sur la reference : ciel bleu vif avec horizon chaud
+       (Skybox/Procedural regle sur _SkyTint 0.30/0.46/0.78, _GroundColor
+       0.45/0.50/0.26, _Exposure 1.35 ; repli sur le shader du projet
+       Assets/Resources/LVShaders/LVSky.shader), soleil energie 1,3, couleur
+       (1 ; 0,90 ; 0,74), rotation (52, -32, 0), lumiere ambiante tricolore et
+       brouillard adouci (densite 0,0022), champ de vision 55 (celui de la
+       Camera3D de la reference, au lieu de 65).
+
+    - VERIFIE : accolades 122/122, parentheses 687/687, crochets 30/30 dans
+      LibreViesGame.cs, relecture du fichier modifie. Il n'y a AUCUN
+      compilateur C# dans le bac a sable (ni mono, ni dotnet) : la compilation
+      reelle se fait chez l'utilisateur. Le fichier doit donc compiler "a
+      l'aveugle" : styles C# 7.3 uniquement, pas de LINQ ajoute, pas de
+      nullable, types et methodes verifies un par un.
+    - Aucune trace de l'ancien moteur ne doit apparaitre dans le depot : le
+      controle : chercher le nom du moteur abandonne dans tout le depot
+      (insensible a la casse, hors .git) doit ne rien retourner. Il ne
+      retourne rien depuis ce commit : les mentions historiques de ce
+      fichier ont ete reformulees en "l'ancien moteur".
+    - COMMIT : 1e14528, pousse sur arena/01a0b32c-librevies.
+    - A FAIRE COTE UTILISATEUR : relancer compilation\build_launcher.bat (le
+      projet est retelecharge automatiquement, puis Unity compile avec les
+      nouveaux fichiers) et regarder la Console Unity : elle doit afficher
+      "LibreVies : shader utilise = Standard" (ou LVColor).
+
 
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
    (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
 ================================================================================
 
-INCIDENT 1 - Le depot melangeait deux moteurs (Godot + Unity)
+INCIDENT 1 - Le depot melangeait deux moteurs (l'ancien + Unity)
   Symptome : plusieurs branches avec des versions differentes du jeu ; le
-  manifeste pointait un coup vers Godot, un coup vers Unity.
-  Cause    : historique du projet (portage Godot -> Unity par une autre IA),
-  la branche de travail choisie par l'utilisateur est celle d'Unity.
+  manifeste pointait un coup vers l'ancien moteur, un coup vers Unity.
+  Cause    : historique du projet (portage de l'ancien moteur vers Unity par
+  une autre IA) ; la branche de travail choisie par l'utilisateur est celle
+  d'Unity.
   Solution : decision de l'utilisateur = UNITY UNIQUEMENT. Toutes les traces
-  de Godot ont ete retirees du depot (manifeste, launcher, outils, commentaires).
-  Reste a faire : 3 archives Godot (~117 Mo) trainent encore dans la release
+  de l'ancien moteur ont ete retirees du depot (manifeste, launcher, outils,
+  commentaires).
+  Reste a faire : 3 archives de l'ancien moteur (~117 Mo) trainent dans la release
   GitHub "derniere" (LibreVies_Windows*.zip). Plus rien ne pointe dessus.
   Attente de la decision de l'utilisateur pour les supprimer.
 
@@ -390,6 +458,36 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
   publie sur une branche, et tester le launcher avec un serveur HTTP local
   (outils/test_launcher.py) au lieu de taper sur GitHub.
 
+INCIDENT 15 - Le jeu compile affichait tout en magenta (rapporte par l'utilisateur)
+  Symptome : capture d'ecran du joueur = collines, batiments et arbres en rose
+  fluo ; le HUD, lui, s'affichait normalement.
+  Cause    : le HUD est dessine par OnGUI (immediat, shader interne de
+  l'interface, toujours present), alors que TOUS les objets 3D recoivent un
+  materiau cree par code avec Shader.Find("Standard"). Unity retire de la
+  build les shaders integres qu'aucun materiau du projet ne reference (aucun
+  materiau ici : tout est cree a l'execution). Dans l'exe, Shader.Find
+  renvoyait null -> materiau sans shader -> magenta. Un jeu entier en magenta
+  = signe quasi certain de ce probleme, pas d'un probleme de couleur.
+  Solution : shader du projet dans Assets/Resources/LVShaders/LVColor.shader
+  (Resources = toujours embarque) + chaine de secours, et LOG du shader
+  retenu. Pour tout nouveau materiau cree par code : passer par
+  ResoudreShader(), jamais par Shader.Find seul.
+  ATTENTION : ce bug n'apparait PAS dans l'editeur Unity, seulement dans
+  l'exe compile. Toujours tester l'exe, pas seulement Play.
+
+INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
+  Symptome : "la camera demarre sous le sol" puis remonte, et la souris met un
+  temps fou a repondre (meme plainte, meme correctif).
+  Cause    : deux bugs independants dans UpdateCamera() et Update() :
+             - Quaternion.Euler(cameraPitch = +18) * Vector3.forward place la
+               camera SOUS le heros (y negatif) : pour mettre une camera en
+               orbite au-dessus, il faut Vector3.back (Unity regarde vers +Z).
+             - Input.GetAxis("Mouse X") est lisse, et la sensibilite 0,3
+               correspondait a 0,03 degre par pixel au lieu de 0,3.
+  Solution : Vector3.back + plafond de securite (0,6 au-dessus du terrain) ;
+  GetAxisRaw + sensibilite 3. Voir MAJ 7.
+
+
 
 ================================================================================
 7. REGLES TECHNIQUES A RESPECTER (pour ne pas reproduire les incidents)
@@ -421,6 +519,11 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
       arena/01a0b32c-librevies (branche de la session). Pour publier depuis
       une autre branche (main par exemple), utiliser
       outils/definir_url_publication.py --branche main.
+  R12. AUCUN materiau 3D ne se cree avec Shader.Find seul : passer par
+      ResoudreShader() (incident 15). Tout shader utilise par un materiau cree
+      par code doit vivre dans Assets/Resources/ pour survivre a la compilation.
+  R13. Une correction de rendu ne se valide QUE dans l'exe compile, jamais dans
+      l'editeur Unity (le magenta n'apparaissait pas dans Play, incident 15).
 
 
 ================================================================================
@@ -431,7 +534,7 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
   Base    : e47ada3 "Show Unity village from the correct camera start"
   Commits de cette refonte :
     8b57024  Tri du depot : jeu/ (joueur) + compilation/ (auteur)
-    d14c200  Unity uniquement : plus aucune trace de Godot
+    d14c200  Unity uniquement : plus aucune trace de l'ancien moteur
     0e1da6d  build_launcher.bat : tout se telecharge tout seul
     +        correctif icone PyInstaller, exclusions, resumer.txt (ce fichier)
 
@@ -439,7 +542,7 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
     jeu/version_url.json   -> game_build: {}  (aucune compilation publiee)
     jeu/launcher.pyw       -> launcher 4.0.0
 
-  Release GitHub "derniere" : 3 archives Godot (ancienne CI) - a nettoyer
+  Release GitHub "derniere" : 3 archives de l'ancien moteur - a nettoyer
   Ulterieurement si l'utilisateur le demande.
 
   Disposition des sorties (demande de l'utilisateur) : le build ecrit dans
@@ -460,23 +563,29 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
 ================================================================================
 
   [ ] 1. UTILISATEUR : relancer compilation\build_launcher.bat.
-          Attendu : release\LibreVies.exe (~10-15 Mo) + release\game\
+          C'EST LA PRIORITE : la MAJ 7 (magenta + camera) n'est pas encore
+          dans l'exe que possede le joueur.
+          Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
           (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...).
+          Pendant la compilation Unity, ouvrir la Console : elle doit afficher
+          "LibreVies : shader utilise = Standard" (ou "LVColor"). Si elle
+          affiche autre chose, le dire plutot que de publier.
           Si l'icone pose encore probleme, lancer outils\creer_icone.bat.
 
   [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
-          compilation\outils\publier_jeu.bat --version 0.4.0 --pousser.
+          compilation\outils\publier_jeu.bat --version 0.5.0 --pousser.
           Attendu : archive LibreVies_jeu_<md5>.zip dans la release
           "derniere", jeu/version_url.json rempli, git push.
           => A PARTIR DE LA, le jeu est telechargeable par les joueurs.
+          Version conseillee pour cette MAJ : 0.5.0 (le jeu change beaucoup).
 
-  [ ] 3. TESTER de bout en bout : copier release\LibreVies.exe dans un dossier
+  [ ] 3. TESTER de bout en bout : copier jeu\LibreVies.exe dans un dossier
           vide sur un autre PC (ou un dossier vide sur le meme PC), le lancer,
           verifier : telechargement, barre de progression, JOUER qui s'active,
           le jeu qui demarre. Puis relancer pour verifier "A jour !".
 
   [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
-          archives Godot de la release "derniere".
+          archives de l'ancien moteur de la release "derniere".
 
   [ ] 5. OPTIONNEL : remettre une CI Unity (GitHub Actions) pour compiler a
           chaque push. Necessite des secrets de licence Unity
@@ -527,7 +636,20 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
     Reextrait icon.ico depuis les octets integres au launcher.
 
   compilation/unity/Assets/Scripts/LibreViesGame.cs
-    Le jeu lui-meme (tout est construit par code).
+    Le jeu lui-meme (tout est construit par code C# : monde, heros, ennemis,
+    combat, HUD OnGUI, sauvegarde).
+    MISE EN GARDE (incident 15) : tous les materiaux 3D sont crees a
+    l'execution. Ils DOIVENT passer par ResoudreShader() et jamais par un
+    Shader.Find seul, sinon le jeu sort en magenta dans l'exe compile.
+
+  compilation/unity/Assets/Resources/LVShaders/LVColor.shader
+    Shader d'eclairage du projet (Lambert : _Color + _EmissionColor) utilise
+    comme secours par ResoudreShader(). Dans Resources\ donc toujours embarque
+    dans la build. Ses .meta ont des GUID ecrits a la main.
+
+  compilation/unity/Assets/Resources/LVShaders/LVSky.shader
+    Ciel degrade en 3 couleurs (haut, horizon, sol), secours de CreateSky()
+    si Skybox/Procedural n'est pas disponible dans la build.
 
 
 ================================================================================
@@ -538,6 +660,14 @@ INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
   - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
   - Lancer la recette :      python compilation/outils/test_launcher.py
   - Verifier un .bat :       controleur de blocs (incident 8)
+  - Aucune trace de l'ancien moteur (regle de l'utilisateur) : chercher son
+    nom dans tout le depot (option -i, insensible a la casse, hors .git) doit
+    ne RIEN afficher. Oui, y compris dans ce fichier et dans les
+    commentaires du code : ne jamais ecrire le nom du moteur abandonne.
+  - Verifier les shaders du jeu :
+        ls compilation/unity/Assets/Resources/LVShaders/   (4 fichiers : 2
+        .shader + 2 .meta ; les .meta sont obligatoires, sinon Unity regenere
+        des GUID et les references Resources.Load cassent)
   - Verifier un fichier publie :
         gh api "repos/killdrago/LibreVies/contents/jeu/version_url.json?ref=arena/01a0b32c-librevies"
   - Voir la release :        gh release view derniere
