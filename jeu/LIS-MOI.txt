@@ -1,0 +1,33 @@
+LibreVies — comment jouer
+=========================
+
+1. Double-clique sur LibreVies.exe.
+2. Au premier lancement, le launcher télécharge tout seul le jeu complet.
+   La barre de progression l'affiche. Tu peux fermer : le téléchargement
+   reprendra où il s'est arrêté.
+3. Quand la barre affiche « Prêt ! », clique sur JOUER.
+
+Rien d'autre à installer : pas de Unity, pas de Python, pas de compte.
+Une connexion Internet est nécessaire pour le téléchargement et pour les
+mises à jour suivantes. Hors ligne, un jeu déjà installé se lance quand même.
+
+Mets LibreVies.exe dans un dossier où tu as le droit d'écrire (Bureau,
+Documents, ou une clé USB), pas dans C:\Program Files : le jeu s'installe
+à côté du launcher.
+
+Où sont mes fichiers ?
+----------------------
+Tout reste dans ce dossier :
+  game\              le jeu téléchargé (LibreViesGame.exe ou LibreVies.exe)
+  etat_jeu.json      l'état de l'installation (version, date)
+  jeu.download.part  téléchargement en cours (reprise automatique)
+
+En cas de souci
+---------------
+* « Hors ligne » : vérifie ta connexion puis relance le launcher.
+* Le téléchargement échoue en boucle : supprime jeu.download.part et
+  relance le launcher.
+* Le jeu ne démarre pas : supprime le dossier game\ puis relance le
+  launcher, il le retéléchargera entièrement.
+
+LibreVies est distribué gratuitement. Bon jeu !

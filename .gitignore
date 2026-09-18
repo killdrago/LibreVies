@@ -1,21 +1,34 @@
-# Sorties locales de build (la distribution est publiée comme artefact)
-/release/
-/build/
-/dist/
-*.spec
-/icon.ico
+# ============================================================
+# Rien de ce qui suit ne doit entrer dans git.
+# ============================================================
 
-# Unity génère ces dossiers localement lors de l'ouverture/build
-/unity/Library/
-/unity/Temp/
-/unity/Logs/
-/unity/obj/
-/unity/UserSettings/
-/unity/Builds/
-
-# Fichiers temporaires du launcher / de l'export
-__pycache__/
+# --- Cote joueur : le jeu telecharge par le launcher ---
+/jeu/game/
+/jeu/jeu.download
+/jeu/jeu.download.part
+/jeu/game.install/
+/jeu/game.ancien/
+/jeu/etat_jeu.json
 *.download
 *.new
 *.tmp
 .librevies-update.cmd
+
+# --- Cote auteur : sorties de compilation ---
+/compilation/release/
+/compilation/build/
+/compilation/dist/
+/compilation/icon.ico
+*.spec
+
+# --- Unity : dossiers recrees a chaque ouverture ---
+/compilation/unity/Library/
+/compilation/unity/Temp/
+/compilation/unity/Logs/
+/compilation/unity/obj/
+/compilation/unity/UserSettings/
+/compilation/unity/Builds/
+
+# --- Python ---
+__pycache__/
+*.pyc

@@ -1,20 +1,23 @@
 @echo off
 setlocal EnableExtensions
+rem ============================================================
+rem  LibreVies - export du jeu Unity seul (etape de diagnostic)
+rem
+rem  Le cas normal est de lancer build_launcher.bat, qui exporte le jeu
+rem  ET fabrique le launcher. Ce script-ci ne sert qu'a verifier l'export
+rem  Unity quand quelque chose ne va pas.
+rem ============================================================
 set "ROOT=%~dp0"
-if not exist "%ROOT%launcher.pyw" (
-    if exist "%ROOT%..\launcher.pyw" for %%R in ("%ROOT%..") do set "ROOT=%%~fR\"
-)
-if not exist "%ROOT%launcher.pyw" (
-    echo ERREUR : launcher.pyw est absent de la racine du projet : %ROOT%
-    echo Placez ce script dans le depot LibreVies complet.
+set "RELEASE=%ROOT%release"
+set "PROJECT=%ROOT%unity"
+
+if not exist "%PROJECT%\Assets" (
+    echo ERREUR : projet Unity absent : %PROJECT%
     pause
     exit /b 1
 )
-cd /d "%ROOT%"
-set "PROJECT=%ROOT%unity"
-if exist "%ROOT%Assets\Scripts" set "PROJECT=%ROOT%"
-if exist "%ROOT%unity\unity\Assets\Scripts" set "PROJECT=%ROOT%unity\unity"
-rem Force le backend Mono même si l'installation locale conserve un ancien réglage IL2CPP.
+
+rem Force le backend Mono meme si l'installation locale conserve un ancien reglage IL2CPP.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Join-Path $env:PROJECT 'ProjectSettings\ProjectSettings.asset'; if (Test-Path $p) { $c = Get-Content -Raw $p; $c = $c -replace '(?m)^([ \t]*Standalone:[ \t]*)1[ \t]*$', '${1}0'; Set-Content -Path $p -Value $c -Encoding UTF8 }"
 if errorlevel 1 (
     echo ERREUR : impossible de configurer le backend Mono Unity.
@@ -28,11 +31,10 @@ for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if 
 )
 
 echo ========================================
-echo   LibreVies - fabrication du jeu Unity
+echo   LibreVies - export du jeu Unity
 echo ========================================
 echo.
-echo Ce script est destine a la machine qui fabrique la distribution.
-echo Le joueur n'aura pas besoin d'installer Unity.
+echo Script de diagnostic : le joueur n'a jamais besoin d'Unity.
 echo.
 
 set "UNITY=%LIBREVIES_UNITY%"
@@ -43,7 +45,7 @@ if not defined UNITY if exist "%ProgramFiles(x86)%\Unity\Editor\Unity.exe" set "
 if not defined UNITY for /r "%ProgramFiles%\Unity\Hub\Editor" %%F in (Unity.exe) do if not defined UNITY set "UNITY=%%F"
 if not defined UNITY (
     echo Unity Editor absent : lancement de l'installation automatique...
-    call "%~dp0setup_unity_build_tools.bat"
+    call "%ROOT%setup_unity_build_tools.bat"
     if errorlevel 1 (
         echo ERREUR : installation automatique de Unity impossible.
         pause
@@ -62,26 +64,28 @@ if not exist "%UNITY%" (
     exit /b 1
 )
 
-if not exist "release\game" mkdir "release\game"
-if exist "build\unity.log" del /q "build\unity.log"
-if not exist "build" mkdir "build"
+if not exist "%RELEASE%\game" mkdir "%RELEASE%\game"
+if not exist "%ROOT%build" mkdir "%ROOT%build"
+if exist "%ROOT%build\unity.log" del /q "%ROOT%build\unity.log"
 
 echo Export Windows Unity en cours...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%ROOT%release\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%RELEASE%\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : Unity a echoue. Consultez build\unity.log
     pause
     exit /b 1
 )
-if not exist "release\game\LibreViesGame.exe" (
+if not exist "%RELEASE%\game\LibreViesGame.exe" (
     echo ERREUR : LibreViesGame.exe n'a pas ete cree.
     pause
     exit /b 1
 )
 
 echo.
-echo Jeu cree dans release\game\
+echo Jeu exporte dans %RELEASE%\game\
 echo IMPORTANT : Unity a aussi genere UnityPlayer.dll et un dossier *_Data.
-echo Conservez tout le dossier game, pas seulement le .exe.
+echo Conserve tout le dossier game, pas seulement le .exe.
+echo.
+echo Pour publier cette compilation : outils\publier_jeu.bat
 echo.
 pause
