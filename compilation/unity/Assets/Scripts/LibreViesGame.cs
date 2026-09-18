@@ -13,8 +13,10 @@ using UnityEngine;
 public sealed class LibreViesGame : MonoBehaviour
 {
     private const float WorldSize = 90f;
-    private const float TownRadius = 32f;
-    private const float VillageRadius = 26f;
+    // Village agrandi : les maisons sont espacees sur un anneau deux fois
+    // plus large, sans changer leur taille lisible.
+    private const float TownRadius = 52f;
+    private const float VillageRadius = 52f;
     private const float PlayerSpeed = 5f;
     private const float RunSpeed = 9f;
     private const int MaxHp = 100;
@@ -52,8 +54,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // collisions de la cloture (on passe par les portails) et au pave.
     private static readonly Vector2[] RoutePoints =
     {
-        new Vector2(0, 30), new Vector2(3, 18), new Vector2(-2, 6), new Vector2(1, -8),
-        new Vector2(4, -20), new Vector2(-1, -34), new Vector2(1, -48), new Vector2(0, -67)
+        new Vector2(0, 58), new Vector2(6, 38), new Vector2(-4, 12), new Vector2(2, -16),
+        new Vector2(8, -34), new Vector2(0, -48), new Vector2(1, -58), new Vector2(0, -67)
     };
 
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
@@ -64,6 +66,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<Vector2> portails = new List<Vector2>();
     private readonly List<GardeState> gardes = new List<GardeState>();
     private readonly List<PnjState> pnjs = new List<PnjState>();
+    private readonly List<FacadeTextState> textesFacades = new List<FacadeTextState>();
     // Degats flottants et etincelles d'impact (listes d'effets temporaires).
     private readonly List<EffetTexte> floaters = new List<EffetTexte>();
     private readonly List<EffetEtincelle> etincelles = new List<EffetEtincelle>();
@@ -127,6 +130,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle buttonStyle;
     private Texture2D miniCarteTexture;
     private float miniCarteZoom = 1f;
+    private float miniCarteOrientation;
 
     // Options persistantes : le fichier est lisible et portable avec la partie
     // jeu. PlayerPrefs reste accepte pour reprendre les anciennes installations.
@@ -234,11 +238,19 @@ public sealed class LibreViesGame : MonoBehaviour
         public Transform Corps;
         public Transform BrasG;
         public Transform BrasD;
+        public Transform Main;
         public Transform Feuille;
         public Transform Marteau;
         public Transform Etal;
         public float Phase;
         public string Metier;
+    }
+
+    private sealed class FacadeTextState
+    {
+        public GameObject Root;
+        public Vector3 Position;
+        public Vector3 DirectionFacade;
     }
 
     private sealed class Obstacle
@@ -1022,27 +1034,26 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateTown()
     {
-        CreateBuilding(new Vector3(-14, 0, 10), new Vector3(8, 4, 7), "Maison_Ouest");
-        CreateBuilding(new Vector3(15, 0, 8), new Vector3(8, 5, 8), "Maison_Est");
-        CreateBuilding(new Vector3(-13, 0, -11), new Vector3(7, 3.5f, 7), "Atelier");
-        CreateBuilding(new Vector3(14, 0, -12), new Vector3(9, 4, 7), "Auberge");
-        CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
-        CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
-        // Bâtiments supplémentaires du village de départ.
-        // La mairie est decalee sur le cote : la route garde son passage.
-        CreateBuilding(new Vector3(10, 0, 20), new Vector3(7, 4, 6), "Mairie");
-        // Maison_Nord est decalee pour ne plus chevaucher Maison_Ouest.
-        CreateBuilding(new Vector3(-21.5f, 0, 14), new Vector3(5, 3.5f, 5), "Maison_Nord");
-        CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
-        // Emplacement libre au sud-est de la ville, loin de l'Auberge et de la route.
-        CreateFountain(new Vector3(7, 0, -20));
-        // Les portes sont maintenant sur la facade sud (+z) : les PNJ restent
-        // sur le cote de cette facade au lieu de bloquer le passage.
-        CreerPnj(new Vector3(19.2f, 0, 1.8f), "Forgeron");
-        // Le vendeur devant une maison a ete retire : le marchand de l'entrepot
-        // conserve l'etal utile, decale sur le cote de sa porte.
-        CreerPnj(new Vector3(-18.2f, 0, 2.8f), "Marchand");
-        CreerPnj(new Vector3(14.2f, 0, 23.5f), "Maire");
+        // Le village est deux fois plus large : les centres sont eloignes,
+        // tandis que les maisons gardent une taille lisible.
+        CreateBuilding(new Vector3(-28, 0, 20), new Vector3(8, 4, 7), "Maison_Ouest");
+        CreateBuilding(new Vector3(30, 0, 16), new Vector3(8, 5, 8), "Maison_Est");
+        CreateBuilding(new Vector3(-26, 0, -22), new Vector3(7, 3.5f, 7), "Atelier");
+        CreateBuilding(new Vector3(28, 0, -24), new Vector3(9, 4, 7), "Auberge");
+        CreateBuilding(new Vector3(-44, 0, -2), new Vector3(6, 3, 6), "Entrepot");
+        CreateBuilding(new Vector3(46, 0, -4), new Vector3(6, 3, 6), "Forge");
+        // Bâtiments supplémentaires, suffisamment espaces pour ne plus se chevaucher.
+        CreateBuilding(new Vector3(20, 0, 40), new Vector3(7, 4, 6), "Mairie");
+        CreateBuilding(new Vector3(-40, 0, 28), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        CreateBuilding(new Vector3(-6, 0, -40), new Vector3(7, 4, 6), "Maison_Sud");
+        // Emplacement libre au sud-est de la ville, loin des maisons et de la route.
+        CreateFountain(new Vector3(14, 0, -40));
+        // Les portes sont sur la facade sud (+z) : les PNJ restent sur le cote.
+        CreerPnj(new Vector3(40.5f, 0, 0.0f), "Forgeron");
+        // Le vendeur inutile devant une maison a ete retire. Le marchand reste
+        // a droite de l'entrepot, derriere son etal.
+        CreerPnj(new Vector3(-38.2f, 0, 2.0f), "Marchand");
+        CreerPnj(new Vector3(26f, 0, 43.5f), "Maire");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1089,8 +1100,17 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
         GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), 0.12f);
         if (texte != null)
-            // Le texte regarde vers la facade sud (+z), sans etre retourne.
-            texte.transform.rotation = parent.rotation;
+        {
+            // Le TextMesh devait etre retourne pour que le nom soit lisible
+            // depuis la facade sud (+z), pas en miroir.
+            texte.transform.rotation = parent.rotation * Quaternion.Euler(0f, 180f, 0f);
+            textesFacades.Add(new FacadeTextState
+            {
+                Root = texte,
+                Position = position,
+                DirectionFacade = parent.TransformDirection(Vector3.forward).normalized
+            });
+        }
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
@@ -1262,12 +1282,25 @@ public sealed class LibreViesGame : MonoBehaviour
     // simplement le panneau en bois, sans erreur.
     private void AjouterTextePanneau(Vector3 position, Quaternion rotation)
     {
-        GameObject objet = CreerTexte3D("LIBREVIES", position, Color.white, 0.09f);
-        if (objet == null) return;
-        objet.name = "Texte_Portail";
-        objet.transform.rotation = rotation;
-        // La face avant du TextMesh suit maintenant la face avant du panneau.
-        // Ne pas le retourner : sinon LIBREVIES se lit a l'envers depuis l'entree.
+        // Deux inscriptions dos a dos : l'une est lisible depuis l'exterieur,
+        // l'autre depuis l'interieur. Elles sont legerement remontees et
+        // decalees de la planche pour ne jamais depasser par dessous.
+        Vector3 normale = rotation * Vector3.forward;
+        float hauteur = position.y + 0.10f;
+        Vector3 faceExterieure = new Vector3(position.x, hauteur, position.z) + normale * 0.085f;
+        Vector3 faceInterieure = new Vector3(position.x, hauteur, position.z) - normale * 0.085f;
+        GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.09f);
+        GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.09f);
+        if (exterieur != null)
+        {
+            exterieur.name = "Texte_Portail_Exterieur";
+            exterieur.transform.rotation = rotation * Quaternion.Euler(0f, 180f, 0f);
+        }
+        if (interieur != null)
+        {
+            interieur.name = "Texte_Portail_Interieur";
+            interieur.transform.rotation = rotation;
+        }
     }
 
     // Un garde par portail, poste a l'interieur (comme la reference : 0,90 du
@@ -1457,10 +1490,15 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(0f, 0.72f, 0.58f), new Vector3(0.90f, 0.22f, 0.54f), "Metal", root, "Enclume");
             Box(new Vector3(0f, 0.92f, 0.58f), new Vector3(0.42f, 0.25f, 0.34f), "Metal", root, "Enclume_Tete");
             pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
+            // Le pivot reste a l'echelle normale du PNJ. Le bras visuel est
+            // une capsule reduite : en faire le parent rendrait le marteau
+            // minuscule. UpdatePnj recalcule donc sa position dans la main.
             pnj.Marteau.SetParent(root, false);
-            pnj.Marteau.localPosition = new Vector3(0.34f, 1.45f, 0.50f);
-            Box(new Vector3(0f, -0.30f, 0f), new Vector3(0.09f, 0.62f, 0.09f), "Bois_Clair", pnj.Marteau, "Manche_Marteau");
-            Box(new Vector3(0f, 0.04f, 0f), new Vector3(0.40f, 0.16f, 0.18f), "Metal", pnj.Marteau, "Tete_Marteau");
+            pnj.Marteau.localPosition = new Vector3(0.23f, 1.35f, 0.42f);
+            pnj.Main = Primitive(PrimitiveType.Sphere, new Vector3(0.23f, 1.35f, 0.42f),
+                new Vector3(0.20f, 0.20f, 0.20f), "Skin", root, "Main_Forgeron").transform;
+            Box(new Vector3(0f, -0.20f, 0f), new Vector3(0.09f, 0.40f, 0.09f), "Bois_Clair", pnj.Marteau, "Manche_Marteau");
+            Box(new Vector3(0f, -0.43f, 0f), new Vector3(0.40f, 0.16f, 0.18f), "Metal", pnj.Marteau, "Tete_Marteau");
         }
         else if (metier == "Maire")
         {
@@ -1524,7 +1562,14 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Marteau != null)
             {
                 float frappe = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f));
-                pnj.Marteau.localRotation = Quaternion.Euler(-18f - frappe * 72f, 0f, 0f);
+                Quaternion rotationBras = pnj.BrasD != null ? pnj.BrasD.localRotation : Quaternion.identity;
+                Vector3 pointMain = new Vector3(-0.15f, 0.35f, 0.37f);
+                Vector3 positionMain = pnj.BrasD != null
+                    ? pnj.BrasD.localPosition + rotationBras * pointMain
+                    : new Vector3(0.23f, 1.35f, 0.42f);
+                pnj.Marteau.localPosition = positionMain;
+                if (pnj.Main != null) pnj.Main.localPosition = positionMain;
+                pnj.Marteau.localRotation = rotationBras * Quaternion.Euler(-18f - frappe * 72f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
@@ -1815,7 +1860,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 p = RoutePoints[i];
             Vector2 suivant = RoutePoints[i + 1];
             parcouru += Vector2.Distance(p, suivant);
-            if (p.magnitude > 24f) continue;              // hors du village
+            if (p.magnitude > VillageRadius + 4f) continue; // hors du village
             if (parcouru < prochain) continue;
             // 13 m dans la reference ; 9 m ici car notre trace de route a peu
             // de sommets : cela donne 3 lampadaires bien repartis dans le
@@ -1907,8 +1952,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // rats (50 PV), araignees (75 PV). Une bete qui naitrait dans le
         // village protege est repoussee juste dehors.
         string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
-        float[] centresX = { 25f, -25f, 30f, -30f, 15f, -18f };
-        float[] centresZ = { 20f, -20f, -25f, 25f, 35f, -38f };
+        float[] centresX = { 50f, -50f, 60f, -60f, 30f, -36f };
+        float[] centresZ = { 40f, -40f, -50f, 50f, 70f, -76f };
         for (int zone = 0; zone < types.Length; zone++)
         {
             for (int i = 0; i < 3; i++)
@@ -2175,6 +2220,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // inclus), comme la visee libre de la reference de jeu.
             gameCamera.transform.position = player.position + Vector3.up * 1.55f;
             gameCamera.transform.rotation = Quaternion.Euler(-cameraPitch, cameraYaw, 0f);
+            MettreAJourVisibiliteAffiches(gameCamera.transform.position);
             return;
         }
         Quaternion orbit = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
@@ -2188,7 +2234,28 @@ public sealed class LibreViesGame : MonoBehaviour
         if (position.y < sol) position.y = sol;
         gameCamera.transform.position = position;
         gameCamera.transform.LookAt(target);
+        MettreAJourVisibiliteAffiches(position);
         RendreObstaclesTranslucides(target, position);
+    }
+
+    private void MettreAJourVisibiliteAffiches(Vector3 cameraPosition)
+    {
+        for (int i = textesFacades.Count - 1; i >= 0; i--)
+        {
+            FacadeTextState affiche = textesFacades[i];
+            if (affiche.Root == null)
+            {
+                textesFacades.RemoveAt(i);
+                continue;
+            }
+            Renderer rendu = affiche.Root.GetComponent<Renderer>();
+            if (rendu == null) continue;
+            // Une affiche de facade n'existe visuellement que du cote de sa
+            // propre facade : le cube opaque de la maison ne laisse plus son
+            // envers apparaitre quand on regarde depuis l'arriere.
+            bool visible = Vector3.Dot(cameraPosition - affiche.Position, affiche.DirectionFacade) > 0.02f;
+            rendu.enabled = visible;
+        }
     }
 
     private Material MateriauFade(Material origine, float alpha)
@@ -2630,20 +2697,34 @@ public sealed class LibreViesGame : MonoBehaviour
             MettreAJourMiniCarte();
         GUI.color = Color.white;
         if (miniCarteTexture != null)
+        {
+            // La carte tourne avec l'orientation du heros : le nord, l'est,
+            // le sud et l'ouest tournent avec le monde affiche.
+            Vector2 centreEcran = new Vector2(carte.x + taille * 0.5f, carte.y + taille * 0.5f);
+            GUIUtility.RotateAroundPivot(-miniCarteOrientation, centreEcran);
             GUI.DrawTexture(carte, miniCarteTexture, ScaleMode.StretchToFill, true);
-
-        // Les points cardinaux restent fixes autour du disque, meme quand la
-        // carte est zoomee autour du joueur.
-        GUI.Label(new Rect(carte.x + 73f, carte.y - 5f, 16f, 22f), "N", smallStyle);
-        GUI.Label(new Rect(carte.x + 73f, carte.y + 139f, 16f, 22f), "S", smallStyle);
-        GUI.Label(new Rect(carte.x + 1f, carte.y + 67f, 16f, 22f), "W", smallStyle);
-        GUI.Label(new Rect(carte.x + 140f, carte.y + 67f, 16f, 22f), "E", smallStyle);
+            GUIUtility.RotateAroundPivot(miniCarteOrientation, centreEcran);
+        }
+        DessinerPointCardinal(carte, "N", new Vector2(0f, -1f));
+        DessinerPointCardinal(carte, "S", new Vector2(0f, 1f));
+        DessinerPointCardinal(carte, "W", new Vector2(-1f, 0f));
+        DessinerPointCardinal(carte, "E", new Vector2(1f, 0f));
         if (GUI.Button(new Rect(carte.x + 112f, carte.y + 18f, 24f, 24f), "+", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
         if (GUI.Button(new Rect(carte.x + 112f, carte.y + 45f, 24f, 24f), "-", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
         GUI.Label(new Rect(carte.x + 108f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
         GUI.color = Color.white;
+    }
+
+    private void DessinerPointCardinal(Rect carte, string texte, Vector2 directionEcran)
+    {
+        float radians = -miniCarteOrientation * Mathf.Deg2Rad;
+        float x = directionEcran.x * Mathf.Cos(radians) - directionEcran.y * Mathf.Sin(radians);
+        float y = directionEcran.x * Mathf.Sin(radians) + directionEcran.y * Mathf.Cos(radians);
+        float centreX = carte.x + carte.width * 0.5f;
+        float centreY = carte.y + carte.height * 0.5f;
+        GUI.Label(new Rect(centreX + x * 69f - 8f, centreY + y * 69f - 11f, 18f, 22f), texte, smallStyle);
     }
 
     private void MettreAJourMiniCarte()
@@ -2671,6 +2752,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         Vector2 centreMonde = player == null ? Vector2.zero : new Vector2(player.position.x, player.position.z);
+        miniCarteOrientation = player == null ? cameraYaw : player.eulerAngles.y;
         float rayonMonde = WorldSize / miniCarteZoom;
         for (int i = 0; i < 120; i++)
         {

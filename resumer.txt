@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 26 : carte, facades et decor corriges
+Derniere mise a jour : 18/09/2026 - MAJ 27 : village agrandi et affichage corrige
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1196,6 +1196,27 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Maison_Nord est decalee pour supprimer le chevauchement avec Maison_Ouest.
   - Verification C# statique et scripts BAT reussies. L'export Unity Windows
     doit etre relance pour controler le rendu final dans la build.
+
+================================================================================
+8.16 MAJ 27 - VILLAGE AGRANDI, TEXTES ET CARTE ORIENTEE
+================================================================================
+
+  - Les inscriptions des maisons sont retournees pour etre lisibles depuis la
+    facade sud. Leur Renderer est masque quand la camera se trouve derriere la
+    facade : les noms ne sont plus visibles a travers le cube de la maison.
+  - Chaque portique possede maintenant deux textes LIBREVIES dos a dos, un
+    pour l'exterieur et un pour l'interieur. Le texte est remonte dans le
+    panneau pour ne plus depasser dessous.
+  - La mini-carte tourne avec l'orientation du joueur ; la texture et les
+    reperes N/S/E/W pivotent ensemble. Le zoom +/− reste disponible.
+  - Le marteau du forgeron est maintenant a l'echelle normale et sa position
+    est recalculee dans la main du bras droit avant son animation de frappe.
+  - Le rayon du village passe de 26 a 52 et les points de route sont etendus
+    pour conserver les deux portails. Les maisons sont reparties sur ce nouvel
+    espace, la Maison_Nord ne chevauche plus Maison_Ouest, et les zones de
+    monstres sont repoussees hors de l'enceinte.
+  - Verification C# statique et scripts BAT reussies. L'export Unity Windows
+    doit etre relance pour verifier orientation, occlusion, carte et marteau.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
