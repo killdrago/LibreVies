@@ -21,16 +21,29 @@ compilation/               reserve a l'auteur
     definir_url_publication.bat/.py
                            change la branche surveillee par le launcher
     tester_launcher.bat/.py recette : telechargement, md5, reprise, securite
+    creer_icone.bat/.py    reextrait l'icone du launcher (utilise par le build)
   release/                 (cree au build, ignore par git)
 ```
 
 ## 1. Fabriquer la distribution
 
-Double-clic sur `build_launcher.bat`. Il fait tout :
+Double-clic sur `build_launcher.bat`. **Il se débrouille tout seul** : il
+télécharge d'abord ce qui manque, puis il compile.
 
-1. exporte le projet Unity (`unity/`) avec son runtime,
-2. compile `jeu/launcher.pyw` en `release\LibreVies.exe`,
-3. copie `jeu/version_url.json` à côté, pour tester ici.
+Ce qu'il télécharge automatiquement (uniquement si c'est absent) :
+
+| Élément | Source | Quand |
+|---|---|---|
+| le projet (Unity + launcher + outils) | GitHub, branche indiquée par `BRANCHE` | si le dossier ne contient que ce `.bat` |
+| Python | winget, sinon python.org | si `python` n'est pas installé |
+| PyInstaller | `pip` | si absent (une seule fois) |
+| Unity Hub + Unity Editor | site officiel Unity | si Unity absent (gros, une seule fois) |
+
+Puis il fabrique :
+
+1. l'export du jeu Unity (`unity/`) **avec son runtime** ;
+2. `release\LibreVies.exe` — le launcher compilé ;
+3. `release\version_url.json` — copie du manifeste, pour tester ici.
 
 Résultat :
 
@@ -40,11 +53,24 @@ Résultat :
 | `release\game\` | à publier (étape 2) |
 | `release\version_url.json` | test local uniquement |
 
-Unity n'est nécessaire que sur cette machine : ni Unity, ni Python, ni Unity
-Hub ne sont installés chez le joueur. Si Unity Editor est absent,
-`build_launcher.bat` lance `setup_unity_build_tools.bat`, qui télécharge Unity
-Hub depuis le site officiel Unity (compte Unity et licence Personal
-nécessaires pour fabriquer une build, jamais pour jouer).
+Deux garanties importantes :
+
+* **Aucun fichier local n'est écrasé.** Seuls les fichiers *absents* sont
+  récupérés depuis GitHub : tu peux travailler dans ce dossier sans risque.
+* **Rien de tout cela n'arrive chez le joueur.** Ni Python, ni PyInstaller, ni
+  Unity, ni ce dossier `compilation\` : le joueur ne reçoit que `LibreVies.exe`.
+  La licence Unity (compte Unity + licence Personal, demandée par Unity Hub)
+  n'est nécessaire que pour *fabriquer* la build, jamais pour jouer.
+
+Pour changer la branche dont le script récupère le projet :
+
+```bat
+set LIBREVIES_BRANCHE=main
+build_launcher.bat
+```
+
+ou en ligne de commande : `build_launcher.bat main`.
+(`outils\definir_url_publication.py` met aussi cette branche à jour tout seul.)
 
 ## 2. Publier la compilation (les joueurs la reçoivent)
 
@@ -96,16 +122,17 @@ game.install\ / game.ancien\   dossiers de travail, supprimes apres coup
 
 ## 4. Changer la branche publiée
 
-Le launcher lit le manifeste sur la branche indiquée dans `raw_url`
-(`jeu/version_url.json`) et, à défaut, dans `DEFAULT_RAW_URL` (`jeu/launcher.pyw`).
-Après avoir fusionné le travail dans `main` :
+Trois fichiers indiquent la branche utilisée : `jeu/version_url.json` (`raw_url`,
+lu par le launcher), `jeu/launcher.pyw` (`DEFAULT_RAW_URL`, valeur de secours) et
+`compilation/build_launcher.bat` (`BRANCHE`, d'où le build récupère le projet
+quand il est absent). Après avoir fusionné le travail dans `main` :
 
 ```bat
 python outils\definir_url_publication.py --branche main
 ```
 
-Le script met les deux endroits d'accord, vérifie que le launcher compile
-toujours, puis il reste à faire `git add` / `commit` / `push`.
+Le script met les trois d'accord, vérifie que le launcher compile toujours et que
+le `.bat` garde ses étiquettes, puis il reste à faire `git add` / `commit` / `push`.
 
 ## 5. Vérifier avant de publier
 

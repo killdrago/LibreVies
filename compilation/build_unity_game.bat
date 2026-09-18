@@ -13,6 +13,7 @@ set "PROJECT=%ROOT%unity"
 
 if not exist "%PROJECT%\Assets" (
     echo ERREUR : projet Unity absent : %PROJECT%
+    echo Lance d'abord build_launcher.bat : il telecharge tout seul ce qui manque.
     pause
     exit /b 1
 )
