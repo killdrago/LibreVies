@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 27 : village agrandi et affichage corrige
+Derniere mise a jour : 18/09/2026 - MAJ 28 : village recentre et endurance corrigee
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1217,6 +1217,23 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     monstres sont repoussees hors de l'enceinte.
   - Verification C# statique et scripts BAT reussies. L'export Unity Windows
     doit etre relance pour verifier orientation, occlusion, carte et marteau.
+
+================================================================================
+8.17 MAJ 28 - VILLAGE RECENTRE, GARDES ET HUD
+================================================================================
+
+  - Le village a ete ramene a la moitie du diametre de la MAJ 27 : rayon 26,
+    route et portails revenus a leur echelle coherente. Les maisons gardent
+    les positions espacees de la MAJ 26, avec la mairie placee au centre-est,
+    hors de l'axe de la route.
+  - Les gardes sont rapproches des portiques (95 % du rayon au lieu de 90 %).
+  - La ligne Energie 100/100 a ete retiree du HUD. La valeur PV est maintenant
+    affichee au centre de la barre de vie sous la forme PV/MaxPV.
+  - La course consomme l'endurance. Quand l'endurance atteint zero, la vitesse
+    repasse automatiquement a la marche et la barre se recharge avant de
+    permettre de courir a nouveau.
+  - Controle C# statique et scripts BAT reussis. Un nouvel export Unity Windows
+    doit confirmer les distances finales, la mairie et le comportement HUD.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

@@ -13,10 +13,10 @@ using UnityEngine;
 public sealed class LibreViesGame : MonoBehaviour
 {
     private const float WorldSize = 90f;
-    // Village agrandi : les maisons sont espacees sur un anneau deux fois
-    // plus large, sans changer leur taille lisible.
-    private const float TownRadius = 52f;
-    private const float VillageRadius = 52f;
+    // Rayon ramene a la moitie du village agrandi : les maisons restent
+    // decalees intelligemment, mais les portiques reviennent pres du centre.
+    private const float TownRadius = 32f;
+    private const float VillageRadius = 26f;
     private const float PlayerSpeed = 5f;
     private const float RunSpeed = 9f;
     private const int MaxHp = 100;
@@ -54,8 +54,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // collisions de la cloture (on passe par les portails) et au pave.
     private static readonly Vector2[] RoutePoints =
     {
-        new Vector2(0, 58), new Vector2(6, 38), new Vector2(-4, 12), new Vector2(2, -16),
-        new Vector2(8, -34), new Vector2(0, -48), new Vector2(1, -58), new Vector2(0, -67)
+        new Vector2(0, 30), new Vector2(3, 18), new Vector2(-2, 6), new Vector2(1, -8),
+        new Vector2(4, -20), new Vector2(-1, -34), new Vector2(1, -48), new Vector2(0, -67)
     };
 
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
@@ -128,6 +128,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle tabStyle;
     private GUIStyle tabActifStyle;
     private GUIStyle buttonStyle;
+    private GUIStyle barreValeurStyle;
     private Texture2D miniCarteTexture;
     private float miniCarteZoom = 1f;
     private float miniCarteOrientation;
@@ -1034,26 +1035,26 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateTown()
     {
-        // Le village est deux fois plus large : les centres sont eloignes,
-        // tandis que les maisons gardent une taille lisible.
-        CreateBuilding(new Vector3(-28, 0, 20), new Vector3(8, 4, 7), "Maison_Ouest");
-        CreateBuilding(new Vector3(30, 0, 16), new Vector3(8, 5, 8), "Maison_Est");
-        CreateBuilding(new Vector3(-26, 0, -22), new Vector3(7, 3.5f, 7), "Atelier");
-        CreateBuilding(new Vector3(28, 0, -24), new Vector3(9, 4, 7), "Auberge");
-        CreateBuilding(new Vector3(-44, 0, -2), new Vector3(6, 3, 6), "Entrepot");
-        CreateBuilding(new Vector3(46, 0, -4), new Vector3(6, 3, 6), "Forge");
-        // Bâtiments supplémentaires, suffisamment espaces pour ne plus se chevaucher.
-        CreateBuilding(new Vector3(20, 0, 40), new Vector3(7, 4, 6), "Mairie");
-        CreateBuilding(new Vector3(-40, 0, 28), new Vector3(5, 3.5f, 5), "Maison_Nord");
-        CreateBuilding(new Vector3(-6, 0, -40), new Vector3(7, 4, 6), "Maison_Sud");
-        // Emplacement libre au sud-est de la ville, loin des maisons et de la route.
-        CreateFountain(new Vector3(14, 0, -40));
+        // Le village revient a la moitie du diametre precedent. Les maisons
+        // restent espacees et Maison_Nord ne chevauche plus Maison_Ouest.
+        CreateBuilding(new Vector3(-14, 0, 10), new Vector3(8, 4, 7), "Maison_Ouest");
+        CreateBuilding(new Vector3(15, 0, 8), new Vector3(8, 5, 8), "Maison_Est");
+        CreateBuilding(new Vector3(-13, 0, -11), new Vector3(7, 3.5f, 7), "Atelier");
+        CreateBuilding(new Vector3(14, 0, -12), new Vector3(9, 4, 7), "Auberge");
+        CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
+        CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
+        // La mairie est au centre-est, hors de l'axe de la route.
+        CreateBuilding(new Vector3(8, 0, 16), new Vector3(7, 4, 6), "Mairie");
+        CreateBuilding(new Vector3(-21.5f, 0, 14), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
+        // Espace libre au sud-est de la ville, loin de l'Auberge et de la route.
+        CreateFountain(new Vector3(7, 0, -20));
         // Les portes sont sur la facade sud (+z) : les PNJ restent sur le cote.
-        CreerPnj(new Vector3(40.5f, 0, 0.0f), "Forgeron");
+        CreerPnj(new Vector3(19.2f, 0, 1.8f), "Forgeron");
         // Le vendeur inutile devant une maison a ete retire. Le marchand reste
         // a droite de l'entrepot, derriere son etal.
-        CreerPnj(new Vector3(-38.2f, 0, 2.0f), "Marchand");
-        CreerPnj(new Vector3(26f, 0, 43.5f), "Maire");
+        CreerPnj(new Vector3(-18.2f, 0, 2.8f), "Marchand");
+        CreerPnj(new Vector3(12.2f, 0, 19.5f), "Maire");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1313,7 +1314,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 portail = portails[i];
             float distance = portail.magnitude;
             if (distance < 0.001f) continue;
-            Vector2 poste = portail.normalized * (VillageRadius * 0.90f);
+            Vector2 poste = portail.normalized * (VillageRadius * 0.95f);
             CreerGarde(poste, portail);
         }
     }
@@ -1860,7 +1861,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 p = RoutePoints[i];
             Vector2 suivant = RoutePoints[i + 1];
             parcouru += Vector2.Distance(p, suivant);
-            if (p.magnitude > VillageRadius + 4f) continue; // hors du village
+            if (p.magnitude > VillageRadius - 2f) continue; // hors du village
             if (parcouru < prochain) continue;
             // 13 m dans la reference ; 9 m ici car notre trace de route a peu
             // de sommets : cela donne 3 lampadaires bien repartis dans le
@@ -1952,8 +1953,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // rats (50 PV), araignees (75 PV). Une bete qui naitrait dans le
         // village protege est repoussee juste dehors.
         string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
-        float[] centresX = { 50f, -50f, 60f, -60f, 30f, -36f };
-        float[] centresZ = { 40f, -40f, -50f, 50f, 70f, -76f };
+        float[] centresX = { 25f, -25f, 30f, -30f, 15f, -18f };
+        float[] centresZ = { 20f, -20f, -25f, 25f, 35f, -38f };
         for (int zone = 0; zone < types.Length; zone++)
         {
             for (int i = 0; i < 3; i++)
@@ -2138,8 +2139,11 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 forward = gameCamera.transform.forward; forward.y = 0; forward.Normalize();
         Vector3 right = gameCamera.transform.right; right.y = 0; right.Normalize();
         Vector3 direction = forward * input.z + right * input.x;
-        float speed = Touche(toucheCourir) ? RunSpeed : PlayerSpeed;
-        endurance = Mathf.MoveTowards(endurance, Touche(toucheCourir) && direction.sqrMagnitude > 0.01f ? 0f : 100f, dt * 22f);
+        bool courseDemandee = Touche(toucheCourir) && direction.sqrMagnitude > 0.01f;
+        bool courseActive = courseDemandee && endurance > 0.5f;
+        float speed = courseActive ? RunSpeed : PlayerSpeed;
+        endurance = Mathf.MoveTowards(endurance, courseActive ? 0f : 100f,
+            dt * (courseActive ? 22f : 16f));
         if (speedBoost > 0) speed += 3f;
         if (direction.sqrMagnitude > 0.01f)
         {
@@ -2638,7 +2642,8 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
         DessinerBarre(new Rect(32, hudY + 56f, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
         GUI.Label(new Rect(32, hudY + 82f, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
-        GUI.Label(new Rect(32, hudY + 103f, 250, 22), "Energie : " + Mathf.RoundToInt(energie) + " / 100", smallStyle);
+        // L'ancienne ligne Energie est retiree : la vie est lue au centre de
+        // sa barre et l'endurance reste la barre de course.
         if (questOpen)
         {
             GUI.Box(new Rect(20, 150, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
@@ -2686,7 +2691,9 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = texte == "PV" ? new Color(0.90f, 0.16f, 0.12f) : (texte == "ENDURANCE" ? new Color(0.20f, 0.78f, 0.28f) : new Color(0.92f, 0.68f, 0.12f));
         GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(valeur), rect.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(rect.x + 5, rect.y - 2, rect.width - 10, rect.height + 5), texte, smallStyle);
+        string affichage = texte == "PV" ? hp + "/" + MaxHp : texte;
+        GUIStyle style = texte == "PV" ? barreValeurStyle : smallStyle;
+        GUI.Label(new Rect(rect.x + 5, rect.y - 2, rect.width - 10, rect.height + 5), affichage, style);
     }
 
     private void DessinerMiniCarte()
@@ -2931,6 +2938,7 @@ public sealed class LibreViesGame : MonoBehaviour
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = new Color(0.82f, 0.87f, 0.92f) } };
         boxStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
         buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
+        barreValeurStyle = new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
         tabStyle = new GUIStyle(buttonStyle) { normal = { textColor = Color.white } };
         tabActifStyle = new GUIStyle(buttonStyle) { fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         loadingTitleStyle = new GUIStyle(GUI.skin.label)
