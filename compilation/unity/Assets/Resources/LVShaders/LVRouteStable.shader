@@ -1,7 +1,7 @@
-// Rendu PBR leger et robuste pour le test de la route.
+// Rendu PBR leger et robuste pour tout le monde.
 // Pas de surface shader Standard : le chemin vertex/fragment reste compatible
 // avec les anciennes cartes Direct3D11 comme l'AMD Radeon R7 200.
-Shader "LibreVies/RoutePBRStable"
+Shader "LibreVies/StablePBR"
 {
     Properties
     {
@@ -10,6 +10,7 @@ Shader "LibreVies/RoutePBRStable"
         _Tiling ("Echelle monde", Float) = 0.28
         _Metallic ("Metallic", Range(0,1)) = 0.05
         _Smoothness ("Brillance", Range(0,1)) = 0.28
+        _EmissionColor ("Emission", Color) = (0,0,0,0)
     }
     SubShader
     {
@@ -29,6 +30,7 @@ Shader "LibreVies/RoutePBRStable"
             float _Tiling;
             float _Metallic;
             float _Smoothness;
+            fixed4 _EmissionColor;
 
             struct AppData
             {
@@ -77,6 +79,7 @@ Shader "LibreVies/RoutePBRStable"
                 // Un plancher de lumiere evite le noir complet sur une vieille
                 // carte ou quand Unity ne fournit pas de lumiere directionnelle.
                 colour = max(colour, albedo * 0.22);
+                colour += _EmissionColor.rgb;
                 return fixed4(colour, 1.0);
             }
             ENDCG

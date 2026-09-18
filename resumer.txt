@@ -1541,6 +1541,26 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     sandbox, mais les modifications restent sur des API deja utilisees.
 
 ================================================================================
+8.31 MAJ 42 - PBR STABLE SUR TOUT LE MONDE
+================================================================================
+
+  - La route en 0.5.41 est visible avec `LibreVies/StablePBR`. Le test est
+    donc valide sur AMD Radeon R7 200 / Direct3D11.
+  - Le meme shader vertex/fragment stable est maintenant selectionne par
+    `ResoudreShader()` pour tous les materiaux : murs, toits, terrain, route,
+    bois, pierres, vegetation, PNJ, monstres et objets.
+  - Les textures originales sont appliquees a chaque famille qui en possede
+    une (`Wall`, `Roof`, `Wood`, `Terrain`, `Dirt`, `Stone`, `Roche`, Touffe),
+    avec mapping triplanaire. Les couleurs des autres familles sont conservees.
+  - L'emission des lanternes et objets lumineux reste supportee par le shader.
+  - `LVColor` reste le repli si le shader stable est absent/non supporte.
+  - Version de cette build : 0.5.42. Le titre et le journal permettent de
+    verifier que cette propagation globale est bien celle lancee.
+  - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
+    sandbox. Recompiler puis verifier le journal `[LV_SHADER] shader general
+    applique = LibreVies/StablePBR`.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 

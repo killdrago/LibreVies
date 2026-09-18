@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.41";
+    private const string VersionJeu = "0.5.42";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -619,15 +619,17 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (cachedShader != null) return cachedShader;
 
-        // Retour volontaire au rendu d'avant MAJ 31 pour isoler le probleme :
-        // le PBR n'est plus applique globalement a tous les objets.
-        cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
+        // Le test route 0.5.41 est concluant : ce chemin vertex/fragment
+        // stable devient maintenant le shader PBR de tout le monde. Il evite
+        // le surface shader Standard qui noircissait la route sur AMD.
+        cachedShader = ChargerShader("LVShaders/LVRouteStable");
+        if (cachedShader == null) cachedShader = ChargerShader("LVShaders/LVColor");
         if (cachedShader == null) cachedShader = Shader.Find("Standard");
         if (cachedShader == null) cachedShader = Shader.Find("Unlit/Color");
         if (cachedShader == null) cachedShader = Shader.Find("Sprites/Default");
         if (cachedShader == null) cachedShader = Shader.Find("UI/Default");
 
-        if (cachedShader != null) Debug.Log("LibreVies : shader general historique = " + cachedShader.name);
+        if (cachedShader != null) Debug.Log("[LV_SHADER] shader general applique = " + cachedShader.name);
         else Debug.LogError("LibreVies : aucun shader general disponible");
         return cachedShader;
     }
