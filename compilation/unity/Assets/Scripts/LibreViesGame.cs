@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using UnityEngine;
 
 /// <summary>
@@ -113,6 +115,76 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
     private GUIStyle boxStyle;
+    private GUIStyle tabStyle;
+    private GUIStyle tabActifStyle;
+    private GUIStyle buttonStyle;
+
+    // Options persistantes : le fichier est lisible et portable avec la partie
+    // jeu. PlayerPrefs reste accepte pour reprendre les anciennes installations.
+    private bool clavierAzerty;
+    private bool inverserAxeX;
+    private bool inverserAxeY;
+    private bool menuResolutions;
+    private int ongletOptions;
+    private string toucheEnCours = "";
+    private int resolutionIndex;
+    private float endurance = 100f;
+    private float energie = 100f;
+
+    private int toucheAvant = (int)KeyCode.Z;
+    private int toucheArriere = (int)KeyCode.S;
+    private int toucheGauche = (int)KeyCode.Q;
+    private int toucheDroite = (int)KeyCode.D;
+    private int toucheSaut = (int)KeyCode.Space;
+    private int toucheCourir = (int)KeyCode.LeftShift;
+    private int toucheRamasser = (int)KeyCode.E;
+    private int toucheAttaque = (int)KeyCode.Mouse0;
+    private int toucheInventaire = (int)KeyCode.I;
+    private int toucheOptions = (int)KeyCode.O;
+    private int toucheQuete = (int)KeyCode.Q;
+    private int toucheCamera = (int)KeyCode.V;
+    private int toucheRenaître = (int)KeyCode.R;
+
+    private readonly Vector2Int[] resolutions =
+    {
+        new Vector2Int(1024, 768), new Vector2Int(1152, 864), new Vector2Int(1280, 720),
+        new Vector2Int(1280, 768), new Vector2Int(1280, 800), new Vector2Int(1280, 854),
+        new Vector2Int(1280, 960), new Vector2Int(1280, 1024), new Vector2Int(1366, 768),
+        new Vector2Int(1400, 1050), new Vector2Int(1440, 900), new Vector2Int(1440, 960),
+        new Vector2Int(1600, 900), new Vector2Int(1600, 1024), new Vector2Int(1600, 1200),
+        new Vector2Int(1680, 1050)
+    };
+
+    [Serializable]
+    private sealed class Configuration
+    {
+        public int version = 1;
+        public float brightness = 0.30f;
+        public float contrast = 1f;
+        public float cameraSensitivity = 3f;
+        public bool invertX;
+        public bool invertY;
+        public bool azerty;
+        public int resolution = 2;
+        public int avant = (int)KeyCode.Z;
+        public int arriere = (int)KeyCode.S;
+        public int gauche = (int)KeyCode.Q;
+        public int droite = (int)KeyCode.D;
+        public int saut = (int)KeyCode.Space;
+        public int courir = (int)KeyCode.LeftShift;
+        public int ramasser = (int)KeyCode.E;
+        public int attaque = (int)KeyCode.Mouse0;
+        public int inventaire = (int)KeyCode.I;
+        public int options = (int)KeyCode.O;
+        public int quete = (int)KeyCode.Q;
+        public int camera = (int)KeyCode.V;
+        public int renaitre = (int)KeyCode.R;
+    }
+
+    private string CheminConfiguration
+    {
+        get { return Path.Combine(Application.persistentDataPath, "librevies_config.json"); }
+    }
 
     private sealed class EffetTexte
     {
@@ -215,7 +287,6 @@ public sealed class LibreViesGame : MonoBehaviour
         JournalMachine();
         Application.targetFrameRate = 60;
         Application.runInBackground = true;
-        Screen.SetResolution(1280, 720, false);
         gameCamera = Camera.main;
         if (gameCamera == null)
         {
@@ -1715,11 +1786,21 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private bool Touche(int code)
+    {
+        return Input.GetKey((KeyCode)code);
+    }
+
+    private bool ToucheDown(int code)
+    {
+        return Input.GetKeyDown((KeyCode)code);
+    }
+
     private void UpdatePlayer(float dt)
     {
         if (dead)
         {
-            if (Input.GetKeyDown(KeyCode.R)) Respawn();
+            if (ToucheDown(toucheRenaître)) Respawn();
             return;
         }
         if (attackCooldown > 0) attackCooldown -= dt;
@@ -1734,15 +1815,16 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         Vector3 input = Vector3.zero;
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.Z) || Input.GetKey(KeyCode.UpArrow)) input.z += 1;
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.z -= 1;
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.Q) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x += 1;
+        if (Touche(toucheAvant) || Input.GetKey(KeyCode.UpArrow)) input.z += 1;
+        if (Touche(toucheArriere) || Input.GetKey(KeyCode.DownArrow)) input.z -= 1;
+        if (Touche(toucheGauche) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1;
+        if (Touche(toucheDroite) || Input.GetKey(KeyCode.RightArrow)) input.x += 1;
         if (input.sqrMagnitude > 1) input.Normalize();
         Vector3 forward = gameCamera.transform.forward; forward.y = 0; forward.Normalize();
         Vector3 right = gameCamera.transform.right; right.y = 0; right.Normalize();
         Vector3 direction = forward * input.z + right * input.x;
-        float speed = Input.GetKey(KeyCode.LeftShift) ? RunSpeed : PlayerSpeed;
+        float speed = Touche(toucheCourir) ? RunSpeed : PlayerSpeed;
+        endurance = Mathf.MoveTowards(endurance, Touche(toucheCourir) && direction.sqrMagnitude > 0.01f ? 0f : 100f, dt * 22f);
         if (speedBoost > 0) speed += 3f;
         if (direction.sqrMagnitude > 0.01f)
         {
@@ -1755,11 +1837,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 RayonJoueur, player.position.y);
             player.position = new Vector3(resolu.x, player.position.y, resolu.y);
             player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(direction), dt * 12f);
-            walkClock += dt * (Input.GetKey(KeyCode.LeftShift) ? 14f : 9f);
+            walkClock += dt * (Touche(toucheCourir) ? 14f : 9f);
         }
         else walkClock = 0;
 
-        if (Input.GetKeyDown(KeyCode.Space) && playerGrounded)
+        if (ToucheDown(toucheSaut) && playerGrounded)
         {
             playerVelocity.y = ForceSaut;
             playerGrounded = false;
@@ -1777,13 +1859,13 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
 
-        if (Input.GetMouseButtonDown(0)) Attack();
-        if (Input.GetKeyDown(KeyCode.E)) CollectNearby();
-        if (Input.GetKeyDown(KeyCode.I)) inventoryOpen = !inventoryOpen;
-        if (Input.GetKeyDown(KeyCode.O)) optionsOpen = !optionsOpen;
-        if (Input.GetKeyDown(KeyCode.Q)) questOpen = !questOpen;
-        if (Input.GetKeyDown(KeyCode.V)) firstPerson = !firstPerson;
-        if (Input.GetKeyDown(KeyCode.R) && dead) Respawn();
+        if (Input.GetMouseButtonDown(0) || ToucheDown(toucheAttaque)) Attack();
+        if (ToucheDown(toucheRamasser)) CollectNearby();
+        if (ToucheDown(toucheInventaire)) inventoryOpen = !inventoryOpen;
+        if (ToucheDown(toucheOptions)) optionsOpen = !optionsOpen;
+        if (ToucheDown(toucheQuete)) questOpen = !questOpen;
+        if (ToucheDown(toucheCamera)) firstPerson = !firstPerson;
+        if (ToucheDown(toucheRenaître) && dead) Respawn();
         for (int i = 0; i < 5; i++) if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) UseSlot(i);
 
         if (Input.GetMouseButtonDown(1)) cameraDragging = true;
@@ -1792,9 +1874,9 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             // GetAxisRaw : pas de lissage, la caméra suit la souris tout de
             // suite. Sensibilité réglable avec [ et ] (panneau Options).
-            cameraYaw += Input.GetAxisRaw("Mouse X") * cameraSensitivity;
+            cameraYaw += Input.GetAxisRaw("Mouse X") * cameraSensitivity * (inverserAxeX ? -1f : 1f);
             cameraPitch = Mathf.Clamp(
-                cameraPitch + Input.GetAxisRaw("Mouse Y") * cameraSensitivity, 5f, 70f);
+                cameraPitch + Input.GetAxisRaw("Mouse Y") * cameraSensitivity * (inverserAxeY ? -1f : 1f), 5f, 70f);
         }
         if (Input.GetKeyDown(KeyCode.LeftBracket))
             cameraSensitivity = Mathf.Clamp(cameraSensitivity - 0.5f, 0.5f, 10f);
@@ -2109,18 +2191,20 @@ public sealed class LibreViesGame : MonoBehaviour
             DessinerChargement();
             return;
         }
+
+        DessinerCorrectionCouleur();
         GUI.Label(new Rect(20, 18, 380, 30), "LIBREVIES  •  MMO OPEN WORLD", titleStyle);
-        GUI.Box(new Rect(20, 55, 270, 48), "", boxStyle);
-        GUI.Label(new Rect(32, 62, 220, 22), "PV  " + hp + " / " + MaxHp, labelStyle);
-        GUI.color = Color.red; GUI.DrawTexture(new Rect(32, 86, 230 * hp / (float)MaxHp, 8), Texture2D.whiteTexture); GUI.color = Color.white;
-        GUI.Label(new Rect(32, 108, 260, 24), "Niveau " + level + "    XP " + xp + " / " + (level * 100), smallStyle);
-        GUI.Label(new Rect(Screen.width - 250, 20, 230, 26), "Or : " + coins + "     Cailloux : " + rocks, labelStyle);
+        GUI.Box(new Rect(20, 55, 270, 124), "", boxStyle);
+        DessinerBarre(new Rect(32, 66, 230, 14), hp / (float)MaxHp, "PV");
+        DessinerBarre(new Rect(32, 94, 230, 14), endurance / 100f, "ENDURANCE");
+        DessinerBarre(new Rect(32, 122, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
+        GUI.Label(new Rect(32, 148, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
+        GUI.Label(new Rect(32, 170, 250, 22), "Energie : " + Mathf.RoundToInt(energie) + " / 100", smallStyle);
+        DessinerMiniCarte();
         GUI.Label(new Rect(Screen.width - 290, 55, 270, 24), "Rats " + ratsKilled + "/10   Araignées " + spidersKilled + "/5", smallStyle);
-        GUI.Label(new Rect(20, Screen.height - 52, 560, 30), "ZQSD / WASD déplacer   •   Maj courir   •   Espace sauter   •   Clic attaquer   •   E ramasser", smallStyle);
-        GUI.Label(new Rect(20, Screen.height - 27, 560, 24), "V caméra   I inventaire   O options   Q quêtes   1-5 objets   R renaître", smallStyle);
         for (int i = 0; i < 5; i++)
         {
-            Rect slot = new Rect(Screen.width * 0.5f - 135 + i * 55, Screen.height - 78, 48, 48);
+            Rect slot = new Rect(Screen.width * 0.5f - 135 + i * 55, Screen.height - 68, 48, 48);
             GUI.color = i == selectedSlot ? Color.yellow : Color.white;
             GUI.Box(slot, (i + 1).ToString(), boxStyle); GUI.color = Color.white;
         }
@@ -2128,20 +2212,155 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             GUI.Box(new Rect(Screen.width - 275, 100, 255, 120), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
         }
+        GUI.color = Color.white;
+        if (GUI.Button(new Rect(Screen.width - 46, 102, 25, 25), questOpen ? "−" : "+", buttonStyle))
+            questOpen = !questOpen;
         if (inventoryOpen)
         {
             GUI.Box(new Rect(Screen.width / 2 - 160, Screen.height / 2 - 100, 320, 200), "INVENTAIRE\n\nPotions de soin : " + potions[0] + "\nPotions de vitesse : " + potions[1] + "\nOr : " + coins + "\nCailloux : " + rocks, boxStyle);
         }
-        if (optionsOpen)
+        if (optionsOpen) DessinerOptions();
+        if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur " + NomTouche(toucheRenaître) + " pour renaître", boxStyle);
+        if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 128, 300, 35), infoMessage, titleStyle);
+    }
+
+    private void DessinerCorrectionCouleur()
+    {
+        // Le vrai reglage luminosite/contraste est applique par OnRenderImage.
+        // Ce petit voile garantit aussi un rendu doux lorsque le shader de
+        // post-traitement est indisponible dans une vieille build.
+        if (contrast < 0.92f)
         {
-            GUI.Box(new Rect(Screen.width / 2 - 200, Screen.height / 2 - 130, 400, 260),
-                "OPTIONS\n\nLuminosité : " + Mathf.RoundToInt(brightness * 100)
-                + "\nContraste : " + Mathf.RoundToInt(contrast * 100)
-                + "\nSensibilité souris : " + cameraSensitivity.ToString("0.0")
-                + "\n(régler avec [ et ])\n\nFermer : O", boxStyle);
+            GUI.color = new Color(0.55f, 0.58f, 0.65f, (1f - contrast) * 0.18f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         }
-        if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur R pour renaître", boxStyle);
-        if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 150, 300, 35), infoMessage, titleStyle);
+        GUI.color = Color.white;
+    }
+
+    private void DessinerBarre(Rect rect, float valeur, string texte)
+    {
+        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.90f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = texte == "PV" ? new Color(0.90f, 0.16f, 0.12f) : (texte == "ENDURANCE" ? new Color(0.20f, 0.78f, 0.28f) : new Color(0.92f, 0.68f, 0.12f));
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(valeur), rect.height), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(rect.x + 5, rect.y - 2, rect.width - 10, rect.height + 5), texte, smallStyle);
+    }
+
+    private void DessinerMiniCarte()
+    {
+        Rect carte = new Rect(Screen.width - 174, 18, 150, 112);
+        GUI.color = new Color(0.06f, 0.12f, 0.16f, 0.88f);
+        GUI.DrawTexture(carte, Texture2D.whiteTexture);
+        GUI.color = new Color(0.40f, 0.64f, 0.35f);
+        GUI.DrawTexture(new Rect(carte.x + 10, carte.y + 10, 130, 92), Texture2D.whiteTexture);
+        GUI.color = new Color(0.72f, 0.58f, 0.30f);
+        GUI.DrawTexture(new Rect(carte.x + 72, carte.y + 10, 5, 92), Texture2D.whiteTexture);
+        if (player != null)
+        {
+            float px = carte.x + 75f + player.position.x / WorldSize * 65f;
+            float py = carte.y + 56f - player.position.z / WorldSize * 46f;
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(px - 3, py - 3, 6, 6), Texture2D.whiteTexture);
+        }
+        GUI.color = Color.white;
+    }
+
+    private string NomTouche(int code)
+    {
+        KeyCode touche = (KeyCode)code;
+        if (touche == KeyCode.Mouse0) return "Clic gauche";
+        return touche.ToString();
+    }
+
+    private void DemanderTouche(string id, string libelle, ref int valeur, float y)
+    {
+        GUI.Label(new Rect(ongletOptions == 1 ? 220 : 0, y, 160, 24), libelle, smallStyle);
+        string texte = toucheEnCours == id ? "Appuyez..." : NomTouche(valeur);
+        if (GUI.Button(new Rect(ongletOptions == 1 ? 370 : 160, y - 2, 125, 25), texte, buttonStyle))
+            toucheEnCours = id;
+        if (toucheEnCours == id && Event.current.type == EventType.KeyDown)
+        {
+            if (Event.current.keyCode == KeyCode.Escape) toucheEnCours = "";
+            else if (Event.current.keyCode != KeyCode.None)
+            {
+                valeur = (int)Event.current.keyCode;
+                toucheEnCours = "";
+                SauverConfiguration();
+                Event.current.Use();
+            }
+        }
+    }
+
+    private void DessinerOptions()
+    {
+        Rect cadre = new Rect(Screen.width / 2 - 310, Screen.height / 2 - 235, 620, 470);
+        GUI.Box(cadre, "OPTIONS", boxStyle);
+        GUI.color = ongletOptions == 0 ? new Color(0.18f, 0.40f, 0.62f) : new Color(0.12f, 0.16f, 0.25f);
+        GUI.DrawTexture(new Rect(cadre.x + 18, cadre.y + 42, 145, 42), Texture2D.whiteTexture);
+        GUI.color = ongletOptions == 1 ? new Color(0.42f, 0.25f, 0.58f) : new Color(0.12f, 0.16f, 0.25f);
+        GUI.DrawTexture(new Rect(cadre.x + 18, cadre.y + 88, 145, 42), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        if (GUI.Button(new Rect(cadre.x + 18, cadre.y + 42, 145, 42), "GRAPHIQUE", tabActifStyle)) ongletOptions = 0;
+        if (GUI.Button(new Rect(cadre.x + 18, cadre.y + 88, 145, 42), "CONTROLE", tabActifStyle)) ongletOptions = 1;
+        GUI.BeginGroup(new Rect(cadre.x + 180, cadre.y + 42, 420, 400));
+        if (ongletOptions == 0) DessinerGraphique(); else DessinerControle();
+        GUI.EndGroup();
+        if (GUI.Button(new Rect(cadre.x + 18, cadre.y + 410, 145, 35), "FERMER", buttonStyle))
+        {
+            optionsOpen = false;
+            toucheEnCours = "";
+            SauverConfiguration();
+        }
+    }
+
+    private void DessinerGraphique()
+    {
+        GUI.Label(new Rect(0, 0, 380, 25), "REGLAGES VISUELS", labelStyle);
+        GUI.Label(new Rect(0, 42, 130, 24), "Luminosite", smallStyle);
+        brightness = GUI.HorizontalSlider(new Rect(135, 51, 220, 18), brightness, 0f, 1f);
+        GUI.Label(new Rect(360, 42, 55, 24), Mathf.RoundToInt(brightness * 100) + "%", smallStyle);
+        GUI.Label(new Rect(0, 78, 130, 24), "Contraste", smallStyle);
+        contrast = GUI.HorizontalSlider(new Rect(135, 87, 220, 18), contrast, 0.5f, 1.5f);
+        GUI.Label(new Rect(360, 78, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
+        GUI.Label(new Rect(0, 114, 160, 24), "Resolution", smallStyle);
+        if (GUI.Button(new Rect(135, 112, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
+        if (menuResolutions)
+        {
+            int debut = Mathf.Max(0, resolutionIndex - 3);
+            for (int i = debut; i < Mathf.Min(resolutions.Length, debut + 6); i++)
+            {
+                if (GUI.Button(new Rect(135, 142 + (i - debut) * 27, 220, 25), resolutions[i].x + " x " + resolutions[i].y, buttonStyle))
+                {
+                    resolutionIndex = i;
+                    menuResolutions = false;
+                    Screen.SetResolution(resolutions[i].x, resolutions[i].y, false);
+                    SauverConfiguration();
+                }
+            }
+        }
+        GUI.Label(new Rect(0, 300, 390, 55), "Luminosite par defaut : 30 %\nContraste par defaut : 100 %", smallStyle);
+    }
+
+    private void DessinerControle()
+    {
+        GUI.Label(new Rect(0, 0, 380, 25), "CLAVIER " + (clavierAzerty ? "AZERTY" : "QWERTY"), labelStyle);
+        GUI.Label(new Rect(0, 30, 190, 24), "Inverser axe horizontal", smallStyle);
+        inverserAxeX = GUI.Toggle(new Rect(205, 30, 24, 24), inverserAxeX, "");
+        GUI.Label(new Rect(245, 30, 150, 24), inverserAxeX ? "Oui" : "Non", smallStyle);
+        GUI.Label(new Rect(0, 57, 190, 24), "Inverser axe vertical", smallStyle);
+        inverserAxeY = GUI.Toggle(new Rect(205, 57, 24, 24), inverserAxeY, "");
+        GUI.Label(new Rect(245, 57, 150, 24), inverserAxeY ? "Oui" : "Non", smallStyle);
+        GUI.Label(new Rect(0, 84, 390, 24), "Clique une touche, puis appuie sur la nouvelle touche.", smallStyle);
+        DemanderTouche("avant", "Avancer", ref toucheAvant, 116);
+        DemanderTouche("arriere", "Reculer", ref toucheArriere, 145);
+        DemanderTouche("gauche", "Gauche", ref toucheGauche, 174);
+        DemanderTouche("droite", "Droite", ref toucheDroite, 203);
+        DemanderTouche("saut", "Sauter", ref toucheSaut, 232);
+        DemanderTouche("courir", "Courir", ref toucheCourir, 261);
+        DemanderTouche("ramasser", "Ramasser", ref toucheRamasser, 290);
+        DemanderTouche("attaque", "Attaquer", ref toucheAttaque, 319);
+        DemanderTouche("camera", "Camera", ref toucheCamera, 348);
     }
 
     private void EnsureStyles()
@@ -2151,6 +2370,9 @@ public sealed class LibreViesGame : MonoBehaviour
         labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, normal = { textColor = Color.white } };
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = new Color(0.82f, 0.87f, 0.92f) } };
         boxStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+        buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
+        tabStyle = new GUIStyle(buttonStyle) { normal = { textColor = Color.white } };
+        tabActifStyle = new GUIStyle(buttonStyle) { fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         loadingTitleStyle = new GUIStyle(GUI.skin.label)
         {
             fontSize = 46, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
@@ -2163,19 +2385,115 @@ public sealed class LibreViesGame : MonoBehaviour
         };
     }
 
-    private void LoadOptions()
+    private bool EstClavierAzerty()
     {
-        brightness = PlayerPrefs.GetFloat("brightness", 0.3f);
-        contrast = PlayerPrefs.GetFloat("contrast", 1f);
-        cameraSensitivity = PlayerPrefs.GetFloat("cameraSensitivity", 3f);
+        string langue = Application.systemLanguage.ToString();
+        string culture = CultureInfo.CurrentCulture.Name;
+        return langue.IndexOf("French", StringComparison.OrdinalIgnoreCase) >= 0
+            || culture.StartsWith("fr", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void OnApplicationQuit()
+    private void AppliquerConfiguration(Configuration config)
     {
+        brightness = Mathf.Clamp01(config.brightness);
+        contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
+        cameraSensitivity = Mathf.Clamp(config.cameraSensitivity, 0.5f, 10f);
+        clavierAzerty = config.azerty;
+        inverserAxeX = config.invertX;
+        inverserAxeY = config.invertY;
+        resolutionIndex = Mathf.Clamp(config.resolution, 0, resolutions.Length - 1);
+        toucheAvant = config.avant; toucheArriere = config.arriere;
+        toucheGauche = config.gauche; toucheDroite = config.droite;
+        toucheSaut = config.saut; toucheCourir = config.courir;
+        toucheRamasser = config.ramasser; toucheAttaque = config.attaque;
+        toucheInventaire = config.inventaire; toucheOptions = config.options;
+        toucheQuete = config.quete; toucheCamera = config.camera;
+        toucheRenaître = config.renaitre;
+    }
+
+    private Configuration LireConfiguration()
+    {
+        try
+        {
+            if (File.Exists(CheminConfiguration))
+            {
+                Configuration config = JsonUtility.FromJson<Configuration>(File.ReadAllText(CheminConfiguration));
+                if (config != null) return config;
+            }
+        }
+        catch (Exception erreur) { Debug.LogWarning("LibreVies : configuration illisible : " + erreur.Message); }
+        var neuve = new Configuration { azerty = EstClavierAzerty() };
+        if (!neuve.azerty)
+        {
+            neuve.avant = (int)KeyCode.W;
+            neuve.gauche = (int)KeyCode.A;
+        }
+        return neuve;
+    }
+
+    private void LoadOptions()
+    {
+        Configuration config = LireConfiguration();
+        AppliquerConfiguration(config);
+        // Compatibilite avec les builds qui avaient seulement PlayerPrefs.
+        if (!File.Exists(CheminConfiguration))
+        {
+            brightness = PlayerPrefs.GetFloat("brightness", brightness);
+            contrast = PlayerPrefs.GetFloat("contrast", contrast);
+            cameraSensitivity = PlayerPrefs.GetFloat("cameraSensitivity", cameraSensitivity);
+        }
+        Vector2Int resolution = resolutions[resolutionIndex];
+        Screen.SetResolution(resolution.x, resolution.y, false);
+    }
+
+    private void SauverConfiguration()
+    {
+        try
+        {
+            var config = new Configuration
+            {
+                brightness = brightness, contrast = contrast, cameraSensitivity = cameraSensitivity,
+                invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
+                resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
+                gauche = toucheGauche, droite = toucheDroite, saut = toucheSaut,
+                courir = toucheCourir, ramasser = toucheRamasser, attaque = toucheAttaque,
+                inventaire = toucheInventaire, options = toucheOptions, quete = toucheQuete,
+                camera = toucheCamera, renaitre = toucheRenaître
+            };
+            string temporaire = CheminConfiguration + ".tmp";
+            File.WriteAllText(temporaire, JsonUtility.ToJson(config, true));
+            File.Copy(temporaire, CheminConfiguration, true);
+            File.Delete(temporaire);
+        }
+        catch (Exception erreur) { Debug.LogWarning("LibreVies : sauvegarde configuration impossible : " + erreur.Message); }
         PlayerPrefs.SetFloat("brightness", brightness);
         PlayerPrefs.SetFloat("contrast", contrast);
         PlayerPrefs.SetFloat("cameraSensitivity", cameraSensitivity);
         PlayerPrefs.Save();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SauverConfiguration();
+    }
+
+    private Material screenAdjustMaterial;
+
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        if (screenAdjustMaterial == null)
+        {
+            Shader shader = Resources.Load<Shader>("LVShaders/LVScreenAdjust");
+            if (shader != null) screenAdjustMaterial = new Material(shader);
+        }
+        if (screenAdjustMaterial == null)
+        {
+            Graphics.Blit(source, destination);
+            return;
+        }
+        screenAdjustMaterial.SetFloat("_Brightness", brightness - 0.30f);
+        screenAdjustMaterial.SetFloat("_Contrast", contrast);
+        Graphics.Blit(source, destination, screenAdjustMaterial);
     }
 
     // ------------------------------------------------------------------
