@@ -250,7 +250,26 @@ robocopy "%JEU%" "%LV_SAUVE%\jeu" /E /XF *.exe /XD game game.ancien game.install
 for %%F in (build_launcher.bat build_unity_game.bat setup_unity_build_tools.bat) do if exist "%ROOT%%%F" copy /y "%ROOT%%%F" "%LV_SAUVE%\%%F" >nul 2>&1
 echo        Sauvegarde de l'ancienne version : build\sauvegarde_locale
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%outils\synchroniser_sources.ps1"
+rem Ce fichier peut etre le seul fichier conserve par l'auteur. Dans ce cas,
+rem l'outil de synchronisation n'existe plus encore : on telecharge d'abord
+rem uniquement ce petit bootstrap depuis la branche demandee.
+set "LV_SYNC=%ROOT%outils\synchroniser_sources.ps1"
+if not exist "%LV_SYNC%" (
+    echo        Outil de synchronisation absent : telechargement bootstrap...
+    if not exist "%ROOT%outils" mkdir "%ROOT%outils"
+    set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%BRANCHE%/compilation/outils/synchroniser_sources.ps1"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -UseBasicParsing -Headers @{'User-Agent'='LibreVies-build'} -Uri $env:LV_SYNC_URL -OutFile $env:LV_SYNC"
+    if errorlevel 1 (
+        echo ERREUR : impossible de telecharger l'outil de synchronisation.
+        echo Verifie la connexion Internet puis relance build_launcher.bat.
+        exit /b 1
+    )
+)
+if not exist "%LV_SYNC%" (
+    echo ERREUR : l'outil de synchronisation reste introuvable : %LV_SYNC%
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LV_SYNC%"
 
 if errorlevel 1 (
     echo.

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+#if UNITY_STANDALONE_WIN
+using System.Runtime.InteropServices;
+#endif
 using UnityEngine;
 
 /// <summary>
@@ -12,6 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
+    private const string VersionJeu = "0.5.0";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -314,10 +318,28 @@ public sealed class LibreViesGame : MonoBehaviour
                 + " | vsync " + QualitySettings.vSyncCount);
     }
 
+#if UNITY_STANDALONE_WIN
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern System.IntPtr GetActiveWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetWindowText(System.IntPtr hWnd, string texte);
+#endif
+
+    private void AfficherVersionDansTitre()
+    {
+#if UNITY_STANDALONE_WIN
+        System.IntPtr fenetre = GetActiveWindow();
+        if (fenetre != System.IntPtr.Zero)
+            SetWindowText(fenetre, "LibreVies - v" + VersionJeu);
+#endif
+    }
+
     private void Awake()
     {
         chrono.Start();
-        Journal("demarrage");
+        AfficherVersionDansTitre();
+        Journal("demarrage LibreVies v" + VersionJeu);
         JournalMachine();
         Application.targetFrameRate = 60;
         Application.runInBackground = true;

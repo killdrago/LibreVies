@@ -100,7 +100,7 @@ CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.1.0"
-GAME_VERSION = "0.4.0"
+GAME_VERSION = "0.5.0"
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
                    "arena/01a0b32c-librevies/jeu")
 
@@ -757,7 +757,7 @@ def launch(path):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LibreVies")
+        self.title("LibreVies - v%s" % GAME_VERSION)
         self.geometry("1024x768")
         self.resizable(False, False)
         self.configure(bg=BG)
@@ -795,8 +795,9 @@ class App(tk.Tk):
 
         # --- LIBREVIES ---
         self.canvas.create_rectangle(20, 15, 250, 100, fill=CARD, outline=ACCENT, width=2)
-        self.canvas.create_text(135, 22, text="LibreVies", font=("Segoe UI", 30, "bold"),
-                                fill=ACCENT, anchor="n")
+        self.brand_item = self.canvas.create_text(
+            135, 22, text="LibreVies  v%s" % GAME_VERSION,
+            font=("Segoe UI", 25, "bold"), fill=ACCENT, anchor="n")
         self.canvas.create_text(135, 65, text="MMO Open World",
                                 font=("Segoe UI", 11), fill=TEXT2, anchor="n")
         self.version_item = self.canvas.create_text(
@@ -1040,7 +1041,10 @@ class App(tk.Tk):
 
     def _set_version(self, version):
         try:
-            self.canvas.itemconfig(self.version_item, text="v%s" % version)
+            valeur = version or GAME_VERSION
+            self.canvas.itemconfig(self.version_item, text="v%s" % valeur)
+            self.canvas.itemconfig(self.brand_item, text="LibreVies  v%s" % valeur)
+            self.title("LibreVies - v%s" % valeur)
         except Exception:
             pass
 

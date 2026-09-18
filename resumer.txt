@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 34 : interdit le lancement d'un
-                        ancien jeu non publie par le launcher
+Derniere mise a jour : 18/09/2026 - MAJ 35 : bootstrap autonome et version
+                        visible dans les titres de fenetre
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1382,6 +1382,30 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Pour verifier localement sans launcher, lancer directement
     jeu\game\LibreViesGame.exe apres le deplacement reussi de unity_export.
     Le journal runtime a examiner est jeu\game\logs\LibreVies.log.
+
+================================================================================
+8.24 MAJ 35 - RECONSTRUCTION DEPUIS LE SEUL BUILD LAUNCHER
+================================================================================
+
+  - Incident Windows : apres suppression de tous les fichiers sauf
+    compilation\build_launcher.bat, le script appelait directement
+    compilation\outils\synchroniser_sources.ps1, qui avait lui aussi ete
+    supprime. PowerShell signalait donc un chemin inexistant puis le projet
+    Unity restait introuvable.
+  - Correction : build_launcher.bat telecharge maintenant d'abord ce seul
+    outil de synchronisation depuis raw.githubusercontent.com, dans le dossier
+    outils\, avant de lancer la synchronisation differentielle. Il peut donc
+    reconstruire compilation\unity, jeu\ et tous les outils a partir du seul
+    build_launcher.bat.
+  - Version du lot visuel : 0.5.0. Elle est dans le bundleVersion Unity, dans
+    le journal runtime, dans le launcher et dans le manifeste source.
+  - Le titre du launcher affiche maintenant "LibreVies - v0.5.0" et son
+    bandeau affiche "LibreVies v0.5.0". Le titre de la fenetre du jeu Windows
+    affiche aussi "LibreVies - v0.5.0" via user32.dll, pour distinguer sans
+    ambiguite l'ancien export 0.4 de la nouvelle build.
+  - Le manifeste conserve game_build: {} tant que l'archive Windows 0.5.0
+    n'est pas fabriquee et publiee : aucun faux hash n'est ajoute.
+  - Controle Python, C#, BAT et diff Git propres.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

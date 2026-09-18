@@ -1,7 +1,7 @@
 {
-  "launcher_version": "4.0.0",
-  "game_version": "0.4.0",
-  "notes": "Version Unity uniquement. Le joueur ne recoit que le launcher : au premier lancement il telecharge l'archive de la compilation Unity publiee dans la release GitHub, verifie son md5, l'installe dans game/ puis active JOUER. Les mises a jour suivantes (jeu et launcher) se font toutes seules. Pour publier une compilation : compilation\\outils\\publier_jeu.bat (qui remplit automatiquement le bloc game_build ci-dessous).",
+  "launcher_version": "4.1.0",
+  "game_version": "0.5.0",
+  "notes": "MAJ 31 : rendu PBR, textures originales et formes baties Unity. Compilation a publier depuis compilation\\outils\\publier_jeu.bat.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

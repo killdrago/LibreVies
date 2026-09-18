@@ -63,6 +63,7 @@ GetKeyUp GetMouseButton GetMouseButtonDown GetMouseButtonUp GetAxis GetAxisRaw
 IsInstanceOfType Equals GetType ToString GetHashCode DestroyImmediate FindObjectsOfType
 Combine GetInstanceID CompareTag Invoke CancelInvoke StartCoroutine StopCoroutine
 QuaternionIdentity Normalize SetResolution RunInBackground targetFrameRate deltaTime
+DllImport
 unscaledDeltaTime fixedDeltaTime timeScale frameCount realtimeSinceStartup
 """.split())
 
