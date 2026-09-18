@@ -17,7 +17,26 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float RunSpeed = 9f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
+    // Valeurs reprises de la reference de jeu : hauteur logique par defaut
+    // d'un obstacle, hauteur de la cloture du village (franchissable en
+    // sautant par le heros, jamais par les monstres), rayon du heros.
+    private const float HauteurCollision = 2f;
+    private const float HauteurCloture = 1f;
+    private const float RayonJoueur = 0.45f;
+    // Saut : 8 m/s avec une gravite de 20 -> 1,60 m de hauteur maximale,
+    // exactement de quoi sauter la cloture de 1 m.
+    private const float Gravite = 20f;
+    private const float ForceSaut = 8f;
 
+    // Trace de la route (memes points que le ruban visible) : sert aux
+    // collisions de la cloture (on passe par les portails) et au pave.
+    private static readonly Vector2[] RoutePoints =
+    {
+        new Vector2(0, 30), new Vector2(3, 18), new Vector2(-2, 6), new Vector2(1, -8),
+        new Vector2(4, -20), new Vector2(-1, -34), new Vector2(1, -48), new Vector2(0, -67)
+    };
+
+    private readonly List<Obstacle> obstacles = new List<Obstacle>();
     private readonly List<EnemyState> enemies = new List<EnemyState>();
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
@@ -66,6 +85,19 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle smallStyle;
     private GUIStyle boxStyle;
 
+    private sealed class Obstacle
+    {
+        public bool Cercle;     // true = cercle (Rayon), false = boite (Largeur/Profondeur)
+        public float X;
+        public float Z;
+        public float Rayon;
+        public float Largeur;
+        public float Profondeur;
+        public float Portee;    // elagage rapide : rayon + 1, ou max(w, d) / 2 + 1
+        public float Hauteur;   // hauteur AU-DESSUS du terrain
+        public bool Actif = true;
+    }
+
     private sealed class EnemyState
     {
         public GameObject Root;
@@ -76,6 +108,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public float RespawnAt;
         public Vector3 Home;
         public Transform[] Legs;
+        public Obstacle Corps;      // pour que le heros ne traverse pas la bete
+        public Vector3 Direction;   // direction de deplacement (errance / poursuite)
+        public float WanderTimer;
+        public float Speed = 1.6f;
     }
 
     private sealed class PickupState
@@ -264,6 +300,145 @@ public sealed class LibreViesGame : MonoBehaviour
         return Mathf.Lerp(hills * townBlend, 11f, plateau);
     }
 
+    // ------------------------------------------------------------------
+    // COLLISIONS
+    // Le deplacement ecrit directement dans transform.position : les
+    // colliders Unity ne servent a rien ici (aucun Rigidbody). On utilise donc
+    // le meme systeme que la reference de jeu : une liste d'obstacles
+    // (cercles ou boites) et une resolution mathematique du deplacement.
+    // Consequences voulues : on ne traverse plus les murs, on saute par-dessus
+    // la cloture, on peut atterrir sur les caisses, et les monstres restent
+    // enfermes hors du village.
+    // ------------------------------------------------------------------
+    private void ColCercle(float x, float z, float r, float h = HauteurCollision)
+    {
+        obstacles.Add(new Obstacle
+        {
+            Cercle = true, X = x, Z = z, Rayon = r, Portee = r + 1f, Hauteur = h
+        });
+    }
+
+    private void ColBoite(float x, float z, float w, float d, float h = HauteurCollision)
+    {
+        obstacles.Add(new Obstacle
+        {
+            X = x, Z = z, Largeur = w, Profondeur = d,
+            Portee = Mathf.Max(w, d) * 0.5f + 1f, Hauteur = h
+        });
+    }
+
+    private bool DansVillage(float x, float z)
+    {
+        return new Vector2(x, z).magnitude < VillageRadius;
+    }
+
+    private float DistRoute(Vector2 p)
+    {
+        float best = 100000f;
+        for (int i = 0; i < RoutePoints.Length - 1; i++)
+        {
+            Vector2 a = RoutePoints[i];
+            Vector2 b = RoutePoints[i + 1];
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 0.001f));
+            best = Mathf.Min(best, (p - (a + ab * t)).magnitude);
+        }
+        return best;
+    }
+
+    // La cloture du village separe l'interieur de l'exterieur : un monstre ne
+    // peut pas frapper le heros a travers (sauf au niveau des portails).
+    private bool ClotureEntre(Vector3 a, Vector3 b)
+    {
+        if (DansVillage(a.x, a.z) == DansVillage(b.x, b.z)) return false;
+        var milieu = new Vector2((a.x + b.x) * 0.5f, (a.z + b.z) * 0.5f);
+        return DistRoute(milieu) > 3.4f;
+    }
+
+    // 'ignorer' sert aux monstres : leur propre corps est un obstacle (le heros
+    // ne les traverse pas), ils ne doivent donc pas se repousser eux-memes.
+    private Vector2 ResoudreCollisions(float px, float pz, float rayon, float pieds = 0f, Obstacle ignorer = null)
+    {
+        var p = new Vector2(px, pz);
+        for (int passe = 0; passe < 2; passe++)
+        {
+            for (int i = 0; i < obstacles.Count; i++)
+            {
+                Obstacle c = obstacles[i];
+                if (!c.Actif || c == ignorer) continue;
+                if (Mathf.Abs(p.x - c.X) > c.Portee + rayon && Mathf.Abs(p.y - c.Z) > c.Portee + rayon) continue;
+                // Ce qui est plus bas que le saut peut etre franchi (et on peut
+                // atterrir dessus, voir HauteurSupport). Epsilon 0,05 : debout
+                // sur un objet, celui-ci ne pousse plus.
+                if (pieds > 0f && pieds > TerrainHeight(c.X, c.Z) + c.Hauteur - 0.05f) continue;
+                if (c.Cercle)
+                {
+                    float rr = c.Rayon + rayon;
+                    float dx = p.x - c.X;
+                    float dz = p.y - c.Z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 < rr * rr)
+                    {
+                        float d = Mathf.Sqrt(d2);
+                        if (d < 0.0001f) p = new Vector2(c.X + rr, c.Z);
+                        else p = new Vector2(c.X + dx / d * rr, c.Z + dz / d * rr);
+                    }
+                }
+                else
+                {
+                    float hw = c.Largeur * 0.5f + rayon;
+                    float hd = c.Profondeur * 0.5f + rayon;
+                    float dx = p.x - c.X;
+                    float dz = p.y - c.Z;
+                    if (Mathf.Abs(dx) < hw && Mathf.Abs(dz) < hd)
+                    {
+                        float ox = hw - Mathf.Abs(dx);
+                        float oz = hd - Mathf.Abs(dz);
+                        if (ox < oz) p.x = c.X + (dx >= 0f ? 1f : -1f) * hw;
+                        else p.y = c.Z + (dz >= 0f ? 1f : -1f) * hd;
+                    }
+                }
+            }
+            // Cloture du village : bloquante SAUF aux portails (la ou passe la
+            // route). Le heros peut sauter par-dessus ; les monstres (pieds = 0,
+            // ils ne sautent pas) ne la franchissent jamais.
+            float dl = p.magnitude;
+            if (pieds <= TerrainHeight(p.x, p.y) + HauteurCloture - 0.05f
+                && Mathf.Abs(dl - VillageRadius) < 0.4f + rayon
+                && DistRoute(p) > 3.4f)
+            {
+                if (dl < 0.001f) p = new Vector2(VillageRadius + 0.4f + rayon, 0f);
+                else if (dl >= VillageRadius) p = p / dl * (VillageRadius + 0.4f + rayon);
+                else p = p / dl * (VillageRadius - 0.4f - rayon);
+            }
+        }
+        return p;
+    }
+
+    // Atterrissage sur les objets : quand le heros retombe au-dessus d'un
+    // objet dont le sommet est sous ses pieds, il se pose DESSUS (perche).
+    private float HauteurSupport(float x, float z, float pieds)
+    {
+        float sol = TerrainHeight(x, z);
+        // La route est pavee (sommet ~ +0,10) : les pieds ne s'enfoncent plus.
+        float dr = DistRoute(new Vector2(x, z));
+        if (dr < 2.9f) sol += 0.10f * Mathf.Clamp01((2.9f - dr) / 0.6f);
+        for (int i = 0; i < obstacles.Count; i++)
+        {
+            Obstacle c = obstacles[i];
+            if (!c.Actif) continue;
+            if (Mathf.Abs(x - c.X) > 4f && Mathf.Abs(z - c.Z) > 4f) continue;
+            bool dedans;
+            if (c.Cercle) dedans = new Vector2(x - c.X, z - c.Z).magnitude < c.Rayon + 0.1f;
+            else dedans = Mathf.Abs(x - c.X) < c.Largeur * 0.5f + 0.05f
+                && Mathf.Abs(z - c.Z) < c.Profondeur * 0.5f + 0.05f;
+            if (!dedans) continue;
+            float sommet = TerrainHeight(c.X, c.Z) + c.Hauteur;
+            if (sommet > sol && pieds >= sommet - 0.25f) sol = sommet;
+        }
+        return sol;
+    }
+
     private void CreateTerrain()
     {
         const int cells = 36;
@@ -333,16 +508,12 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateRoad()
     {
-        var points = new[]
+        // Memes points que RoutePoints (voir constantes) : la trace sert aux
+        // collisions (portails de la cloture) et au pave sous les pieds.
+        for (int i = 0; i < RoutePoints.Length - 1; i++)
         {
-            new Vector3(0, 0, 30), new Vector3(3, 0, 18), new Vector3(-2, 0, 6),
-            new Vector3(1, 0, -8), new Vector3(4, 0, -20), new Vector3(-1, 0, -34),
-            new Vector3(1, 0, -48), new Vector3(0, 0, -67)
-        };
-        for (int i = 0; i < points.Length - 1; i++)
-        {
-            Vector3 a = points[i];
-            Vector3 b = points[i + 1];
+            Vector3 a = new Vector3(RoutePoints[i].x, 0f, RoutePoints[i].y);
+            Vector3 b = new Vector3(RoutePoints[i + 1].x, 0f, RoutePoints[i + 1].y);
             Vector3 direction = b - a;
             Vector3 center = (a + b) * 0.5f;
             center.y = TerrainHeight(center.x, center.z) + 0.04f;
@@ -374,6 +545,8 @@ public sealed class LibreViesGame : MonoBehaviour
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         Box(Vector3.up * (size.y * 0.5f), size, "Wall", root, "Murs", true);
         Box(new Vector3(0, size.y + 0.15f, 0), new Vector3(size.x + 0.8f, 0.35f, size.z + 0.8f), "Roof", root, "Toit");
+        // On ne traverse plus les maisons (0,5 m de marge comme la reference).
+        ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
         Box(new Vector3(0, 1.0f, -size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
         for (int side = -1; side <= 1; side += 2)
         {
@@ -388,6 +561,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(3.4f, 0.18f, 3.4f), "Stone", root, "Bassin");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.1f, 0), new Vector3(0.32f, 1.1f, 0.32f), "Stone", root, "Colonne");
         Primitive(PrimitiveType.Sphere, new Vector3(0, 2.3f, 0), new Vector3(0.5f, 0.5f, 0.5f), "Water", root, "Orbe");
+        ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
+        ColCercle(position.x, position.z, 0.32f, 2.2f);   // colonne
     }
 
     private void CreateCastle()
@@ -408,17 +583,44 @@ public sealed class LibreViesGame : MonoBehaviour
             Primitive(PrimitiveType.Cylinder, new Vector3(x, 8.0f, z), new Vector3(2.3f, 0.5f, 2.3f), "Roof", root, "Toit_Tour");
         }
         Box(new Vector3(0, 1.2f, 6.7f), new Vector3(3, 2.4f, 0.3f), "Wood", root, "Porte");
+        // Memes obstacles que la reference : donjon, tours, porte.
+        ColBoite(0, -67, 21, 13, 5f);
+        ColCercle(-10, -73, 1.0f, 7.6f);
+        ColCercle(10, -73, 1.0f, 7.6f);
+        ColCercle(-10, -61, 1.0f, 7.6f);
+        ColCercle(10, -61, 1.0f, 7.6f);
+        ColBoite(0, -60.3f, 3, 0.6f, 2.4f);
     }
 
     private void CreateFence()
     {
-        const int posts = 64;
+        const int posts = 96;                 // 96 poteaux, comme la reference
+        // 1) Ou la route traverse l'enceinte, il y a un PORTAIL (deux trous
+        //    dans cet anneau : au nord et au sud). On les repere d'abord, pour
+        //    que le dessin et les collisions soient d'accord.
+        var portails = new List<Vector2>();   // (angle de debut, angle de fin)
+        const int pas = 720;
+        bool dansTrou = false;
+        float debut = 0f;
+        for (int i = 0; i <= pas; i++)
+        {
+            float a = i * Mathf.PI * 2f / pas;
+            bool trou = DistRoute(new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius)) < 3.0f;
+            if (trou && !dansTrou) { dansTrou = true; debut = a; }
+            else if (!trou && dansTrou)
+            {
+                dansTrou = false;
+                portails.Add(new Vector2(debut, a));
+            }
+        }
+
+        // 2) Poteaux + traverses sur toute la longueur, portails exclus.
         for (int i = 0; i < posts; i++)
         {
             float angle = i * Mathf.PI * 2f / posts;
             float x = Mathf.Cos(angle) * VillageRadius;
             float z = Mathf.Sin(angle) * VillageRadius;
-            if (Mathf.Abs(x) < 4f && z > 22f) continue;
+            if (DistRoute(new Vector2(x, z)) < 3.0f) continue;
             float y = TerrainHeight(x, z);
             Primitive(PrimitiveType.Cylinder, new Vector3(x, y + 0.65f, z), new Vector3(0.14f, 0.65f, 0.14f), "Wood", null, "Cloture");
         }
@@ -427,11 +629,75 @@ public sealed class LibreViesGame : MonoBehaviour
             float angle = (i + 0.5f) * Mathf.PI * 2f / posts;
             float x = Mathf.Cos(angle) * VillageRadius;
             float z = Mathf.Sin(angle) * VillageRadius;
-            if (Mathf.Abs(x) < 4f && z > 22f) continue;
+            if (DistRoute(new Vector2(x, z)) < 3.2f) continue;
             float y = TerrainHeight(x, z) + 0.85f;
             var rail = Box(new Vector3(x, y, z), new Vector3(0.12f, 0.14f, 2.8f), "Wood", null, "Traverse");
             rail.transform.rotation = Quaternion.Euler(0, -angle * Mathf.Rad2Deg, 0);
         }
+
+        // 3) Les portails : grands poteaux, linteau et panneau LIBREVIES.
+        for (int g = 0; g < portails.Count; g++)
+        {
+            float a0 = portails[g].x;
+            float a1 = portails[g].y;
+            foreach (float a in new[] { a0, a1 })
+            {
+                float gx = Mathf.Cos(a) * VillageRadius;
+                float gz = Mathf.Sin(a) * VillageRadius;
+                float gy = TerrainHeight(gx, gz);
+                Primitive(PrimitiveType.Cylinder, new Vector3(gx, gy + 2.6f, gz), new Vector3(0.30f, 2.6f, 0.30f), "Wood", null, "Poteau_Portail");
+                Box(new Vector3(gx, gy + 5.26f, gz), new Vector3(0.40f, 0.14f, 0.40f), "Wood", null, "Chapeau_Portail");
+            }
+            float am = (a0 + a1) * 0.5f;
+            float mx = Mathf.Cos(am) * VillageRadius;
+            float mz = Mathf.Sin(am) * VillageRadius;
+            float my = TerrainHeight(mx, mz);
+            // Longueur du linteau = corde entre les deux poteaux.
+            float longueur = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0)).magnitude * VillageRadius + 0.2f;
+            // L'axe du linteau suit la corde (donc la route qui passe dessous).
+            var corde = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0));
+            var rotation = Quaternion.LookRotation(new Vector3(corde.x, 0f, corde.y).normalized);
+            Box(new Vector3(mx, my + 5.2f, mz), new Vector3(longueur, 0.18f, 0.16f), "Wood", null, "Linteau", false, rotation);
+            // Panneau en bois portant le nom du village (deux planches).
+            Box(new Vector3(mx, my + 4.35f, mz), new Vector3(2.6f, 0.7f, 0.10f), "Wood", null, "Panneau_Fond", false, rotation);
+            Box(new Vector3(mx, my + 4.35f, mz), new Vector3(2.4f, 0.55f, 0.12f), "Wood", null, "Panneau_Bois", false, rotation);
+            AjouterTextePanneau(new Vector3(mx, my + 4.35f, mz), rotation);
+        }
+
+        // La cloture n'est pas enregistree poteau par poteau : elle est geree
+        // comme un anneau (voir ResoudreCollisions). Bloquante SAUF dans les
+        // portails, et franchissable en sautant : le comportement de la
+        // reference, ou le village reste interdit aux monstres.
+    }
+
+    // Nom du village sur le panneau des portails. Le rendu de texte 2D
+    // (TextMesh) est optionnel : si aucune police n'est disponible, on garde
+    // simplement le panneau en bois, sans erreur.
+    private void AjouterTextePanneau(Vector3 position, Quaternion rotation)
+    {
+        Font police = null;
+        try { police = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
+        catch (System.Exception) { police = null; }
+        if (police == null)
+        {
+            try { police = Resources.GetBuiltinResource<Font>("Arial.ttf"); }
+            catch (System.Exception) { police = null; }
+        }
+        if (police == null) return;
+        var objet = new GameObject("Texte_Portail");
+        objet.transform.position = position;
+        objet.transform.rotation = rotation;
+        var texte = objet.AddComponent<TextMesh>();
+        texte.text = "LIBREVIES";
+        texte.font = police;
+        texte.characterSize = 0.42f;   // des lettres d environ 40 cm, ajustees au panneau
+        texte.fontSize = 64;
+        texte.anchor = TextAnchor.MiddleCenter;
+        texte.color = new Color(0.20f, 0.12f, 0.05f);
+        var rendu = objet.GetComponent<MeshRenderer>();
+        if (rendu != null) rendu.sharedMaterial = police.material;
+        // Le texte regarde vers l'exterieur, comme le panneau.
+        objet.transform.Rotate(0f, 180f, 0f, Space.Self);
     }
 
     private void CreateGuard(Vector3 position)
@@ -440,6 +706,7 @@ public sealed class LibreViesGame : MonoBehaviour
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         Primitive(PrimitiveType.Capsule, new Vector3(0, 1.1f, 0), new Vector3(0.5f, 1.1f, 0.5f), "Player", root, "Corps");
         Box(new Vector3(0.55f, 1.5f, 0), new Vector3(0.10f, 2.2f, 0.10f), "Stone", root, "Hallebarde", false, Quaternion.Euler(0, 0, -8));
+        ColCercle(position.x, position.z, 0.4f, 1.8f);
     }
 
     private void CreateTreesAndProps()
@@ -457,6 +724,8 @@ public sealed class LibreViesGame : MonoBehaviour
             float x = (float)(random.NextDouble() * 54 - 27);
             float z = (float)(random.NextDouble() * 54 - 27);
             Box(new Vector3(x, TerrainHeight(x, z) + 0.5f, z), new Vector3(1, 1, 1), i % 2 == 0 ? "Wood" : "Stone", null, "Caisse");
+            // 1 m de haut : on saute dessus (saut de 1,60 m) et on peut s'y percher.
+            ColBoite(x, z, 1f, 1f, 1f);
         }
     }
 
@@ -468,6 +737,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.0f * size, 0), new Vector3(0.24f * size, 1.0f * size, 0.24f * size), "Wood", root, "Tronc");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.0f * size, 0), new Vector3(1.1f * size, 1.2f * size, 1.1f * size), "Leaf", root, "Feuillage");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 3.25f * size, 0), new Vector3(0.75f * size, 1.15f * size, 0.75f * size), "Leaf", root, "Feuillage_Haut");
+        ColCercle(x, z, 0.4f * size, 2.2f);   // tronc
+
     }
 
     private void CreateClouds()
@@ -525,8 +796,18 @@ public sealed class LibreViesGame : MonoBehaviour
             Root = enemyObject,
             Spider = spider,
             Home = position,
-            Legs = new Transform[spider ? 8 : 0]
+            Legs = new Transform[spider ? 8 : 0],
+            Speed = spider ? 2.0f : 1.6f
         };
+        // Le corps de la bete est un obstacle : on ne la traverse pas. Il suit
+        // ses deplacements (voir UpdateEnemies) et il est desactive a sa mort.
+        state.Corps = new Obstacle
+        {
+            Cercle = true, X = position.x, Z = position.z,
+            Rayon = spider ? 0.5f : 0.45f, Portee = 1.5f,
+            Hauteur = spider ? 0.7f : 0.9f
+        };
+        obstacles.Add(state.Corps);
         string material = spider ? "Spider" : "Enemy";
         Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.45f : 0.55f, 0), spider ? new Vector3(0.85f, 0.35f, 0.85f) : new Vector3(0.65f, 0.45f, 1.0f), material, enemyObject.transform, "Corps");
         Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.62f : 0.72f, -0.48f), new Vector3(0.24f, 0.24f, 0.24f), "Red", enemyObject.transform, "Yeux");
@@ -603,7 +884,13 @@ public sealed class LibreViesGame : MonoBehaviour
         if (direction.sqrMagnitude > 0.01f)
         {
             direction.Normalize();
-            player.position += direction * speed * dt;
+            // On ne traverse plus les murs : le deplacement est resolu contre
+            // les obstacles (maisons, tours, arbres, caisses, monstres).
+            Vector2 resolu = ResoudreCollisions(
+                player.position.x + direction.x * speed * dt,
+                player.position.z + direction.z * speed * dt,
+                RayonJoueur, player.position.y);
+            player.position = new Vector3(resolu.x, player.position.y, resolu.y);
             player.rotation = Quaternion.Slerp(player.rotation, Quaternion.LookRotation(direction), dt * 12f);
             walkClock += dt * (Input.GetKey(KeyCode.LeftShift) ? 14f : 9f);
         }
@@ -611,12 +898,13 @@ public sealed class LibreViesGame : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Space) && playerGrounded)
         {
-            playerVelocity.y = 8f;
+            playerVelocity.y = ForceSaut;
             playerGrounded = false;
         }
-        playerVelocity.y -= 20f * dt;
+        playerVelocity.y -= Gravite * dt;
         player.position += Vector3.up * playerVelocity.y * dt;
-        float ground = TerrainHeight(player.position.x, player.position.z);
+        // Le sol n'est pas que le terrain : route pavee et dessus des caisses.
+        float ground = HauteurSupport(player.position.x, player.position.z, player.position.y);
         if (player.position.y <= ground)
         {
             player.position = new Vector3(player.position.x, ground, player.position.z);
@@ -682,38 +970,89 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (!enemy.Alive)
             {
+                // Une bete morte ne bloque plus le passage.
+                if (enemy.Corps != null) enemy.Corps.Actif = false;
                 if (Time.time >= enemy.RespawnAt)
                 {
                     enemy.Alive = true; enemy.Hp = MaxHp; enemy.Root.SetActive(true);
                     enemy.Root.transform.position = enemy.Home;
+                    if (enemy.Corps != null)
+                    {
+                        enemy.Corps.Actif = true;
+                        enemy.Corps.X = enemy.Home.x; enemy.Corps.Z = enemy.Home.z;
+                    }
                 }
                 continue;
             }
             if (enemy.AttackCooldown > 0) enemy.AttackCooldown -= dt;
             Vector3 position = enemy.Root.transform.position;
             float distance = Vector3.Distance(position, player.position);
-            bool outsideVillage = new Vector2(position.x, position.z).magnitude > VillageRadius + 1f;
-            if (!outsideVillage)
+            enemy.WanderTimer -= dt;
+
+            // Poursuite quand le heros est proche, errance sinon : les betes ne
+            // restent plus plantees a ne rien faire (comme la reference).
+            if (distance < 10f && !dead)
             {
-                Vector2 radial = new Vector2(position.x, position.z).normalized * (VillageRadius + 2f);
-                position.x = radial.x; position.z = radial.y;
+                Vector3 vers = player.position - position; vers.y = 0f;
+                if (vers.sqrMagnitude > 0.01f) enemy.Direction = vers.normalized;
             }
-            if (distance < 13f && outsideVillage)
+            else if (enemy.WanderTimer <= 0f)
             {
-                Vector3 direction = player.position - position; direction.y = 0;
-                if (direction.sqrMagnitude > 0.1f)
+                enemy.WanderTimer = UnityEngine.Random.Range(1.5f, 4f);
+                if (UnityEngine.Random.value < 0.35f) enemy.Direction = Vector3.zero;
+                else
                 {
-                    direction.Normalize();
-                    position += direction * dt * (enemy.Spider ? 2.0f : 1.6f);
-                    enemy.Root.transform.rotation = Quaternion.LookRotation(direction);
-                }
-                if (distance < 1.8f && enemy.AttackCooldown <= 0)
-                {
-                    enemy.AttackCooldown = 0.8f;
-                    DamagePlayer(8);
+                    float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+                    enemy.Direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
                 }
             }
-            enemy.Root.transform.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
+
+            float speed = enemy.Speed * (distance < 10f ? 1.4f : 0.6f);
+            Vector3 deplacement = enemy.Direction;
+            // A portee de coup, la bete s'arrete : elle n'entre plus dans les
+            // jambes du heros.
+            if (distance < 1.5f) deplacement = Vector3.zero;
+
+            // Securite : une bete egaree dans le village est remise dehors.
+            if (DansVillage(position.x, position.z))
+            {
+                Vector2 dehors = new Vector2(position.x, position.z);
+                if (dehors.magnitude < 0.001f) dehors = new Vector2(1f, 0f);
+                dehors = dehors.normalized * (VillageRadius + 0.5f);
+                position.x = dehors.x; position.z = dehors.y;
+            }
+
+            if (deplacement.sqrMagnitude > 0.01f)
+            {
+                Vector3 suivant = position + deplacement * speed * dt;
+                if (DansVillage(suivant.x, suivant.z))
+                {
+                    // Village protege : la bete longe la cloture sans entrer.
+                    enemy.WanderTimer = Mathf.Min(enemy.WanderTimer, 0.4f);
+                }
+                else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
+                {
+                    // Les monstres ne traversent rien non plus (murs, arbres).
+                    Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps);
+                    position.x = resolu.x; position.z = resolu.y;
+                    Vector3 regard = new Vector3(deplacement.x, 0f, deplacement.z);
+                    if (regard.sqrMagnitude > 0.01f)
+                        enemy.Root.transform.rotation = Quaternion.LookRotation(regard);
+                }
+            }
+
+            position.y = TerrainHeight(position.x, position.z);
+            enemy.Root.transform.position = position;
+            if (enemy.Corps != null) { enemy.Corps.X = position.x; enemy.Corps.Z = position.z; }
+
+            // Attaque : a portee et pas a travers la cloture du village.
+            if (distance < 1.8f && enemy.AttackCooldown <= 0 && !dead
+                && !ClotureEntre(position, player.position))
+            {
+                enemy.AttackCooldown = 0.8f;
+                DamagePlayer(8);
+            }
+
             if (enemy.Spider && enemy.Legs != null)
                 for (int i = 0; i < enemy.Legs.Length; i++) enemy.Legs[i].localRotation *= Quaternion.Euler(0, dt * 50f, 0);
         }
@@ -738,31 +1077,34 @@ public sealed class LibreViesGame : MonoBehaviour
     private void Attack()
     {
         if (attackCooldown > 0 || dead) return;
-        attackCooldown = 0.55f;
+        attackCooldown = 0.5f;          // meme cadence que la reference
         attackAnimation = 0.3f;
-        EnemyState best = null;
-        float bestDistance = 3.1f;
         Vector3 forward = player.forward; forward.y = 0;
-        foreach (EnemyState enemy in enemies)
+        forward = forward.normalized;
+        int touches = 0;
+        // Portee corps a corps de 2,4 m, et INTERDIT de taper a travers la
+        // cloture du village (comme la reference).
+        for (int i = 0; i < enemies.Count; i++)
         {
+            EnemyState enemy = enemies[i];
             if (!enemy.Alive) continue;
             Vector3 delta = enemy.Root.transform.position - player.position; delta.y = 0;
             float distance = delta.magnitude;
-            if (distance < bestDistance && Vector3.Dot(forward.normalized, delta.normalized) > 0.1f)
+            if (distance >= 2.4f) continue;
+            if (distance > 0.01f && Vector3.Dot(forward, delta.normalized) < 0.1f) continue;
+            if (ClotureEntre(player.position, enemy.Root.transform.position)) continue;
+            enemy.Hp -= HammerDamage;
+            touches++;
+            if (enemy.Hp <= 0)
             {
-                best = enemy; bestDistance = distance;
+                enemy.Alive = false; enemy.RespawnAt = Time.time + 10f; enemy.Root.SetActive(false);
+                if (enemy.Spider) spidersKilled++; else ratsKilled++;
+                GainXp(enemy.Spider ? 35 : 20);
+                coins += enemy.Spider ? 4 : 2;
             }
         }
-        if (best == null) { ShowInfo("Aucune cible à portée"); return; }
-        best.Hp -= HammerDamage;
-        ShowInfo("-25");
-        if (best.Hp <= 0)
-        {
-            best.Alive = false; best.RespawnAt = Time.time + 10f; best.Root.SetActive(false);
-            if (best.Spider) spidersKilled++; else ratsKilled++;
-            GainXp(best.Spider ? 35 : 20);
-            coins += best.Spider ? 4 : 2;
-        }
+        if (touches == 0) { ShowInfo("Aucune cible à portée"); return; }
+        ShowInfo(touches > 1 ? "-25 x" + touches : "-25");
     }
 
     private void DamagePlayer(int amount)
@@ -786,15 +1128,22 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CollectNearby()
     {
+        // Portees et reapparitions de la reference : caillou 3,0 m / 20 s,
+        // piece 3,5 m / 60 s. On ramasse tout ce qui est a portee d'un coup.
+        int pris = 0;
         foreach (PickupState pickup in pickups)
         {
-            if (!pickup.Active || Vector3.Distance(player.position, pickup.Root.transform.position) > 2.2f) continue;
-            pickup.Active = false; pickup.RespawnAt = Time.time + 8f; pickup.Root.SetActive(false);
-            if (pickup.Coin) { coins++; ShowInfo("Pièce d'or ramassée"); }
-            else { rocks++; ShowInfo("Caillou ramassé"); }
-            return;
+            if (!pickup.Active) continue;
+            float portee = pickup.Coin ? 3.5f : 3.0f;
+            if (Vector3.Distance(player.position, pickup.Root.transform.position) > portee) continue;
+            pickup.Active = false;
+            pickup.RespawnAt = Time.time + (pickup.Coin ? 60f : 20f);
+            pickup.Root.SetActive(false);
+            if (pickup.Coin) { coins++; ShowInfo("+1 Pièce d'or"); }
+            else { rocks++; ShowInfo("+1 Caillou"); }
+            pris++;
         }
-        ShowInfo("Rien à ramasser ici");
+        if (pris == 0) ShowInfo("Rien à ramasser ici");
     }
 
     private void GainXp(int amount)

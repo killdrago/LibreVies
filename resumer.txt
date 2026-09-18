@@ -316,11 +316,53 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       (insensible a la casse, hors .git) doit ne rien retourner. Il ne
       retourne rien depuis ce commit : les mentions historiques de ce
       fichier ont ete reformulees en "l'ancien moteur".
-    - COMMIT : 1e14528, pousse sur arena/01a0b32c-librevies.
+    - COMMITS : 1e14528 puis 9bc6405 (doc + nettoyage), puis le commit
+      de la MAJ 8 pour les collisions. Tout est pousse sur
+      arena/01a0b32c-librevies.
     - A FAIRE COTE UTILISATEUR : relancer compilation\build_launcher.bat (le
       projet est retelecharge automatiquement, puis Unity compile avec les
       nouveaux fichiers) et regarder la Console Unity : elle doit afficher
       "LibreVies : shader utilise = Standard" (ou LVColor).
+
+  MAJ 8 - Parite gameplay avec la reference : on ne traverse plus les murs
+    (meme lot que la MAJ 7, non encore compilee/publiee)
+
+    Jusqu'ici le heros traversait les maisons, les arbres et les monstres : les
+    deplacements ecrivent directement dans transform.position, donc les
+    colliders Unity ne servaient a rien (aucun Rigidbody nulle part).
+
+    - Systeme de collisions repris de la reference, en C# : liste d'obstacles
+      (cercles et boites) + resolution mathematique du deplacement, deux
+      passes, elagage par portee. Fonctions : ColCercle, ColBoite,
+      ResoudreCollisions, HauteurSupport, DansVillage, DistRoute, ClotureEntre.
+    - Ce qui est enregistre comme obstacle : les 9 maisons (0,5 m de marge),
+      le donjon + les 4 tours + la porte du chateau, le bassin de la fontaine,
+      les 2 gardes, les 75 troncs d'arbres, les 22 caisses, et le corps de
+      chaque monstre (il suit la bete et disparait a sa mort).
+    - Le saut fait 1,60 m (8 m/s, gravite 20) : on saute donc sur les caisses
+      et par-dessus la cloture de 1 m, et on atterrit dessus (HauteurSupport).
+      La route est pavee : les pieds ne s'enfoncent plus dedans (+0,10 m).
+    - La cloture du village est un ANNEAU (rayon 26) bloqueur, sauf la ou passe
+      la route. Elle est dessinee avec 96 poteaux comme la reference, et les
+      deux portails ont des poteaux doubles de 5,20 m, un linteau, un panneau
+      en deux planches et le texte "LIBREVIES" (TextMesh, ignore proprement si
+      aucune police n'est disponible).
+    - Les monstres : errance quand le heros est loin (0,6x vitesse, direction
+      changee toutes les 1,5 a 4 s, 35 % de pauses), poursuite a moins de
+      10 m (1,4x), arret a 1,5 m, resolution des collisions (ils ne traversent
+      plus rien), et interdiction DEFINITIVE d'entrer dans le village (ils
+      longent la cloture) ; un monstre egare est remis dehors d'office.
+    - Combat aligne : cadence 0,50 s, portee 2,40 m, tous les ennemis a portee
+      sont touches, et INTERDIT de frapper a travers la cloture (ClotureEntre).
+    - Ramassage aligne : caillou 3,0 m puis retour apres 20 s, piece 3,5 m puis
+      retour apres 60 s, et tout ce qui est a portee est ramasse d'un coup.
+    - VERIFIE : accolades 159/159, parentheses 871/871, crochets 40/40. Pas de
+      compilateur C# ici : la compilation reelle se fait chez l'utilisateur, et
+      la correction ne vaut que si l'exe compile.
+    - RESTE DE LA PARITE A FAIRE (voir le TODO) : gardes qui patrouillent les
+      portails, degats flottants/sparks, lampadaires-panneaux-bannieres,
+      raccourcis de touches reconfigurables (AZERTY), camouflage, resolution et
+      sauvegarde de configuration hors PlayerPrefs.
 
 
 ================================================================================
@@ -583,6 +625,19 @@ INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
           vide sur un autre PC (ou un dossier vide sur le meme PC), le lancer,
           verifier : telechargement, barre de progression, JOUER qui s'active,
           le jeu qui demarre. Puis relancer pour verifier "A jour !".
+
+  [ ] 3 bis. PARITE RESTANTE avec la reference (a faire par lots, par ordre
+          d'importance visuelle) :
+            a) gardes qui patrouillent devant les portails (update_pnj) ;
+            b) degats flottants ("-25" qui monte) et etincelles a l'impact ;
+            c) lampadaires, panneaux, bannieres et buissons/rochers varies ;
+            d) touches reconfigurables (panneau OPTIONS + clavier AZERTY) ;
+            e) camouflage (changer la couleur du heros), resolution d'ecran,
+               sauvegarde de configuration dans un fichier (aujourd'hui
+               PlayerPrefs, ce qui suffit mais n'est pas la reference) ;
+            f) barres de vie au-dessus des monstres, interieur du chateau.
+          Chaque lot doit tenir dans un commit, avec la recette relancee et un
+          controle des accolades (il n'y a pas de compilateur C# ici).
 
   [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
           archives de l'ancien moteur de la release "derniere".
