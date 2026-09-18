@@ -1127,15 +1127,15 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
             build_launcher.bat.maj en build_launcher.bat puis relancer. Apres
             cette fois, le script s'installe tout seul (MAJ 12) et il n'y aura
             plus jamais rien a remplacer a la main.
-          - Ce lancement construit la nouvelle AMORCE (jeu\LibreVies.exe) et
-            le jeu corrige (MAJ 7 a 11). C'est la seule reconstruction du
-            launcher qui restera : ensuite, les modifications du launcher
-            arrivent par hash, sans recompilation.
+          - Ce lancement exporte le jeu Unity. Il ne reconstruit l'AMORCE
+            (jeu\LibreVies.exe) que si amorce_launcher.py a change ou si
+            l'executable manque ; une modification de launcher.pyw arrive par
+            hash, sans PyInstaller.
           - Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
             (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...) +
             jeu\launcher.pyw (le code, a cote de l'exe).
           - Pendant la compilation Unity, la Console doit afficher
-            "LibreVies : shader utilise = Standard" (ou "LVColor"). Si elle
+            "LibreVies : shader utilise = LVColor" (ou "Standard" en repli). Si elle
             affiche autre chose, le dire plutot que de publier.
 
   [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
