@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.0";
+    private const string VersionJeu = "0.5.37";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -45,6 +45,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // dernier "debut" sans "fin" dans le journal designe le coupable exact.
     // ------------------------------------------------------------------
     private readonly System.Diagnostics.Stopwatch chrono = new System.Diagnostics.Stopwatch();
+    private string cheminJournalRuntime;
     private bool mondePret;
     private string etapeChargement = "Preparation...";
     private float avancement;
@@ -299,6 +300,38 @@ public sealed class LibreViesGame : MonoBehaviour
         public float RespawnAt;
     }
 
+    private void InitialiserJournalRuntime()
+    {
+        try
+        {
+            string dossierJeu = Path.GetDirectoryName(Application.dataPath);
+            string dossierLogs = Path.Combine(dossierJeu ?? Application.dataPath, "logs");
+            Directory.CreateDirectory(dossierLogs);
+            cheminJournalRuntime = Path.Combine(dossierLogs, "LibreViesRuntime.log");
+            File.WriteAllText(cheminJournalRuntime,
+                "LibreVies runtime v" + VersionJeu + " - " + DateTime.Now.ToString("s")
+                + Environment.NewLine);
+            Application.logMessageReceived += EcrireLogRuntime;
+        }
+        catch (Exception erreur)
+        {
+            cheminJournalRuntime = null;
+            Debug.LogWarning("[LV] journal runtime indisponible : " + erreur.Message);
+        }
+    }
+
+    private void EcrireLogRuntime(string condition, string stackTrace, LogType type)
+    {
+        if (string.IsNullOrEmpty(cheminJournalRuntime)) return;
+        try
+        {
+            string ligne = DateTime.Now.ToString("s") + " [" + type + "] " + condition;
+            if (!string.IsNullOrEmpty(stackTrace)) ligne += Environment.NewLine + stackTrace;
+            File.AppendAllText(cheminJournalRuntime, ligne + Environment.NewLine);
+        }
+        catch (Exception) { }
+    }
+
     private void Journal(string message)
     {
         Debug.Log("[LV] " + chrono.Elapsed.TotalSeconds.ToString("0.00")
@@ -337,8 +370,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void Awake()
     {
+        InitialiserJournalRuntime();
         chrono.Start();
         AfficherVersionDansTitre();
+        Journal("journal runtime : " + (cheminJournalRuntime ?? "indisponible"));
         Journal("demarrage LibreVies v" + VersionJeu);
         JournalMachine();
         Application.targetFrameRate = 60;
@@ -362,6 +397,11 @@ public sealed class LibreViesGame : MonoBehaviour
         etincelles.Clear();
         Journal("tout est pret : construction du monde");
         StartCoroutine(ConstruireMonde());
+    }
+
+    private void OnDestroy()
+    {
+        Application.logMessageReceived -= EcrireLogRuntime;
     }
 
     // Le monde se construit une etape par image : l'ecran de chargement reste

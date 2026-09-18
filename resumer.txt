@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 37 : repli de rendu visible et
-                        diagnostic des shaders dans le player
+Derniere mise a jour : 18/09/2026 - MAJ 38 : version 0.5.37 et journal
+                        runtime local obligatoire pour le diagnostic
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1447,6 +1447,29 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     puis lire jeu\game\logs\LibreVies.log si le monde reste invisible :
     les lignes `shader utilise`, `controle rendu`, `debut` et `ECHEC` donnent
     enfin le point exact du probleme.
+
+================================================================================
+8.27 MAJ 38 - VERSION 0.5.37 ET JOURNAL DANS jeu\game\logs
+================================================================================
+
+  - La convention demandee est appliquee : chaque lot visuel porte maintenant
+    une version lisible. MAJ 37 est donc le jeu 0.5.37, et non plus seulement
+    0.5.0.
+  - Le numero 0.5.37 est present dans le titre du launcher, le bandeau du
+    launcher, le titre de la fenetre Unity, ProjectSettings.bundleVersion et
+    le journal de demarrage.
+  - Le jeu cree maintenant lui-meme `jeu\game\logs\LibreViesRuntime.log`
+    des le lancement, meme si l'executable est lance manuellement sans
+    l'option Unity `-logFile`. Il enregistre les erreurs Unity, les etapes de
+    construction, le shader choisi, le nombre de Renderer et les exceptions.
+  - Les deux executables normaux de l'export sont attendus :
+    LibreViesGame.exe (jeu) et UnityCrashHandler64.exe (outil de rapport Unity).
+    Les DLL, d3d12, MonoBleedingEdge et LibreViesGame_Data sont indispensables
+    et doivent rester dans `jeu\game`.
+  - `game_build: {}` explique toujours le message du launcher tant que
+    publier_jeu.bat n'a pas envoye l'archive 0.5.37 dans la release GitHub.
+  - Controle C#, BAT, Python et diff Git propres. Recompiler avant de juger
+    la presence du nouveau journal et du nouveau titre.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
