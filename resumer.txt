@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - GEL AU DEMARRAGE CORRIGE (incident 19)
+Derniere mise a jour : 18/09/2026 - MAJ 17 : monde visuel et interieur du chateau
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1014,6 +1014,46 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
 
 
 ================================================================================
+8.5 MAJ 16 - SYNCHRONISATION DIFFERENTIELLE ET OPTIONS UNITY
+================================================================================
+
+  - Une virgule dans le code du jeu exige bien une nouvelle compilation Unity,
+    mais build_launcher.bat ne retetelecharge plus toute l'archive du depot :
+    synchroniser_sources.ps1 compare les SHA des blobs Git et telecharge seuls
+    les fichiers modifies. Le joueur, lui, ne compile jamais rien.
+  - Les onglets Graphique et Controle sont colores differemment, avec
+    luminosite 30 %, contraste 100 %, resolution, inversion X/Y, detection
+    AZERTY/QWERTY et boutons de reconfiguration par action.
+  - Les reglages sont ecrits dans persistentDataPath/librevies_config.json,
+    avec compatibilite PlayerPrefs. Le HUD a trois barres a gauche, or et
+    cailloux sous les PV, mini-carte en haut a droite et quete repliable.
+    La grande ligne d'aide des touches a ete retiree.
+
+================================================================================
+8.6 MAJ 17 - MONDE VISUEL, ROUTE, CHATEAU ET PNJ
+================================================================================
+
+  - La route est maintenant un ruban Catmull-Rom continu : courbes reelles,
+    bord de terre et bande centrale de paves, au lieu de rectangles anguleux.
+  - Les toits des maisons sont des prismes triangulaires, avec couleurs douces
+    et toiture bleue de la mairie ; aucun toit carre plat ni petit auvent inutile.
+  - La mairie est decalee du passage ; la fontaine est au sud sur le terrain
+    libre. La boule qui flottait a ete retiree : il reste une eau plate et un
+    jet dans un bassin stable au sol.
+  - La colline du chateau est elargie et recentree sous le chateau. Le chateau
+    a ete reconstruit avec une salle interieure, une entree centrale ouverte,
+    murs, torches, tours et collisions par morceaux : le joueur peut passer par
+    la porte au lieu de heurter un bloc plein.
+  - Forgeron, Vendeur, Maire et Marchand existent devant leurs batiments et ont
+    chacun une animation idle distincte. Les arbres gardent leur tronc ; les
+    couleurs de mur/toit ont ete adoucies.
+  - Le heros a un bras d'attaque anime qui part vers l'avant puis redescend ;
+    son marteau est maintenant une tete sans manche.
+
+  R17. Une construction visuelle doit utiliser la position reelle du terrain et
+       une collision coherente : aucun objet flottant ne doit etre introduit.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
@@ -1058,24 +1098,15 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
           verifier : telechargement, barre de progression, JOUER qui s'active,
           le jeu qui demarre. Puis relancer pour verifier "A jour !".
 
-  [ ] 3 bis. PARITE RESTANTE avec la reference (a faire par lots, par ordre
-          d'importance visuelle) :
-            a) Fait en MAJ 11 : gardes devant les portails, coup mortel ;
-            b) Fait en MAJ 11 : degats flottants et etincelles d'impact ;
-               retouche en MAJ 14 : les degats montent puis redescendent ;
-            c) Fait en MAJ 10 : lampadaires, panneaux, bannieres, herbe,
-               rochers, barils, cloutures de route ;
-            d) touches reconfigurables (panneau OPTIONS + clavier AZERTY) ;
-            e) camouflage (changer la couleur du heros), resolution d'ecran,
-               sauvegarde de configuration dans un fichier (aujourd'hui
-               PlayerPrefs, ce qui suffit mais n'est pas la reference) ;
-            f) Fait en MAJ 14 : barres de vie au-dessus des monstres (et
-               monstres aux PV de la reference) ; reste l'INTERIEUR DU CHATEAU
-               (salle sombre, la reference n'a pas de herse) ;
-            g) Fait en MAJ 14 : ressources qui apparaissent et reapparaissent
-               ailleurs (15 cailloux + 3 pieces, hors du village).
-          Chaque lot doit tenir dans un commit, avec la recette relancee et un
-          controle des accolades (il n'y a pas de compilateur C# ici).
+  [x] 3 bis. Parite principale codee en MAJ 16-17 : controles/resolution,
+          configuration, route pavee courbe, mairie/fontaine, toits triangulaires,
+          colline et interieur du chateau, PNJ idle, attaque et marteau sans
+          manche. Reste une validation dans une vraie build Unity sur le PC de
+          l'auteur.
+
+  [ ] 3 ter. Camouflage avance (mat_fade), transparence des objets entre la
+          camera et le heros, finition visuelle des murs et test des collisions
+          dans la build reelle.
 
   [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
           archives de l'ancien moteur de la release "derniere".

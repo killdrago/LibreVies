@@ -82,6 +82,6 @@ try {
     exit 0
 }
 catch {
-    Write-Host ('        ERREUR synchronisation differntielle : ' + $_.Exception.Message)
+    Write-Host ('        ERREUR synchronisation differentielle : ' + $_.Exception.Message)
     exit 2
 }

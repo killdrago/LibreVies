@@ -63,6 +63,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // Portails du village (position du portail) et gardes qui les surveillent.
     private readonly List<Vector2> portails = new List<Vector2>();
     private readonly List<GardeState> gardes = new List<GardeState>();
+    private readonly List<PnjState> pnjs = new List<PnjState>();
     // Degats flottants et etincelles d'impact (listes d'effets temporaires).
     private readonly List<EffetTexte> floaters = new List<EffetTexte>();
     private readonly List<EffetEtincelle> etincelles = new List<EffetEtincelle>();
@@ -75,6 +76,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Transform player;
     private Transform cameraPivot;
+    private Transform brasAttaque;
     private Camera gameCamera;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
@@ -217,6 +219,16 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Z;
         public float Largeur;
         public float Profondeur;
+    }
+
+    private sealed class PnjState
+    {
+        public GameObject Root;
+        public Transform Corps;
+        public Transform BrasG;
+        public Transform BrasD;
+        public float Phase;
+        public string Metier;
     }
 
     private sealed class Obstacle
@@ -378,6 +390,7 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdatePickups(dt);
         UpdateEnemies(dt);
         UpdateGuards(dt);
+        UpdatePnj(dt);
         UpdatePlayer(dt);
         UpdateCamera();
         UpdateEffects(dt);
@@ -391,8 +404,10 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Dirt", new Color(0.45f, 0.30f, 0.17f));
         MakeMaterial("Stone", new Color(0.42f, 0.45f, 0.48f));
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
-        MakeMaterial("Wall", new Color(0.65f, 0.55f, 0.38f));
-        MakeMaterial("Roof", new Color(0.38f, 0.08f, 0.05f));
+        MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
+        MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
+        MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
+        MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
         MakeMaterial("Leaf", new Color(0.08f, 0.31f, 0.10f));
         MakeMaterial("Player", new Color(0.16f, 0.35f, 0.70f));
         MakeMaterial("Skin", new Color(0.86f, 0.59f, 0.40f));
@@ -533,8 +548,10 @@ public sealed class LibreViesGame : MonoBehaviour
         float hills = Mathf.Sin(x * 0.09f) * Mathf.Cos(z * 0.07f) * 2.2f;
         hills += Mathf.Sin(x * 0.21f + 1.7f) * Mathf.Cos(z * 0.17f + 0.6f) * 0.9f;
         hills += Mathf.Sin((x + z) * 0.05f) * 1.4f;
-        float castleDistance = new Vector2(x, z + 78f).magnitude;
-        float plateau = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(52f, 20f, castleDistance));
+        float castleDistance = new Vector2(x, z + 67f).magnitude;
+        // Colline large et douce : le chateau repose sur un plateau, pas sur
+        // une petite pointe de terre.
+        float plateau = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(50f, 13f, castleDistance));
         return Mathf.Lerp(hills * townBlend, 11f, plateau);
     }
 
@@ -881,6 +898,23 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(tournes[1], tournes[5], tournes[7], tournes[3]);
         }
 
+        public void ToitTriangle(float largeur, float profondeur, float hauteur)
+        {
+            float x = largeur * 0.5f;
+            float z = profondeur * 0.5f;
+            Vector3 avantG = new Vector3(-x, 0f, -z);
+            Vector3 avantD = new Vector3(x, 0f, -z);
+            Vector3 arriereG = new Vector3(-x, 0f, z);
+            Vector3 arriereD = new Vector3(x, 0f, z);
+            Vector3 faItageAvant = new Vector3(0f, hauteur, -z);
+            Vector3 faItageArriere = new Vector3(0f, hauteur, z);
+            Triangle(avantG, avantD, faItageAvant);
+            Triangle(arriereD, arriereG, faItageArriere);
+            Quad(avantG, faItageAvant, faItageArriere, arriereG);
+            Quad(avantD, arriereD, faItageArriere, faItageAvant);
+            Quad(avantG, arriereG, arriereD, avantD);
+        }
+
         public Mesh VersMesh(string nom)
         {
             var mesh = new Mesh { name = nom };
@@ -919,24 +953,58 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (DistRoute(new Vector2(x, z)) < 3.0f + marge) return false;
         if (Mathf.Abs(z + 67f) < 20f && Mathf.Abs(x) < 26f) return false;   // chateau
-        if (new Vector2(x - 9f, z - 15f).magnitude < 3.2f + marge) return false;  // fontaine
+        if (new Vector2(x - 9f, z + 15f).magnitude < 3.2f + marge) return false;  // fontaine
         return true;
+    }
+
+    private Vector2 CourbeRoute(float t)
+    {
+        float position = Mathf.Clamp01(t) * (RoutePoints.Length - 1);
+        int i = Mathf.Min(RoutePoints.Length - 2, Mathf.FloorToInt(position));
+        float local = position - i;
+        Vector2 p0 = RoutePoints[Mathf.Max(0, i - 1)];
+        Vector2 p1 = RoutePoints[i];
+        Vector2 p2 = RoutePoints[i + 1];
+        Vector2 p3 = RoutePoints[Mathf.Min(RoutePoints.Length - 1, i + 2)];
+        return 0.5f * ((2f * p1) + (-p0 + p2) * local
+            + (2f * p0 - 5f * p1 + 4f * p2 - p3) * local * local
+            + (-p0 + 3f * p1 - 3f * p2 + p3) * local * local * local);
     }
 
     private void CreateRoad()
     {
-        // Memes points que RoutePoints (voir constantes) : la trace sert aux
-        // collisions (portails de la cloture) et au pave sous les pieds.
-        for (int i = 0; i < RoutePoints.Length - 1; i++)
+        // Ruban Catmull-Rom : les paves suivent une vraie courbe et ne sont
+        // plus une suite de gros carres qui se chevauchent aux virages.
+        var bord = new Maillage();
+        var pave = new Maillage();
+        const int echantillons = 72;
+        for (int i = 0; i < echantillons; i++)
         {
-            Vector3 a = new Vector3(RoutePoints[i].x, 0f, RoutePoints[i].y);
-            Vector3 b = new Vector3(RoutePoints[i + 1].x, 0f, RoutePoints[i + 1].y);
-            Vector3 direction = b - a;
-            Vector3 center = (a + b) * 0.5f;
-            center.y = TerrainHeight(center.x, center.z) + 0.04f;
-            Box(center, new Vector3(5f, 0.10f, direction.magnitude), "Dirt", null,
-                "Route", false, Quaternion.LookRotation(direction));
+            float t0 = i / (float)echantillons;
+            float t1 = (i + 1) / (float)echantillons;
+            Vector2 a = CourbeRoute(t0);
+            Vector2 b = CourbeRoute(t1);
+            Vector2 direction = (b - a).normalized;
+            Vector2 normale = new Vector2(-direction.y, direction.x);
+            Vector2 gauche = a + normale * 2.65f;
+            Vector2 droite = a - normale * 2.65f;
+            Vector2 gauche2 = b + normale * 2.65f;
+            Vector2 droite2 = b - normale * 2.65f;
+            bord.Quad(new Vector3(gauche.x, TerrainHeight(gauche.x, gauche.y) + 0.045f, gauche.y),
+                new Vector3(gauche2.x, TerrainHeight(gauche2.x, gauche2.y) + 0.045f, gauche2.y),
+                new Vector3(droite2.x, TerrainHeight(droite2.x, droite2.y) + 0.045f, droite2.y),
+                new Vector3(droite.x, TerrainHeight(droite.x, droite.y) + 0.045f, droite.y));
+            Vector2 pavG = a + normale * 2.05f;
+            Vector2 pavD = a - normale * 2.05f;
+            Vector2 pavG2 = b + normale * 2.05f;
+            Vector2 pavD2 = b - normale * 2.05f;
+            pave.Quad(new Vector3(pavG.x, TerrainHeight(pavG.x, pavG.y) + 0.095f, pavG.y),
+                new Vector3(pavG2.x, TerrainHeight(pavG2.x, pavG2.y) + 0.095f, pavG2.y),
+                new Vector3(pavD2.x, TerrainHeight(pavD2.x, pavD2.y) + 0.095f, pavD2.y),
+                new Vector3(pavD.x, TerrainHeight(pavD.x, pavD.y) + 0.095f, pavD.y));
         }
+        ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Dirt");
+        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Stone");
     }
 
     private void CreateTown()
@@ -948,10 +1016,16 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-22, 0, -1), new Vector3(6, 3, 6), "Entrepot");
         CreateBuilding(new Vector3(23, 0, -2), new Vector3(6, 3, 6), "Forge");
         // Bâtiments supplémentaires du village de départ.
-        CreateBuilding(new Vector3(-3, 0, 21), new Vector3(7, 4, 6), "Mairie");
+        // La mairie est decalee sur le cote : la route garde son passage.
+        CreateBuilding(new Vector3(10, 0, 20), new Vector3(7, 4, 6), "Mairie");
         CreateBuilding(new Vector3(-19, 0, 13), new Vector3(5, 3.5f, 5), "Maison_Nord");
         CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
-        CreateFountain(new Vector3(9, 0, 15));
+        // Terrain vide au sud du village : la fontaine est enfin visible.
+        CreateFountain(new Vector3(9, 0, -15));
+        CreerPnj(new Vector3(22, 0, -6), "Forgeron");
+        CreerPnj(new Vector3(15, 0, 3), "Vendeur");
+        CreerPnj(new Vector3(10, 0, 16), "Maire");
+        CreerPnj(new Vector3(-22, 0, -5), "Marchand");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -961,7 +1035,8 @@ public sealed class LibreViesGame : MonoBehaviour
         var root = new GameObject(name).transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         Box(Vector3.up * (size.y * 0.5f), size, "Wall", root, "Murs", true);
-        Box(new Vector3(0, size.y + 0.15f, 0), new Vector3(size.x + 0.8f, 0.35f, size.z + 0.8f), "Roof", root, "Toit");
+        string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
+        CreerToitTriangle(root, size, materiauToit, "Toit_" + name);
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
         ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
         batiments.Add(new Batiment
@@ -975,13 +1050,24 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
+    {
+        var maillage = new Maillage();
+        maillage.ToitTriangle(taille.x + 0.8f, taille.z + 0.8f, 2.2f);
+        var toit = ObjetMaillage(nom, maillage.VersMesh(nom), materiau);
+        toit.transform.SetParent(parent, false);
+        toit.transform.localPosition = new Vector3(0f, taille.y + 0.10f, 0f);
+    }
+
     private void CreateFountain(Vector3 position)
     {
         var root = new GameObject("Fontaine").transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(3.4f, 0.18f, 3.4f), "Stone", root, "Bassin");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.1f, 0), new Vector3(0.32f, 1.1f, 0.32f), "Stone", root, "Colonne");
-        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.3f, 0), new Vector3(0.5f, 0.5f, 0.5f), "Water", root, "Orbe");
+        // Eau plate au sommet : l'ancienne boule bleue flottante est supprimee.
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.05f, 0), new Vector3(0.72f, 0.035f, 0.72f), "Water", root, "Eau");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.17f, 0), new Vector3(0.12f, 0.12f, 0.12f), "Water", root, "Jet");
         ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
         ColCercle(position.x, position.z, 0.32f, 2.2f);   // colonne
     }
@@ -991,7 +1077,22 @@ public sealed class LibreViesGame : MonoBehaviour
         var root = new GameObject("Chateau").transform;
         Vector3 center = new Vector3(0, TerrainHeight(0, -67), -67);
         root.position = center;
-        Box(new Vector3(0, 2.5f, 0), new Vector3(21, 5, 13), "Stone", root, "Donjon", true);
+        // Donjon ouvert sur sa face nord : la porte est un vrai passage vers
+        // une petite salle interieure, et non un bloc qui empeche d'entrer.
+        Box(new Vector3(0, 0.10f, 0), new Vector3(20.5f, 0.20f, 12.5f), "Stone", root, "Sol_Interieur");
+        Box(new Vector3(0, 2.5f, -5.8f), new Vector3(21f, 5f, 1f), "Stone", root, "Mur_Fond", true);
+        Box(new Vector3(-10f, 2.5f, 0), new Vector3(1f, 5f, 12f), "Stone", root, "Mur_Gauche", true);
+        Box(new Vector3(10f, 2.5f, 0), new Vector3(1f, 5f, 12f), "Stone", root, "Mur_Droit", true);
+        Box(new Vector3(-7.4f, 2.5f, 5.7f), new Vector3(5.2f, 5f, 1f), "Stone", root, "Facade_Gauche", true);
+        Box(new Vector3(7.4f, 2.5f, 5.7f), new Vector3(5.2f, 5f, 1f), "Stone", root, "Facade_Droite", true);
+        Box(new Vector3(0, 5.0f, 5.7f), new Vector3(10f, 1f, 1f), "Stone", root, "Arc_Porte", true);
+        // Vieille porte pleine retiree : seuls les montants encadrent l'entree.
+        Box(new Vector3(-2.1f, 1.2f, 5.7f), new Vector3(0.45f, 2.4f, 0.65f), "Stone", root, "Montant_Porte");
+        Box(new Vector3(2.1f, 1.2f, 5.7f), new Vector3(0.45f, 2.4f, 0.65f), "Stone", root, "Montant_Porte");
+        Primitive(PrimitiveType.Cylinder, new Vector3(-6.5f, 2.6f, 0.5f), new Vector3(0.12f, 2.1f, 0.12f), "Wood", root, "Torche_G");
+        Primitive(PrimitiveType.Cylinder, new Vector3(6.5f, 2.6f, 0.5f), new Vector3(0.12f, 2.1f, 0.12f), "Wood", root, "Torche_D");
+        Primitive(PrimitiveType.Sphere, new Vector3(-6.5f, 4.7f, 0.5f), new Vector3(0.24f, 0.24f, 0.24f), "Lanterne", root, "Flamme_G");
+        Primitive(PrimitiveType.Sphere, new Vector3(6.5f, 4.7f, 0.5f), new Vector3(0.24f, 0.24f, 0.24f), "Lanterne", root, "Flamme_D");
         for (int x = -9; x <= 9; x += 6)
         {
             Box(new Vector3(x, 5.7f, -6), new Vector3(1.2f, 1.4f, 1.2f), "Stone", root, "Creneau");
@@ -1001,16 +1102,19 @@ public sealed class LibreViesGame : MonoBehaviour
         foreach (float z in new[] { -6f, 6f })
         {
             Primitive(PrimitiveType.Cylinder, new Vector3(x, 3.8f, z), new Vector3(2f, 3.8f, 2f), "Stone", root, "Tour", false);
-            Primitive(PrimitiveType.Cylinder, new Vector3(x, 8.0f, z), new Vector3(2.3f, 0.5f, 2.3f), "Roof", root, "Toit_Tour");
+            Primitive(PrimitiveType.Cylinder, new Vector3(x, 8.0f, z), new Vector3(2.3f, 0.5f, 2.3f), "RoofRed", root, "Toit_Tour");
         }
-        Box(new Vector3(0, 1.2f, 6.7f), new Vector3(3, 2.4f, 0.3f), "Wood", root, "Porte");
-        // Memes obstacles que la reference : donjon, tours, porte.
-        ColBoite(0, -67, 21, 13, 5f);
+        // Collisions de la salle, avec le passage de 4 m au centre de la facade.
+        ColBoite(0, -72.8f, 21, 1f, 5f);
+        ColBoite(-10, -67, 1f, 12f, 5f);
+        ColBoite(10, -67, 1f, 12f, 5f);
+        ColBoite(-7.4f, -61.3f, 5.2f, 1f, 5f);
+        ColBoite(7.4f, -61.3f, 5.2f, 1f, 5f);
+        ColBoite(0, -61.3f, 10f, 1f, 5f);
         ColCercle(-10, -73, 1.0f, 7.6f);
         ColCercle(10, -73, 1.0f, 7.6f);
         ColCercle(-10, -61, 1.0f, 7.6f);
         ColCercle(10, -61, 1.0f, 7.6f);
-        ColBoite(0, -60.3f, 3, 0.6f, 2.4f);
     }
 
     private void CreateFence()
@@ -1280,6 +1384,56 @@ public sealed class LibreViesGame : MonoBehaviour
         ennemi.Root.SetActive(false);
         // Remarque : la reference ne compte pas ce monstre pour la quete et ne
         // donne pas d'experience au heros (c'est le garde qui l'a tue).
+    }
+
+    private void CreerPnj(Vector3 position, string metier)
+    {
+        float y = TerrainHeight(position.x, position.z);
+        var root = new GameObject("PNJ_" + metier).transform;
+        root.position = new Vector3(position.x, y, position.z);
+        var pnj = new PnjState { Root = root.gameObject, Metier = metier };
+        pnj.Corps = Primitive(PrimitiveType.Capsule, new Vector3(0f, 1.0f, 0f), new Vector3(0.52f, 1.0f, 0.52f), "Player", root, "Corps").transform;
+        Primitive(PrimitiveType.Cube, new Vector3(0f, 2.05f, 0f), new Vector3(0.52f, 0.52f, 0.52f), "Skin", root, "Tete");
+        pnj.BrasG = Primitive(PrimitiveType.Capsule, new Vector3(-0.38f, 1.0f, 0.05f), new Vector3(0.16f, 0.38f, 0.16f), "Skin", root, "BrasG").transform;
+        pnj.BrasD = Primitive(PrimitiveType.Capsule, new Vector3(0.38f, 1.0f, 0.05f), new Vector3(0.16f, 0.38f, 0.16f), "Skin", root, "BrasD").transform;
+        string couleur = metier == "Maire" ? "RoofBlue" : (metier == "Forgeron" ? "Metal" : "Player");
+        Box(new Vector3(0f, 1.05f, 0.28f), new Vector3(0.34f, 0.45f, 0.05f), couleur, root, "Insigne");
+        ColCercle(position.x, position.z, 0.42f, 2.2f);
+        pnjs.Add(pnj);
+    }
+
+    private void UpdatePnj(float dt)
+    {
+        for (int i = 0; i < pnjs.Count; i++)
+        {
+            PnjState pnj = pnjs[i];
+            pnj.Phase += dt;
+            float balancement;
+            float hauteur;
+            if (pnj.Metier == "Forgeron")
+            {
+                balancement = Mathf.Sin(pnj.Phase * 1.4f) * 0.55f;
+                hauteur = 0f;
+            }
+            else if (pnj.Metier == "Vendeur")
+            {
+                balancement = Mathf.Sin(pnj.Phase * 2.2f) * 0.16f;
+                hauteur = Mathf.Sin(pnj.Phase * 2.2f) * 0.025f;
+            }
+            else if (pnj.Metier == "Maire")
+            {
+                balancement = Mathf.Sin(pnj.Phase * 0.5f) * 0.20f;
+                hauteur = Mathf.Sin(pnj.Phase * 0.5f) * 0.06f;
+            }
+            else
+            {
+                balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
+                hauteur = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.06f;
+            }
+            if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, 1.0f + hauteur, 0f);
+            if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
+            if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+        }
     }
 
     private void CreateTreesAndProps()
@@ -1629,9 +1783,13 @@ public sealed class LibreViesGame : MonoBehaviour
         Primitive(PrimitiveType.Cube, new Vector3(0, 2.25f, 0), new Vector3(0.62f, 0.62f, 0.62f), "Skin", body, "Tete");
         Box(new Vector3(-0.26f, 0.35f, 0), new Vector3(0.25f, 0.7f, 0.3f), "Stone", body, "JambeG");
         Box(new Vector3(0.26f, 0.35f, 0), new Vector3(0.25f, 0.7f, 0.3f), "Stone", body, "JambeD");
-        Box(new Vector3(0.75f, 1.35f, 0), new Vector3(0.22f, 0.85f, 0.22f), "Skin", body, "BrasD");
+        brasAttaque = new GameObject("BrasDroit_Attaque").transform;
+        brasAttaque.SetParent(body, false);
+        brasAttaque.localPosition = new Vector3(0.52f, 1.58f, 0.18f);
+        Primitive(PrimitiveType.Capsule, new Vector3(0f, -0.28f, 0f), new Vector3(0.22f, 0.32f, 0.22f), "Skin", brasAttaque, "BrasD");
+        // Marteau sans manche : seule la tete massive est visible.
+        Box(new Vector3(0f, -0.78f, 0.10f), new Vector3(0.62f, 0.30f, 0.38f), "Metal", brasAttaque, "Tete_Marteau");
         Box(new Vector3(-0.75f, 1.35f, 0), new Vector3(0.22f, 0.85f, 0.22f), "Skin", body, "BrasG");
-        Box(new Vector3(1.0f, 1.1f, 0), new Vector3(0.18f, 0.75f, 0.18f), "Wood", body, "Marteau");
         var collider = player.gameObject.AddComponent<CapsuleCollider>();
         collider.center = new Vector3(0, 1.15f, 0);
         collider.height = 2.3f;
@@ -1805,6 +1963,12 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (attackCooldown > 0) attackCooldown -= dt;
         if (attackAnimation > 0) attackAnimation -= dt;
+        if (brasAttaque != null)
+        {
+            float phaseAttaque = attackAnimation > 0f ? 1f - attackAnimation / 0.30f : 1f;
+            float angle = attackAnimation > 0f ? Mathf.Lerp(-72f, 8f, phaseAttaque) : 8f;
+            brasAttaque.localRotation = Quaternion.Euler(angle, Mathf.Lerp(-35f, 0f, phaseAttaque), 0f);
+        }
         if (playerProtection > 0) playerProtection -= dt;
         if (speedBoost > 0) speedBoost -= dt;
         regenClock += dt;
