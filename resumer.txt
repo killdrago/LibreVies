@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 22 : module JSON Unity ajoute
+Derniere mise a jour : 18/09/2026 - MAJ 23 : HUD et portails corriges
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1117,6 +1117,19 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Correction : ajout de com.unity.modules.jsonserialize 1.0.0 dans
     compilation/unity/Packages/manifest.json. Le fichier de configuration
     JSON du jeu peut maintenant etre compile normalement.
+
+================================================================================
+8.12 MAJ 23 - HUD, PORTAILS ET TOITS
+================================================================================
+
+  - Le texte HUD "LIBREVIES MMO OPEN WORLD" a ete retire.
+  - La quete est en haut a gauche avec un bouton X pour la fermer ; les barres
+    PV/ENDURANCE/EXPERIENCE et les compteurs or/cailloux sont colles dessous.
+    Le compteur Rats/Araignees a cote de la carte a ete retire.
+  - Le haut des portiques est maintenant ferme par un panneau plein et un
+    linteau epais. Le mot LIBREVIES est reduit et pose sur un vrai panneau.
+  - LVColor est double face pour que les pignons et les faces fermees des toits
+    restent visibles dans la build Windows.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

@@ -1197,11 +1197,15 @@ public sealed class LibreViesGame : MonoBehaviour
             // L'axe du linteau suit la corde (donc la route qui passe dessous).
             var corde = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0));
             var rotation = Quaternion.LookRotation(new Vector3(corde.x, 0f, corde.y).normalized);
-            Box(new Vector3(mx, my + 5.2f, mz), new Vector3(longueur, 0.18f, 0.16f), "Wood", null, "Linteau", false, rotation);
-            // Panneau en bois portant le nom du village (deux planches).
-            Box(new Vector3(mx, my + 4.35f, mz), new Vector3(2.6f, 0.7f, 0.10f), "Wood", null, "Panneau_Fond", false, rotation);
-            Box(new Vector3(mx, my + 4.35f, mz), new Vector3(2.4f, 0.55f, 0.12f), "Wood", null, "Panneau_Bois", false, rotation);
-            AjouterTextePanneau(new Vector3(mx, my + 4.35f, mz), rotation);
+            // Le portique est ferme en haut : un panneau plein relie les deux
+            // poteaux, puis un linteau epais termine la couverture.
+            Box(new Vector3(mx, my + 4.78f, mz), new Vector3(longueur, 1.05f, 0.30f), "Wood", null, "Fermeture_Superieure", false, rotation);
+            Box(new Vector3(mx, my + 5.35f, mz), new Vector3(longueur + 0.25f, 0.22f, 0.38f), "Bois_Clair", null, "Linteau", false, rotation);
+            // Panneau en bois portant le nom du village : texte petit et pose
+            // sur sa face, pas en plein milieu du passage.
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.12f), "Wood", null, "Panneau_Fond", false, rotation);
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.14f), "Bois_Clair", null, "Panneau_Bois", false, rotation);
+            AjouterTextePanneau(new Vector3(mx, my + 4.45f, mz), rotation);
         }
 
         // La cloture n'est pas enregistree poteau par poteau : elle est geree
@@ -1215,7 +1219,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // simplement le panneau en bois, sans erreur.
     private void AjouterTextePanneau(Vector3 position, Quaternion rotation)
     {
-        GameObject objet = CreerTexte3D("LIBREVIES", position, new Color(0.20f, 0.12f, 0.05f), 0.42f);
+        GameObject objet = CreerTexte3D("LIBREVIES", position, new Color(0.20f, 0.12f, 0.05f), 0.18f);
         if (objet == null) return;
         objet.name = "Texte_Portail";
         objet.transform.rotation = rotation;
@@ -2434,28 +2438,33 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         DessinerCorrectionCouleur();
-        GUI.Label(new Rect(20, 18, 380, 30), "LIBREVIES  •  MMO OPEN WORLD", titleStyle);
-        GUI.Box(new Rect(20, 55, 270, 124), "", boxStyle);
-        DessinerBarre(new Rect(32, 66, 230, 14), hp / (float)MaxHp, "PV");
-        DessinerBarre(new Rect(32, 94, 230, 14), endurance / 100f, "ENDURANCE");
-        DessinerBarre(new Rect(32, 122, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
-        GUI.Label(new Rect(32, 148, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
-        GUI.Label(new Rect(32, 170, 250, 22), "Energie : " + Mathf.RoundToInt(energie) + " / 100", smallStyle);
+        // La quete est le premier panneau en haut a gauche ; les barres et les
+        // compteurs restent colles juste dessous, sans titre HUD superflu.
+        if (questOpen)
+        {
+            GUI.Box(new Rect(20, 18, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
+            if (GUI.Button(new Rect(262, 22, 24, 24), "X", buttonStyle))
+                questOpen = false;
+        }
+        else if (GUI.Button(new Rect(20, 18, 112, 26), "QUÊTE  +", buttonStyle))
+        {
+            questOpen = true;
+        }
+        GUI.Box(new Rect(20, questOpen ? 146 : 52, 270, 124), "", boxStyle);
+        float hudY = questOpen ? 157f : 63f;
+        DessinerBarre(new Rect(32, hudY, 230, 14), hp / (float)MaxHp, "PV");
+        DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
+        DessinerBarre(new Rect(32, hudY + 56f, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
+        GUI.Label(new Rect(32, hudY + 82f, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
+        GUI.Label(new Rect(32, hudY + 103f, 250, 22), "Energie : " + Mathf.RoundToInt(energie) + " / 100", smallStyle);
         DessinerMiniCarte();
-        GUI.Label(new Rect(Screen.width - 290, 55, 270, 24), "Rats " + ratsKilled + "/10   Araignées " + spidersKilled + "/5", smallStyle);
         for (int i = 0; i < 5; i++)
         {
             Rect slot = new Rect(Screen.width * 0.5f - 135 + i * 55, Screen.height - 68, 48, 48);
             GUI.color = i == selectedSlot ? Color.yellow : Color.white;
             GUI.Box(slot, (i + 1).ToString(), boxStyle); GUI.color = Color.white;
         }
-        if (questOpen)
-        {
-            GUI.Box(new Rect(Screen.width - 275, 100, 255, 120), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
-        }
-        GUI.color = Color.white;
-        if (GUI.Button(new Rect(Screen.width - 46, 102, 25, 25), questOpen ? "−" : "+", buttonStyle))
-            questOpen = !questOpen;
+
         if (inventoryOpen)
         {
             GUI.Box(new Rect(Screen.width / 2 - 160, Screen.height / 2 - 100, 320, 200), "INVENTAIRE\n\nPotions de soin : " + potions[0] + "\nPotions de vitesse : " + potions[1] + "\nOr : " + coins + "\nCailloux : " + rocks, boxStyle);
