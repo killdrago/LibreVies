@@ -73,6 +73,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
     private readonly List<Material> materials = new List<Material>();
+    private readonly Dictionary<Renderer, Material[]> materiauxOriginaux = new Dictionary<Renderer, Material[]>();
+    private bool camouflage;
 
     private Transform player;
     private Transform cameraPivot;
@@ -455,6 +457,10 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         var material = new Material(shader) { name = name };
         if (material.HasProperty("_Color")) material.color = color;
+        if (material.HasProperty("_DetailScale"))
+            material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
+        if (material.HasProperty("_DetailStrength"))
+            material.SetFloat("_DetailStrength", name == "Terrain" ? 0.12f : (name.Contains("Roof") ? 0.10f : 0.055f));
         if (emission && material.HasProperty("_EmissionColor"))
         {
             material.EnableKeyword("_EMISSION");
@@ -468,15 +474,15 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (cachedShader != null) return cachedShader;
 
-        // 1) Eclairage complet : disponible dans l'editeur et dans la plupart
-        //    des builds, tant qu'Unity ne l'a pas retire.
-        cachedShader = Shader.Find("Standard");
+        // Le shader du projet est choisi en premier : il est toujours embarque,
+        // eclaire en Lambert et ajoute un micro-motif procedural doux (platre,
+        // pierre et bois), sans texture externe ni surface magenta.
+        cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
 
-        // 2) Le shader du projet (Assets/Resources/LVShaders/LVColor) : les
-        //    assets de Resources sont TOUJOURS inclus dans la build.
-        if (cachedShader == null) cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
+        // Repli Standard dans l'editeur et dans les builds qui le conservent.
+        if (cachedShader == null) cachedShader = Shader.Find("Standard");
 
-        // 3) Derniers recours integres (sans eclairage, mais colores).
+        // Derniers recours integres (sans eclairage, mais colores).
         if (cachedShader == null) cachedShader = Shader.Find("Unlit/Color");
         if (cachedShader == null) cachedShader = Shader.Find("Sprites/Default");
         if (cachedShader == null) cachedShader = Shader.Find("UI/Default");
@@ -2052,6 +2058,13 @@ public sealed class LibreViesGame : MonoBehaviour
     private void UpdateCamera()
     {
         if (player == null) return;
+        RestaurerTransparences();
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            camouflage = !camouflage;
+            ShowInfo(camouflage ? "Camouflage active (C)" : "Camouflage desactive (C)");
+        }
+        if (camouflage) AppliquerTransparenceJoueur(0.42f);
         if (firstPerson)
         {
             // Vue 1re personne : on regarde dans l'axe de la caméra (pitch
@@ -2071,6 +2084,72 @@ public sealed class LibreViesGame : MonoBehaviour
         if (position.y < sol) position.y = sol;
         gameCamera.transform.position = position;
         gameCamera.transform.LookAt(target);
+        RendreObstaclesTranslucides(target, position);
+    }
+
+    private Material MateriauFade(Material origine, float alpha)
+    {
+        Shader shader = Resources.Load<Shader>("LVShaders/LVFade");
+        if (shader == null) return origine;
+        string nomOrigine = origine != null ? origine.name : "default";
+        var fade = new Material(shader) { name = "mat_fade_" + nomOrigine };
+        Color couleur = origine != null && origine.HasProperty("_Color") ? origine.color : Color.white;
+        fade.SetColor("_Color", couleur);
+        fade.SetFloat("_Alpha", alpha);
+        return fade;
+    }
+
+    private void RendreTranslucide(Renderer rendu, float alpha)
+    {
+        if (rendu == null || materiauxOriginaux.ContainsKey(rendu)) return;
+        Material[] originaux = rendu.sharedMaterials;
+        if (originaux == null || originaux.Length == 0) return;
+        var fades = new Material[originaux.Length];
+        for (int i = 0; i < originaux.Length; i++) fades[i] = MateriauFade(originaux[i], alpha);
+        materiauxOriginaux.Add(rendu, originaux);
+        rendu.sharedMaterials = fades;
+    }
+
+    private void AppliquerTransparenceJoueur(float alpha)
+    {
+        Renderer[] rendus = player.GetComponentsInChildren<Renderer>();
+        for (int i = 0; i < rendus.Length; i++) RendreTranslucide(rendus[i], alpha);
+    }
+
+    private void RendreObstaclesTranslucides(Vector3 cible, Vector3 cameraPosition)
+    {
+        Vector3 direction = cameraPosition - cible;
+        float distance = direction.magnitude;
+        if (distance < 0.1f) return;
+        RaycastHit[] touches = Physics.RaycastAll(cible, direction.normalized, distance, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < touches.Length; i++)
+        {
+            Transform touche = touches[i].collider.transform;
+            if (touche == player || touche.IsChildOf(player)) continue;
+            Renderer rendu = touche.GetComponent<Renderer>();
+            if (rendu == null) rendu = touche.GetComponentInParent<Renderer>();
+            if (rendu != null) RendreTranslucide(rendu, 0.30f);
+        }
+    }
+
+    private void RestaurerTransparences()
+    {
+        foreach (KeyValuePair<Renderer, Material[]> entree in materiauxOriginaux)
+        {
+            if (entree.Key != null) renduRestaurer(entree.Key, entree.Value);
+        }
+        materiauxOriginaux.Clear();
+    }
+
+    private void renduRestaurer(Renderer rendu, Material[] originaux)
+    {
+        Material[] actuels = rendu.sharedMaterials;
+        rendu.sharedMaterials = originaux;
+        if (actuels == null) return;
+        for (int i = 0; i < actuels.Length; i++)
+        {
+            if (actuels[i] != null && actuels[i].name.StartsWith("mat_fade_")) Destroy(actuels[i]);
+        }
     }
 
     private void UpdateEnemies(float dt)

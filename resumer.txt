@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 17 : monde visuel et interieur du chateau
+Derniere mise a jour : 18/09/2026 - MAJ 18 : camouflage et transparence camera
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1054,6 +1054,22 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
        une collision coherente : aucun objet flottant ne doit etre introduit.
 
 ================================================================================
+8.7 MAJ 18 - CAMOUFLAGE, OBJETS TRANSLUCIDES ET MOTIFS VISUELS
+================================================================================
+
+  - LVFade.shader fournit le materiau mat_fade : les obstacles entre la
+    camera et le heros deviennent translucides au lieu de cacher la vue.
+  - La touche C active/desactive le camouflage du heros, avec le meme materiau
+    translucide et un message visible.
+  - LVColor.shader est maintenant le premier choix dans la build Unity : les
+    murs, toits, paves, pierres et terrain recoivent un micro-motif procedural
+    doux (eclairage Lambert, sans asset externe), au lieu d'aplats parfaitement
+    uniformes. Le secours Standard reste disponible.
+
+  R18. Le camouflage et la transparence ne suppriment pas les collisions :
+       ils ne changent que le rendu.
+
+================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
@@ -1104,9 +1120,9 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
           manche. Reste une validation dans une vraie build Unity sur le PC de
           l'auteur.
 
-  [ ] 3 ter. Camouflage avance (mat_fade), transparence des objets entre la
-          camera et le heros, finition visuelle des murs et test des collisions
-          dans la build reelle.
+  [x] 3 ter. Camouflage mat_fade, transparence des objets entre la camera et
+          le heros et motif visuel procedural : code present en MAJ 18.
+          Validation de rendu/collisions dans la build reelle reste a faire.
 
   [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
           archives de l'ancien moteur de la release "derniere".
