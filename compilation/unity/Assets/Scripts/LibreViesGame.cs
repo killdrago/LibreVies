@@ -28,6 +28,24 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float Gravite = 20f;
     private const float ForceSaut = 8f;
 
+    // ------------------------------------------------------------------
+    // DEMARRAGE : journal et ecran de chargement
+    // Le monde est construit entierement par code. Sans ces quelques lignes,
+    // un demarrage lent ressemble exactement a un plantage (ecran noir) et un
+    // vrai probleme ne laisse aucune trace. Desormais le journal (Player.log)
+    // dit ou le demarrage en est, et l'ecran affiche l'etape en cours : le
+    // dernier "debut" sans "fin" dans le journal designe le coupable exact.
+    // ------------------------------------------------------------------
+    private readonly System.Diagnostics.Stopwatch chrono = new System.Diagnostics.Stopwatch();
+    private bool mondePret;
+    private string etapeChargement = "Preparation...";
+    private float avancement;
+    private int objetsCrees;
+    private int imagesAffichees;
+    private float prochainBattement = 5f;
+    private GUIStyle loadingTitleStyle;
+    private GUIStyle loadingTextStyle;
+
     // Trace de la route (memes points que le ruban visible) : sert aux
     // collisions de la cloture (on passe par les portails) et au pave.
     private static readonly Vector2[] RoutePoints =
@@ -166,8 +184,30 @@ public sealed class LibreViesGame : MonoBehaviour
         public float RespawnAt;
     }
 
+    private void Journal(string message)
+    {
+        Debug.Log("[LV] " + chrono.Elapsed.TotalSeconds.ToString("0.00")
+                  + " s  " + message);
+    }
+
+    private void JournalMachine()
+    {
+        // Ces lignes evitent de deviner la machine du joueur en cas de probleme.
+        Journal("LibreVies " + Application.version + " / Unity " + Application.unityVersion);
+        Journal("systeme " + SystemInfo.operatingSystem + " | " + SystemInfo.processorCount
+                + " coeurs | RAM " + SystemInfo.systemMemorySize + " Mo");
+        Journal("carte " + SystemInfo.graphicsDeviceName + " | API " + SystemInfo.graphicsDeviceType
+                + " | VRAM " + SystemInfo.graphicsMemorySize + " Mo");
+        Journal("ecran " + Screen.currentResolution.width + "x" + Screen.currentResolution.height
+                + " | fenetre " + Screen.width + "x" + Screen.height
+                + " | vsync " + QualitySettings.vSyncCount);
+    }
+
     private void Awake()
     {
+        chrono.Start();
+        Journal("demarrage");
+        JournalMachine();
         Application.targetFrameRate = 60;
         Application.runInBackground = true;
         Screen.SetResolution(1280, 720, false);
@@ -188,28 +228,75 @@ public sealed class LibreViesGame : MonoBehaviour
         gardes.Clear();
         floaters.Clear();
         etincelles.Clear();
-        CreateMaterials();
-        CreateEnvironment();
-        CreateTerrain();
-        CreateRoad();
-        CreateTown();
-        CreateCastle();
-        CreateFence();
-        CreateTreesAndProps();
-        CreateGrassTufts();
-        CreateRocks();
-        CreateProps();
-        CreateLampposts();
-        CreateClouds();
-        CreatePlayer();
-        CreateEnemies();
-        CreateGuards();
-        CreatePickups();
+        Journal("tout est pret : construction du monde");
+        StartCoroutine(ConstruireMonde());
+    }
+
+    // Le monde se construit une etape par image : l'ecran de chargement reste
+    // vivant et chaque etape laisse une trace dans le journal. Une etape qui
+    // echoue (exception) est signalee mais n'empeche plus le jeu de demarrer.
+    private System.Collections.IEnumerator ConstruireMonde()
+    {
+        string[] noms =
+        {
+            "materiaux", "environnement", "terrain", "route", "village", "chateau",
+            "cloture et portails", "arbres", "herbe", "rochers",
+            "decor (barils, caisses)", "lampadaires", "nuages", "heros",
+            "monstres", "gardes", "objets a ramasser"
+        };
+        System.Action[] travaux =
+        {
+            CreateMaterials, CreateEnvironment, CreateTerrain, CreateRoad, CreateTown,
+            CreateCastle, CreateFence, CreateTreesAndProps, CreateGrassTufts, CreateRocks,
+            CreateProps, CreateLampposts, CreateClouds, CreatePlayer, CreateEnemies,
+            CreateGuards, CreatePickups
+        };
+        for (int i = 0; i < noms.Length; i++)
+        {
+            etapeChargement = noms[i];
+            avancement = i / (float)noms.Length;
+            Journal("debut : " + noms[i]);
+            try
+            {
+                travaux[i]();
+            }
+            catch (System.Exception erreur)
+            {
+                Debug.LogError("[LV] ECHEC de l'etape " + noms[i] + " : " + erreur.Message);
+                Debug.LogException(erreur);
+            }
+            Journal("fin   : " + noms[i] + "  (" + objetsCrees + " objets)");
+            yield return null;
+        }
         ShowInfo("LibreVies — monde Unity prêt");
+        Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
+                + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
+        avancement = 1f;
+        etapeChargement = "";
+        mondePret = true;
     }
 
     private void Update()
     {
+        imagesAffichees++;
+        if (!mondePret)
+        {
+            if (imagesAffichees == 1)
+                Journal("premiere image affichee : le rendu fonctionne");
+            // Battement de coeur : s'il s'arrete net, c'est la que ca bloque.
+            if (Time.realtimeSinceStartup >= prochainBattement)
+            {
+                prochainBattement = Time.realtimeSinceStartup + 5f;
+                Journal("construction en cours : " + etapeChargement);
+            }
+            return;
+        }
+        if (Time.realtimeSinceStartup >= prochainBattement)
+        {
+            prochainBattement = Time.realtimeSinceStartup + 60f;
+            Journal("jeu en cours : image " + imagesAffichees + ", "
+                    + Mathf.RoundToInt(1f / Mathf.Max(Time.deltaTime, 0.0001f)) + " i/s");
+        }
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
         UpdateClouds(dt);
         UpdatePickups(dt);
@@ -577,6 +664,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private GameObject Primitive(PrimitiveType type, Vector3 position, Vector3 scale, string material,
         Transform parent = null, string objectName = "Primitive", bool collider = false)
     {
+        objetsCrees++;
         var obj = GameObject.CreatePrimitive(type);
         obj.name = objectName;
         obj.transform.SetParent(parent, false);
@@ -729,6 +817,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private GameObject ObjetMaillage(string nom, Mesh mesh, string materiau)
     {
+        objetsCrees++;
         var objet = new GameObject(nom);
         objet.AddComponent<MeshFilter>().sharedMesh = mesh;
         var rendu = objet.AddComponent<MeshRenderer>();
@@ -1863,10 +1952,37 @@ public sealed class LibreViesGame : MonoBehaviour
         if (infoTimer > 0) infoTimer -= dt;
     }
 
+    // Ecran de chargement : plus d'ecran noir pendant la construction du
+    // monde. Il affiche l'etape en cours et l'avancement, et reste visible
+    // jusqu'a ce que le jeu soit jouable.
+    private void DessinerChargement()
+    {
+        GUI.color = new Color(0.06f, 0.08f, 0.14f);
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        float haut = Screen.height * 0.38f;
+        GUI.Label(new Rect(0, haut, Screen.width, 56), "LIBREVIES", loadingTitleStyle);
+        GUI.Label(new Rect(0, haut + 62, Screen.width, 30), "Chargement du monde...", loadingTextStyle);
+        GUI.Label(new Rect(0, haut + 96, Screen.width, 26), etapeChargement, loadingTextStyle);
+        int largeur = Mathf.Max(200, Mathf.RoundToInt(Screen.width * 0.5f));
+        int x = (Screen.width - largeur) / 2;
+        int y = Mathf.RoundToInt(haut) + 136;
+        GUI.color = new Color(0.18f, 0.20f, 0.30f);
+        GUI.DrawTexture(new Rect(x, y, largeur, 14), Texture2D.whiteTexture);
+        GUI.color = new Color(1f, 0.78f, 0.10f);
+        GUI.DrawTexture(new Rect(x, y, largeur * Mathf.Clamp01(avancement), 14), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
-        GUI.Label(new Rect(20, 18, 300, 30), "LIBREVIES  •  UNITY", titleStyle);
+        if (!mondePret)
+        {
+            DessinerChargement();
+            return;
+        }
+        GUI.Label(new Rect(20, 18, 380, 30), "LIBREVIES  •  MMO OPEN WORLD", titleStyle);
         GUI.Box(new Rect(20, 55, 270, 48), "", boxStyle);
         GUI.Label(new Rect(32, 62, 220, 22), "PV  " + hp + " / " + MaxHp, labelStyle);
         GUI.color = Color.red; GUI.DrawTexture(new Rect(32, 86, 230 * hp / (float)MaxHp, 8), Texture2D.whiteTexture); GUI.color = Color.white;
@@ -1908,6 +2024,16 @@ public sealed class LibreViesGame : MonoBehaviour
         labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, normal = { textColor = Color.white } };
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = new Color(0.82f, 0.87f, 0.92f) } };
         boxStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+        loadingTitleStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 46, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = new Color(1f, 0.78f, 0.10f) }
+        };
+        loadingTextStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 18, alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = new Color(0.85f, 0.89f, 0.95f) }
+        };
     }
 
     private void LoadOptions()

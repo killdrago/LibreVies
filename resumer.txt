@@ -532,6 +532,52 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       lancement chez l'utilisateur est le vrai test.
 
 
+  MAJ 13 - Demarrage du jeu : journal, etapes et ecran de chargement
+    CONTEXTE (18/09/2026) : l'utilisateur signale "mon jeu crash au demarrage".
+    Il a envoye trois journaux : Player-prev.log (ancienne build) et deux
+    copies identiques de Player.log (build actuelle). Analyse :
+      - la build actuelle TROUVE le shader du projet
+        ("LibreVies : shader utilisé = LibreVies/Couleur") : le monde magenta
+        est donc bien regle, et ce journal ne contient AUCUNE autre ligne ;
+      - aucune exception C#, aucun "Crash!!!" ni pile d'appels, pas de dossier
+        Crashes mentionne : ce n'est donc PAS un plantage natif classique ;
+      - le journal s'arrete ~0,45 s apres le premier materiau, et la ligne
+        "vsync is broken" vue dans l'ancienne build (preuve que le jeu
+        rendait des images) est absente : l'arret se produit pendant la
+        construction du monde, avant que des images soient affichees.
+      - conclusion probable : gel (ou process tue par l'utilisateur) pendant
+        le demarrage, ou demarrage si lent qu'il ressemble a un plantage ;
+        aucune correction ne peut etre faite a l'aveugle.
+    CE QUI A ETE FAIT (instrumentation, pour que le prochain journal soit
+    decisif) :
+      a) Journal "[LV] <secondes> s  <etape>" dans Player.log : machine
+         (SystemInfo, RAM, VRAM, API graphique, resolution, vsync), puis un
+         "debut :" et un "fin :" AUTOUR DE CHAQUE etape de construction
+         (materiaux, environnement, terrain, route, village, chateau, cloture,
+         arbres, herbe, rochers, decor, lampadaires, nuages, heros, monstres,
+         gardes, objets). Le DERNIER "debut" sans "fin" designe le coupable.
+      b) Une etape = une image (coroutine ConstruireMonde) : le jeu repond
+         pendant la construction, et chaque etape a son temps dans le journal.
+      c) Chaque etape est protegee par try/catch : une exception est ecrite
+         dans le journal et n'empeche plus le monde de finir de se construire.
+      d) ECRAN DE CHARGEMENT (DessinerChargement) : fond sombre, "LIBREVIES",
+         "Chargement du monde...", l'etape en cours et une barre de
+         progression. Fini l'ecran noir qui fait croire a un plantage.
+      e) Battement de coeur : "premiere image affichee" a la premiere image,
+         "construction en cours : <etape>" toutes les 5 s pendant la
+         construction, puis "jeu en cours : image N, X i/s" toutes les 60 s.
+         Si l'affichage se fige, le journal s'arrete net au dernier battement.
+      f) Compteur d'objets crees, affiche a la fin de chaque etape et au
+         demarrage termine (detecte une explosion du nombre d'objets).
+      g) Titre du HUD : "LIBREVIES  •  MMO OPEN WORLD" (l'ancien affichait
+         "UNITY", ce qui n'a rien a faire chez le joueur).
+    - NON VERIFIE ici : compilation Unity et rendu (pas d'Unity dans le bac a
+      sable). VERIFIE : syntaxe C# (verifier_cs_syntaxe.py) et relecture.
+    PROCHAINE ETAPE : faire recompiler les dernieres sources a l'utilisateur,
+    puis lui demander la derniere ligne "[LV]" du journal. C'est elle qui
+    dira si le jeu se bloque (gel) ou s'il est simplement tres lent.
+
+
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
    (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
@@ -836,19 +882,29 @@ INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
 
-  [ ] 0. PRIORITE ABSOLUE : comprendre pourquoi le jeu plante au demarrage
-          chez l'utilisateur (incident 18). Il faut SON journal, dans cet ordre :
-            - s'il a un launcher a jour : bouton RAPPORT, puis envoyer
-              jeu\game\logs\LibreVies.log ;
-            - sinon aller a la main dans
-              %USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log
-              et dans %USERPROFILE%\AppData\Local\Temp\LibreVies\LibreVies\
-              Crashes\<horodatage>\error.log ;
-            - lui demander aussi QUOI il a lance (jeu\LibreVies.exe ou
-              jeu\game\LibreViesGame.exe) et si les sources avaient bien ete
-              rafraichies avant la compilation Unity.
-          Ne rien "corriger au hasard" sans ce fichier : le jeu n'est pas
-          reproductible ici (pas de Windows, pas d'Unity, pas de compilateur C#).
+  [ ] 0. PRIORITE ABSOLUE : le plantage au demarrage (incident 18 + MAJ 13).
+          Etat au 18/09/2026 : les journaux recus montrent qu'il n'y a NI
+          exception NI plantage natif ; le demarrage s'arrete pendant la
+          construction du monde (voir MAJ 13). Le jeu est desormais instrumente.
+          A FAIRE :
+            1. faire recompiler les sources actuelles par l'utilisateur
+               (build_launcher.bat) ;
+            2. lui demander la DERNIERE ligne "[LV]" de son journal
+               (%USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log
+               ou jeu\game\logs\LibreVies.log avec un launcher a jour) ;
+            3. questions a lui poser en meme temps :
+               - voit-il l'ecran "Chargement du monde..." ? jusqu'a quelle
+                 etape va la barre ?
+               - la fenetre se fige-t-elle ("ne repond pas") ou disparait-elle ?
+               - y a-t-il un dossier
+                 %TEMP%\LibreVies\LibreVies\Crashes\... ?
+               - quel exe exactement (jeu\LibreVies.exe ou
+                 jeu\game\LibreViesGame.exe) et quelle taille fait
+                 jeu\game\ (dossier LibreViesGame_Data) ?
+          Le dernier "debut :" sans "fin :" du journal designera l'etape
+          exacte ; si le journal contient "premiere image affichee" et les
+          battements, le jeu tourne et le probleme est ailleurs (affichage,
+          fenetre hors ecran, carte graphique).
 
   [ ] 1. UTILISATEUR : lancer build_launcher.bat (celui qu'il a deja).
           - S'il affiche "une nouvelle version de build_launcher.bat a ete
