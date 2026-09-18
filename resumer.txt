@@ -396,6 +396,45 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - build_unity_game.bat (script de diagnostic) previent maintenant qu'il ne
       met PAS les sources a jour.
 
+  MAJ 10 - Decor du village comme la reference (lot demande par l'utilisateur)
+    Probleme : le village etait nu (seulement 22 caisses posees au hasard, dont
+    certaines dans les murs ou sur la route) et les sapins etaient des
+    cylindres empiles.
+
+    - Maillage procedural (classe Maillage) : c'est le seul moyen d'avoir des
+      CONES a notre sauce (Unity n'a que cube/sphere/cylindre/capsule) et des
+      touffes d'herbe faconnees. Une seule soupe de triangles, normales
+      recalculees, aucun asset externe.
+    - Sapins : tronc epais + souche + 4 renforts + 3 cones de feuillage (verts
+      de plus en plus clairs vers le haut), exactement le modele de la
+      reference. 80 sapins disperses, avec des regles qui manquaient :
+      JAMAIS sur la route ni dans un batiment (c'etait le cas avant : des
+      arbres poussaient sur la route).
+    - 6 arbres ronds (tronc + 2 masses de feuillage) aux positions de la
+      reference.
+    - Herbe : 3 nuances x 140 touffes = 420 touffes dans 3 maillages seulement
+      (l'equivalent du MultiMesh de la reference) : aucun cout visible.
+      Regles reprises : rien sur la route, rien au milieu du village.
+    - Rochers : 2 nuances x 45, hexaedres deformes, poses comme dans la
+      reference (jamais sur la route, jamais sur la clouture du village),
+      bloquants sauf ceux poses sur la route.
+    - Barils (5) pres de l'auberge et de la forge, caisses (positions de la
+      reference + 2 libres), petites cloutures le long de la route,
+      2 bannieres (bleue et rouge, epees croisees en embleme), 2 panneaux
+      indicateurs : tous avec collisions, tous verifies par EmplacementLibre
+      (rien n'est plante dans un mur : le decor occupe est simplement ignore).
+    - 3 lampadaires (socle, mat, bras, lanterne emissive, chapeau) le long de
+      la route a 3,4 m du bord, en alternance de cote comme la reference ; le
+      bras est oriente VERS la route. 13 m d'ecart dans la reference, 9 m ici
+      car notre trace de route a peu de sommets.
+    - Nouveaux materiaux : Bois_Clair, Metal, Lanterne (emissive), 3 verts de
+      sapin, 3 verts d'herbe, 2 gris de rocher, 2 tissus de banniere, Embleme,
+      Arbre_Rond.
+    - VERIFIE : syntaxe C# par tree-sitter (aucune erreur), accolades
+      226/226, parentheses 1264/1264, .bat propres. La pose des lampadaires a
+      ete simulee cote a cote en Python pour verifier que les 3 lampadaires
+      tombent bien a 3,4 m de la route et hors des batiments.
+
 
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
@@ -690,7 +729,8 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
           d'importance visuelle) :
             a) gardes qui patrouillent devant les portails (update_pnj) ;
             b) degats flottants ("-25" qui monte) et etincelles a l'impact ;
-            c) lampadaires, panneaux, bannieres et buissons/rochers varies ;
+            c) Fait en MAJ 10 : lampadaires, panneaux, bannieres, herbe,
+               rochers, barils, cloutures de route ;
             d) touches reconfigurables (panneau OPTIONS + clavier AZERTY) ;
             e) camouflage (changer la couleur du heros), resolution d'ecran,
                sauvegarde de configuration dans un fichier (aujourd'hui

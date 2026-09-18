@@ -37,6 +37,9 @@ public sealed class LibreViesGame : MonoBehaviour
     };
 
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
+    // Rectangles des batiments : le decor (arbres, lampadaires, caisses...)
+    // ne doit jamais etre pose dans un mur.
+    private readonly List<Batiment> batiments = new List<Batiment>();
     private readonly List<EnemyState> enemies = new List<EnemyState>();
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
@@ -84,6 +87,14 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
     private GUIStyle boxStyle;
+
+    private sealed class Batiment
+    {
+        public float X;
+        public float Z;
+        public float Largeur;
+        public float Profondeur;
+    }
 
     private sealed class Obstacle
     {
@@ -147,6 +158,10 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateCastle();
         CreateFence();
         CreateTreesAndProps();
+        CreateGrassTufts();
+        CreateRocks();
+        CreateProps();
+        CreateLampposts();
         CreateClouds();
         CreatePlayer();
         CreateEnemies();
@@ -184,6 +199,22 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Water", new Color(0.08f, 0.45f, 0.85f), true);
         MakeMaterial("Red", new Color(0.80f, 0.06f, 0.04f), true);
         MakeMaterial("White", Color.white);
+        // --- Decor (portage de la reference) ---
+        MakeMaterial("Bois_Clair", new Color(0.58f, 0.41f, 0.21f));
+        MakeMaterial("Metal", new Color(0.30f, 0.28f, 0.28f));
+        MakeMaterial("Lanterne", new Color(1f, 0.80f, 0.30f), true);
+        MakeMaterial("Sapin_Bas", new Color(0.13f, 0.42f, 0.16f));
+        MakeMaterial("Sapin_Milieu", new Color(0.16f, 0.50f, 0.19f));
+        MakeMaterial("Sapin_Haut", new Color(0.20f, 0.58f, 0.22f));
+        MakeMaterial("Touffe1", new Color(0.28f, 0.55f, 0.16f));
+        MakeMaterial("Touffe2", new Color(0.36f, 0.65f, 0.22f));
+        MakeMaterial("Touffe3", new Color(0.45f, 0.72f, 0.26f));
+        MakeMaterial("Roche1", new Color(0.55f, 0.55f, 0.56f));
+        MakeMaterial("Roche2", new Color(0.44f, 0.44f, 0.46f));
+        MakeMaterial("Banniere_Bleue", new Color(0.16f, 0.30f, 0.62f));
+        MakeMaterial("Banniere_Rouge", new Color(0.55f, 0.16f, 0.16f));
+        MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
+        MakeMaterial("Arbre_Rond", new Color(0.22f, 0.58f, 0.20f));
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false)
@@ -346,6 +377,29 @@ public sealed class LibreViesGame : MonoBehaviour
         return best;
     }
 
+    // Point de la route le plus proche d'une position : sert a poser les
+    // lampadaires a distance fixe du bord de la route.
+    private Vector2 PointRouteProche(Vector2 p)
+    {
+        Vector2 meilleur = RoutePoints[0];
+        float distanceMin = 100000f;
+        for (int i = 0; i < RoutePoints.Length - 1; i++)
+        {
+            Vector2 a = RoutePoints[i];
+            Vector2 b = RoutePoints[i + 1];
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 0.001f));
+            Vector2 projete = a + ab * t;
+            float d = (p - projete).magnitude;
+            if (d < distanceMin)
+            {
+                distanceMin = d;
+                meilleur = projete;
+            }
+        }
+        return meilleur;
+    }
+
     // La cloture du village separe l'interieur de l'exterieur : un monstre ne
     // peut pas frapper le heros a travers (sauf au niveau des portails).
     private bool ClotureEntre(Vector3 a, Vector3 b)
@@ -506,6 +560,160 @@ public sealed class LibreViesGame : MonoBehaviour
         return obj;
     }
 
+    // ------------------------------------------------------------------
+    // MAILLAGE PROCEDURAL
+    // L'herbe en touffes et les rochers de la reference sont des maillages
+    // faits a la main (MultiMesh cote reference, un seul maillage ici). Les
+    // sapins ont besoin de cones : Unity n'a que des primitives simples, donc
+    // on fabrique les triangles nous-memes. Aucun asset externe.
+    // ------------------------------------------------------------------
+    private sealed class Maillage
+    {
+        private readonly List<Vector3> sommets = new List<Vector3>();
+        private readonly List<int> triangles = new List<int>();
+
+        public void Triangle(Vector3 a, Vector3 b, Vector3 c)
+        {
+            int premier = sommets.Count;
+            sommets.Add(a);
+            sommets.Add(b);
+            sommets.Add(c);
+            triangles.Add(premier);
+            triangles.Add(premier + 1);
+            triangles.Add(premier + 2);
+        }
+
+        public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        {
+            Triangle(a, b, c);
+            Triangle(a, c, d);
+        }
+
+        // Cone (ou pyramide) : base circulaire + sommet, avec le dessous ferme.
+        public void Cone(Vector3 baseCentre, float rayon, float hauteur, int segments)
+        {
+            Vector3 sommet = baseCentre + Vector3.up * hauteur;
+            for (int i = 0; i < segments; i++)
+            {
+                float a0 = i * Mathf.PI * 2f / segments;
+                float a1 = (i + 1) * Mathf.PI * 2f / segments;
+                Vector3 p0 = baseCentre + new Vector3(Mathf.Cos(a0) * rayon, 0f, Mathf.Sin(a0) * rayon);
+                Vector3 p1 = baseCentre + new Vector3(Mathf.Cos(a1) * rayon, 0f, Mathf.Sin(a1) * rayon);
+                Triangle(p0, p1, sommet);
+                Triangle(baseCentre, p1, p0);
+            }
+        }
+
+        // Touffe d'herbe : 3 lames fines (comme make_touffe de la reference).
+        public void Touffe(Vector3 pied, float echelle, float rotation, System.Random rng)
+        {
+            float cos = Mathf.Cos(rotation);
+            float sin = Mathf.Sin(rotation);
+            float[] decalagesX = { 0f, 0.09f, -0.07f };
+            float[] decalagesZ = { 0f, 0.05f, 0.08f };
+            float[] hauteurs = { 0.42f, 0.32f, 0.28f };
+            for (int k = 0; k < 3; k++)
+            {
+                float dx = decalagesX[k];
+                float dz = decalagesZ[k];
+                float ox = (dx * cos - dz * sin) * echelle;
+                float oz = (dx * sin + dz * cos) * echelle;
+                float angle = rotation + k;
+                float pointeX = (float)(rng.NextDouble() * 0.08 - 0.04);
+                float pointeZ = (float)(rng.NextDouble() * 0.08 - 0.04);
+                Vector3 centre = pied + new Vector3(ox, 0f, oz);
+                Vector3 pointe = centre + new Vector3(pointeX * echelle, hauteurs[k] * echelle, pointeZ * echelle);
+                float r = 0.055f * echelle;
+                Vector3 c0 = centre + new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
+                Vector3 c1 = centre + new Vector3(-Mathf.Cos(angle) * r, 0f, -Mathf.Sin(angle) * r);
+                Vector3 c2 = centre + new Vector3(-Mathf.Sin(angle) * r, 0f, Mathf.Cos(angle) * r);
+                Triangle(c0, c1, pointe);
+                Triangle(c1, c2, pointe);
+                Triangle(c2, c0, pointe);
+            }
+        }
+
+        // Rocher : cube de 8 sommets deplaces au hasard (hexaedre facette).
+        public static Vector3[] SommetsRocher(System.Random rng)
+        {
+            var coins = new Vector3[8];
+            for (int i = 0; i < 8; i++)
+            {
+                var v = new Vector3(
+                    (i & 1) == 0 ? -0.5f : 0.5f,
+                    (i & 2) == 0 ? -0.5f : 0.5f,
+                    (i & 4) == 0 ? -0.5f : 0.5f);
+                v += new Vector3(
+                    (float)(rng.NextDouble() * 0.32 - 0.16),
+                    (float)(rng.NextDouble() * 0.32 - 0.16),
+                    (float)(rng.NextDouble() * 0.32 - 0.16));
+                coins[i] = v;
+            }
+            return coins;
+        }
+
+        public void Rocher(Vector3 pied, Vector3 echelle, float rotation, Vector3[] coins)
+        {
+            var tournes = new Vector3[8];
+            float cos = Mathf.Cos(rotation);
+            float sin = Mathf.Sin(rotation);
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 c = coins[i];
+                float x = (c.x * cos - c.z * sin) * echelle.x;
+                float z = (c.x * sin + c.z * cos) * echelle.z;
+                tournes[i] = pied + new Vector3(x, c.y * echelle.y, z);
+            }
+            // 6 faces (2 triangles chacune)
+            Quad(tournes[0], tournes[1], tournes[3], tournes[2]);
+            Quad(tournes[4], tournes[6], tournes[7], tournes[5]);
+            Quad(tournes[0], tournes[4], tournes[5], tournes[1]);
+            Quad(tournes[2], tournes[3], tournes[7], tournes[6]);
+            Quad(tournes[0], tournes[2], tournes[6], tournes[4]);
+            Quad(tournes[1], tournes[5], tournes[7], tournes[3]);
+        }
+
+        public Mesh VersMesh(string nom)
+        {
+            var mesh = new Mesh { name = nom };
+            if (sommets.Count > 65000)
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(sommets);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+    }
+
+    private GameObject ObjetMaillage(string nom, Mesh mesh, string materiau)
+    {
+        var objet = new GameObject(nom);
+        objet.AddComponent<MeshFilter>().sharedMesh = mesh;
+        var rendu = objet.AddComponent<MeshRenderer>();
+        var materiauTrouve = Mat(materiau);
+        if (materiauTrouve != null) rendu.sharedMaterial = materiauTrouve;
+        return objet;
+    }
+
+    // Un emplacement est libre s'il n'est ni dans un batiment, ni sur la route,
+    // ni dans le chateau, ni dans la fontaine. Sert a poser le decor sans
+    // qu'un arbre pousse dans un mur ou au milieu de la route.
+    private bool EmplacementLibre(float x, float z, float marge = 1f)
+    {
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment b = batiments[i];
+            if (Mathf.Abs(x - b.X) < b.Largeur * 0.5f + marge
+                && Mathf.Abs(z - b.Z) < b.Profondeur * 0.5f + marge)
+                return false;
+        }
+        if (DistRoute(new Vector2(x, z)) < 3.0f + marge) return false;
+        if (Mathf.Abs(z + 67f) < 20f && Mathf.Abs(x) < 26f) return false;   // chateau
+        if (new Vector2(x - 9f, z - 15f).magnitude < 3.2f + marge) return false;  // fontaine
+        return true;
+    }
+
     private void CreateRoad()
     {
         // Memes points que RoutePoints (voir constantes) : la trace sert aux
@@ -547,6 +755,10 @@ public sealed class LibreViesGame : MonoBehaviour
         Box(new Vector3(0, size.y + 0.15f, 0), new Vector3(size.x + 0.8f, 0.35f, size.z + 0.8f), "Roof", root, "Toit");
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
         ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
+        batiments.Add(new Batiment
+        {
+            X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z
+        });
         Box(new Vector3(0, 1.0f, -size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
         for (int side = -1; side <= 1; side += 2)
         {
@@ -711,34 +923,324 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateTreesAndProps()
     {
+        // Sapins disperses (meme esprit que la reference, avec ses regles :
+        // jamais sur la route, jamais dans un batiment, jamais dans le village).
         var random = new System.Random(4217);
-        for (int i = 0; i < 75; i++)
+        int plantes = 0;
+        for (int i = 0; i < 220 && plantes < 80; i++)
         {
             float x = (float)(random.NextDouble() * 170 - 85);
             float z = (float)(random.NextDouble() * 170 - 85);
-            if (new Vector2(x, z).magnitude < VillageRadius + 4 || Mathf.Abs(z + 67) < 22) continue;
-            CreateTree(x, z, (float)(random.NextDouble() * 1.0 + 0.75));
+            if (new Vector2(x, z).magnitude < VillageRadius + 4) continue;
+            if (!EmplacementLibre(x, z, 1.5f)) continue;
+            CreatePine(x, z, (float)(random.NextDouble() * 0.7 + 0.8));
+            plantes++;
         }
-        for (int i = 0; i < 22; i++)
+        // Quelques arbres ronds aux positions de la reference.
+        foreach (float[] p in new[]
         {
-            float x = (float)(random.NextDouble() * 54 - 27);
-            float z = (float)(random.NextDouble() * 54 - 27);
-            Box(new Vector3(x, TerrainHeight(x, z) + 0.5f, z), new Vector3(1, 1, 1), i % 2 == 0 ? "Wood" : "Stone", null, "Caisse");
-            // 1 m de haut : on saute dessus (saut de 1,60 m) et on peut s'y percher.
-            ColBoite(x, z, 1f, 1f, 1f);
+            new[] { -14f, 7f }, new[] { 14f, 7f }, new[] { -24f, -8f },
+            new[] { 24f, 8f }, new[] { -30f, 30f }, new[] { 30f, -30f }
+        })
+        {
+            if (EmplacementLibre(p[0], p[1], 1.5f)) CreateRoundTree(p[0], p[1]);
         }
     }
 
-    private void CreateTree(float x, float z, float size)
+    // Sapin de la reference : tronc epais bien visible, 4 renforts et 3 cones
+    // de feuillage superposes (verts de plus en plus clairs vers le haut).
+    private void CreatePine(float x, float z, float taille)
     {
         float y = TerrainHeight(x, z);
         var root = new GameObject("Sapin").transform;
         root.position = new Vector3(x, y, z);
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.0f * size, 0), new Vector3(0.24f * size, 1.0f * size, 0.24f * size), "Wood", root, "Tronc");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.0f * size, 0), new Vector3(1.1f * size, 1.2f * size, 1.1f * size), "Leaf", root, "Feuillage");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 3.25f * size, 0), new Vector3(0.75f * size, 1.15f * size, 0.75f * size), "Leaf", root, "Feuillage_Haut");
-        ColCercle(x, z, 0.4f * size, 2.2f);   // tronc
+        root.localScale = Vector3.one * taille;
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.3f, 0), new Vector3(0.68f, 1.3f, 0.68f), "Wood", root, "Tronc");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.25f, 0), new Vector3(1.1f, 0.25f, 1.1f), "Wood", root, "Souche");
+        for (int k = 0; k < 4; k++)
+        {
+            float a = k * Mathf.PI * 0.5f;
+            Box(new Vector3(Mathf.Cos(a) * 0.30f, 1.3f, Mathf.Sin(a) * 0.30f), new Vector3(0.10f, 2.4f, 0.10f),
+                "Wood", root, "Renfort", false, Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f));
+        }
+        CreateCone(root, new Vector3(0f, 3.3f, 0f), 1.35f, 2.4f, "Sapin_Bas", "Feuillage_Bas");
+        CreateCone(root, new Vector3(0f, 4.4f, 0f), 1.05f, 2.1f, "Sapin_Milieu", "Feuillage_Milieu");
+        CreateCone(root, new Vector3(0f, 5.4f, 0f), 0.72f, 1.8f, "Sapin_Haut", "Feuillage_Haut");
+        ColCercle(x, z, 0.4f * taille, 2.2f);   // tronc
+    }
 
+    // Arbre rond : tronc + deux masses de feuillage facettees.
+    private void CreateRoundTree(float x, float z)
+    {
+        float y = TerrainHeight(x, z);
+        var root = new GameObject("Arbre_Rond").transform;
+        root.position = new Vector3(x, y, z);
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.8f, 0), new Vector3(0.72f, 1.8f, 0.72f), "Wood", root, "Tronc");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.3f, 0), new Vector3(1.2f, 0.3f, 1.2f), "Wood", root, "Souche");
+        Primitive(PrimitiveType.Sphere, new Vector3(0, 4.2f, 0), new Vector3(2.4f, 2.0f, 2.4f), "Arbre_Rond", root, "Feuillage");
+        Primitive(PrimitiveType.Sphere, new Vector3(0.7f, 3.6f, 0.4f), new Vector3(1.4f, 1.2f, 1.4f), "Leaf", root, "Feuillage_Bas");
+        ColCercle(x, z, 0.45f, 2.2f);
+    }
+
+    private void CreateCone(Transform parent, Vector3 position, float rayon, float hauteur, string materiau, string nom)
+    {
+        var maillage = new Maillage();
+        maillage.Cone(Vector3.zero, rayon, hauteur, 7);
+        var objet = ObjetMaillage(nom, maillage.VersMesh(nom), materiau);
+        objet.transform.SetParent(parent, false);
+        objet.transform.localPosition = position;
+    }
+
+    // Herbe en touffes : 3 nuances x 140 touffes, en UN seul maillage par
+    // nuance (comme le MultiMesh de la reference) : aucun ralentissement.
+    private void CreateGrassTufts()
+    {
+        string[] nuances = { "Touffe1", "Touffe2", "Touffe3" };
+        var rng = new System.Random(7);
+        for (int teinte = 0; teinte < nuances.Length; teinte++)
+        {
+            var maillage = new Maillage();
+            for (int k = 0; k < 140; k++)
+            {
+                float x = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+                float z = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+                if (new Vector2(x, z).magnitude < TownRadius * 0.55f) x += TownRadius;
+                x = Mathf.Clamp(x, -WorldSize + 4, WorldSize - 4);
+                z = Mathf.Clamp(z, -WorldSize + 4, WorldSize - 4);
+                int garde = 0;
+                while (DistRoute(new Vector2(x, z)) < 3.2f && garde < 8)
+                {
+                    x = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+                    z = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+                    garde++;
+                }
+                maillage.Touffe(new Vector3(x, TerrainHeight(x, z) - 0.02f, z),
+                    (float)(rng.NextDouble() * 0.8 + 0.8),
+                    (float)(rng.NextDouble() * Mathf.PI * 2f), rng);
+            }
+            ObjetMaillage("Herbe_" + (teinte + 1), maillage.VersMesh("Touffes"),
+                nuances[teinte]);
+        }
+    }
+
+    // Rochers facettes : 2 nuances x 45, poses comme dans la reference (jamais
+    // sur la route, jamais sur la cloture du village) et bloquants.
+    private void CreateRocks()
+    {
+        string[] nuances = { "Roche1", "Roche2" };
+        var rng = new System.Random(99);
+        var rngForme = new System.Random(5);
+        Vector3[] forme = Maillage.SommetsRocher(rngForme);
+        for (int teinte = 0; teinte < nuances.Length; teinte++)
+        {
+            var maillage = new Maillage();
+            for (int k = 0; k < 45; k++)
+            {
+                float x = (float)(rng.NextDouble() * (WorldSize * 2 - 10) - (WorldSize - 5));
+                float z = (float)(rng.NextDouble() * (WorldSize * 2 - 10) - (WorldSize - 5));
+                if (new Vector2(x, z).magnitude < TownRadius * 0.6f) x += TownRadius;
+                x = Mathf.Clamp(x, -WorldSize + 5, WorldSize - 5);
+                z = Mathf.Clamp(z, -WorldSize + 5, WorldSize - 5);
+                var radial = new Vector2(x, z);
+                if (radial.magnitude > 0.001f && Mathf.Abs(radial.magnitude - VillageRadius) < 2.2f)
+                {
+                    radial = radial.normalized * (VillageRadius + 2.6f);
+                    x = radial.x;
+                    z = radial.y;
+                }
+                int garde = 0;
+                while (DistRoute(new Vector2(x, z)) < 4.0f && garde < 8)
+                {
+                    x = (float)(rng.NextDouble() * (WorldSize * 2 - 10) - (WorldSize - 5));
+                    z = (float)(rng.NextDouble() * (WorldSize * 2 - 10) - (WorldSize - 5));
+                    garde++;
+                }
+                float taille = (float)(rng.NextDouble() * 1.1 + 0.4);
+                var echelle = new Vector3(taille * (float)(rng.NextDouble() * 0.5 + 0.8), taille * 0.75f, taille);
+                maillage.Rocher(new Vector3(x, TerrainHeight(x, z) + taille * 0.18f, z), echelle,
+                    (float)(rng.NextDouble() * Mathf.PI * 2f), forme);
+                if (DistRoute(new Vector2(x, z)) > 2.8f)
+                    ColCercle(x, z, 0.42f * taille, 0.45f * taille + 0.2f);
+            }
+            ObjetMaillage("Rochers_" + (teinte + 1), maillage.VersMesh("Rochers"), nuances[teinte]);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // DECOR DU VILLAGE (barils, caisses, cloutures, bannieres, panneaux)
+    // Positions reprises de la reference. Chaque emplacement est verifie
+    // (EmplacementLibre) : si un batiment ou la route est la, l'objet est
+    // simplement ignore plutot que plante dans un mur.
+    // ------------------------------------------------------------------
+    private void CreateProps()
+    {
+        // Barils pres de l'auberge et de la forge.
+        float[][] barils =
+        {
+            new[] { 8.2f, 5.6f }, new[] { 8.7f, 6.2f }, new[] { -7.0f, -1.4f },
+            new[] { -7.7f, -1.9f }, new[] { 12.4f, 1.0f }
+        };
+        foreach (float[] p in barils)
+        {
+            if (!EmplacementLibre(p[0], p[1], 0.6f)) continue;
+            float y = TerrainHeight(p[0], p[1]);
+            Primitive(PrimitiveType.Cylinder, new Vector3(p[0], y + 0.45f, p[1]),
+                new Vector3(0.68f, 0.45f, 0.68f), "Wood", null, "Baril");
+            Primitive(PrimitiveType.Cylinder, new Vector3(p[0], y + 0.62f, p[1]),
+                new Vector3(0.72f, 0.05f, 0.72f), "Metal", null, "Couvercle_Baril");
+            ColCercle(p[0], p[1], 0.45f, 0.95f);
+        }
+
+        // Caisses : positions de la reference + deux de plus, libres.
+        float[][] caisses =
+        {
+            new[] { -14.2f, -6.0f }, new[] { 12.6f, 4.6f }, new[] { -12.4f, 4.8f },
+            new[] { 10.6f, -2.2f }, new[] { -10.5f, -4.5f }
+        };
+        foreach (float[] p in caisses)
+        {
+            if (!EmplacementLibre(p[0], p[1], 0.6f)) continue;
+            CreateCrate(p[0], p[1], 0.7f);
+        }
+
+        // Bannieres (bleue et rouge) et panneaux indicateurs.
+        CreateBanner(-5.5f, -3.0f, "Banniere_Bleue");
+        CreateBanner(6.0f, 8.0f, "Banniere_Rouge");
+        CreateSignpost(-5.2f, 9.8f, 0.6f);
+        CreateSignpost(5.0f, -8.5f, -1.1f);
+
+        CreateRoadFence();
+    }
+
+    private void CreateCrate(float x, float z, float taille)
+    {
+        float y = TerrainHeight(x, z);
+        Box(new Vector3(x, y + taille * 0.5f, z), new Vector3(taille, taille, taille), "Wood", null, "Caisse");
+        Box(new Vector3(x, y + taille * 0.62f, z), new Vector3(taille * 1.03f, taille * 0.17f, taille * 1.03f),
+            "Bois_Clair", null, "Couvercle_Caisse");
+        // Moins d'un metre de haut : on saute dessus (saut de 1,60 m).
+        ColBoite(x, z, taille + 0.1f, taille + 0.1f, taille * 0.75f);
+    }
+
+    private void CreateRoadFence()
+    {
+        // Petite clouture de bois le long de la route dans le village :
+        // positions de la reference (aucun poteau devant le passage : les
+        // indices -1, 0 et 1 sont sautes).
+        var libre = new List<bool>();
+        var positions = new List<float>();
+        for (int i = -6; i <= 6; i++)
+        {
+            float x = i * 2.4f;
+            bool place = Mathf.Abs(i) >= 2 && EmplacementLibre(x, 4.6f, 0.2f);
+            libre.Add(place);
+            positions.Add(x);
+            if (!place) continue;
+            float y = TerrainHeight(x, 4.6f);
+            Box(new Vector3(x, y + 0.45f, 4.6f), new Vector3(0.1f, 0.9f, 0.1f), "Wood", null, "Poteau_Cloture");
+            Box(new Vector3(x, y + 0.7f, 4.6f), new Vector3(2.4f, 0.09f, 0.07f), "Bois_Clair", null, "Traverse_Cloture");
+        }
+        // Collisions : un bloc par suite de poteaux consecutifs.
+        int debut = -1;
+        for (int k = 0; k <= libre.Count; k++)
+        {
+            bool place = k < libre.Count && libre[k];
+            if (place && debut < 0) debut = k;
+            if (!place && debut >= 0)
+            {
+                float premier = positions[debut];
+                float dernier = positions[k - 1];
+                ColBoite((premier + dernier) * 0.5f, 4.6f, dernier - premier + 1.2f, 0.25f, 0.85f);
+                debut = -1;
+            }
+        }
+    }
+
+    private void CreateBanner(float x, float z, string tissu)
+    {
+        if (!EmplacementLibre(x, z, 0.6f)) return;
+        float y = TerrainHeight(x, z);
+        var root = new GameObject("Banniere").transform;
+        root.position = new Vector3(x, y, z);
+        Box(new Vector3(0, 1.6f, 0), new Vector3(0.16f, 3.2f, 0.16f), "Dirt", root, "Mat");
+        Box(new Vector3(0, 3.15f, 0), new Vector3(1.5f, 0.14f, 0.14f), "Dirt", root, "Traverse");
+        Box(new Vector3(0, 2.35f, 0.02f), new Vector3(1.1f, 1.5f, 0.06f), tissu, root, "Tissu");
+        Box(new Vector3(0, 2.4f, 0.08f), new Vector3(0.7f, 0.12f, 0.05f), "Embleme", root, "Epee1", false, Quaternion.Euler(0f, 0f, 45f));
+        Box(new Vector3(0, 2.4f, 0.08f), new Vector3(0.7f, 0.12f, 0.05f), "Embleme", root, "Epee2", false, Quaternion.Euler(0f, 0f, -45f));
+        ColCercle(x, z, 0.22f, 3.2f);
+    }
+
+    private void CreateSignpost(float x, float z, float rotation)
+    {
+        if (!EmplacementLibre(x, z, 0.6f)) return;
+        float y = TerrainHeight(x, z);
+        var root = new GameObject("Panneau").transform;
+        root.position = new Vector3(x, y, z);
+        root.rotation = Quaternion.Euler(0f, rotation * Mathf.Rad2Deg, 0f);
+        Box(new Vector3(0, 0.9f, 0), new Vector3(0.12f, 1.8f, 0.12f), "Wood", root, "Pied");
+        Box(new Vector3(0, 1.7f, 0), new Vector3(1.3f, 0.5f, 0.08f), "Bois_Clair", root, "Panneau");
+        Box(new Vector3(0.2f, 1.35f, 0), new Vector3(1.0f, 0.4f, 0.08f), "Dirt", root, "Planche", false, Quaternion.Euler(0f, 0f, 20f));
+        ColCercle(x, z, 0.18f, 2.0f);
+    }
+
+    private void CreateLampposts()
+    {
+        // Lampadaires le long de la route, en alternance d'un cote puis de
+        // l'autre, tous les 13 m, uniquement dans le village : exactement la
+        // regle de la reference (poser_lampadaires_route).
+        float parcouru = 0f;
+        float prochain = 6f;
+        float cote = 1f;
+        for (int i = 0; i < RoutePoints.Length - 1; i++)
+        {
+            Vector2 p = RoutePoints[i];
+            Vector2 suivant = RoutePoints[i + 1];
+            parcouru += Vector2.Distance(p, suivant);
+            if (p.magnitude > 24f) continue;              // hors du village
+            if (parcouru < prochain) continue;
+            // 13 m dans la reference ; 9 m ici car notre trace de route a peu
+            // de sommets : cela donne 3 lampadaires bien repartis dans le
+            // village (sinon un seul).
+            prochain = parcouru + 9f;
+            cote = -cote;                                 // un coup a gauche, un coup a droite
+            var normale = new Vector2(-(suivant - p).normalized.y, (suivant - p).normalized.x);
+            bool pose = false;
+            var position = Vector2.zero;
+            // On essaie d'abord le cote voulu, puis l'autre : assez de
+            // lampadaires pour eclairer le village sans en planter dans un mur.
+            for (int essai = 0; essai < 2 && !pose; essai++)
+            {
+                float facteur = cote * (essai == 0 ? 1f : -1f);
+                var candidat = new Vector2(p.x + normale.x * 3.4f * facteur, p.y + normale.y * 3.4f * facteur);
+                // On repart du point de route le plus proche : un sommet de la
+                // ligne droite donnerait un ecart faux.
+                Vector2 bord = PointRouteProche(candidat);
+                Vector2 ecart = candidat - bord;
+                Vector2 essaiPose = ecart.sqrMagnitude > 0.04f ? bord + ecart.normalized * 3.4f : candidat;
+                if (!EmplacementLibre(essaiPose.x, essaiPose.y, 0.3f)) continue;
+                position = essaiPose;
+                pose = true;
+            }
+            if (!pose) continue;
+            CreateLamppost(position.x, position.y, PointRouteProche(position));
+        }
+    }
+
+    private void CreateLamppost(float x, float z, Vector2 pointRoute)
+    {
+        float y = TerrainHeight(x, z);
+        var root = new GameObject("Lampadaire").transform;
+        root.position = new Vector3(x, y, z);
+        // Le bras doit regarder la route : on oriente le lampadaire vers elle.
+        Vector3 versRoute = new Vector3(pointRoute.x - x, 0f, pointRoute.y - z);
+        if (versRoute.sqrMagnitude > 0.01f)
+            root.rotation = Quaternion.LookRotation(versRoute.normalized);
+        Box(new Vector3(0, 0.05f, 0), new Vector3(0.5f, 0.12f, 0.5f), "Metal", root, "Socle");
+        Box(new Vector3(0, 1.5f, 0), new Vector3(0.14f, 3.0f, 0.14f), "Metal", root, "Mat");
+        Box(new Vector3(0, 3.05f, 0), new Vector3(0.5f, 0.1f, 0.1f), "Metal", root, "Bras");
+        Box(new Vector3(0, 2.75f, 0.22f), new Vector3(0.26f, 0.4f, 0.26f), "Lanterne", root, "Lanterne");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 3.05f, 0.22f), new Vector3(0.42f, 0.1f, 0.42f), "Metal", root, "Chapeau");
+        ColCercle(x, z, 0.25f, 3.0f);
     }
 
     private void CreateClouds()
