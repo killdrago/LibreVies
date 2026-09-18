@@ -8,9 +8,9 @@ rem    1. le projet (dossier unity + launcher) s'il n'est pas deja la ;
 rem    2. Python (winget, sinon site officiel python.org) ;
 rem    3. PyInstaller (necessaire une seule fois) ;
 rem    4. Unity Hub + Unity Editor (via setup_unity_build_tools.bat).
-rem  Puis il fabrique :
-rem    release\LibreVies.exe     = LE SEUL fichier a donner au joueur
-rem    release\game\...          = le jeu exporte, a publier
+rem  Puis il fabrique, DANS LE DOSSIER jeu\ (tout au meme endroit) :
+rem    jeu\LibreVies.exe     = LE SEUL fichier a donner au joueur
+rem    jeu\game\...          = le jeu exporte, a publier
 rem
 rem  Rien n'est jamais ecrase : seuls les fichiers absents sont recuperes.
 rem  Etape suivante : outils\publier_jeu.bat (met le jeu en ligne)
@@ -25,7 +25,7 @@ if not "%~1"=="" set "BRANCHE=%~1"
 set "ROOT=%~dp0"
 set "LAUNCHER=%ROOT%..\jeu\launcher.pyw"
 set "PROJECT=%ROOT%unity"
-set "RELEASE=%ROOT%release"
+set "JEU=%ROOT%..\jeu"
 set "BUILD=%ROOT%build"
 set "PYTHON="
 set "UNITY="
@@ -65,10 +65,12 @@ for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if 
     if exist "%PROJECT%\Packages\packages-lock.json" del /q "%PROJECT%\Packages\packages-lock.json"
 )
 
-if exist "%RELEASE%" rmdir /s /q "%RELEASE%"
+rem On supprime UNIQUEMENT l'ancien export du jeu : le dossier jeu\ contient
+rem aussi le launcher, le manifeste et LIS-MOI, qui ne doivent jamais partir.
+if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
 if exist "%BUILD%\launcher" rmdir /s /q "%BUILD%\launcher"
 if exist "%BUILD%\unity.log" del /q "%BUILD%\unity.log"
-mkdir "%RELEASE%\game"
+mkdir "%JEU%\game"
 mkdir "%BUILD%\launcher"
 
 echo Creation de l'icone du launcher...
@@ -80,12 +82,12 @@ if not exist "%ROOT%icon.ico" "%PYTHON%" "%ROOT%outils\creer_icone.py" "%LAUNCHE
 if not exist "%ROOT%icon.ico" set "ICONE_ARG="
 if not defined ICONE_ARG echo AVERTISSEMENT : icone indisponible, compilation sans icone.
 
-"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%RELEASE%\game\LibreViesGame.exe" -logFile "%BUILD%\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%JEU%\game\LibreViesGame.exe" -logFile "%BUILD%\unity.log"
 if errorlevel 1 (
     echo ERREUR : export Unity echoue. Consultez build\unity.log
     goto :echec
 )
-if not exist "%RELEASE%\game\LibreViesGame.exe" (
+if not exist "%JEU%\game\LibreViesGame.exe" (
     echo ERREUR : Unity n'a pas produit LibreViesGame.exe
     goto :echec
 )
@@ -96,17 +98,15 @@ rem Les modules exclus ne sont pas utilises par le launcher : sans cela,
 rem PyInstaller embarque pygame/numpy s'ils sont installes sur la machine
 rem de build, ce qui gonfle LibreVies.exe pour rien.
 if exist "%BUILD%\LibreVies.spec" del /q "%BUILD%\LibreVies.spec"
-"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%RELEASE%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%LAUNCHER%"
+"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%JEU%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%LAUNCHER%"
 if errorlevel 1 (
     echo ERREUR : compilation du launcher echouee.
     goto :echec
 )
-if not exist "%RELEASE%\LibreVies.exe" (
+if not exist "%JEU%\LibreVies.exe" (
     echo ERREUR : l'executable du launcher est absent.
     goto :echec
 )
-
-copy /y "%ROOT%..\jeu\version_url.json" "%RELEASE%\version_url.json" >nul
 
 if exist "%BUILD%\launcher" rmdir /s /q "%BUILD%\launcher"
 if exist "%ROOT%icon.ico" del /q "%ROOT%icon.ico"
@@ -116,8 +116,8 @@ echo.
 echo ==========================================================================
 echo   TERMINE
 echo ==========================================================================
-echo   A donner au joueur : %RELEASE%\LibreVies.exe
-echo   A publier (le jeu) : %RELEASE%\game\
+echo   A donner au joueur : %JEU%\LibreVies.exe
+echo   A publier (le jeu) : %JEU%\game\
 echo.
 echo   Le joueur ne peut jouer qu'apres la publication de cette compilation.
 echo.
@@ -154,6 +154,7 @@ set "PROJET_INCOMPLET="
 if not exist "%PROJECT%\Assets" set "PROJET_INCOMPLET=1"
 if not exist "%LAUNCHER%" set "PROJET_INCOMPLET=1"
 if not exist "%ROOT%outils\publier_jeu.py" set "PROJET_INCOMPLET=1"
+if not exist "%JEU%\version_url.json" set "PROJET_INCOMPLET=1"
 if not defined PROJET_INCOMPLET (
     echo [1/6] Projet : deja complet sur ce PC, rien a telecharger.
     exit /b 0

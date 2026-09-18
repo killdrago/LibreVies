@@ -2,7 +2,8 @@
 # Rien de ce qui suit ne doit entrer dans git.
 # ============================================================
 
-# --- Cote joueur : le jeu telecharge par le launcher ---
+# --- Cote joueur : ce que le build et le launcher produisent dans jeu/ ---
+/jeu/LibreVies.exe
 /jeu/game/
 /jeu/jeu.download
 /jeu/jeu.download.part
@@ -14,7 +15,8 @@
 *.tmp
 .librevies-update.cmd
 
-# --- Cote auteur : sorties de compilation ---
+# --- Cote auteur : sorties de compilation (le dossier release n'est plus
+#     utilise : le build ecrit directement dans jeu/) ---
 /compilation/release/
 /compilation/build/
 /compilation/dist/

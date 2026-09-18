@@ -8,7 +8,7 @@ rem  ET fabrique le launcher. Ce script-ci ne sert qu'a verifier l'export
 rem  Unity quand quelque chose ne va pas.
 rem ============================================================
 set "ROOT=%~dp0"
-set "RELEASE=%ROOT%release"
+set "JEU=%ROOT%..\jeu"
 set "PROJECT=%ROOT%unity"
 
 if not exist "%PROJECT%\Assets" (
@@ -65,25 +65,25 @@ if not exist "%UNITY%" (
     exit /b 1
 )
 
-if not exist "%RELEASE%\game" mkdir "%RELEASE%\game"
+if not exist "%JEU%\game" mkdir "%JEU%\game"
 if not exist "%ROOT%build" mkdir "%ROOT%build"
 if exist "%ROOT%build\unity.log" del /q "%ROOT%build\unity.log"
 
 echo Export Windows Unity en cours...
-"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%RELEASE%\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%JEU%\game\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
 if errorlevel 1 (
     echo ERREUR : Unity a echoue. Consultez build\unity.log
     pause
     exit /b 1
 )
-if not exist "%RELEASE%\game\LibreViesGame.exe" (
+if not exist "%JEU%\game\LibreViesGame.exe" (
     echo ERREUR : LibreViesGame.exe n'a pas ete cree.
     pause
     exit /b 1
 )
 
 echo.
-echo Jeu exporte dans %RELEASE%\game\
+echo Jeu exporte dans %JEU%\game\
 echo IMPORTANT : Unity a aussi genere UnityPlayer.dll et un dossier *_Data.
 echo Conserve tout le dossier game, pas seulement le .exe.
 echo.

@@ -4,8 +4,8 @@ Deux dossiers, deux rôles bien séparés :
 
 | Dossier | Pour qui | Contenu |
 |---|---|---|
-| **`jeu/`** | le joueur et le launcher | `launcher.pyw`, `version_url.json`, `LIS-MOI.txt`. C'est ici que le jeu s'installe (`jeu/game/`). |
-| **`compilation/`** | l'auteur seul | projet Unity, scripts de build Windows, images de travail, outils de publication. **Jamais téléchargé par le joueur.** |
+| **`jeu/`** | le joueur | **tout ce qui concerne le joueur, dans un seul dossier** : `launcher.pyw` (source) → `LibreVies.exe` (compilé), `version_url.json`, `LIS-MOI.txt`, et `game/` (le jeu, installé par le launcher). |
+| **`compilation/`** | l'auteur seul | projet Unity, scripts de build Windows, images de travail, outils de publication. Il **compile** et dépose le résultat dans `jeu/`. **Jamais téléchargé par le joueur.** |
 
 ## Le parcours du joueur
 
@@ -23,9 +23,10 @@ Un jeu déjà installé se lance même hors ligne.
 1. `compilation\build_launcher.bat` — **un seul double-clic, tout est
    automatique** : il télécharge ce qui manque (le projet depuis GitHub,
    Python, PyInstaller, Unity) sans jamais écraser tes fichiers, puis il
-   exporte le jeu Unity et fabrique `LibreVies.exe`.
-2. `compilation\outils\publier_jeu.bat` — met l'archive dans la release GitHub
-   et met à jour `jeu/version_url.json`.
+   compile et dépose le résultat **dans `jeu/`** : `jeu\LibreVies.exe`
+   (le launcher) et `jeu\game\` (le jeu exporté).
+2. `compilation\outils\publier_jeu.bat` — met `jeu\game` en ligne
+   (release GitHub) et met à jour `jeu/version_url.json`.
 3. `git push` — les joueurs reçoivent la mise à jour au prochain lancement.
 
 La **première** publication est obligatoire : avant elle, le launcher affiche

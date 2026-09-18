@@ -1,17 +1,23 @@
 """Publie une compilation du jeu pour le launcher LibreVies.
 
 Etapes (tout est automatique) :
-  1. met le dossier du jeu (release/game) dans UNE archive .zip ;
+  1. met le dossier du jeu (jeu/game, rempli par build_launcher.bat) dans UNE
+     archive .zip ;
   2. envoie l'archive dans la release GitHub « derniere » (gh CLI) ;
-  3. met a jour jeu/version_url.json : url, taille et md5 de l'archive.
+  3. met a jour jeu/version_url.json : url, taille et md5 de l'archive ;
+  4. publie aussi jeu/LibreVies.exe si present (les launchers se mettent a jour)
+     et note l'installation locale dans jeu/etat_jeu.json.
 
 Le joueur n'utilise jamais ce script : il ne recoit que le launcher, qui lit
 le manifeste et telecharge l'archive ici publiee.
 
 Exemple (Windows, depuis le dossier compilation) :
 
-    python outils\\publier_jeu.py --jeu release\\game --version 0.5.0 ^
-        --notes "Village Unity + camera corrigee" --exe release\\LibreVies.exe
+    python outils\\publier_jeu.py --version 0.5.0 ^
+        --notes "Village Unity + camera corrigee"
+
+Les chemins par defaut sont ceux du depot : --jeu jeu\\game et
+--exe jeu\\LibreVies.exe.
 
 Sans gh installe, le script fabrique quand meme l'archive et met le manifeste
 a jour : il suffit alors d'envoyer le .zip a la main a l'URL indiquee.
@@ -25,6 +31,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -42,6 +49,36 @@ def md5_fichier(chemin: Path) -> str:
         for bloc in iter(lambda: flux.read(1024 * 1024), b""):
             digest.update(bloc)
     return digest.hexdigest()
+
+
+def noter_installation_locale(manifeste: dict, dossier_jeu: Path) -> None:
+    """Note l'installation locale dans jeu/etat_jeu.json.
+
+    Le dossier du jeu vient d'etre archive et publie : le launcher installe ici
+    (ou dans un dossier jeu\\ copie tel quel chez un joueur) n'a donc pas
+    besoin de retelecharger l'archive, il affiche « jeu a jour ».
+    """
+    build = manifeste.get("game_build") or {}
+    exe = trouver_exe(dossier_jeu)
+    dossier = RACINE / "jeu"
+    if not build.get("hash") or not exe or not dossier.is_dir():
+        return
+    try:                                   # chemin de l'exe depuis jeu\
+        exe_relatif = exe.resolve().relative_to(dossier.resolve()).as_posix()
+    except ValueError:
+        exe_relatif = "game/%s" % exe.name
+    etat = {
+        "hash": build.get("hash", ""),
+        "moteur": build.get("moteur", "unity"),
+        "version": build.get("version", manifeste.get("game_version", "")),
+        "dossier": build.get("dossier", "game"),
+        "exe": exe_relatif,
+        "installe": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    fichier = dossier / "etat_jeu.json"
+    fichier.write_text(json.dumps(etat, indent=2, ensure_ascii=False) + "\n",
+                       encoding="utf-8", newline="\n")
+    print("   installation locale notee : %s" % fichier.relative_to(RACINE))
 
 
 def lire_version_launcher() -> str:
@@ -107,12 +144,13 @@ def envoyer_release(fichier: Path, tag: str, depot: str) -> bool:
 
 def main() -> int:
     parseur = argparse.ArgumentParser(description="Publier une compilation LibreVies")
-    parseur.add_argument("--jeu", type=Path, required=True,
-                         help="dossier du jeu exporte (ex. release/game)")
+    parseur.add_argument("--jeu", type=Path, default=RACINE / "jeu" / "game",
+                         help="dossier du jeu exporte (defaut : jeu/game)")
     parseur.add_argument("--version", required=True, help="version du jeu (ex. 0.5.0)")
     parseur.add_argument("--notes", default="", help="texte affiche dans le launcher")
     parseur.add_argument("--exe", type=Path, default=None,
-                         help="launcher compile (release/LibreVies.exe) a publier aussi")
+                         help="launcher compile a publier aussi "
+                              "(defaut : jeu/LibreVies.exe si present)")
     parseur.add_argument("--tag", default="derniere", help="release GitHub (defaut : derniere)")
     parseur.add_argument("--depot", default="killdrago/LibreVies", help="depot GitHub")
     parseur.add_argument("--sans-upload", action="store_true",
@@ -182,8 +220,9 @@ def main() -> int:
         fichiers = {}
         manifeste["files"] = fichiers
 
-    if args.exe:
-        exe_launcher = args.exe.resolve()
+    # Le launcher compile : celui demande, sinon jeu/LibreVies.exe s'il existe.
+    exe_launcher = args.exe.resolve() if args.exe else RACINE / "jeu" / "LibreVies.exe"
+    if exe_launcher.is_file() or args.exe:
         if not exe_launcher.is_file():
             print("ERREUR : launcher introuvable : %s" % exe_launcher)
             return 1
@@ -202,6 +241,11 @@ def main() -> int:
     MANIFESTE.write_text(json.dumps(manifeste, indent=2, ensure_ascii=False) + "\n",
                          encoding="utf-8", newline="\n")
     print("   %s mis a jour" % MANIFESTE.relative_to(RACINE))
+
+    # L'installation locale vient d'etre publiee : on la note pour que le
+    # launcher d'ici (ou d'un dossier copie tel quel, jeu\ complet) affiche
+    # directement « jeu a jour » au lieu de retelecharger la meme archive.
+    noter_installation_locale(manifeste, dossier_jeu)
 
     print()
     print("== resume ==")

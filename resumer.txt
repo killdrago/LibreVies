@@ -53,30 +53,35 @@ Parcours du joueur :
 
 Le depot contient exactement deux dossiers fonctionnels :
 
-  jeu/                 CE QUE LE JOUEUR RECOIT (et rien d'autre)
+  jeu/                 TOUT CE QUI CONCERNE LE JOUEUR, DANS UN SEUL DOSSIER
     launcher.pyw       le launcher (source ; compile en LibreVies.exe)
     version_url.json   le manifeste lu par le launcher
     LIS-MOI.txt        explication envoyee au joueur
-    [game/]            le jeu telecharge (ignore par git)
+    [LibreVies.exe]    le launcher COMPILE, depose ici par le build (ignore par git)
+    [game/]            le jeu : export Unity depose par le build, ou telecharge
+                       par le launcher chez le joueur (ignore par git)
     [etat_jeu.json]    etat de l'installation (ignore par git)
     [jeu.download.part] telechargement en cours (ignore par git)
 
-  compilation/         RESERVE A L'AUTEUR - JAMAIS telecharge par le joueur
+  compilation/         SERT UNIQUEMENT A COMPILER - JAMAIS telecharge par le joueur
     unity/             le projet Unity (le jeu)
-    build_launcher.bat fabrique release\LibreVies.exe + release\game
+    build_launcher.bat compile et depose tout DANS jeu\ (LibreVies.exe + game\)
     build_unity_game.bat  export Unity seul (diagnostic)
     setup_unity_build_tools.bat + download_unity_hub.ps1  installent Unity
     image/             images de travail (bannieres, chapitres, logos)
     outils/            publier_jeu, definir_url_publication, creer_icone,
                        test_launcher (la recette)
-    [release/] [build/]  sorties de build (ignorees par git)
+    [build/]           fichiers de travail du build (ignore par git)
 
 + README.md (2 sections : joueur / auteur) et resumer.txt (ce fichier).
 
 REGLES :
-  - rien de "compilation/" ne doit apparaitre dans "jeu/" ;
-  - le launcher ne doit JAMAIS telecharger de fichier de compilation/ ;
-  - "jeu/" doit rester minuscule : c'est le dossier des joueurs.
+  - le build DEPOSE ses resultats dans "jeu/" : c'est la demande explicite de
+    l'utilisateur ("au joueur il aura tous dans un seul dossier") ;
+  - rien de "compilation/" (sources Unity, images, outils) n'arrive dans "jeu/"
+    et le launcher n'en telecharge jamais ;
+  - "jeu/" ne contient que : launcher.pyw, version_url.json, LIS-MOI.txt,
+    plus LibreVies.exe et game/ produits par le build ou par le launcher.
 
 
 ================================================================================
@@ -158,17 +163,20 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
 ================================================================================
 
   1. compilation\build_launcher.bat   (double-clic)
-     Il telecharge ce qui manque (voir section 6) puis fabrique :
-        compilation\release\LibreVies.exe   <- LE fichier a donner au joueur
-        compilation\release\game\           <- le jeu a publier
+     Il telecharge ce qui manque (voir section 6) puis COMPILE et DEPOSE tout
+     dans le dossier jeu\ :
+        jeu\LibreVies.exe   <- LE fichier a donner au joueur
+        jeu\game\           <- le jeu a publier
      A la fin il demande : "Publier cette compilation maintenant ? [O/N]"
 
   2. Repondre O  -> il enchaine sur outils\publier_jeu.bat, qui :
-       - rassemble release\game en UNE archive LibreVies_jeu_<md5>.zip ;
+       - rassemble jeu\game en UNE archive LibreVies_jeu_<md5>.zip ;
        - l'envoie dans la release GitHub "derniere" (gh release upload) ;
        - ecrit url/size/hash/moteur/exe/version dans jeu/version_url.json ;
-       - publie aussi release\LibreVies.exe (cle "files"/"LibreVies.exe")
+       - publie aussi jeu\LibreVies.exe (cle "files"/"LibreVies.exe")
          pour que les launchers deja installes se mettent a jour ;
+       - note l'installation locale dans jeu\etat_jeu.json : le launcher d'ici
+         affiche "jeu a jour" sans retelecharger ce qui vient d'etre compile ;
        - avec --pousser : git add/commit/push du manifeste.
 
   3. Les joueurs recoivent la mise a jour au prochain lancement.
@@ -225,10 +233,28 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     - definir_url_publication.py met desormais TROIS references de branche
       d'accord : manifeste, launcher, et BRANCHE du script de build.
 
-  MAJ 5 - Correctif de l'icone + exe allege (commit suivant, ce fichier)
+  MAJ 5 - Correctif de l'icone + exe allege
     - Chemin d'icone ABSOLU pour PyInstaller (voir incident 5).
     - --exclude-module pygame/numpy/psutil/setuptools/pip (incident 6).
     - Suppression du .spec avant chaque build (evite les restes).
+
+  MAJ 6 - Le build depose tout dans jeu\ (demande de l'utilisateur)
+    - Avant : le build ecrivait dans compilation\release\.
+      Maintenant : jeu\LibreVies.exe (le launcher) et jeu\game\ (le jeu).
+      compilation\ ne sert plus qu'a compiler.
+    - build_launcher.bat : plus de dossier release ; Unity exporte directement
+      dans jeu\game, PyInstaller ecrit dans jeu\.
+    - build_unity_game.bat : export vers jeu\game aussi.
+    - publier_jeu.py / .bat : chemins par defaut = jeu\game et
+      jeu\LibreVies.exe (plus besoin de --jeu / --exe).
+    - publier_jeu.py note l'installation locale dans jeu\etat_jeu.json : apres
+      une publication, le launcher d'ici affiche "jeu a jour" au lieu de
+      retelecharger les 40 Mo qu'il vient de compiler. Un dossier jeu\ copie
+      tel quel (cle USB) est donc jouable immediatement, meme hors ligne.
+    - .gitignore : /jeu/LibreVies.exe et /jeu/game/ ignores (ce sont des
+      sorties de build, jamais des sources).
+    - VERIFIE : le launcher charge depuis jeu\ annonce bien "jeu a jour" et
+      trouve jeu\game\LibreViesGame.exe. La recette (31 controles) passe.
 
 
 ================================================================================
@@ -344,7 +370,20 @@ INCIDENT 12 - Le depot est un clone superficiel (shallow)
   Solution : "git fetch origin 'refs/heads/*:refs/remotes/origin/*'" avant
   toute comparaison de branches. Ne pas supposer que l'historique est complet.
 
-INCIDENT 13 - Pas d'acces reseau direct a GitHub dans le bac a sable
+INCIDENT 13 - rmdir /s /q sur le mauvais dossier (piege du renommage)
+  Contexte : en remplacant le dossier de sortie release\ par jeu\ dans
+  build_launcher.bat, un remplacement global a transforme
+  'if exist "release" rmdir /s /q "release"' en 'if exist "jeu" rmdir /s /q
+  "jeu"' : le script aurait EFFACE jeu\ en entier (launcher.pyw,
+  version_url.json, LIS-MOI.txt) a chaque build.
+  Solution : la ligne supprime desormais uniquement %JEU%\game (l'ancien
+  export), et un controle automatique verifie que toute cible de rmdir /s
+  est bien un sous-dossier connu (game, game.install, game.ancien, Library,
+  launcher, build).
+  LECON : apres un remplacement de chemins dans un .bat, relire CHAQUE ligne
+  de suppression. Un "rmdir /s /q" mal cible detruit le travail.
+
+INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
   Symptome : curl vers raw.githubusercontent.com / release-assets.githubusercontent.com
   echoue (SSL_ERROR_SYSCALL, EOF).
   Solution : passer par l'API (gh api) pour verifier qu'un fichier est bien
@@ -402,6 +441,10 @@ INCIDENT 13 - Pas d'acces reseau direct a GitHub dans le bac a sable
 
   Release GitHub "derniere" : 3 archives Godot (ancienne CI) - a nettoyer
   Ulterieurement si l'utilisateur le demande.
+
+  Disposition des sorties (demande de l'utilisateur) : le build ecrit dans
+  jeu\ (jeu\LibreVies.exe + jeu\game\), plus dans compilation\release\.
+  compilation\ ne sert qu'a compiler.
 
   Cote machine de l'auteur (Windows, chemin ...\unity2\) :
     - build_launcher.bat a deja recupere le projet tout seul (etape 1 OK)
@@ -466,8 +509,10 @@ INCIDENT 13 - Pas d'acces reseau direct a GitHub dans le bac a sable
     jour ; "game_build" = l'archive du jeu (rempli par publier_jeu.py).
 
   compilation/outils/publier_jeu.py / .bat
-    Archive release\game -> LibreVies_jeu_<md5>.zip, envoi dans la release,
-    mise a jour du manifeste, option --pousser pour git.
+    Archive jeu\game -> LibreVies_jeu_<md5>.zip, envoi dans la release,
+    mise a jour du manifeste, publication du launcher compile, notation de
+    l'installation locale (jeu\etat_jeu.json), option --pousser pour git.
+    Chemins par defaut : --jeu jeu\game et --exe jeu\LibreVies.exe.
 
   compilation/outils/definir_url_publication.py / .bat
     Change la branche publiee dans les 3 endroits, avec garde-fous.

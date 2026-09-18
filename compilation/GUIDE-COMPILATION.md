@@ -39,19 +39,16 @@ Ce qu'il télécharge automatiquement (uniquement si c'est absent) :
 | PyInstaller | `pip` | si absent (une seule fois) |
 | Unity Hub + Unity Editor | site officiel Unity | si Unity absent (gros, une seule fois) |
 
-Puis il fabrique :
+Puis il compile et **dépose tout dans `jeu/`** — le dossier du joueur :
 
-1. l'export du jeu Unity (`unity/`) **avec son runtime** ;
-2. `release\LibreVies.exe` — le launcher compilé ;
-3. `release\version_url.json` — copie du manifeste, pour tester ici.
-
-Résultat :
-
-| Fichier | Destinataire |
+| Résultat du build | Destinataire |
 |---|---|
-| `release\LibreVies.exe` | **le joueur : c'est le seul fichier à lui donner** |
-| `release\game\` | à publier (étape 2) |
-| `release\version_url.json` | test local uniquement |
+| `jeu\LibreVies.exe` | **le joueur : c'est le seul fichier à lui donner** |
+| `jeu\game\` (LibreViesGame.exe + UnityPlayer.dll + *_Data) | à publier (étape 2) |
+
+Il ne touche à rien d'autre dans `jeu/` : `launcher.pyw`, `version_url.json` et
+`LIS-MOI.txt` restent en place. **`compilation/` ne sert qu'à compiler** : tu
+peux l'oublier une fois le build terminé.
 
 Deux garanties importantes :
 
@@ -81,14 +78,17 @@ ou en ligne de commande : `build_launcher.bat main`.
 > puis se met à jour tout seul à chaque nouvelle publication.
 
 Double-clic sur `outils\publier_jeu.bat` (ou lance-le avec la version en
-paramètre). Le script :
+paramètre). Par défaut il travaille sur `jeu\game` et `jeu\LibreVies.exe`.
+Le script :
 
-1. rassemble `release\game\` en **une seule archive** `LibreVies_jeu_<md5>.zip` ;
+1. rassemble `jeu\game\` en **une seule archive** `LibreVies_jeu_<md5>.zip` ;
 2. l'envoie dans la release GitHub `derniere` (via `gh`) ;
 3. met à jour `jeu/version_url.json` : `url`, `size`, `hash` (md5), `moteur`, `exe` ;
-4. si `release\LibreVies.exe` existe, le publie aussi : le launcher des joueurs
-   se met à jour tout seul ;
-5. avec `--pousser` (utilisé par le `.bat`), il envoie le manifeste dans git.
+4. publie aussi `jeu\LibreVies.exe` : le launcher des joueurs se met à jour
+   tout seul ;
+5. note l'installation locale dans `jeu/etat_jeu.json` : le launcher installé
+   ici affiche « jeu à jour » au lieu de retélécharger ce qu'il vient de compiler ;
+6. avec `--pousser` (utilisé par le `.bat`), il envoie le manifeste dans git.
 
 Sans GitHub CLI (`gh`) sur la machine, le script fabrique quand même l'archive
 et met le manifeste à jour : il indique alors l'URL exacte où déposer le `.zip`
@@ -97,8 +97,8 @@ et met le manifeste à jour : il indique alors l'URL exacte où déposer le `.zi
 Commande équivalente en ligne de commande :
 
 ```bat
-python outils\publier_jeu.py --jeu release\game --version 0.5.0 ^
-    --notes "Village Unity, camera corrigee" --exe release\LibreVies.exe --pousser
+python outils\publier_jeu.py --version 0.5.0 ^
+    --notes "Village Unity, camera corrigee" --pousser
 ```
 
 ## 3. Ce que fait le joueur
@@ -112,13 +112,19 @@ python outils\publier_jeu.py --jeu release\game --version 0.5.0 ^
 Rien n'est installé ailleurs que dans le dossier du launcher :
 
 ```
-LibreVies.exe            le launcher
-version_url.json         le manifeste (recopie localement)
-etat_jeu.json            version installee (hash, date, exe)
-jeu.download.part        telechargement en cours (reprise)
-game\                    le jeu (LibreViesGame.exe + UnityPlayer.dll + *_Data)
-game.install\ / game.ancien\   dossiers de travail, supprimes apres coup
+jeu\                     UN SEUL dossier pour le joueur
+  LibreVies.exe          le launcher (il verifie les MAJ et telecharge le jeu)
+  version_url.json       le manifeste
+  LIS-MOI.txt            l'explication
+  game\                  le jeu (LibreViesGame.exe + UnityPlayer.dll + *_Data)
+  etat_jeu.json          version installee (hash, date, exe)
+  jeu.download.part      telechargement en cours (reprise)
+  game.install\ / game.ancien\   dossiers de travail, supprimes apres coup
 ```
+
+Le joueur peut aussi recevoir **tout le dossier `jeu\`** (clé USB, zip) : le
+launcher y trouve le jeu déjà installé et JOUER est disponible immédiatement,
+même sans Internet.
 
 ## 4. Changer la branche publiée
 
