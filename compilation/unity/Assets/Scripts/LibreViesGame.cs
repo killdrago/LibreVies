@@ -80,7 +80,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform cameraPivot;
     private Transform heroBody;
     private Transform brasAttaque;
-    private Collider joueurCollider;
+    private CapsuleCollider joueurCollider;
     private Camera gameCamera;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;

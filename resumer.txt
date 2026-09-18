@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 24 : camera, PNJ, mort et transparence
+Derniere mise a jour : 18/09/2026 - MAJ 25 : correction de compilation du collider joueur
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1157,8 +1157,22 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le forgeron dispose d'une enclume et frappe un marteau, le maire tient une
     feuille animee, et les vendeur/marchand disposent d'un etal anime avec
     marchandises visibles.
-  - Controle statique C# et scripts BAT passes. Aucun export Unity Windows reel
-    n'a encore ete relance apres cette MAJ : a confirmer sur le PC de l'auteur.
+  - Controle statique C# et scripts BAT passes. Le premier export Unity Windows
+    reel apres cette MAJ a revele une erreur de type sur le collider du joueur ;
+    elle est corrigee ci-dessous en MAJ 25.
+
+================================================================================
+8.14 MAJ 25 - CORRECTION DE COMPILATION DU COLLIDER JOUEUR
+================================================================================
+
+  - Le build Unity 6000.6.1f1 a bien charge com.unity.modules.jsonserialize,
+    puis a atteint la compilation C#.
+  - Erreur observee dans le log auteur : `Collider` ne possede pas les membres
+    `center`, `height` et `radius` aux lignes de creation du heros.
+  - Cause : le champ joueurCollider avait ete declare avec le type general
+    `Collider`, alors que ces proprietes appartiennent a `CapsuleCollider`.
+  - Correction : joueurCollider est maintenant un `CapsuleCollider`. Le build
+    doit etre relance sur le PC Windows pour confirmer l'export complet.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
