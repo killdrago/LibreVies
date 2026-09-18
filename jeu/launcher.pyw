@@ -687,10 +687,19 @@ def installer_build_jeu(build, progress_cb):
 
 
 def find_game():
-    """Retrouve l'executable du jeu installe, sinon None."""
+    """Retrouve uniquement un jeu valide selon le manifeste distant."""
     etat = lire_etat_jeu()
     cfg = load_local_config()
     build = cfg.get('game_build') if isinstance(cfg.get('game_build'), dict) else {}
+
+    # Ne jamais lancer silencieusement une ancienne compilation presente dans
+    # game/. Avant cette verification, un manifeste avec game_build={} laissait
+    # le bouton JOUER actif sur un vieux export : l'utilisateur croyait avoir
+    # recu la MAJ alors qu'il executait encore l'ancien monde.
+    if not build.get('url') or not build.get('hash'):
+        return None
+    if etat.get('hash') != build.get('hash'):
+        return None
 
     candidats = []
     if etat.get('exe'):

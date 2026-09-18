@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 33 : export Unity PBR valide
-                        apres correction du remplacement de jeu\game
+Derniere mise a jour : 18/09/2026 - MAJ 34 : interdit le lancement d'un
+                        ancien jeu non publie par le launcher
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1355,6 +1355,33 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Prochaine verification visuelle : lancer la nouvelle version et confirmer
     dans une capture que les murs, toits, sol, routes, bois et pierres affichent
     bien les textures PBR de MAJ 31, et non l'ancien export plat.
+
+================================================================================
+8.23 MAJ 34 - DIAGNOSTIC DU MONDE VISUEL NON MIS A JOUR
+================================================================================
+
+  - Controle utilisateur : l'ecran affiche encore le ciel bleu, le sol vert et
+    le HUD (mini-carte, PV, quete, cases 1 a 5), sans constater la nouvelle
+    version visuelle.
+  - Le log Unity fourni confirme seulement que le nouvel executable a ete
+    genere dans compilation\build\unity_export\LibreViesGame.exe. Il ne
+    prouve pas que cet executable a ete lance ni publie dans la release.
+  - Verification du depot et de GitHub : jeu/version_url.json contient encore
+    game_build: {} et la release derniere ne connait donc aucune compilation
+    PBR MAJ 31. Un launcher existant pouvait malgre tout trouver un ancien
+    jeu/game/ et activer JOUER : c'etait trompeur.
+  - Correction dans jeu/launcher.pyw : JOUER ne devient actif que si le
+    manifeste contient une URL et un hash d'archive, et si etat_jeu.json porte
+    exactement ce meme hash. Une ancienne build locale ne peut plus masquer
+    l'absence de publication.
+  - Pour rendre MAJ 31 visible a tous, il faut terminer le cycle Windows apres
+    l'export : compilation\outils\publier_jeu.bat, avec une version (ex.
+    0.5.0), afin de creer l'archive, l'envoyer dans la release derniere et
+    remplir game_build. Ce n'est pas possible depuis ce sandbox sans le binaire
+    genere sur le PC Windows.
+  - Pour verifier localement sans launcher, lancer directement
+    jeu\game\LibreViesGame.exe apres le deplacement reussi de unity_export.
+    Le journal runtime a examiner est jeu\game\logs\LibreVies.log.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
