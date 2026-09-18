@@ -1045,15 +1045,17 @@ public sealed class LibreViesGame : MonoBehaviour
         // La mairie est proche du centre, mais decalee de la route.
         CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
         CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Maison_Nord");
-        CreateBuilding(new Vector3(-4, 0, -26), new Vector3(7, 4, 6), "Maison_Sud");
-        // Espace libre au sud-est de la ville, loin de l'Auberge et de la route.
-        CreateFountain(new Vector3(10, 0, -25));
-        // Les portes sont sur la facade sud (+z) : les PNJ restent sur le cote.
-        CreerPnj(new Vector3(24.5f, 0, 1.0f), "Forgeron");
+        // Maison_Sud est remise sur le terrain plat du village, loin de la
+        // colline du chateau : son socle ne s'enfonce plus dans la pente.
+        CreateBuilding(new Vector3(8, 0, -6), new Vector3(7, 4, 6), "Maison_Sud");
+        // Fontaine sur le terrain libre directement devant la mairie.
+        CreateFountain(new Vector3(-8, 0, 24));
+        // Les PNJ sont a moins d'une largeur de porte de leur batiment.
+        CreerPnj(new Vector3(25.2f, 0, 0.8f), "Forgeron");
         // Le vendeur inutile devant une maison a ete retire. Le marchand reste
         // a droite de l'entrepot, derriere son etal.
-        CreerPnj(new Vector3(-22.2f, 0, 2.8f), "Marchand");
-        CreerPnj(new Vector3(-3.8f, 0, 17.5f), "Maire");
+        CreerPnj(new Vector3(-25.3f, 0, 2.5f), "Marchand");
+        CreerPnj(new Vector3(-4.8f, 0, 17.5f), "Maire");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1270,7 +1272,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // sur sa face, pas en plein milieu du passage.
             // Plaque centrale opaque et epaisse : elle separe vraiment les
             // inscriptions interieure et exterieure.
-            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.34f), "Bois_Clair", null, "Panneau_Fond", false, rotation);
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.34f), "Bois_Clair", null, "Panneau_Fond", true, rotation);
             Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.30f), "Wood", null, "Panneau_Bois", false, rotation);
             AjouterTextePanneau(new Vector3(mx, my + 4.45f, mz), rotation);
         }

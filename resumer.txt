@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 29 : village 40 m, toits et textes corriges
+Derniere mise a jour : 18/09/2026 - MAJ 30 : fontaine, PNJ et terrain corriges
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1255,6 +1255,22 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     recouvre maintenant legerement le haut du mur pour supprimer le jour.
   - Controle C# statique et scripts BAT reussis. L'export Unity Windows doit
     etre relance pour verifier les distances, l'occlusion et la transparence.
+
+================================================================================
+8.19 MAJ 30 - FONTAINE, PNJ, PORTIQUES ET TERRAIN
+================================================================================
+
+  - La fontaine est deplacee sur le terrain libre devant la mairie.
+  - Le forgeron, le marchand et le maire sont places juste a cote de la porte
+    de leur batiment ; le marchand reste du cote interieur de son etal.
+  - Les plaques LIBREVIES des portiques ont un vrai collider opaque : le texte
+    oppose est masque par la plaque et ne peut plus se voir au travers.
+  - La Maison_Sud est sortie de la pente de la colline du chateau et posee sur
+    le terrain plat du village.
+  - Le rayon du village reste fixe a 40 m, avec route, portiques et mairie
+    coherents avec cette echelle.
+  - Controle C# statique et scripts BAT reussis. Relancer l'export Unity
+    Windows pour confirmer les positions et la profondeur des panneaux.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
