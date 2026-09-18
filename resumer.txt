@@ -750,6 +750,17 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
   compilation/outils/creer_icone.py / creer_icone.bat
     Reextrait icon.ico depuis les octets integres au launcher.
 
+  compilation/outils/verifier_cs_syntaxe.py
+    Controleur de SYNTAXE des fichiers C# (grammaire tree-sitter) : attrape les
+    accolades/points-virgules manquants AVANT de lancer Unity, alors qu'il n'y
+    a aucun compilateur C# dans le bac a sable. Ne verifie ni les types ni les
+    API Unity : a lancer apres chaque modification du jeu.
+        pip install --break-system-packages tree_sitter tree_sitter_c_sharp
+        python compilation/outils/verifier_cs_syntaxe.py
+    Teste sur une faute volontaire (point-virgule retire) : detectee.
+    LIMITE : le paquet pip est perdu a chaque nouvelle session (bac a sable
+    re-clone), il faut le reinstaller.
+
   compilation/outils/verifier_bat.py
     Controleur de scripts .bat : ASCII uniquement, parentheses non echappees
     dans un echo en bloc, labels appeles par call/goto mais inexistants,
@@ -781,6 +792,11 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
   - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
   - Lancer la recette :      python compilation/outils/test_launcher.py
   - Verifier les .bat :      python compilation/outils/verifier_bat.py
+  - Verifier le C# :         python compilation/outils/verifier_cs_syntaxe.py
+                             (installer d'abord : pip install
+                              --break-system-packages tree_sitter
+                              tree_sitter_c_sharp)
+  - Empreinte de la branche (build) : compilation\build\branche_actuelle.txt
   - Aucune trace de l'ancien moteur (regle de l'utilisateur) : chercher son
     nom dans tout le depot (option -i, insensible a la casse, hors .git) doit
     ne RIEN afficher. Oui, y compris dans ce fichier et dans les
