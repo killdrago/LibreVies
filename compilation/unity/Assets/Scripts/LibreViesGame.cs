@@ -40,6 +40,14 @@ public sealed class LibreViesGame : MonoBehaviour
     // Rectangles des batiments : le decor (arbres, lampadaires, caisses...)
     // ne doit jamais etre pose dans un mur.
     private readonly List<Batiment> batiments = new List<Batiment>();
+    // Portails du village (position du portail) et gardes qui les surveillent.
+    private readonly List<Vector2> portails = new List<Vector2>();
+    private readonly List<GardeState> gardes = new List<GardeState>();
+    // Degats flottants et etincelles d'impact (listes d'effets temporaires).
+    private readonly List<EffetTexte> floaters = new List<EffetTexte>();
+    private readonly List<EffetEtincelle> etincelles = new List<EffetEtincelle>();
+    private Font policeDefaut;
+    private bool policeCherchee;
     private readonly List<EnemyState> enemies = new List<EnemyState>();
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
@@ -87,6 +95,30 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
     private GUIStyle boxStyle;
+
+    private sealed class EffetTexte
+    {
+        public GameObject Root;
+        public float Age;
+    }
+
+    private sealed class EffetEtincelle
+    {
+        public GameObject Root;
+        public float Age;
+    }
+
+    private sealed class GardeState
+    {
+        public GameObject Root;
+        public Transform JambeG;
+        public Transform JambeD;
+        public Obstacle Corps;
+        public Vector2 Poste;      // la ou il revient quand tout est calme
+        public Vector2 Portail;    // la porte qu'il surveille
+        public float Recharge;
+        public float Phase;
+    }
 
     private sealed class Batiment
     {
@@ -150,6 +182,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // Champ de vision 55 : le cadrage de la reference de jeu.
         gameCamera.fieldOfView = 55f;
         LoadOptions();
+        obstacles.Clear();
+        batiments.Clear();
+        portails.Clear();
+        gardes.Clear();
+        floaters.Clear();
+        etincelles.Clear();
         CreateMaterials();
         CreateEnvironment();
         CreateTerrain();
@@ -165,6 +203,7 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateClouds();
         CreatePlayer();
         CreateEnemies();
+        CreateGuards();
         CreatePickups();
         ShowInfo("LibreVies — monde Unity prêt");
     }
@@ -175,6 +214,7 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdateClouds(dt);
         UpdatePickups(dt);
         UpdateEnemies(dt);
+        UpdateGuards(dt);
         UpdatePlayer(dt);
         UpdateCamera();
         UpdateEffects(dt);
@@ -215,6 +255,7 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Banniere_Rouge", new Color(0.55f, 0.16f, 0.16f));
         MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
         MakeMaterial("Arbre_Rond", new Color(0.22f, 0.58f, 0.20f));
+        MakeMaterial("Cimier", new Color(0.75f, 0.15f, 0.15f));
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false)
@@ -743,8 +784,8 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-19, 0, 13), new Vector3(5, 3.5f, 5), "Maison_Nord");
         CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
         CreateFountain(new Vector3(9, 0, 15));
-        CreateGuard(new Vector3(-12, 0, 26));
-        CreateGuard(new Vector3(12, 0, 26));
+        // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
+        // juste devant les portails du village (voir CreateFence).
     }
 
     private void CreateBuilding(Vector3 position, Vector3 size, string name)
@@ -864,6 +905,8 @@ public sealed class LibreViesGame : MonoBehaviour
             float mx = Mathf.Cos(am) * VillageRadius;
             float mz = Mathf.Sin(am) * VillageRadius;
             float my = TerrainHeight(mx, mz);
+            // Memorise : les gardes se postent a l'interieur de chaque portail.
+            portails.Add(new Vector2(mx, mz));
             // Longueur du linteau = corde entre les deux poteaux.
             float longueur = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0)).magnitude * VillageRadius + 0.2f;
             // L'axe du linteau suit la corde (donc la route qui passe dessous).
@@ -887,38 +930,179 @@ public sealed class LibreViesGame : MonoBehaviour
     // simplement le panneau en bois, sans erreur.
     private void AjouterTextePanneau(Vector3 position, Quaternion rotation)
     {
-        Font police = null;
-        try { police = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
-        catch (System.Exception) { police = null; }
-        if (police == null)
-        {
-            try { police = Resources.GetBuiltinResource<Font>("Arial.ttf"); }
-            catch (System.Exception) { police = null; }
-        }
-        if (police == null) return;
-        var objet = new GameObject("Texte_Portail");
-        objet.transform.position = position;
+        GameObject objet = CreerTexte3D("LIBREVIES", position, new Color(0.20f, 0.12f, 0.05f), 0.42f);
+        if (objet == null) return;
+        objet.name = "Texte_Portail";
         objet.transform.rotation = rotation;
-        var texte = objet.AddComponent<TextMesh>();
-        texte.text = "LIBREVIES";
-        texte.font = police;
-        texte.characterSize = 0.42f;   // des lettres d environ 40 cm, ajustees au panneau
-        texte.fontSize = 64;
-        texte.anchor = TextAnchor.MiddleCenter;
-        texte.color = new Color(0.20f, 0.12f, 0.05f);
-        var rendu = objet.GetComponent<MeshRenderer>();
-        if (rendu != null) rendu.sharedMaterial = police.material;
         // Le texte regarde vers l'exterieur, comme le panneau.
         objet.transform.Rotate(0f, 180f, 0f, Space.Self);
     }
 
-    private void CreateGuard(Vector3 position)
+    // Un garde par portail, poste a l'interieur (comme la reference : 0,90 du
+    // rayon du village). Il ne patrouille pas : il reste a son poste, regarde
+    // vers l'exterieur, et va frapper tout monstre qui approche de SA porte.
+    private void CreateGuards()
     {
+        for (int i = 0; i < portails.Count; i++)
+        {
+            Vector2 portail = portails[i];
+            float distance = portail.magnitude;
+            if (distance < 0.001f) continue;
+            Vector2 poste = portail.normalized * (VillageRadius * 0.90f);
+            CreerGarde(poste, portail);
+        }
+    }
+
+    private void CreerGarde(Vector2 poste, Vector2 portail)
+    {
+        float y = TerrainHeight(poste.x, poste.y);
         var root = new GameObject("Garde").transform;
-        root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
-        Primitive(PrimitiveType.Capsule, new Vector3(0, 1.1f, 0), new Vector3(0.5f, 1.1f, 0.5f), "Player", root, "Corps");
-        Box(new Vector3(0.55f, 1.5f, 0), new Vector3(0.10f, 2.2f, 0.10f), "Stone", root, "Hallebarde", false, Quaternion.Euler(0, 0, -8));
-        ColCercle(position.x, position.z, 0.4f, 1.8f);
+        root.position = new Vector3(poste.x, y, poste.y);
+        var state = new GardeState { Root = root.gameObject, Poste = poste, Portail = portail };
+
+        // Jambes : chacune est un pivot anime (comme jg / jd de la reference).
+        state.JambeG = CreerJambe(root, -0.12f);
+        state.JambeD = CreerJambe(root, 0.12f);
+
+        Box(new Vector3(0, 0.70f, 0), new Vector3(0.38f, 0.20f, 0.26f), "Stone", root, "Bassin");
+        Box(new Vector3(0, 0.98f, 0), new Vector3(0.44f, 0.52f, 0.28f), "Stone", root, "Cuirasse");
+        Box(new Vector3(0, 0.80f, 0), new Vector3(0.46f, 0.10f, 0.30f), "Dirt", root, "Ceinturon");
+        Box(new Vector3(0, 1.02f, 0.15f), new Vector3(0.30f, 0.30f, 0.05f), "White", root, "Plastron");
+        Box(new Vector3(0, 1.0f, 0), new Vector3(0.46f, 0.09f, 0.30f), "Cimier", root, "Baudrier", false, Quaternion.Euler(0f, 0f, 35f));
+        Primitive(PrimitiveType.Sphere, new Vector3(-0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereG");
+        Primitive(PrimitiveType.Sphere, new Vector3(0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereD");
+        Primitive(PrimitiveType.Capsule, new Vector3(-0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasG");
+        Primitive(PrimitiveType.Capsule, new Vector3(0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasD");
+        Primitive(PrimitiveType.Sphere, new Vector3(-0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainG");
+        Primitive(PrimitiveType.Sphere, new Vector3(0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainD");
+        Box(new Vector3(0, 1.42f, 0), new Vector3(0.30f, 0.30f, 0.28f), "Skin", root, "Visage");
+        Box(new Vector3(-0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilG");
+        Box(new Vector3(0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilD");
+        Box(new Vector3(0, 1.59f, 0), new Vector3(0.34f, 0.16f, 0.32f), "Stone", root, "Casque");
+        Box(new Vector3(0, 1.49f, 0.16f), new Vector3(0.26f, 0.05f, 0.06f), "Metal", root, "Visiere");
+        Box(new Vector3(0, 1.74f, 0), new Vector3(0.06f, 0.18f, 0.32f), "Cimier", root, "Cimier");
+
+        // Hallebarde verticale, bien visible (manche clair, fer, croc, talon).
+        var hallebarde = new GameObject("Hallebarde").transform;
+        hallebarde.SetParent(root, false);
+        hallebarde.localPosition = new Vector3(0.34f, 1.25f, 0.05f);
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0, 0), new Vector3(0.08f, 1.25f, 0.08f), "Bois_Clair", hallebarde, "Manche");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.55f, 0), new Vector3(0.11f, 0.025f, 0.11f), "Metal", hallebarde, "Bague");
+        Box(new Vector3(0, 1.10f, 0), new Vector3(0.12f, 0.50f, 0.20f), "White", hallebarde, "Fer");
+        CreateCone(hallebarde, new Vector3(0, 1.50f, 0), 0.10f, 0.32f, "White", "Pointe_Hallebarde");
+        Box(new Vector3(-0.16f, 0.90f, 0), new Vector3(0.22f, 0.32f, 0.07f), "White", hallebarde, "Croc");
+        Box(new Vector3(0, -1.20f, 0), new Vector3(0.10f, 0.14f, 0.10f), "Stone", hallebarde, "Talon");
+
+        state.Corps = new Obstacle
+        {
+            Cercle = true, X = poste.x, Z = poste.y, Rayon = 0.4f, Portee = 1.4f, Hauteur = 1.8f
+        };
+        obstacles.Add(state.Corps);
+        gardes.Add(state);
+    }
+
+    private Transform CreerJambe(Transform parent, float decalageX)
+    {
+        var jambe = new GameObject(decalageX < 0f ? "JambeG" : "JambeD").transform;
+        jambe.SetParent(parent, false);
+        jambe.localPosition = new Vector3(decalageX, 0.62f, 0f);
+        Primitive(PrimitiveType.Capsule, new Vector3(0, -0.26f, 0), new Vector3(0.19f, 0.26f, 0.19f), "Stone", jambe, "Jambard");
+        Box(new Vector3(0, -0.55f, -0.03f), new Vector3(0.17f, 0.16f, 0.26f), "Metal", jambe, "Soleret");
+        return jambe;
+    }
+
+    // Les gardes : poste fixe, regard vers l'exterieur, et coup mortel sur tout
+    // monstre qui s'approche a moins de 2,5 m de LEUR portail (la reference est
+    // volontairement radicale : un garde tue un monstre en un seul coup).
+    private void UpdateGuards(float dt)
+    {
+        for (int i = 0; i < gardes.Count; i++)
+        {
+            GardeState garde = gardes[i];
+            garde.Recharge -= dt;
+            garde.Phase += dt;
+            var position = new Vector2(garde.Root.transform.position.x, garde.Root.transform.position.z);
+
+            EnemyState cible = null;
+            for (int e = 0; e < enemies.Count; e++)
+            {
+                EnemyState ennemi = enemies[e];
+                if (!ennemi.Alive) continue;
+                Vector3 ep = ennemi.Root.transform.position;
+                if (new Vector2(ep.x - garde.Portail.x, ep.z - garde.Portail.y).magnitude < 2.5f)
+                {
+                    cible = ennemi;
+                    break;
+                }
+            }
+
+            bool marche = false;
+            Vector2 regard = Vector2.zero;
+            if (cible != null)
+            {
+                var ciblePosition = new Vector2(cible.Root.transform.position.x, cible.Root.transform.position.z);
+                regard = ciblePosition - position;
+                float distance = regard.magnitude;
+                if (distance > 1.5f && distance > 0.001f)
+                {
+                    Vector2 pas = regard.normalized * Mathf.Min(2.6f * dt, distance - 1.4f);
+                    position += pas;
+                    marche = true;
+                }
+                if (distance < 2.0f && garde.Recharge <= 0f)
+                {
+                    garde.Recharge = 0.8f;
+                    // Coup de grace : "-999" et etincelles, comme la reference.
+                    cible.Hp = 0;
+                    SpawnFloater(cible.Root.transform.position + Vector3.up * 1.3f, "-999",
+                        new Color(1f, 0.85f, 0.30f));
+                    SpawnSpark(cible.Root.transform.position + Vector3.up * 0.6f);
+                    if (cible.Hp <= 0)
+                    {
+                        TuerEnnemiParGarde(cible);
+                        ShowInfo("Un garde du village a repousse " + cible.Root.name + " !");
+                    }
+                }
+            }
+            else
+            {
+                Vector2 retour = garde.Poste - position;
+                if (retour.magnitude > 0.15f)
+                {
+                    Vector2 pas = retour.normalized * Mathf.Min(2.0f * dt, retour.magnitude);
+                    position += pas;
+                    marche = true;
+                    regard = retour;
+                }
+                else if (garde.Portail.magnitude > 0.01f)
+                {
+                    regard = garde.Portail.normalized;
+                }
+                else regard = Vector2.up;
+            }
+
+            float sol = TerrainHeight(position.x, position.y);
+            garde.Root.transform.position = new Vector3(position.x, sol, position.y);
+            if (garde.Corps != null)
+            {
+                garde.Corps.X = position.x;
+                garde.Corps.Z = position.y;
+            }
+            if (regard.sqrMagnitude > 0.0001f)
+                garde.Root.transform.rotation = Quaternion.LookRotation(new Vector3(regard.x, 0f, regard.y));
+            float balancement = marche ? Mathf.Sin(garde.Phase * 8f) * 0.45f : 0f;
+            if (garde.JambeG != null) garde.JambeG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
+            if (garde.JambeD != null) garde.JambeD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+        }
+    }
+
+    private void TuerEnnemiParGarde(EnemyState ennemi)
+    {
+        ennemi.Alive = false;
+        ennemi.RespawnAt = Time.time + 10f;
+        ennemi.Root.SetActive(false);
+        // Remarque : la reference ne compte pas ce monstre pour la quete et ne
+        // donne pas d'experience au heros (c'est le garde qui l'a tue).
     }
 
     private void CreateTreesAndProps()
@@ -1548,11 +1732,13 @@ public sealed class LibreViesGame : MonoBehaviour
             if (enemy.Corps != null) { enemy.Corps.X = position.x; enemy.Corps.Z = position.z; }
 
             // Attaque : a portee et pas a travers la cloture du village.
-            if (distance < 1.8f && enemy.AttackCooldown <= 0 && !dead
+            // Cadence 1,2 s / portee 1,6 m / 6 degats : les valeurs de la
+            // reference (c'etait 0,8 s / 1,8 m / 8 degats).
+            if (distance < 1.6f && enemy.AttackCooldown <= 0 && !dead
                 && !ClotureEntre(position, player.position))
             {
-                enemy.AttackCooldown = 0.8f;
-                DamagePlayer(8);
+                enemy.AttackCooldown = 1.2f;
+                DamagePlayer(6);
             }
 
             if (enemy.Spider && enemy.Legs != null)
@@ -1597,6 +1783,9 @@ public sealed class LibreViesGame : MonoBehaviour
             if (ClotureEntre(player.position, enemy.Root.transform.position)) continue;
             enemy.Hp -= HammerDamage;
             touches++;
+            // Le "-25" qui s'envole et les etincelles de l'impact.
+            SpawnFloater(enemy.Root.transform.position + Vector3.up * 1.3f, "-" + HammerDamage, Color.white);
+            SpawnSpark(enemy.Root.transform.position + Vector3.up * 0.6f);
             if (enemy.Hp <= 0)
             {
                 enemy.Alive = false; enemy.RespawnAt = Time.time + 10f; enemy.Root.SetActive(false);
@@ -1614,6 +1803,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (playerProtection > 0 || dead) return;
         hp = Mathf.Max(0, hp - amount);
         playerProtection = 0.45f;
+        // Le nombre de degats s'affiche au-dessus du heros (en rouge).
+        SpawnFloater(player.position + Vector3.up * 1.8f, "-" + amount, new Color(1f, 0.30f, 0.20f));
         if (hp <= 0) Die();
     }
 
@@ -1734,6 +1925,113 @@ public sealed class LibreViesGame : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    private void CreateEffectsPlaceholder() { }
-    private void UpdateEffects(float dt) { }
+    // ------------------------------------------------------------------
+    // DEGATS FLOTTANTS ET ETINCELLES
+    // Le petit "-25" qui s'envole a chaque coup et les etincelles jaunes de
+    // l'impact : sans eux, on ne sait pas si on touche. Ecrits en clair dans le
+    // jeu (le HUD OnGUI ne peut pas suivre un point du monde en 3D).
+    // ------------------------------------------------------------------
+    private Font PoliceParDefaut()
+    {
+        if (policeCherchee) return policeDefaut;
+        policeCherchee = true;
+        try { policeDefaut = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
+        catch (System.Exception) { policeDefaut = null; }
+        if (policeDefaut == null)
+        {
+            try { policeDefaut = Resources.GetBuiltinResource<Font>("Arial.ttf"); }
+            catch (System.Exception) { policeDefaut = null; }
+        }
+        return policeDefaut;
+    }
+
+    private GameObject CreerTexte3D(string texte, Vector3 position, Color couleur, float taille)
+    {
+        Font police = PoliceParDefaut();
+        if (police == null) return null;
+        var objet = new GameObject("Texte3D");
+        objet.transform.position = position;
+        var composant = objet.AddComponent<TextMesh>();
+        composant.text = texte;
+        composant.font = police;
+        composant.fontSize = 64;
+        composant.characterSize = taille;
+        composant.anchor = TextAnchor.MiddleCenter;
+        composant.color = couleur;
+        var rendu = objet.GetComponent<MeshRenderer>();
+        if (rendu != null) rendu.sharedMaterial = police.material;
+        return objet;
+    }
+
+    private void SpawnFloater(Vector3 position, string texte, Color couleur)
+    {
+        GameObject objet = CreerTexte3D(texte, position, couleur, 0.25f);
+        if (objet == null) return;
+        floaters.Add(new EffetTexte { Root = objet, Age = 0f });
+    }
+
+    private void SpawnSpark(Vector3 position)
+    {
+        var root = new GameObject("Etincelles");
+        root.transform.position = position;
+        for (int i = 0; i < 3; i++)
+        {
+            var branche = new GameObject("Etincelle");
+            branche.transform.SetParent(root.transform, false);
+            Box(Vector3.zero, new Vector3(0.9f, 0.10f, 0.10f), "Lanterne", branche.transform, "Branche");
+            branche.transform.localRotation = Quaternion.Euler(20f, i * 60f, 0f);
+        }
+        etincelles.Add(new EffetEtincelle { Root = root, Age = 0f });
+    }
+
+    private void UpdateEffects(float dt)
+    {
+        // Textes de degats : montent de 1,6 m/s et s'effacent en 1 s.
+        for (int i = floaters.Count - 1; i >= 0; i--)
+        {
+            EffetTexte floater = floaters[i];
+            if (floater.Root == null)
+            {
+                floaters.RemoveAt(i);
+                continue;
+            }
+            floater.Age += dt;
+            floater.Root.transform.position += Vector3.up * dt * 1.6f;
+            float opacite = 1f - floater.Age;
+            if (opacite <= 0f)
+            {
+                Destroy(floater.Root);
+                floaters.RemoveAt(i);
+                continue;
+            }
+            var composant = floater.Root.GetComponent<TextMesh>();
+            if (composant != null)
+            {
+                Color couleur = composant.color;
+                couleur.a = opacite;
+                composant.color = couleur;
+            }
+        }
+
+        // Etincelles : grossissent et clignotent pendant 0,25 s.
+        for (int i = etincelles.Count - 1; i >= 0; i--)
+        {
+            EffetEtincelle effet = etincelles[i];
+            if (effet.Root == null)
+            {
+                etincelles.RemoveAt(i);
+                continue;
+            }
+            effet.Age += dt;
+            float avancement = effet.Age / 0.25f;
+            if (avancement >= 1f)
+            {
+                Destroy(effet.Root);
+                etincelles.RemoveAt(i);
+                continue;
+            }
+            effet.Root.transform.localScale = Vector3.one * (0.6f + avancement * 1.2f);
+            effet.Root.SetActive(((int)(effet.Age * 30f)) % 2 == 0);
+        }
+    }
 }

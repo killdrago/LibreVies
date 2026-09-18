@@ -435,6 +435,37 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       ete simulee cote a cote en Python pour verifier que les 3 lampadaires
       tombent bien a 3,4 m de la route et hors des batiments.
 
+  MAJ 11 - Gardes des portails + degats flottants (lots demandes par l'utilisateur)
+    a) GARDES. Avant : deux gardes plantes la, sans rien faire, loin des
+       portails. Maintenant : un garde DEVANT CHAQUE PORTAIL (position exacte
+       de la reference : 0,90 du rayon du village), en armure complete (casque,
+       cimier rouge, plastron, baudrier, spallieres, jambards, solerets) avec
+       une hallebarde entiere et des jambes ANIMEES.
+       Comportement (update_gardes de la reference) : il ne patrouille pas, il
+       reste a son poste et regarde vers l'exterieur ; si un monstre arrive a
+       moins de 2,5 m de SA porte, il va dessus et le tue en UN COUP ("-999"
+       dore + etincelles, message "Un garde du village a repousse X !"), puis
+       retourne a son poste. Le monstre revient 10 s plus tard.
+       Le garde tue ne rapporte NI experience NI monstre pour la quete : c'est
+       le garde qui l'a tue, pas le heros (comportement de la reference).
+    b) DEGATS FLOTTANTS ET ETINCELLES. Le "-25" blanc qui s'envole a chaque coup
+       de marteau, le "-6" rouge au-dessus du heros quand un monstre le touche,
+       le "-999" dore des gardes, et les etincelles jaunes croisees a l'impact
+       (elles grossissent et clignotent 0,25 s, exactement comme la reference).
+       C'est le seul moyen de savoir qu'on touche : le HUD OnGUI ne peut pas
+       suivre un point du monde en 3D.
+       Ecrit avec TextMesh (texte 3D) et non avec un Label3D : Unity n'a pas
+       l'equivalent, et le rendu reste lisible.
+    c) EQUILIBRE ALIGNE sur la reference : les monstres font 6 degats (et non 8),
+       toutes les 1,2 s (et non 0,8 s), a 1,6 m (et non 1,8 m). Le heros garde
+       100 PV et 25 degats par coup de marteau. A dire si l'utilisateur prefere
+       la difficulte precedente : c'est une seule ligne.
+    - VERIFIE : syntaxe C# OK, accolades 264/264, parentheses 1452/1452.
+      Nouveaute de l'outil : verifier_cs_syntaxe.py detecte maintenant aussi
+      les APPELS a des methodes qui n'existent pas (renommees ou supprimees).
+      Il a trouve un vrai bug de ce lot : CreateTown appelait encore
+      CreateGuard() alors que la methode avait ete remplacee.
+
 
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
@@ -727,8 +758,8 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
 
   [ ] 3 bis. PARITE RESTANTE avec la reference (a faire par lots, par ordre
           d'importance visuelle) :
-            a) gardes qui patrouillent devant les portails (update_pnj) ;
-            b) degats flottants ("-25" qui monte) et etincelles a l'impact ;
+            a) Fait en MAJ 11 : gardes devant les portails, coup mortel ;
+            b) Fait en MAJ 11 : degats flottants et etincelles d'impact ;
             c) Fait en MAJ 10 : lampadaires, panneaux, bannieres, herbe,
                rochers, barils, cloutures de route ;
             d) touches reconfigurables (panneau OPTIONS + clavier AZERTY) ;
@@ -793,8 +824,10 @@ INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sourn
   compilation/outils/verifier_cs_syntaxe.py
     Controleur de SYNTAXE des fichiers C# (grammaire tree-sitter) : attrape les
     accolades/points-virgules manquants AVANT de lancer Unity, alors qu'il n'y
-    a aucun compilateur C# dans le bac a sable. Ne verifie ni les types ni les
-    API Unity : a lancer apres chaque modification du jeu.
+    a aucun compilateur C# dans le bac a sable. Il signale aussi les APPELS a
+    des methodes qui n'existent nulle part (methode renommee ou supprimee) :
+    c'est ce qui a permis de trouver CreateGuard() appele apres sa suppression.
+    Il ne verifie PAS les types (a completer par une relecture).
         pip install --break-system-packages tree_sitter tree_sitter_c_sharp
         python compilation/outils/verifier_cs_syntaxe.py
     Teste sur une faute volontaire (point-virgule retire) : detectee.
