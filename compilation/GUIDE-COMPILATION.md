@@ -154,6 +154,8 @@ touché.
 | Le joueur reste sur une vieille version | le manifeste n'a pas été envoyé (`git push`) ou l'archive n'est pas dans la release |
 | Le launcher ne se met pas à jour | publie aussi `LibreVies.exe` (`--exe`) : la mise à jour du launcher passe par lui |
 | L'export Unity échoue | regarde `compilation\build\unity.log` |
+| `FileNotFoundError: Icon input file ...\build\icon.ico` | PyInstaller résout un chemin d'icône **relatif au dossier du `.spec`**. Le script passe donc l'icône en chemin absolu. Si ça revient : lance `outils\creer_icone.bat`, il doit afficher « Icone prete » |
+| `LibreVies.exe` énorme (pygame, numpy dedans) | ces modules sont installés sur la machine de build et PyInstaller les aspire : ils sont exclus dans `build_launcher.bat` (`--exclude-module`) |
 
 ## Rappels utiles
 

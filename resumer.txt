@@ -1,0 +1,505 @@
+================================================================================
+LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
+Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
+Derniere mise a jour : 18/09/2026 - launcher 4.0.0 / depot reorganise
+Depot : https://github.com/killdrago/LibreVies
+Branche de travail et publiee : arena/01a0b32c-librevies
+================================================================================
+
+COMMENT UTILISER CE FICHIER
+---------------------------
+Donne ce fichier a l'assistant en disant par exemple :
+
+  "Voici resumer.txt du projet LibreVies. Lis-le entierement, puis reprends le
+   travail exactement la ou il s'est arrete. Ne recommence pas ce qui est fait
+   et respecte les regles techniques de la section 7."
+
+L'assistant doit :
+  1. lire ce fichier en entier avant de toucher au code ;
+  2. verifier l'etat reel du depot (git log, git status) au lieu de supposer ;
+  3. ne jamais casser le contrat de la section 2 (deux dossiers) ;
+  4. lancer la recette (section 9) apres toute modification du launcher.
+
+
+================================================================================
+1. LE PROJET EN UNE PAGE
+================================================================================
+
+LibreVies est un jeu (MMO open world low-poly) developpe par l'utilisateur
+("Dragonus" sur GitHub : killdrago). Le jeu est une application UNITY :
+une seule scene (compilation/unity/Assets/Scenes/LibreVies.unity) et tout le
+jeu construit par code C# dans compilation/unity/Assets/Scripts/LibreViesGame.cs
+(~35 Ko) : village, chateau, personnage, ennemis, combat, HUD, sauvegarde.
+Version du jeu : 0.4.0 (moteur Unity, export Windows 64 bits Mono).
+
+Le but de la refonte terminee ici est la DISTRIBUTION :
+  - l'utilisateur ne veut plus envoyer le projet entier aux joueurs ;
+  - le joueur recoit UN SEUL fichier : LibreVies.exe (le launcher compile) ;
+  - le launcher telecharge tout seul le jeu complet et ses mises a jour ;
+  - Unity, Python, PyInstaller, GitHub, le projet Unity et les images de
+    travail restent strictement chez l'auteur.
+
+Parcours du joueur :
+  double-clic sur LibreVies.exe
+    -> verifie les mises a jour sur GitHub
+    -> telecharge le jeu complet (1re fois) avec reprise si la connexion coupe
+    -> installe dans game\ (controle md5)
+    -> bouton JOUER -> le jeu Unity demarre
+
+
+================================================================================
+2. CONTRAT DE STRUCTURE - A NE JAMAIS CASSER
+================================================================================
+
+Le depot contient exactement deux dossiers fonctionnels :
+
+  jeu/                 CE QUE LE JOUEUR RECOIT (et rien d'autre)
+    launcher.pyw       le launcher (source ; compile en LibreVies.exe)
+    version_url.json   le manifeste lu par le launcher
+    LIS-MOI.txt        explication envoyee au joueur
+    [game/]            le jeu telecharge (ignore par git)
+    [etat_jeu.json]    etat de l'installation (ignore par git)
+    [jeu.download.part] telechargement en cours (ignore par git)
+
+  compilation/         RESERVE A L'AUTEUR - JAMAIS telecharge par le joueur
+    unity/             le projet Unity (le jeu)
+    build_launcher.bat fabrique release\LibreVies.exe + release\game
+    build_unity_game.bat  export Unity seul (diagnostic)
+    setup_unity_build_tools.bat + download_unity_hub.ps1  installent Unity
+    image/             images de travail (bannieres, chapitres, logos)
+    outils/            publier_jeu, definir_url_publication, creer_icone,
+                       test_launcher (la recette)
+    [release/] [build/]  sorties de build (ignorees par git)
+
++ README.md (2 sections : joueur / auteur) et resumer.txt (ce fichier).
+
+REGLES :
+  - rien de "compilation/" ne doit apparaitre dans "jeu/" ;
+  - le launcher ne doit JAMAIS telecharger de fichier de compilation/ ;
+  - "jeu/" doit rester minuscule : c'est le dossier des joueurs.
+
+
+================================================================================
+3. COMMENT FONCTIONNE LE LAUNCHER (jeu/launcher.pyw, version 4.0.0)
+================================================================================
+
+Le launcher est un fichier Python unique de ~650 Ko : ~1080 lignes + les
+images (banniere, icone, ICO) integrees en base64. Il n'a besoin d'AUCUNE
+bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
+(facultatif : sans lui, les PNG integres passent par tk.PhotoImage).
+
+3.1 Au lancement (1er passage)
+  - GAME_DIR = dossier du .exe (ou du .pyw en developpement).
+  - Il lit jeu/version_url.json recopie a cote de lui. S'il n'existe pas, il
+    utilise DEFAULT_RAW_URL ecrit en dur (valeur de secours).
+  - Il lit le manifeste distant (raw_url) : URL GitHub "raw".
+
+3.2 Mise a jour des petits fichiers (cle "files" du manifeste)
+  - Uniquement des fichiers TEXTE (md5 calcule sur le contenu normalise LF/CRLF).
+  - Quand on developpe avec launcher.pyw, les entrees launcher.pyw et
+    LibreVies.exe sont ignorees (sinon on ecraserait ses propres sources).
+  - Les chemins sont valides par _safe_local_path() : refus des chemins
+    absolus, des lecteurs Windows (C:) et de tout "..". Un manifeste corrompu
+    ne peut donc pas ecrire hors du dossier du launcher.
+  - Le launcher compile (LibreVies.exe) ne peut pas se remplacer pendant qu'il
+    tourne : il depose .new puis un .cmd remplace le fichier apres fermeture et
+    relance le launcher.
+
+3.3 Mise a jour du JEU COMPLET (cle "game_build" du manifeste)
+  C'est le coeur de la distribution. Le jeu n'est PAS telecharge fichier par
+  fichier : il arrive en UNE SEULE archive .zip.
+
+    {
+      "game_build": {
+        "moteur": "unity",
+        "version": "0.4.0",
+        "dossier": "game",           <- ou l'archive est installee
+        "exe": "LibreViesGame.exe",  <- lance par le bouton JOUER
+        "url": "https://github.com/.../releases/download/derniere/LibreVies_jeu_xxxx.zip",
+        "size": 39269570,
+        "hash": "md5 de l'archive"
+      }
+    }
+
+  Deroulement de installer_build_jeu() :
+    1. telechargement dans jeu.download.part avec en-tete HTTP Range si un
+       fichier partiel existe (reprise), verif que le serveur repond bien 206
+       sinon on repart de zero, barre de progression en Mo ;
+    2. controle de la TAILLE puis du MD5 annonces par le manifeste. Si l'un des
+       deux est faux : l'archive est effacee et l'installation existante reste
+       intacte (le joueur peut toujours jouer) ;
+    3. extraction dans game.install\ avec protection contre les archives
+       piegees (tout chemin contenant "..", absolu ou avec "C:" est refuse) ;
+    4. si l'archive contient un unique dossier racine, il est "remonte" ;
+    5. recherche de l'executable (LibreViesGame.exe) ;
+    6. remplacement ATOMIQUE : l'ancienne installation devient game.ancien\,
+       la nouvelle game\, puis game.ancien\ est supprime. En cas d'echec, on
+       remet l'ancienne en place ;
+    7. etat enregistre dans etat_jeu.json (hash, version, exe, date) ;
+    8. archive supprimee.
+
+  build_a_installer() decide s'il faut (re)telecharger :
+    - pas de hash dans le manifeste -> "aucune compilation Unity publiee"
+      (message affiche au joueur, bouton JOUER grise) ;
+    - hash different de etat_jeu.json -> "nouvelle compilation disponible" ;
+    - hash identique mais jeu absent/casse -> "fichiers du jeu a reparer" ;
+    - sinon -> "jeu a jour".
+
+3.4 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
+  Aujourd'hui jeu/version_url.json a "game_build": {} et "files": {}.
+  Cela veut dire : AUCUNE compilation n'a encore ete publiee. Le launcher
+  affiche donc "aucune compilation Unity publiee" et le bouton JOUER reste
+  grise. C'est voulu : c'est la premiere publication (section 4) qui remplit
+  ce bloc, et tout devient automatique ensuite.
+
+
+================================================================================
+4. PUBLIER UNE MISE A JOUR (procedure normale, cote auteur, sous Windows)
+================================================================================
+
+  1. compilation\build_launcher.bat   (double-clic)
+     Il telecharge ce qui manque (voir section 6) puis fabrique :
+        compilation\release\LibreVies.exe   <- LE fichier a donner au joueur
+        compilation\release\game\           <- le jeu a publier
+     A la fin il demande : "Publier cette compilation maintenant ? [O/N]"
+
+  2. Repondre O  -> il enchaine sur outils\publier_jeu.bat, qui :
+       - rassemble release\game en UNE archive LibreVies_jeu_<md5>.zip ;
+       - l'envoie dans la release GitHub "derniere" (gh release upload) ;
+       - ecrit url/size/hash/moteur/exe/version dans jeu/version_url.json ;
+       - publie aussi release\LibreVies.exe (cle "files"/"LibreVies.exe")
+         pour que les launchers deja installes se mettent a jour ;
+       - avec --pousser : git add/commit/push du manifeste.
+
+  3. Les joueurs recoivent la mise a jour au prochain lancement.
+
+  Le nom de l'archive contient son md5 : une nouvelle publication ne remplace
+  jamais l'archive sous les pieds d'un joueur en train de telecharger.
+  Sans gh installe, publier_jeu.py cree quand meme l'archive et le manifeste
+  et affiche l'URL exacte ou deposer le .zip a la main.
+
+
+================================================================================
+5. JOURNAL DES MISES A JOUR (ce qui a ete fait, dans l'ordre)
+================================================================================
+
+  Historique AVANT cette refonte (launcher, pour memoire) :
+    2.0/2.6/2.8/3.1 : auto-update, images integrees, retour aux md5 par
+    fichier, distribution Unity autonome. Ces notes sont dans NEWS, dans
+    jeu/launcher.pyw (elles s'affichent dans "Dernieres actualites").
+
+  MAJ 1 - Tri complet du depot (commit 8b57024)
+    - Creation des deux dossiers : jeu/ et compilation/.
+    - Deplacements : launcher.pyw, version_url.json -> jeu/ ;
+      unity/, image/, build_*.bat, setup_*, download_unity_hub.ps1,
+      README_RELEASE_FR.md -> compilation/.
+    - make_package_manifest.py supprime (voir incident 2).
+    - .gitignore reecrit pour les deux dossiers.
+
+  MAJ 2 - Launcher 4.0.0 : le jeu complet se telecharge tout seul (commit 8b57024)
+    - Nouveau modele "une archive" (game_build) a la place de "un fichier par
+      fichier" (package.files).
+    - Telechargement avec REPRISE (HTTP Range), controle taille + md5,
+      extraction securisee, remplacement atomique du dossier du jeu.
+    - etat_jeu.json pour savoir ce qui est installe.
+    - Message clair quand rien n'est publie ; JOUER grise.
+
+  MAJ 3 - Unity uniquement, plus aucune trace de Godot (commit d14c200)
+    - game_build remis a {} : l'ancien manifeste pointait vers une archive
+      Godot publiee par une CI d'une autre branche.
+    - NOMS_EXE_JEU = ("LibreViesGame.exe",) : le launcher ne cherche plus
+      LibreVies.exe comme jeu (c'est le nom du launcher).
+    - publier_jeu.py : moteur "unity" en dur, option --moteur supprimee.
+    - Commentaires C# du jeu nettoyes (plus de reference a Godot).
+    - README + guide : Unity uniquement, premiere publication obligatoire.
+
+  MAJ 4 - build_launcher.bat : tout se telecharge tout seul (commit 0e1da6d)
+    - Etape 1 : si le dossier ne contient pas le projet, il telecharge
+      l'archive de la branche sur GitHub et copie les fichiers MANQUANTS
+      (robocopy /E /XC /XN /XO : aucun fichier local n'est jamais ecrase).
+    - Etape 2 : Python (winget, sinon python.org, avec tkinter) si absent.
+    - Etape 3 : PyInstaller si absent.
+    - Etape 4 : Unity Hub + Unity Editor si absents.
+    - Etapes 5-6 : export Unity + compilation du launcher, puis proposition
+      de publication.
+    - definir_url_publication.py met desormais TROIS references de branche
+      d'accord : manifeste, launcher, et BRANCHE du script de build.
+
+  MAJ 5 - Correctif de l'icone + exe allege (commit suivant, ce fichier)
+    - Chemin d'icone ABSOLU pour PyInstaller (voir incident 5).
+    - --exclude-module pygame/numpy/psutil/setuptools/pip (incident 6).
+    - Suppression du .spec avant chaque build (evite les restes).
+
+
+================================================================================
+6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
+   (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
+================================================================================
+
+INCIDENT 1 - Le depot melangeait deux moteurs (Godot + Unity)
+  Symptome : plusieurs branches avec des versions differentes du jeu ; le
+  manifeste pointait un coup vers Godot, un coup vers Unity.
+  Cause    : historique du projet (portage Godot -> Unity par une autre IA),
+  la branche de travail choisie par l'utilisateur est celle d'Unity.
+  Solution : decision de l'utilisateur = UNITY UNIQUEMENT. Toutes les traces
+  de Godot ont ete retirees du depot (manifeste, launcher, outils, commentaires).
+  Reste a faire : 3 archives Godot (~117 Mo) trainent encore dans la release
+  GitHub "derniere" (LibreVies_Windows*.zip). Plus rien ne pointe dessus.
+  Attente de la decision de l'utilisateur pour les supprimer.
+
+INCIDENT 2 - Le modele "un fichier par fichier" ne tenait pas
+  Symptome : package.files devait lister chaque fichier de la build (dll,
+  dossiers *_Data, ressources...) avec son md5. Des centaines d'entrees a
+  regenerer a chaque build, et une coupure de connexion obligeait a tout
+  reprendre.
+  Solution : le jeu est publie en UNE archive .zip identifiee par son md5.
+  make_package_manifest.py (qui generait ce manifeste par fichier) a ete
+  supprime ; c'est publier_jeu.py qui remplit game_build.
+
+INCIDENT 3 - L'etape "icone" du build echouait TOUJOURS
+  Symptome : le build s'arretait avec "ERREUR : impossible de creer icon.ico".
+  Cause : le script utilisait python -c "... spec_from_file_location('lv',
+  'launcher.pyw') ...". spec_from_file_location ne reconnait pas l'extension
+  .pyw : il renvoie None et module_from_spec plante (AttributeError).
+  Solution : nouvel outil compilation/outils/creer_icone.py qui utilise
+  importlib.machinery.SourceFileLoader (qui charge n'importe quelle extension),
+  verifie l'en-tete du .ico et la taille. Si l'icone echoue, le build CONTINUE
+  sans icone au lieu de s'arreter.
+
+INCIDENT 4 - Le telechargement du projet ecrasait des fichiers locaux (risque)
+  Symptome : aucun, mais le risque etait reel : si on ecrase le dossier de
+  l'auteur avec l'archive GitHub, on perd son travail en cours.
+  Solution : robocopy /E /XC /XN /XO (copie uniquement ce qui est ABSENT).
+  Verifie par simulation : les fichiers deja presents sont intacts.
+
+INCIDENT 5 - PyInstaller ne trouvait pas l'icone (rapporte par l'utilisateur)
+  Symptome exact :
+    FileNotFoundError: Icon input file
+    ...\compilation\build\icon.ico not found
+    (le .ico existait pourtant dans ...\compilation\icon.ico)
+  Cause : PyInstaller resout un chemin d'icone RELATIF au dossier du fichier
+  .spec (--specpath, donc build\), pas au dossier courant.
+  Solution : passage du chemin ABSOLU et entre guillemets:
+      set "ICONE_ARG=--icon="%ROOT%icon.ico""
+  Le double guillemet externe de set "VAR=..." et les guillemets internes
+  sont volontaires : le dossier de l'utilisateur contient des espaces
+  (C:\Users\Dragonus\Desktop\Jeu\LibreVies\unity2\compilation\...).
+
+INCIDENT 6 - LibreVies.exe aspirait pygame/numpy
+  Symptome (visible dans le journal du build) : PyInstaller analysait
+  hook-pygame/hook-numpy/hook-PIL/hook-psutil et "pygame 2.6.1 ... Hello from
+  the pygame community" s'affichait pendant le build.
+  Cause : ces paquets sont installes dans le Python de l'auteur ; un fichier
+  .pth de site-packages provoque leur import pendant l'analyse, et PyInstaller
+  embarque tout ce qu'il a vu -> executable inutilement enorme.
+  Solution : --exclude-module pygame --exclude-module numpy --exclude-module
+  psutil --exclude-module setuptools --exclude-module pip (aucun n'est utilise
+  par le launcher). Pillow reste inclus : il sert a redimensionner la banniere.
+
+INCIDENT 7 - Un de mes outils a corrompu le launcher (le plus grave)
+  Symptome : IndentationError: unexpected indent, launcher.pyw line 88.
+  Cause : definir_url_publication.py (1re version) remplacait DEFAULT_RAW_URL
+  avec une REGEX multi-lignes trop gourmande : elle a avale le bloc
+  "def start_update" qui suivait.
+  Solution : remplacement LIGNE PAR LIGNE (on part de la ligne qui commence
+  par "DEFAULT_RAW_URL" et on compte les parentheses), plus deux garde-fous :
+  compile() sur le resultat et comparaison du nombre de lignes. Rien n'est
+  ecrit si l'un des deux echoue. Le launcher a ete reconstruit depuis git.
+  LECON : ne jamais modifier launcher.pyw avec une regex multi-lignes ; et
+  toujours verifier avec py_compile/compile() avant/arriere.
+
+INCIDENT 8 - cmd.exe : parentheses dans un echo a l'interieur d'un bloc
+  Symptome : erreur de syntaxe du .bat, ou texte tronque.
+  Cause : dans un bloc ( ... ), une parenthese non echappee ferme le bloc.
+  Solution : ^( et ^) partout dans les echo places dans un bloc.
+  Comme le developpement se fait sous Linux (pas de cmd.exe), un CONTROLEUR
+  Python verifie chaque .bat : equilibre des blocs, parentheses en milieu de
+  ligne, guillemets impairs, et presence des etiquettes (labels) appelees.
+  Ce controle a trouve une vraie faute : une ligne "echo ... l''acces ..."
+  (double apostrophe) corrigee.
+
+INCIDENT 9 - choix [O/N] avec une logique inversee
+  Cause : errorlevel de choice = INDEX de la touche (1 pour O, 2 pour N), pas
+  un code d'erreur ; "if errorlevel 1" est donc vrai dans les deux cas.
+  Solution : "if errorlevel 2 goto :fin" puis "if not errorlevel 1 goto :fin"
+  (seul un O explicite lance la publication).
+
+INCIDENT 10 - Tester le launcher sans tkinter (bac a sable Linux)
+  Cause : tkinter n'est pas installable/installé dans l'environnement de
+  developpement de l'IA.
+  Solution : la recette (outils/test_launcher.py) injecte un faux module
+  tkinter dans sys.modules et charge le launcher avec SourceFileLoader. On
+  teste ainsi TOUTE la logique (telechargement, md5, installation, reprise,
+  securite) sans interface graphique.
+
+INCIDENT 11 - Chez le joueur : ecriture impossible a cote du launcher
+  Cause : si LibreVies.exe est dans C:\Program Files, Windows interdit
+  l'ecriture et le jeu ne peut pas s'installer.
+  Solution : LIS-MOI.txt demande de mettre LibreVies.exe sur le Bureau, dans
+  Documents ou sur une cle USB.
+
+INCIDENT 12 - Le depot est un clone superficiel (shallow)
+  Cause : la session de travail est clonee en --depth 1 et certaines branches
+  distantes n'existaient pas localement.
+  Solution : "git fetch origin 'refs/heads/*:refs/remotes/origin/*'" avant
+  toute comparaison de branches. Ne pas supposer que l'historique est complet.
+
+INCIDENT 13 - Pas d'acces reseau direct a GitHub dans le bac a sable
+  Symptome : curl vers raw.githubusercontent.com / release-assets.githubusercontent.com
+  echoue (SSL_ERROR_SYSCALL, EOF).
+  Solution : passer par l'API (gh api) pour verifier qu'un fichier est bien
+  publie sur une branche, et tester le launcher avec un serveur HTTP local
+  (outils/test_launcher.py) au lieu de taper sur GitHub.
+
+
+================================================================================
+7. REGLES TECHNIQUES A RESPECTER (pour ne pas reproduire les incidents)
+================================================================================
+
+  R1. Ne jamais modifier launcher.pyw par regex multi-lignes. Remplacement
+      ligne par ligne + compile() de controle (voir incident 7).
+  R2. Apres TOUTE modification du launcher, lancer :
+        python compilation/outils/test_launcher.py     (31 controles, local)
+      et verifier python -m py_compile jeu/launcher.pyw.
+  R3. Les .bat sont ecrits en ASCII, sans accents, et doivent passer le
+      controleur de blocs/parentheses/labels (incident 8). On ne peut pas les
+      executer sous Linux : la relecture automatique est obligatoire.
+  R4. Le dossier jeu/ ne contient que launcher.pyw, version_url.json,
+      LIS-MOI.txt (plus les fichiers telecharges, ignores par git).
+  R5. Le launcher ne telecharge jamais rien venant de compilation/.
+  R6. Toute entree du manifeste passe par _safe_local_path : pas de "..",
+      pas de chemin absolu, pas de "C:".
+  R7. Une archive de jeu publiee ne doit jamais etre ecrasee : son nom
+      contient son md5 (LibreVies_jeu_<md5 8 car.>.zip).
+  R8. Le jeu ne se met a jour que par une archive complete (game_build) ;
+      le contenu de l'archive est place A LA RACINE du zip (pas de dossier
+      enveloppe : le launcher remonte quand meme un dossier unique).
+  R9. Une panne reseau ne doit jamais bloquer un jeu deja installe : hors
+      ligne, le launcher affiche "Hors ligne" mais JOUER marche encore.
+  R10. Ne jamais demander de mot de passe, token ou identifiant GitHub : la
+      connexion git/gh est deja configuree dans l'environnement.
+  R11. Ne pas changer de branche : le travail est publie sur
+      arena/01a0b32c-librevies (branche de la session). Pour publier depuis
+      une autre branche (main par exemple), utiliser
+      outils/definir_url_publication.py --branche main.
+
+
+================================================================================
+8. ETAT ACTUEL DU DEPOT (a verifier avec git log avant de continuer)
+================================================================================
+
+  Branche : arena/01a0b32c-librevies (poussee sur GitHub)
+  Base    : e47ada3 "Show Unity village from the correct camera start"
+  Commits de cette refonte :
+    8b57024  Tri du depot : jeu/ (joueur) + compilation/ (auteur)
+    d14c200  Unity uniquement : plus aucune trace de Godot
+    0e1da6d  build_launcher.bat : tout se telecharge tout seul
+    +        correctif icone PyInstaller, exclusions, resumer.txt (ce fichier)
+
+  Publie sur GitHub (verifie via gh api) :
+    jeu/version_url.json   -> game_build: {}  (aucune compilation publiee)
+    jeu/launcher.pyw       -> launcher 4.0.0
+
+  Release GitHub "derniere" : 3 archives Godot (ancienne CI) - a nettoyer
+  Ulterieurement si l'utilisateur le demande.
+
+  Cote machine de l'auteur (Windows, chemin ...\unity2\) :
+    - build_launcher.bat a deja recupere le projet tout seul (etape 1 OK)
+    - Python 3.11.9 + PyInstaller 6.21.0 presents
+    - Unity 6000.6.1f1 present
+    - l'export Unity a reussi
+    - la compilation du launcher a echoue UNIQUEMENT sur l'icone (corrige)
+    => il suffit de relancer build_launcher.bat
+
+
+================================================================================
+9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
+================================================================================
+
+  [ ] 1. UTILISATEUR : relancer compilation\build_launcher.bat.
+          Attendu : release\LibreVies.exe (~10-15 Mo) + release\game\
+          (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...).
+          Si l'icone pose encore probleme, lancer outils\creer_icone.bat.
+
+  [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
+          compilation\outils\publier_jeu.bat --version 0.4.0 --pousser.
+          Attendu : archive LibreVies_jeu_<md5>.zip dans la release
+          "derniere", jeu/version_url.json rempli, git push.
+          => A PARTIR DE LA, le jeu est telechargeable par les joueurs.
+
+  [ ] 3. TESTER de bout en bout : copier release\LibreVies.exe dans un dossier
+          vide sur un autre PC (ou un dossier vide sur le meme PC), le lancer,
+          verifier : telechargement, barre de progression, JOUER qui s'active,
+          le jeu qui demarre. Puis relancer pour verifier "A jour !".
+
+  [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
+          archives Godot de la release "derniere".
+
+  [ ] 5. OPTIONNEL : remettre une CI Unity (GitHub Actions) pour compiler a
+          chaque push. Necessite des secrets de licence Unity
+          (UNITY_EMAIL/UNITY_PASSWORD/UNITY_LICENSE) : a ne faire que si
+          l'utilisateur les fournit. Sinon on reste en local.
+
+  [ ] 6. OPTIONNEL : tenir a jour NEWS dans jeu/launcher.pyw a chaque MAJ
+          (c'est ce qui s'affiche dans "Dernieres actualites" chez le joueur)
+          et le bloc "notes" de jeu/version_url.json.
+
+  [ ] 7. OPTIONNEL : bouton "Reinstaller le jeu" dans le launcher (supprimer
+          etat_jeu.json + game\ pour forcer un retelechargement complet).
+
+
+================================================================================
+10. FICHIERS CLES ET CE QU'ILS FONT
+================================================================================
+
+  jeu/launcher.pyw
+    Interface tkinter (1024x768, banniere + actualites + classement + annonces)
+    et toute la logique : load_local_config, save_local_config,
+    normalize_raw_url, _safe_local_path, _manifest_files, check_for_updates,
+    apply_updates, schedule_launcher_restart, _telecharger_archive,
+    _extraire_zip, installer_build_jeu, build_a_installer, find_game, launch.
+    Constantes : LAUNCHER_VERSION 4.0.0, GAME_VERSION 0.4.0,
+    DEFAULT_RAW_URL, DOSSIER_JEU_DEFAUT "game", NOMS_EXE_JEU.
+
+  jeu/version_url.json
+    Manifeste lu par le launcher. "files" = petits fichiers texte a mettre a
+    jour ; "game_build" = l'archive du jeu (rempli par publier_jeu.py).
+
+  compilation/outils/publier_jeu.py / .bat
+    Archive release\game -> LibreVies_jeu_<md5>.zip, envoi dans la release,
+    mise a jour du manifeste, option --pousser pour git.
+
+  compilation/outils/definir_url_publication.py / .bat
+    Change la branche publiee dans les 3 endroits, avec garde-fous.
+
+  compilation/outils/test_launcher.py / tester_launcher.bat
+    Recette complete, hors ligne, sans tkinter. 31 controles :
+    premiere installation, mise a jour, reprise apres coupure, archive
+    corrompue (refusee sans casser l'installation), archive piegee (../),
+    chemins interdits du manifeste, lancement du jeu, cas "rien de publie".
+
+  compilation/outils/creer_icone.py / creer_icone.bat
+    Reextrait icon.ico depuis les octets integres au launcher.
+
+  compilation/unity/Assets/Scripts/LibreViesGame.cs
+    Le jeu lui-meme (tout est construit par code).
+
+
+================================================================================
+11. AIDES-MEMOIRE POUR LA SUITE
+================================================================================
+
+  - Verifier l'etat :        git log --oneline -5 ; git status --short
+  - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
+  - Lancer la recette :      python compilation/outils/test_launcher.py
+  - Verifier un .bat :       controleur de blocs (incident 8)
+  - Verifier un fichier publie :
+        gh api "repos/killdrago/LibreVies/contents/jeu/version_url.json?ref=arena/01a0b32c-librevies"
+  - Voir la release :        gh release view derniere
+  - Tester le launcher sans toucher a GitHub : la recette utilise un serveur
+    HTTP local (SimpleHTTPRequestHandler), aucun appel externe.
+
+  Phrase a retenir : le joueur n'a qu'un fichier (LibreVies.exe) ; tout le
+  reste (jeu, mises a jour) arrive par le manifeste et une archive verifiee
+  par md5. Toute nouvelle fonctionnalite doit respecter ce principe simple.
+================================================================================

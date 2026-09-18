@@ -72,12 +72,13 @@ mkdir "%RELEASE%\game"
 mkdir "%BUILD%\launcher"
 
 echo Creation de l'icone du launcher...
-set "ICONE_ARG=--icon=icon.ico"
-"%PYTHON%" "%ROOT%outils\creer_icone.py" "%LAUNCHER%" "%ROOT%icon.ico"
-if errorlevel 1 (
-    set "ICONE_ARG="
-    echo AVERTISSEMENT : icone indisponible, le launcher sera compile sans icone.
-)
+rem PyInstaller resout un chemin d'icone relatif depuis le dossier du .spec
+rem (build\), donc l'icone doit lui etre donnee en chemin ABSOLU et entre
+rem guillemets : le dossier du projet peut contenir des espaces.
+set "ICONE_ARG=--icon="%ROOT%icon.ico""
+if not exist "%ROOT%icon.ico" "%PYTHON%" "%ROOT%outils\creer_icone.py" "%LAUNCHER%" "%ROOT%icon.ico"
+if not exist "%ROOT%icon.ico" set "ICONE_ARG="
+if not defined ICONE_ARG echo AVERTISSEMENT : icone indisponible, compilation sans icone.
 
 "%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%RELEASE%\game\LibreViesGame.exe" -logFile "%BUILD%\unity.log"
 if errorlevel 1 (
@@ -91,7 +92,11 @@ if not exist "%RELEASE%\game\LibreViesGame.exe" (
 
 echo.
 echo [6/6] Compilation du launcher autonome...
-"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --distpath "%RELEASE%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%LAUNCHER%"
+rem Les modules exclus ne sont pas utilises par le launcher : sans cela,
+rem PyInstaller embarque pygame/numpy s'ils sont installes sur la machine
+rem de build, ce qui gonfle LibreVies.exe pour rien.
+if exist "%BUILD%\LibreVies.spec" del /q "%BUILD%\LibreVies.spec"
+"%PYTHON%" -m PyInstaller --onefile --noconsole --clean --name LibreVies %ICONE_ARG% --exclude-module pygame --exclude-module numpy --exclude-module psutil --exclude-module setuptools --exclude-module pip --distpath "%RELEASE%" --workpath "%BUILD%\launcher" --specpath "%BUILD%" "%LAUNCHER%"
 if errorlevel 1 (
     echo ERREUR : compilation du launcher echouee.
     goto :echec
