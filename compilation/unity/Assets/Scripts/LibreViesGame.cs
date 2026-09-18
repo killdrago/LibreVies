@@ -29,6 +29,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
     private float cameraYaw;
+    // Sensibilite de la souris (comme la version Godot : reglable). Unity
+    // lisse GetAxis("Mouse X") : on utilise GetAxisRaw pour une reponse
+    // immediate, sinon la camera parait "longue a la detente".
+    private float cameraSensitivity = 3f;
+    private Shader cachedShader;
     private bool firstPerson;
     private bool cameraDragging;
     private Vector3 playerVelocity;
@@ -95,7 +100,8 @@ public sealed class LibreViesGame : MonoBehaviour
             cameraObject.tag = "MainCamera";
         }
         gameCamera.clearFlags = CameraClearFlags.Skybox;
-        gameCamera.fieldOfView = 65f;
+        // Champ de vision de la version Godot (55), pour le meme cadrage.
+        gameCamera.fieldOfView = 55f;
         LoadOptions();
         CreateMaterials();
         CreateEnvironment();
@@ -146,18 +152,20 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Material MakeMaterial(string name, Color color, bool emission = false)
     {
-        // Runtime-generated materials are not referenced by an asset. Keep a
-        // fallback chain so shader stripping cannot abort Awake in a player.
-        Shader shader = Shader.Find("Standard");
-        if (shader == null) shader = Shader.Find("Unlit/Color");
+        // Les materiaux sont crees en code : aucun n'est reference par un asset,
+        // donc Unity peut retirer les shaders integres de la build. C'est ce qui
+        // affichait tout le monde en MAGENTA (Shader.Find renvoie null).
+        // ResoudreShader() passe par un shader du projet place dans Resources,
+        // qui est toujours embarque : plus de monde rose.
+        Shader shader = ResoudreShader();
         if (shader == null)
         {
-            Debug.LogWarning("LibreVies : aucun shader intégré disponible pour " + name);
+            Debug.LogError("LibreVies : aucun shader disponible pour " + name);
             materials.Add(null);
             return null;
         }
         var material = new Material(shader) { name = name };
-        material.color = color;
+        if (material.HasProperty("_Color")) material.color = color;
         if (emission && material.HasProperty("_EmissionColor"))
         {
             material.EnableKeyword("_EMISSION");
@@ -165,6 +173,27 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         materials.Add(material);
         return material;
+    }
+
+    private Shader ResoudreShader()
+    {
+        if (cachedShader != null) return cachedShader;
+
+        // 1) Eclairage complet : disponible dans l'editeur et dans la plupart
+        //    des builds, tant qu'Unity ne l'a pas retire.
+        cachedShader = Shader.Find("Standard");
+
+        // 2) Le shader du projet (Assets/Resources/LVShaders/LVColor) : les
+        //    assets de Resources sont TOUJOURS inclus dans la build.
+        if (cachedShader == null) cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
+
+        // 3) Derniers recours integres (sans eclairage, mais colores).
+        if (cachedShader == null) cachedShader = Shader.Find("Unlit/Color");
+        if (cachedShader == null) cachedShader = Shader.Find("Sprites/Default");
+        if (cachedShader == null) cachedShader = Shader.Find("UI/Default");
+
+        if (cachedShader != null) Debug.Log("LibreVies : shader utilisé = " + cachedShader.name);
+        return cachedShader;
     }
 
     private Material Mat(string name)
@@ -179,19 +208,48 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreateEnvironment()
     {
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.40f, 0.52f, 0.72f);
-        RenderSettings.ambientEquatorColor = new Color(0.55f, 0.55f, 0.46f);
-        RenderSettings.ambientGroundColor = new Color(0.15f, 0.13f, 0.10f);
+        RenderSettings.ambientSkyColor = new Color(0.42f, 0.53f, 0.74f);
+        RenderSettings.ambientEquatorColor = new Color(0.58f, 0.56f, 0.45f);
+        RenderSettings.ambientGroundColor = new Color(0.17f, 0.15f, 0.11f);
         RenderSettings.fog = true;
-        RenderSettings.fogColor = new Color(0.56f, 0.69f, 0.80f);
-        RenderSettings.fogDensity = 0.003f;
+        RenderSettings.fogColor = new Color(0.68f, 0.77f, 0.88f);
+        RenderSettings.fogDensity = 0.0022f;
+        CreateSky();
         var sunObject = new GameObject("Soleil");
         var sun = sunObject.AddComponent<Light>();
         sun.type = LightType.Directional;
-        sun.intensity = 1.15f;
-        sun.color = new Color(1f, 0.88f, 0.70f);
+        sun.intensity = 1.3f;                       // energie du soleil Godot
+        sun.color = new Color(1f, 0.90f, 0.74f);
         sun.shadows = LightShadows.Soft;
-        sunObject.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
+        sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
+    }
+
+    private void CreateSky()
+    {
+        // Ciel bleu vif avec un horizon chaud, comme Creer_environnement() de
+        // la version Godot. Repli en cascade : aucun de ces shaders ne peut
+        // laisser le ciel noir, et le dernier laisse simplement le ciel Unity.
+        Shader procedural = Shader.Find("Skybox/Procedural");
+        if (procedural != null)
+        {
+            var material = new Material(procedural) { name = "Ciel_LibreVies" };
+            if (material.HasProperty("_SkyTint")) material.SetColor("_SkyTint", new Color(0.30f, 0.46f, 0.78f));
+            if (material.HasProperty("_GroundColor")) material.SetColor("_GroundColor", new Color(0.45f, 0.50f, 0.26f));
+            if (material.HasProperty("_AtmosphereThickness")) material.SetFloat("_AtmosphereThickness", 0.85f);
+            if (material.HasProperty("_Exposure")) material.SetFloat("_Exposure", 1.35f);
+            if (material.HasProperty("_SunSize")) material.SetFloat("_SunSize", 0.04f);
+            RenderSettings.skybox = material;
+            return;
+        }
+        Shader secours = Resources.Load<Shader>("LVShaders/LVSky");
+        if (secours != null)
+        {
+            var material = new Material(secours) { name = "Ciel_LibreVies" };
+            if (material.HasProperty("_SkyColor")) material.SetColor("_SkyColor", new Color(0.30f, 0.46f, 0.78f));
+            if (material.HasProperty("_HorizonColor")) material.SetColor("_HorizonColor", new Color(0.98f, 0.74f, 0.48f));
+            if (material.HasProperty("_GroundColor")) material.SetColor("_GroundColor", new Color(0.45f, 0.50f, 0.26f));
+            RenderSettings.skybox = material;
+        }
     }
 
     private float TerrainHeight(float x, float z)
@@ -581,9 +639,16 @@ public sealed class LibreViesGame : MonoBehaviour
         if (Input.GetMouseButtonUp(1)) cameraDragging = false;
         if (cameraDragging && Input.GetMouseButton(1))
         {
-            cameraYaw += Input.GetAxis("Mouse X") * 0.3f;
-            cameraPitch = Mathf.Clamp(cameraPitch - Input.GetAxis("Mouse Y") * 0.3f, 5f, 70f);
+            // GetAxisRaw : pas de lissage, la caméra suit la souris tout de
+            // suite. Sensibilité réglable avec [ et ] (panneau Options).
+            cameraYaw += Input.GetAxisRaw("Mouse X") * cameraSensitivity;
+            cameraPitch = Mathf.Clamp(
+                cameraPitch + Input.GetAxisRaw("Mouse Y") * cameraSensitivity, 5f, 70f);
         }
+        if (Input.GetKeyDown(KeyCode.LeftBracket))
+            cameraSensitivity = Mathf.Clamp(cameraSensitivity - 0.5f, 0.5f, 10f);
+        if (Input.GetKeyDown(KeyCode.RightBracket))
+            cameraSensitivity = Mathf.Clamp(cameraSensitivity + 0.5f, 0.5f, 10f);
         cameraDistance = Mathf.Clamp(cameraDistance - Input.mouseScrollDelta.y * 0.5f, 3f, 18f);
     }
 
@@ -592,14 +657,22 @@ public sealed class LibreViesGame : MonoBehaviour
         if (player == null) return;
         if (firstPerson)
         {
+            // Vue 1re personne : on regarde dans l'axe de la caméra (pitch
+            // inclus), comme le look_at() de la version Godot.
             gameCamera.transform.position = player.position + Vector3.up * 1.55f;
-            gameCamera.transform.rotation = player.rotation;
+            gameCamera.transform.rotation = Quaternion.Euler(-cameraPitch, cameraYaw, 0f);
             return;
         }
-        Quaternion orbit = Quaternion.Euler(cameraPitch, cameraYaw, 0);
+        Quaternion orbit = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
         Vector3 target = player.position + Vector3.up * 1.1f;
-        // Caméra placée au nord du village.
-        gameCamera.transform.position = target + orbit * (Vector3.forward * cameraDistance);
+        // Vector3.back : la caméra se place DERRIERE et AU-DESSUS du héros.
+        // Avec Vector3.forward elle passait SOUS le terrain (c'était le bug
+        // "caméra sous le sol" : pitch +18° envoyait la caméra vers le bas).
+        Vector3 position = target + orbit * (Vector3.back * cameraDistance);
+        // Filet de sécurité identique à Godot : jamais sous le terrain.
+        float sol = TerrainHeight(position.x, position.z) + 0.6f;
+        if (position.y < sol) position.y = sol;
+        gameCamera.transform.position = position;
         gameCamera.transform.LookAt(target);
     }
 
@@ -776,7 +849,11 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (optionsOpen)
         {
-            GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 120, 360, 240), "OPTIONS\n\nLuminosité : " + Mathf.RoundToInt(brightness * 100) + "\nContraste : " + Mathf.RoundToInt(contrast * 100) + "\n\nFermer : O", boxStyle);
+            GUI.Box(new Rect(Screen.width / 2 - 200, Screen.height / 2 - 130, 400, 260),
+                "OPTIONS\n\nLuminosité : " + Mathf.RoundToInt(brightness * 100)
+                + "\nContraste : " + Mathf.RoundToInt(contrast * 100)
+                + "\nSensibilité souris : " + cameraSensitivity.ToString("0.0")
+                + "\n(régler avec [ et ])\n\nFermer : O", boxStyle);
         }
         if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur R pour renaître", boxStyle);
         if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 150, 300, 35), infoMessage, titleStyle);
@@ -795,12 +872,14 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         brightness = PlayerPrefs.GetFloat("brightness", 0.3f);
         contrast = PlayerPrefs.GetFloat("contrast", 1f);
+        cameraSensitivity = PlayerPrefs.GetFloat("cameraSensitivity", 3f);
     }
 
     private void OnApplicationQuit()
     {
         PlayerPrefs.SetFloat("brightness", brightness);
         PlayerPrefs.SetFloat("contrast", contrast);
+        PlayerPrefs.SetFloat("cameraSensitivity", cameraSensitivity);
         PlayerPrefs.Save();
     }
 
