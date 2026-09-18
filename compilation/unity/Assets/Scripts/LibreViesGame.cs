@@ -125,6 +125,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle tabStyle;
     private GUIStyle tabActifStyle;
     private GUIStyle buttonStyle;
+    private Texture2D miniCarteTexture;
+    private float miniCarteZoom = 1f;
 
     // Options persistantes : le fichier est lisible et portable avec la partie
     // jeu. PlayerPrefs reste accepte pour reprendre les anciennes installations.
@@ -1029,14 +1031,18 @@ public sealed class LibreViesGame : MonoBehaviour
         // Bâtiments supplémentaires du village de départ.
         // La mairie est decalee sur le cote : la route garde son passage.
         CreateBuilding(new Vector3(10, 0, 20), new Vector3(7, 4, 6), "Mairie");
-        CreateBuilding(new Vector3(-19, 0, 13), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        // Maison_Nord est decalee pour ne plus chevaucher Maison_Ouest.
+        CreateBuilding(new Vector3(-21.5f, 0, 14), new Vector3(5, 3.5f, 5), "Maison_Nord");
         CreateBuilding(new Vector3(-3, 0, -20), new Vector3(7, 4, 6), "Maison_Sud");
-        // Terrain vide au sud du village : la fontaine est enfin visible.
-        CreateFountain(new Vector3(9, 0, -15));
-        CreerPnj(new Vector3(21.5f, 0, -6), "Forgeron");
-        CreerPnj(new Vector3(19.2f, 0, 3.5f), "Vendeur");
-        CreerPnj(new Vector3(14.2f, 0, 16), "Maire");
-        CreerPnj(new Vector3(-19.2f, 0, -5), "Marchand");
+        // Emplacement libre au sud-est de la ville, loin de l'Auberge et de la route.
+        CreateFountain(new Vector3(7, 0, -20));
+        // Les portes sont maintenant sur la facade sud (+z) : les PNJ restent
+        // sur le cote de cette facade au lieu de bloquer le passage.
+        CreerPnj(new Vector3(19.2f, 0, 1.8f), "Forgeron");
+        // Le vendeur devant une maison a ete retire : le marchand de l'entrepot
+        // conserve l'etal utile, decale sur le cote de sa porte.
+        CreerPnj(new Vector3(-18.2f, 0, 2.8f), "Marchand");
+        CreerPnj(new Vector3(14.2f, 0, 23.5f), "Maire");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1054,10 +1060,12 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z
         });
-        Box(new Vector3(0, 1.0f, -size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
+        // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
+        // est le cote +z. Les panneaux suivent exactement cette facade.
+        Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
         for (int side = -1; side <= 1; side += 2)
         {
-            Box(new Vector3(side * size.x * 0.27f, 1.8f, -size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Water", root, "Fenetre");
+            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Water", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
     }
@@ -1076,12 +1084,13 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerAfficheMaison(Transform parent, Vector3 taille, string nom)
     {
-        float z = -taille.z * 0.525f;
+        float z = taille.z * 0.525f;
         Box(new Vector3(0f, 2.62f, z), new Vector3(2.8f, 0.48f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
-        Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z - 0.06f));
+        Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
         GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), 0.12f);
         if (texte != null)
-            texte.transform.rotation = parent.rotation * Quaternion.Euler(0f, 180f, 0f);
+            // Le texte regarde vers la facade sud (+z), sans etre retourne.
+            texte.transform.rotation = parent.rotation;
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
@@ -1237,8 +1246,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(mx, my + 5.35f, mz), new Vector3(longueur + 0.25f, 0.22f, 0.38f), "Bois_Clair", null, "Linteau", false, rotation);
             // Panneau en bois portant le nom du village : texte petit et pose
             // sur sa face, pas en plein milieu du passage.
-            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.12f), "Wood", null, "Panneau_Fond", false, rotation);
-            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.14f), "Bois_Clair", null, "Panneau_Bois", false, rotation);
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.5f, 0.76f, 0.12f), "Bois_Clair", null, "Panneau_Fond", false, rotation);
+            Box(new Vector3(mx, my + 4.45f, mz), new Vector3(3.25f, 0.60f, 0.14f), "Wood", null, "Panneau_Bois", false, rotation);
             AjouterTextePanneau(new Vector3(mx, my + 4.45f, mz), rotation);
         }
 
@@ -1253,12 +1262,12 @@ public sealed class LibreViesGame : MonoBehaviour
     // simplement le panneau en bois, sans erreur.
     private void AjouterTextePanneau(Vector3 position, Quaternion rotation)
     {
-        GameObject objet = CreerTexte3D("LIBREVIES", position, new Color(0.20f, 0.12f, 0.05f), 0.18f);
+        GameObject objet = CreerTexte3D("LIBREVIES", position, Color.white, 0.09f);
         if (objet == null) return;
         objet.name = "Texte_Portail";
         objet.transform.rotation = rotation;
-        // Le texte regarde vers l'exterieur, comme le panneau.
-        objet.transform.Rotate(0f, 180f, 0f, Space.Self);
+        // La face avant du TextMesh suit maintenant la face avant du panneau.
+        // Ne pas le retourner : sinon LIBREVIES se lit a l'envers depuis l'entree.
     }
 
     // Un garde par portail, poste a l'interieur (comme la reference : 0,90 du
@@ -2143,6 +2152,10 @@ public sealed class LibreViesGame : MonoBehaviour
             cameraSensitivity = Mathf.Clamp(cameraSensitivity - 0.5f, 0.5f, 10f);
         if (Input.GetKeyDown(KeyCode.RightBracket))
             cameraSensitivity = Mathf.Clamp(cameraSensitivity + 0.5f, 0.5f, 10f);
+        if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus))
+            miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
+        if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
+            miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
         cameraDistance = Mathf.Clamp(cameraDistance - Input.mouseScrollDelta.y * 0.5f, 3f, 18f);
     }
 
@@ -2184,7 +2197,9 @@ public sealed class LibreViesGame : MonoBehaviour
         if (shader == null) return origine;
         string nomOrigine = origine != null ? origine.name : "default";
         var fade = new Material(shader) { name = "mat_fade_" + nomOrigine };
-        Color couleur = origine != null && origine.HasProperty("_Color") ? origine.color : Color.white;
+        // La transparence doit rester neutre : un toit rouge ou bleu ne doit
+        // pas teinter tout l'ecran quand il passe devant le heros.
+        Color couleur = Color.white;
         fade.SetColor("_Color", couleur);
         fade.SetFloat("_Alpha", alpha);
         return fade;
@@ -2609,21 +2624,118 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerMiniCarte()
     {
-        Rect carte = new Rect(Screen.width - 174, 18, 150, 112);
-        GUI.color = new Color(0.06f, 0.12f, 0.16f, 0.88f);
-        GUI.DrawTexture(carte, Texture2D.whiteTexture);
-        GUI.color = new Color(0.40f, 0.64f, 0.35f);
-        GUI.DrawTexture(new Rect(carte.x + 10, carte.y + 10, 130, 92), Texture2D.whiteTexture);
-        GUI.color = new Color(0.72f, 0.58f, 0.30f);
-        GUI.DrawTexture(new Rect(carte.x + 72, carte.y + 10, 5, 92), Texture2D.whiteTexture);
-        if (player != null)
-        {
-            float px = carte.x + 75f + player.position.x / WorldSize * 65f;
-            float py = carte.y + 56f - player.position.z / WorldSize * 46f;
-            GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(px - 3, py - 3, 6, 6), Texture2D.whiteTexture);
-        }
+        const float taille = 154f;
+        Rect carte = new Rect(Screen.width - 190f, 18f, taille, taille);
+        if (miniCarteTexture == null || Event.current.type == EventType.Repaint)
+            MettreAJourMiniCarte();
         GUI.color = Color.white;
+        if (miniCarteTexture != null)
+            GUI.DrawTexture(carte, miniCarteTexture, ScaleMode.StretchToFill, true);
+
+        // Les points cardinaux restent fixes autour du disque, meme quand la
+        // carte est zoomee autour du joueur.
+        GUI.Label(new Rect(carte.x + 73f, carte.y - 5f, 16f, 22f), "N", smallStyle);
+        GUI.Label(new Rect(carte.x + 73f, carte.y + 139f, 16f, 22f), "S", smallStyle);
+        GUI.Label(new Rect(carte.x + 1f, carte.y + 67f, 16f, 22f), "W", smallStyle);
+        GUI.Label(new Rect(carte.x + 140f, carte.y + 67f, 16f, 22f), "E", smallStyle);
+        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 18f, 24f, 24f), "+", buttonStyle))
+            miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
+        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 45f, 24f, 24f), "-", buttonStyle))
+            miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
+        GUI.Label(new Rect(carte.x + 108f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
+        GUI.color = Color.white;
+    }
+
+    private void MettreAJourMiniCarte()
+    {
+        const int taille = 128;
+        const int centre = 64;
+        const int rayon = 60;
+        if (miniCarteTexture == null)
+        {
+            miniCarteTexture = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
+            miniCarteTexture.name = "MiniCarteRonde";
+            miniCarteTexture.filterMode = FilterMode.Bilinear;
+            miniCarteTexture.wrapMode = TextureWrapMode.Clamp;
+        }
+
+        Color fond = new Color(0.10f, 0.20f, 0.12f, 1f);
+        Color bord = new Color(0.72f, 0.58f, 0.30f, 1f);
+        for (int y = 0; y < taille; y++)
+        for (int x = 0; x < taille; x++)
+        {
+            float distance = Vector2.Distance(new Vector2(x, y), new Vector2(centre, centre));
+            if (distance > rayon) miniCarteTexture.SetPixel(x, y, Color.clear);
+            else if (distance > rayon - 2f) miniCarteTexture.SetPixel(x, y, bord);
+            else miniCarteTexture.SetPixel(x, y, fond);
+        }
+
+        Vector2 centreMonde = player == null ? Vector2.zero : new Vector2(player.position.x, player.position.z);
+        float rayonMonde = WorldSize / miniCarteZoom;
+        for (int i = 0; i < 120; i++)
+        {
+            float t0 = i / 120f;
+            float t1 = (i + 1) / 120f;
+            DessinerLigneMiniCarte(CourbeRoute(t0), CourbeRoute(t1), centreMonde, rayonMonde,
+                new Color(0.72f, 0.58f, 0.30f, 1f), 2);
+        }
+        // Limite de l'enceinte du village.
+        const int cerclePoints = 96;
+        for (int i = 0; i < cerclePoints; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / cerclePoints;
+            float a1 = (i + 1) * Mathf.PI * 2f / cerclePoints;
+            DessinerLigneMiniCarte(
+                new Vector2(Mathf.Cos(a0) * VillageRadius, Mathf.Sin(a0) * VillageRadius),
+                new Vector2(Mathf.Cos(a1) * VillageRadius, Mathf.Sin(a1) * VillageRadius),
+                centreMonde, rayonMonde, new Color(0.48f, 0.70f, 0.35f, 1f), 1);
+        }
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            Vector2 a = new Vector2(batiment.X - batiment.Largeur * 0.5f, batiment.Z - batiment.Profondeur * 0.5f);
+            Vector2 b = new Vector2(batiment.X + batiment.Largeur * 0.5f, batiment.Z - batiment.Profondeur * 0.5f);
+            Vector2 c = new Vector2(batiment.X + batiment.Largeur * 0.5f, batiment.Z + batiment.Profondeur * 0.5f);
+            Vector2 d = new Vector2(batiment.X - batiment.Largeur * 0.5f, batiment.Z + batiment.Profondeur * 0.5f);
+            Color couleurMaison = new Color(0.66f, 0.48f, 0.30f, 1f);
+            DessinerLigneMiniCarte(a, b, centreMonde, rayonMonde, couleurMaison, 1);
+            DessinerLigneMiniCarte(b, c, centreMonde, rayonMonde, couleurMaison, 1);
+            DessinerLigneMiniCarte(c, d, centreMonde, rayonMonde, couleurMaison, 1);
+            DessinerLigneMiniCarte(d, a, centreMonde, rayonMonde, couleurMaison, 1);
+        }
+        if (player != null)
+            DessinerPointMiniCarte(centreMonde, centreMonde, rayonMonde, Color.white, 3);
+        miniCarteTexture.Apply(false, false);
+    }
+
+    private void DessinerLigneMiniCarte(Vector2 debut, Vector2 fin, Vector2 centreMonde,
+        float rayonMonde, Color couleur, int epaisseur)
+    {
+        int pas = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(debut, fin) * 2f));
+        for (int i = 0; i <= pas; i++)
+        {
+            float t = i / (float)pas;
+            DessinerPointMiniCarte(Vector2.Lerp(debut, fin, t), centreMonde, rayonMonde,
+                couleur, epaisseur);
+        }
+    }
+
+    private void DessinerPointMiniCarte(Vector2 monde, Vector2 centreMonde, float rayonMonde,
+        Color couleur, int epaisseur)
+    {
+        const int centre = 64;
+        const int rayon = 60;
+        int x = centre + Mathf.RoundToInt((monde.x - centreMonde.x) / rayonMonde * rayon);
+        int y = centre + Mathf.RoundToInt((monde.y - centreMonde.y) / rayonMonde * rayon);
+        for (int oy = -epaisseur; oy <= epaisseur; oy++)
+        for (int ox = -epaisseur; ox <= epaisseur; ox++)
+        {
+            int px = x + ox;
+            int py = y + oy;
+            if (px < 0 || px >= 128 || py < 0 || py >= 128) continue;
+            if (Vector2.Distance(new Vector2(px, py), new Vector2(centre, centre)) <= rayon - 1)
+                miniCarteTexture.SetPixel(px, py, couleur);
+        }
     }
 
     private string NomTouche(int code)

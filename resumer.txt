@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 25 : correction de compilation du collider joueur
+Derniere mise a jour : 18/09/2026 - MAJ 26 : carte, facades et decor corriges
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1173,6 +1173,29 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     `Collider`, alors que ces proprietes appartiennent a `CapsuleCollider`.
   - Correction : joueurCollider est maintenant un `CapsuleCollider`. Le build
     doit etre relance sur le PC Windows pour confirmer l'export complet.
+
+================================================================================
+8.15 MAJ 26 - CARTE, FACADES, TOITS ET DECOR CORRIGES
+================================================================================
+
+  - La transparence des toits utilise maintenant un materiau neutre blanc :
+    un toit rouge ou bleu ne colore plus la vue quand il devient translucide.
+  - Portes, fenetres et affiches des maisons sont passes sur la facade sud
+    (+z). L'orientation des TextMesh a ete corrigee pour que AUBERGE se lise
+    normalement depuis l'exterieur et ne soit plus visible a travers l'arriere.
+  - Le panneau de portail LIBREVIES est deux fois plus petit, blanc, avec une
+    face en bois sombre pour le contraste.
+  - La mini-carte est ronde, affiche N/S/E/W, la route, l'enceinte, les maisons
+    et le joueur. Les boutons + et - ainsi que les touches + et - permettent
+    de zoomer et dezoomer autour du joueur.
+  - La fontaine est placee dans un espace libre au sud-est de la ville, hors
+    des maisons et de la route.
+  - Le PNJ Vendeur inutile devant une maison et son etal ont ete retires.
+    Le Marchand de l'entrepot est decale sur le cote de la porte, et le maire
+    ainsi que le forgeron sont repositionnes devant leur facade sud.
+  - Maison_Nord est decalee pour supprimer le chevauchement avec Maison_Ouest.
+  - Verification C# statique et scripts BAT reussies. L'export Unity Windows
+    doit etre relance pour controler le rendu final dans la build.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
