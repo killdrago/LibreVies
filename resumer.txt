@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 19 : options completes et entree chateau
+Derniere mise a jour : 18/09/2026 - MAJ 20 : toits triangulaires visibles
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1083,6 +1083,14 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le garde-fou reste en place : monstres hors village, attaque interdite au
     travers de la cloture, objets bas franchissables en saut et atterrissage
     sur les caisses.
+
+================================================================================
+8.9 MAJ 20 - CORRECTION DE RENDU DES TOITS
+================================================================================
+
+  - Le sens des triangles des deux pignons a ete corrige : les faces sont
+    visibles des deux cotes dans le rendu Unity (plus de pignon noir/invisible
+    a cause du culling).
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
