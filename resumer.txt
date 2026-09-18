@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 35 : bootstrap autonome et version
-                        visible dans les titres de fenetre
+Derniere mise a jour : 18/09/2026 - MAJ 36 : etape Unity inline pour CMD
+                        et correction de l'erreur etape_unity
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1406,6 +1406,25 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le manifeste conserve game_build: {} tant que l'archive Windows 0.5.0
     n'est pas fabriquee et publiee : aucun faux hash n'est ajoute.
   - Controle Python, C#, BAT et diff Git propres.
+
+================================================================================
+8.25 MAJ 36 - APPEL UNITY SANS ETIQUETTE FRAGILE
+================================================================================
+
+  - Controle utilisateur : apres la synchronisation (49 fichiers a jour),
+    Windows affichait "Le systeme ne trouve pas le nom de fichier de commandes
+    - etape_unity" juste apres PyInstaller.
+  - Cause de compatibilite : l'appel `call :etape_unity` vers une etiquette
+    de sous-routine placee plus bas dans un .bat telecharge en LF/PowerShell
+    n'etait pas accepte par le CMD utilise sur ce PC, alors que les premieres
+    sous-routines etaient deja passees.
+  - Correction : la detection de Unity 6000.6.1f1/2022/6000 est maintenant
+    executee inline apres PyInstaller. L'etiquette et l'appel fragiles ont ete
+    supprimes ; le message [4/6] doit apparaitre directement.
+  - Les autres sous-routines (projet, Python, PyInstaller) restent utilisees,
+    controlees par verifier_bat.py.
+  - Relancer le meme build_launcher.bat : la synchronisation telechargera la
+    nouvelle version du script si necessaire, puis la fabrication reprendra.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
