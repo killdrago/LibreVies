@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.37";
+    private const string VersionJeu = "0.5.39";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -98,6 +98,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // immediate, sinon la camera parait "longue a la detente".
     private float cameraSensitivity = 3f;
     private Shader cachedShader;
+    private Shader routeShader;
     private bool firstPerson;
     private bool cameraDragging;
     private Vector3 playerVelocity;
@@ -524,6 +525,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // Barres de vie des monstres : fond sombre + partie rouge (reference).
         MakeMaterial("Vie_Fond", new Color(0.15f, 0.05f, 0.05f));
         MakeMaterial("Vie_Rouge", new Color(0.90f, 0.12f, 0.12f));
+        // Test isole du nouveau shader : seule la route utilise le PBR pour
+        // l'instant. Tous les autres materiaux restent sur le rendu d'avant.
+        MakeMaterial("Route_PBR", new Color(0.42f, 0.45f, 0.48f), false, true);
     }
 
     private Texture2D TextureRealiste(string nom)
@@ -533,18 +537,15 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
         else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Stone" || nom.StartsWith("Roche")) chemin = "LVTextures/LV_ConcretePaving";
+        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Route_PBR") chemin = "LVTextures/LV_ConcretePaving";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
     }
 
-    private Material MakeMaterial(string name, Color color, bool emission = false)
+    private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
     {
-        // Les materiaux sont crees en code : aucun n'est reference par un asset,
-        // donc Unity peut retirer les shaders integres de la build. C'est ce qui
-        // affichait tout le monde en MAGENTA (Shader.Find renvoie null).
-        // ResoudreShader() passe par un shader du projet place dans Resources,
-        // qui est toujours embarque : plus de monde rose.
-        Shader shader = ResoudreShader();
+        // Les materiaux ordinaires reviennent au shader couleur de la version
+        // precedente. Le shader PBR est reserve a Route_PBR pour isoler le test.
+        Shader shader = pbr ? ResoudreShaderRoute() : ResoudreShader();
         if (shader == null)
         {
             Debug.LogError("LibreVies : aucun shader disponible pour " + name);
@@ -600,33 +601,37 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (cachedShader != null) return cachedShader;
 
-        // Le shader PBR avec textures est choisi en premier : les primitives
-        // existantes recoivent des surfaces realistes par mapping triplanaire.
-        // On verifie isSupported : sans cela une variante PBR invalide pouvait
-        // laisser tous les MeshRenderer sans materiau visible dans le player.
-        cachedShader = ChargerShader("LVShaders/LVRealistic");
-        if (cachedShader == null) cachedShader = ChargerShader("LVShaders/LVColor");
-        // Repli du projet, sans surface shader : meme une build qui refuse les
-        // variantes Standard conserve des objets et des textures visibles.
-        if (cachedShader == null) cachedShader = ChargerShader("LVShaders/LVVisibleFallback");
-
-        // Repli Standard dans l'editeur et dans les builds qui le conservent.
+        // Retour volontaire au rendu d'avant MAJ 31 pour isoler le probleme :
+        // le PBR n'est plus applique globalement a tous les objets.
+        cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
         if (cachedShader == null) cachedShader = Shader.Find("Standard");
-
-        // Derniers recours integres (sans eclairage, mais colores).
         if (cachedShader == null) cachedShader = Shader.Find("Unlit/Color");
         if (cachedShader == null) cachedShader = Shader.Find("Sprites/Default");
         if (cachedShader == null) cachedShader = Shader.Find("UI/Default");
 
-        if (cachedShader != null) Debug.Log("LibreVies : shader utilise = " + cachedShader.name);
-        else Debug.LogError("LibreVies : aucun shader de rendu disponible");
+        if (cachedShader != null) Debug.Log("LibreVies : shader general historique = " + cachedShader.name);
+        else Debug.LogError("LibreVies : aucun shader general disponible");
         return cachedShader;
+    }
+
+    private Shader ResoudreShaderRoute()
+    {
+        if (routeShader != null) return routeShader;
+        routeShader = ChargerShader("LVShaders/LVRealistic");
+        if (routeShader != null)
+            Debug.Log("LibreVies : shader PBR de test applique a la route = " + routeShader.name);
+        else
+            Debug.LogError("LibreVies : shader PBR de test indisponible pour la route");
+        return routeShader;
     }
 
     private Material Mat(string name)
     {
         for (int i = 0; i < materials.Count; i++)
             if (materials[i] != null && materials[i].name == name) return materials[i];
+        // Route_PBR doit rester strictement isole : ne pas lui donner en douce
+        // le premier materiau historique si le shader PBR est casse.
+        if (name == "Route_PBR") return null;
         for (int i = 0; i < materials.Count; i++)
             if (materials[i] != null) return materials[i];
         return null;
@@ -1180,8 +1185,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 new Vector3(pavD2.x, TerrainHeight(pavD2.x, pavD2.y) + 0.095f, pavD2.y),
                 new Vector3(pavD.x, TerrainHeight(pavD.x, pavD.y) + 0.095f, pavD.y));
         }
-        ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Dirt");
-        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Stone");
+        ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_PBR");
+        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Route_PBR");
     }
 
     private void CreateTown()

@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 38 : version 0.5.37 et journal
-                        runtime local obligatoire pour le diagnostic
+Derniere mise a jour : 18/09/2026 - MAJ 39 : version 0.5.39 et shader PBR
+                        limite a la route pour test isole
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1470,6 +1470,27 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     publier_jeu.bat n'a pas envoye l'archive 0.5.37 dans la release GitHub.
   - Controle C#, BAT, Python et diff Git propres. Recompiler avant de juger
     la presence du nouveau journal et du nouveau titre.
+
+================================================================================
+8.28 MAJ 39 - RETOUR AU RENDU HISTORIQUE, PBR ROUTE UNIQUEMENT
+================================================================================
+
+  - Le monde 3D restait invisible dans le player 0.5.37 malgre le titre de
+    version correct. Pour isoler la panne au lieu de casser tout le monde,
+    les materiaux ordinaires reviennent a LVColor, comme avant MAJ 31.
+  - Le shader `LibreVies/RealistePBR` n'est plus utilise que par le materiau
+    `Route_PBR`, affecte aux deux rubans de la route (`Route_Sinueuse` et
+    `Paves_Route`). Les murs, toits, terrain, chateau, arbres, PNJ, monstres
+    et rochers reviennent au rendu historique.
+  - Le shader de secours global LVVisibleFallback a ete retire : le test est
+    volontairement limite a une seule famille de geometrie.
+  - Version de cette MAJ : 0.5.39. La regle est maintenant MAJ N -> version
+    0.5.N ; le titre de la fenetre permet de verifier directement la build.
+  - Le journal automatique reste actif dans `jeu\game\logs\LibreViesRuntime.log`.
+  - Controle C#, BAT, Python et diff Git propres. Recompiler 0.5.39 puis
+    comparer : si tout le monde reapparait sauf la route, la panne est isolee
+    au shader PBR ; si rien ne reapparait, elle est dans la creation/camera,
+    independamment du shader.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

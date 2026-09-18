@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.37",
-  "notes": "MAJ 37 : rendu de secours visible, titre de fenetre versionne et journal runtime local.",
+  "game_version": "0.5.39",
+  "notes": "MAJ 39 : retour au rendu historique, PBR applique uniquement a la route pour test isole.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
