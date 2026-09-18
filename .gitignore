@@ -20,6 +20,8 @@
 /compilation/release/
 /compilation/build/
 /compilation/dist/
+/compilation/build_launcher.bat.maj
+/compilation/sauvegarde_locale/
 /compilation/icon.ico
 *.spec
 

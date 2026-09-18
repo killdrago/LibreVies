@@ -364,6 +364,38 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
       raccourcis de touches reconfigurables (AZERTY), camouflage, resolution et
       sauvegarde de configuration hors PlayerPrefs.
 
+  MAJ 9 - Le script de fabrication met vraiment le projet a jour
+    PIEGE CRITIQUE CORRIGE : jusqu'ici build_launcher.bat commencait par
+    "si le projet est deja complet sur ce PC, je ne telecharge rien". Resultat :
+    une correction poussee sur GitHub n'arrivait JAMAIS chez l'utilisateur, et
+    il recompilait l'ancien jeu (c'est exactement ce qui se serait passe avec
+    le correctif magenta).
+
+    - Etape 1 refaite : a chaque lancement, le script interroge l'API GitHub
+      (api.github.com/repos/.../commits/<branche>) et compare le SHA avec celui
+      de la derniere compilation (memorise dans compilation\build\
+      branche_actuelle.txt). Identique = rien a telecharger (le build demarre
+      tout de suite, sans les 72 Mo d'images). Different = l'archive de la
+      branche est telechargee et les fichiers sont remis a jour dans
+      compilation\ puis dans jeu\.
+    - Avant tout remplacement : sauvegarde de l'ancienne version dans
+      compilation\build\sauvegarde_locale\ (unity, outils, jeu et les .bat ;
+      le dossier image\ de 72 Mo est volontairement ignore).
+    - Le script ne s'ecrase jamais lui-meme en cours d'execution : s'il a change
+      sur GitHub, la nouvelle version est posee a cote sous le nom
+      build_launcher.bat.maj et le script affiche a la fin qu'il faut la
+      renommer puis relancer.
+    - Si l'API GitHub ne repond pas (hors ligne), on retombe simplement sur le
+      telechargement de l'archive : jamais de blocage.
+    - Nouveau : compilation\outils\verifier_bat.py, le controleur de .bat
+      (ASCII, parentheses des echo en bloc, labels appeles mais absents).
+      A lancer apres chaque modification d'un .bat :
+        python compilation/outils/verifier_bat.py
+      Il a ete teste sur un fichier volontairement faux : les 4 pieges sont
+      bien detectes. Tous les .bat du projet le passent.
+    - build_unity_game.bat (script de diagnostic) previent maintenant qu'il ne
+      met PAS les sources a jour.
+
 
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
@@ -529,6 +561,21 @@ INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
   Solution : Vector3.back + plafond de securite (0,6 au-dessus du terrain) ;
   GetAxisRaw + sensibilite 3. Voir MAJ 7.
 
+INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sournois)
+  Symptome : aucune erreur nulle part, mais le jeu recompile chez l'utilisateur
+  restait exactement l'ancien (monde magenta). C'est le genre de piege qu'aucun
+  message de log ne signale.
+  Cause    : build_launcher.bat commencait par "si le projet existe deja, on ne
+  telecharge rien" (pour ne pas ecraser le travail local). Les sources sur ce PC
+  n'etaient donc jamais rafraichies, alors que c'est le depot GitHub qui fait
+  foi.
+  Solution : mise a jour a chaque lancement, avec deux garde-fous : sauvegarde
+  de l'ancienne version dans build\sauvegarde_locale\ AVANT de remplacer, et
+  le script de fabrication lui-meme n'est jamais ecrase pendant son execution
+  (il est pose a cote en .maj). Voir MAJ 9.
+  A retenir : apres avoir pousse une correction du jeu, TOUJOURS verifier
+  qu'elle arrive jusqu'a l'exe du joueur (et pas seulement dans le depot).
+
 
 
 ================================================================================
@@ -605,8 +652,14 @@ INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
 ================================================================================
 
   [ ] 1. UTILISATEUR : relancer compilation\build_launcher.bat.
-          C'EST LA PRIORITE : la MAJ 7 (magenta + camera) n'est pas encore
-          dans l'exe que possede le joueur.
+          C'EST LA PRIORITE : les MAJ 7 et 8 (magenta, camera, collisions) ne
+          sont pas encore dans l'exe que possede le joueur.
+          ATTENTION : le script lui-meme a change (MAJ 9). Au premier
+          lancement, il doit afficher une sauvegarde, se mettre a jour tout
+          seul, puis dire a la fin "renomme build_launcher.bat.maj en
+          build_launcher.bat puis relance". Il faut le faire et relancer une
+          2e fois : ce 2e lancement compile pour de bon (et il est rapide, le
+          projet etant deja a jour).
           Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
           (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...).
           Pendant la compilation Unity, ouvrir la Console : elle doit afficher
@@ -690,6 +743,12 @@ INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
   compilation/outils/creer_icone.py / creer_icone.bat
     Reextrait icon.ico depuis les octets integres au launcher.
 
+  compilation/outils/verifier_bat.py
+    Controleur de scripts .bat : ASCII uniquement, parentheses non echappees
+    dans un echo en bloc, labels appeles par call/goto mais inexistants,
+    parentheses de bloc non equilibrees. A lancer apres chaque modification
+    d'un .bat (incidents 8 et 9).
+
   compilation/unity/Assets/Scripts/LibreViesGame.cs
     Le jeu lui-meme (tout est construit par code C# : monde, heros, ennemis,
     combat, HUD OnGUI, sauvegarde).
@@ -714,7 +773,7 @@ INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
   - Verifier l'etat :        git log --oneline -5 ; git status --short
   - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
   - Lancer la recette :      python compilation/outils/test_launcher.py
-  - Verifier un .bat :       controleur de blocs (incident 8)
+  - Verifier les .bat :      python compilation/outils/verifier_bat.py
   - Aucune trace de l'ancien moteur (regle de l'utilisateur) : chercher son
     nom dans tout le depot (option -i, insensible a la casse, hors .git) doit
     ne RIEN afficher. Oui, y compris dans ce fichier et dans les

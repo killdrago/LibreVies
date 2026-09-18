@@ -4,7 +4,8 @@ rem ==========================================================================
 rem  LibreVies - fabrication de la distribution (TOUT AUTOMATIQUE)
 rem
 rem  Ce script telecharge lui-meme tout ce qui manque, depuis GitHub :
-rem    1. le projet (dossier unity + launcher) s'il n'est pas deja la ;
+rem    1. le projet (dossier unity + launcher) : les fichiers sont MIS A JOUR
+rem       a chaque lancement depuis la branche GitHub ;
 rem    2. Python (winget, sinon site officiel python.org) ;
 rem    3. PyInstaller (necessaire une seule fois) ;
 rem    4. Unity Hub + Unity Editor (via setup_unity_build_tools.bat).
@@ -12,7 +13,8 @@ rem  Puis il fabrique, DANS LE DOSSIER jeu\ (tout au meme endroit) :
 rem    jeu\LibreVies.exe     = LE SEUL fichier a donner au joueur
 rem    jeu\game\...          = le jeu exporte, a publier
 rem
-rem  Rien n'est jamais ecrase : seuls les fichiers absents sont recuperes.
+rem  Avant tout remplacement, l'ancienne version est copiee dans
+rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
 rem  Etape suivante : outils\publier_jeu.bat (met le jeu en ligne)
 rem ==========================================================================
 
@@ -30,6 +32,9 @@ set "BUILD=%ROOT%build"
 set "PYTHON="
 set "UNITY="
 set "LV_ROOT=%ROOT%"
+set "LV_JEU=%JEU%"
+set "LV_DEPOT=%DEPOT%"
+set "LV_BRANCHE=%BRANCHE%"
 
 echo ==========================================================================
 echo   LibreVies - fabrication de la distribution
@@ -147,26 +152,32 @@ exit /b 0
 
 
 rem ==========================================================================
-rem  ETAPE 1 - le projet (sources) : telechargement depuis GitHub si besoin
+rem  ETAPE 1 - le projet (sources) : MISE A JOUR depuis GitHub
+rem  Les fichiers sont mis a jour a chaque lancement (le depot est la
+rem  reference). Avant tout remplacement, l'ancienne version est copiee dans
+rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
 rem ==========================================================================
 :etape_projet
-set "PROJET_INCOMPLET="
-if not exist "%PROJECT%\Assets" set "PROJET_INCOMPLET=1"
-if not exist "%LAUNCHER%" set "PROJET_INCOMPLET=1"
-if not exist "%ROOT%outils\publier_jeu.py" set "PROJET_INCOMPLET=1"
-if not exist "%JEU%\version_url.json" set "PROJET_INCOMPLET=1"
-if not defined PROJET_INCOMPLET (
-    echo [1/6] Projet : deja complet sur ce PC, rien a telecharger.
-    exit /b 0
-)
-
-echo [1/6] Projet incomplet : telechargement depuis GitHub...
+echo [1/6] Projet : mise a jour depuis GitHub...
 echo        https://github.com/%DEPOT% ^(branche %BRANCHE%^)
 set "LV_URL=https://github.com/%DEPOT%/archive/refs/heads/%BRANCHE%.zip"
 set "LV_ZIP=%TEMP%\librevies-projet.zip"
 set "LV_DIR=%TEMP%\librevies-projet"
+set "LV_SAUVE=%BUILD%\sauvegarde_locale"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $z=$env:LV_ZIP; $d=$env:LV_DIR; if (Test-Path $d) { Remove-Item -Recurse -Force $d }; if (Test-Path $z) { Remove-Item -Force $z }; Write-Host '        telechargement de l''archive...'; try { Invoke-WebRequest -Uri $env:LV_URL -OutFile $z -UseBasicParsing } catch { Write-Host ('        ECHEC du telechargement : ' + $_.Exception.Message); exit 2 }; Write-Host '        extraction...'; Expand-Archive -Path $z -DestinationPath $d -Force; Remove-Item -Force $z; $racine=(Get-ChildItem $d -Directory | Select-Object -First 1).FullName; & robocopy (Join-Path $racine 'compilation') $env:LV_ROOT /E /XC /XN /XO /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { Write-Host '        ECHEC : copie des fichiers du projet'; exit 3 }; $parent = Split-Path -Parent ($env:LV_ROOT.TrimEnd('\')); & robocopy (Join-Path $racine 'jeu') (Join-Path $parent 'jeu') /E /XC /XN /XO /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { Write-Host '        ECHEC : copie du launcher'; exit 4 }; Remove-Item -Recurse -Force $d; exit 0"
+rem --- Copie de sauvegarde de ce qui peut etre remplace ---------------------
+rem     (uniquement les sources : le dossier image\ fait 72 Mo et n'est
+rem     jamais modifie par ce script, inutile de le recopier)
+mkdir "%BUILD%" 2>nul
+if exist "%LV_SAUVE%" rmdir /s /q "%LV_SAUVE%"
+mkdir "%LV_SAUVE%" 2>nul
+robocopy "%ROOT%unity" "%LV_SAUVE%\unity" /E /XD Library Temp Logs obj Build build .vs /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%ROOT%outils" "%LV_SAUVE%\outils" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%JEU%" "%LV_SAUVE%\jeu" /E /XF *.exe /XD game game.ancien game.install /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+for %%F in (build_launcher.bat build_unity_game.bat setup_unity_build_tools.bat) do if exist "%ROOT%%%F" copy /y "%ROOT%%%F" "%LV_SAUVE%\%%F" >nul 2>&1
+echo        Sauvegarde de l'ancienne version : build\sauvegarde_locale
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $z=$env:LV_ZIP; $d=$env:LV_DIR; if (Test-Path $d) { Remove-Item -Recurse -Force $d }; if (Test-Path $z) { Remove-Item -Force $z }; Write-Host '        y a-t-il du nouveau sur GitHub ?'; $sha=$null; try { $reponse = Invoke-RestMethod -Uri ('https://api.github.com/repos/' + $env:LV_DEPOT + '/commits/' + $env:LV_BRANCHE) -UserAgent 'LibreVies' -TimeoutSec 30; $sha = $reponse.sha } catch { $sha = $null }; $fichier = Join-Path $env:LV_ROOT 'build\branche_actuelle.txt'; $connu = $null; if (Test-Path $fichier) { $connu = (Get-Content -Raw $fichier).Trim() }; if ($sha -and $connu -eq $sha) { Write-Host '        projet deja a jour : rien a telecharger.'; exit 0 }; Write-Host '        telechargement de l''archive...'; try { Invoke-WebRequest -Uri $env:LV_URL -OutFile $z -UseBasicParsing } catch { Write-Host ('        ECHEC du telechargement : ' + $_.Exception.Message); exit 2 }; Write-Host '        extraction...'; Expand-Archive -Path $z -DestinationPath $d -Force; Remove-Item -Force $z; $racine=(Get-ChildItem $d -Directory | Select-Object -First 1).FullName; Write-Host '        mise a jour des fichiers du projet...'; & robocopy (Join-Path $racine 'compilation') $env:LV_ROOT /E /XF build_launcher.bat /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { Write-Host '        ECHEC : copie des fichiers du projet'; exit 3 }; & robocopy (Join-Path $racine 'jeu') $env:LV_JEU /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { Write-Host '        ECHEC : copie du launcher'; exit 4 }; $neuf = Join-Path $racine 'compilation\build_launcher.bat'; $courant = Join-Path $env:LV_ROOT 'build_launcher.bat'; $etat = Join-Path $env:LV_ROOT 'build\script_recu.txt'; if (Test-Path $etat) { Remove-Item -Force $etat }; if ((Test-Path $neuf) -and (Test-Path $courant)) { if ((Get-FileHash $neuf).Hash -ne (Get-FileHash $courant).Hash) { Copy-Item -Force $neuf (Join-Path $env:LV_ROOT 'build_launcher.bat.maj'); Set-Content -Path $etat -Value 'oui' -Encoding ASCII } }; if ($sha) { Set-Content -Path $fichier -Value $sha -Encoding ASCII }; Remove-Item -Recurse -Force $d; exit 0"
 
 if errorlevel 1 (
     echo.
@@ -174,7 +185,17 @@ if errorlevel 1 (
     echo Verifie la connexion Internet ^(ou l'acces a github.com^) puis relance.
     exit /b 1
 )
-echo        Fichiers manquants recuperes ^(tes fichiers locaux sont conserves^).
+echo        Projet a jour.
+
+if exist "%ROOT%build\script_recu.txt" (
+    del /q "%ROOT%build\script_recu.txt" >nul 2>&1
+    echo.
+    echo IMPORTANT : une nouvelle version de build_launcher.bat a ete telechargee.
+    echo Elle est posee sous le nom : build_launcher.bat.maj
+    echo Renomme-la en build_launcher.bat ^(en remplacant le fichier^) puis relance.
+    echo Cette compilation-ci finit avec l'ancienne version : c'est normal.
+    echo.
+)
 
 if not exist "%PROJECT%\Assets" (
     echo ERREUR : le projet Unity reste introuvable : %PROJECT%
@@ -185,7 +206,6 @@ if not exist "%LAUNCHER%" (
     exit /b 1
 )
 exit /b 0
-
 
 rem ==========================================================================
 rem  ETAPE 2 - Python

@@ -6,6 +6,10 @@ rem
 rem  Le cas normal est de lancer build_launcher.bat, qui exporte le jeu
 rem  ET fabrique le launcher. Ce script-ci ne sert qu'a verifier l'export
 rem  Unity quand quelque chose ne va pas.
+rem
+rem  ATTENTION : ce script ne met PAS les sources a jour (il n'ouvre meme pas
+rem  Internet). Si le jeu exporte ne contient pas les dernieres corrections,
+rem  lancer build_launcher.bat, qui les telecharge depuis GitHub.
 rem ============================================================
 set "ROOT=%~dp0"
 set "JEU=%ROOT%..\jeu"
