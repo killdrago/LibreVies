@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 32 : export protege contre les fichiers
-                        verrouilles et nettoyage du warning energie
+Derniere mise a jour : 18/09/2026 - MAJ 33 : export Unity PBR valide
+                        apres correction du remplacement de jeu\game
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1330,6 +1330,31 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     formes de batiments biseautees, soubassements, chainages, rives et cheminees.
   - Controle C# statique, scripts BAT et diff Git propres. Relancer
     build_launcher.bat pour produire la nouvelle build visuelle.
+
+================================================================================
+8.22 MAJ 33 - EXPORT UNITY PBR VALIDE
+================================================================================
+
+  - Controle utilisateur du 18/09/2026, Unity 6000.6.1f1 sous Windows 10 :
+    la compilation C# et l'export Windows Mono se terminent correctement.
+  - Le log confirme : "Build Finished, Result: Success", puis
+    "LibreVies Unity exporte" et enfin "Exiting batchmode successfully now".
+    Le code retour Unity final est 0.
+  - Le chemin d'export temporaire confirme que MAJ 32 est bien utilise :
+    compilation\build\unity_export\LibreViesGame.exe.
+  - Un passage intermediaire Bee affiche ExitCode 4 pendant la construction
+    incrementale, mais Unity relance ses etapes puis termine avec succes. Ce
+    code intermediaire n'est pas l'echec du build final.
+  - Le message "Native extension for WindowsStandalone target not found" est
+    non bloquant dans ce log : le support WindowsStandalone est bien utilise et
+    le player est genere.
+  - Le log ne montre pas encore la sortie du batch apres Unity (deplacement de
+    unity_export vers jeu\game). Si build_launcher.bat a ete laisse aller
+    jusqu'au bout, le deplacement et la compilation du launcher ont suivi ;
+    sinon relancer le script apres fermeture de l'ancien jeu.
+  - Prochaine verification visuelle : lancer la nouvelle version et confirmer
+    dans une capture que les murs, toits, sol, routes, bois et pierres affichent
+    bien les textures PBR de MAJ 31, et non l'ancien export plat.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
