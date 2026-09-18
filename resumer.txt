@@ -1,7 +1,7 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 18 : camouflage et transparence camera
+Derniere mise a jour : 18/09/2026 - MAJ 19 : options completes et entree chateau
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1068,6 +1068,21 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
 
   R18. Le camouflage et la transparence ne suppriment pas les collisions :
        ils ne changent que le rendu.
+
+================================================================================
+8.8 MAJ 19 - FINITIONS DES DEMANDES 10.2 A 10.8
+================================================================================
+
+  - Le message d'accueil automatique de fin de chargement a ete retire.
+  - L'onglet Controle expose maintenant toutes les actions : avancer,
+    reculer, gauche, droite, sauter, courir, ramasser, attaquer, inventaire,
+    options, quete, camera et renaitre. Chaque touche se configure par bouton.
+  - Le passage central du chateau est vraiment libre : la collision de l'arc
+    superieur ne descend plus jusqu'au sol. Les murs lateraux et le fond restent
+    bloquants, donc on peut entrer sans traverser le chateau.
+  - Le garde-fou reste en place : monstres hors village, attaque interdite au
+    travers de la cloture, objets bas franchissables en saut et atterrissage
+    sur les caisses.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

@@ -358,7 +358,6 @@ public sealed class LibreViesGame : MonoBehaviour
             Journal("fin   : " + noms[i] + "  (" + objetsCrees + " objets)");
             yield return null;
         }
-        ShowInfo("LibreVies — monde Unity prêt");
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
         avancement = 1f;
@@ -1091,7 +1090,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Box(new Vector3(10f, 2.5f, 0), new Vector3(1f, 5f, 12f), "Stone", root, "Mur_Droit", true);
         Box(new Vector3(-7.4f, 2.5f, 5.7f), new Vector3(5.2f, 5f, 1f), "Stone", root, "Facade_Gauche", true);
         Box(new Vector3(7.4f, 2.5f, 5.7f), new Vector3(5.2f, 5f, 1f), "Stone", root, "Facade_Droite", true);
-        Box(new Vector3(0, 5.0f, 5.7f), new Vector3(10f, 1f, 1f), "Stone", root, "Arc_Porte", true);
+        Box(new Vector3(0, 5.0f, 5.7f), new Vector3(10f, 1f, 1f), "Stone", root, "Arc_Porte");
         // Vieille porte pleine retiree : seuls les montants encadrent l'entree.
         Box(new Vector3(-2.1f, 1.2f, 5.7f), new Vector3(0.45f, 2.4f, 0.65f), "Stone", root, "Montant_Porte");
         Box(new Vector3(2.1f, 1.2f, 5.7f), new Vector3(0.45f, 2.4f, 0.65f), "Stone", root, "Montant_Porte");
@@ -1116,7 +1115,6 @@ public sealed class LibreViesGame : MonoBehaviour
         ColBoite(10, -67, 1f, 12f, 5f);
         ColBoite(-7.4f, -61.3f, 5.2f, 1f, 5f);
         ColBoite(7.4f, -61.3f, 5.2f, 1f, 5f);
-        ColBoite(0, -61.3f, 10f, 1f, 5f);
         ColCercle(-10, -73, 1.0f, 7.6f);
         ColCercle(10, -73, 1.0f, 7.6f);
         ColCercle(-10, -61, 1.0f, 7.6f);
@@ -2516,11 +2514,11 @@ public sealed class LibreViesGame : MonoBehaviour
         return touche.ToString();
     }
 
-    private void DemanderTouche(string id, string libelle, ref int valeur, float y)
+    private void DemanderTouche(string id, string libelle, ref int valeur, float colonne, float y)
     {
-        GUI.Label(new Rect(ongletOptions == 1 ? 220 : 0, y, 160, 24), libelle, smallStyle);
+        GUI.Label(new Rect(colonne, y, 102, 24), libelle, smallStyle);
         string texte = toucheEnCours == id ? "Appuyez..." : NomTouche(valeur);
-        if (GUI.Button(new Rect(ongletOptions == 1 ? 370 : 160, y - 2, 125, 25), texte, buttonStyle))
+        if (GUI.Button(new Rect(colonne + 104, y - 2, 94, 25), texte, buttonStyle))
             toucheEnCours = id;
         if (toucheEnCours == id && Event.current.type == EventType.KeyDown)
         {
@@ -2595,15 +2593,19 @@ public sealed class LibreViesGame : MonoBehaviour
         inverserAxeY = GUI.Toggle(new Rect(205, 57, 24, 24), inverserAxeY, "");
         GUI.Label(new Rect(245, 57, 150, 24), inverserAxeY ? "Oui" : "Non", smallStyle);
         GUI.Label(new Rect(0, 84, 390, 24), "Clique une touche, puis appuie sur la nouvelle touche.", smallStyle);
-        DemanderTouche("avant", "Avancer", ref toucheAvant, 116);
-        DemanderTouche("arriere", "Reculer", ref toucheArriere, 145);
-        DemanderTouche("gauche", "Gauche", ref toucheGauche, 174);
-        DemanderTouche("droite", "Droite", ref toucheDroite, 203);
-        DemanderTouche("saut", "Sauter", ref toucheSaut, 232);
-        DemanderTouche("courir", "Courir", ref toucheCourir, 261);
-        DemanderTouche("ramasser", "Ramasser", ref toucheRamasser, 290);
-        DemanderTouche("attaque", "Attaquer", ref toucheAttaque, 319);
-        DemanderTouche("camera", "Camera", ref toucheCamera, 348);
+        DemanderTouche("avant", "Avancer", ref toucheAvant, 0, 116);
+        DemanderTouche("arriere", "Reculer", ref toucheArriere, 0, 145);
+        DemanderTouche("gauche", "Gauche", ref toucheGauche, 0, 174);
+        DemanderTouche("droite", "Droite", ref toucheDroite, 0, 203);
+        DemanderTouche("saut", "Sauter", ref toucheSaut, 0, 232);
+        DemanderTouche("courir", "Courir", ref toucheCourir, 0, 261);
+        DemanderTouche("ramasser", "Ramasser", ref toucheRamasser, 205, 116);
+        DemanderTouche("attaque", "Attaquer", ref toucheAttaque, 205, 145);
+        DemanderTouche("inventaire", "Inventaire", ref toucheInventaire, 205, 174);
+        DemanderTouche("options", "Options", ref toucheOptions, 205, 203);
+        DemanderTouche("quete", "Quete", ref toucheQuete, 205, 232);
+        DemanderTouche("camera", "Camera", ref toucheCamera, 205, 261);
+        DemanderTouche("renaitre", "Renaitre", ref toucheRenaître, 205, 290);
     }
 
     private void EnsureStyles()
