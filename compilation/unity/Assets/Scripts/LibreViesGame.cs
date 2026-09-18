@@ -402,6 +402,9 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
+        Renderer[] renderers = FindObjectsOfType<Renderer>();
+        Journal("controle rendu : " + renderers.Length + " renderer(s), shader "
+                + (cachedShader == null ? "AUCUN" : cachedShader.name));
         avancement = 1f;
         etapeChargement = "";
         mondePret = true;
@@ -541,15 +544,31 @@ public sealed class LibreViesGame : MonoBehaviour
         return material;
     }
 
+    private Shader ChargerShader(string chemin)
+    {
+        Shader shader = Resources.Load<Shader>(chemin);
+        if (shader == null) return null;
+        if (!shader.isSupported)
+        {
+            Debug.LogWarning("LibreVies : shader non supporte, repli : " + chemin);
+            return null;
+        }
+        return shader;
+    }
+
     private Shader ResoudreShader()
     {
         if (cachedShader != null) return cachedShader;
 
         // Le shader PBR avec textures est choisi en premier : les primitives
         // existantes recoivent des surfaces realistes par mapping triplanaire.
-        // LVColor reste le secours procedural si le shader PBR ne se charge pas.
-        cachedShader = Resources.Load<Shader>("LVShaders/LVRealistic");
-        if (cachedShader == null) cachedShader = Resources.Load<Shader>("LVShaders/LVColor");
+        // On verifie isSupported : sans cela une variante PBR invalide pouvait
+        // laisser tous les MeshRenderer sans materiau visible dans le player.
+        cachedShader = ChargerShader("LVShaders/LVRealistic");
+        if (cachedShader == null) cachedShader = ChargerShader("LVShaders/LVColor");
+        // Repli du projet, sans surface shader : meme une build qui refuse les
+        // variantes Standard conserve des objets et des textures visibles.
+        if (cachedShader == null) cachedShader = ChargerShader("LVShaders/LVVisibleFallback");
 
         // Repli Standard dans l'editeur et dans les builds qui le conservent.
         if (cachedShader == null) cachedShader = Shader.Find("Standard");
@@ -559,7 +578,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (cachedShader == null) cachedShader = Shader.Find("Sprites/Default");
         if (cachedShader == null) cachedShader = Shader.Find("UI/Default");
 
-        if (cachedShader != null) Debug.Log("LibreVies : shader utilisé = " + cachedShader.name);
+        if (cachedShader != null) Debug.Log("LibreVies : shader utilise = " + cachedShader.name);
+        else Debug.LogError("LibreVies : aucun shader de rendu disponible");
         return cachedShader;
     }
 

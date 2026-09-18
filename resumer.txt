@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 36 : etape Unity inline pour CMD
-                        et correction de l'erreur etape_unity
+Derniere mise a jour : 18/09/2026 - MAJ 37 : repli de rendu visible et
+                        diagnostic des shaders dans le player
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1425,6 +1425,28 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     controlees par verifier_bat.py.
   - Relancer le meme build_launcher.bat : la synchronisation telechargera la
     nouvelle version du script si necessaire, puis la fabrication reprendra.
+
+================================================================================
+8.26 MAJ 37 - PLAYER 0.5 SANS MONDE VISIBLE
+================================================================================
+
+  - Controle utilisateur : le titre confirme la version 0.5.0, mais l'image
+    montre uniquement le bleu du ciel et le vert du bas, avec le HUD. Le nouvel
+    executable est donc bien lance, mais aucun objet 3D n'est rendu a l'ecran.
+  - Hypothese technique prioritaire : le shader charge dynamiquement depuis
+    Resources n'est pas supporte dans le player Windows, ce qui pouvait laisser
+    les MeshRenderer sans materiau visible sans empecher le HUD OnGUI.
+  - Ajout de `LVVisibleFallback.shader`, un shader vertex/fragment simple,
+    texturable et triplanaire, place dans Assets/Resources/LVShaders. Il est
+    utilise si LVRealistic ou LVColor est absent/non supporte ; les formes du
+    monde restent alors visibles au lieu de disparaitre.
+  - ResoudreShader() verifie maintenant `shader.isSupported`, journalise le
+    shader choisi et affiche une erreur explicite si aucun shader ne peut etre
+    charge. La fin de la construction journalise aussi le nombre de Renderer.
+  - Controle statique C#, BAT et Python propre. Recompiler le player 0.5.0,
+    puis lire jeu\game\logs\LibreVies.log si le monde reste invisible :
+    les lignes `shader utilise`, `controle rendu`, `debut` et `ECHEC` donnent
+    enfin le point exact du probleme.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
