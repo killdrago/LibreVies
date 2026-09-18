@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.39";
+    private const string VersionJeu = "0.5.40";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -99,6 +99,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private float cameraSensitivity = 3f;
     private Shader cachedShader;
     private Shader routeShader;
+    private bool routePbrActif;
     private bool firstPerson;
     private bool cameraDragging;
     private Vector3 playerVelocity;
@@ -548,7 +549,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Shader shader = pbr ? ResoudreShaderRoute() : ResoudreShader();
         if (shader == null)
         {
-            Debug.LogError("LibreVies : aucun shader disponible pour " + name);
+            Debug.LogError("[LV_SHADER] aucun shader disponible pour " + name);
             materials.Add(null);
             return null;
         }
@@ -556,6 +557,14 @@ public sealed class LibreViesGame : MonoBehaviour
         if (material.HasProperty("_Color")) material.color = color;
         Texture2D texture = TextureRealiste(name);
         if (texture != null && material.HasProperty("_MainTex")) material.SetTexture("_MainTex", texture);
+        if (pbr)
+        {
+            if (texture == null)
+                Debug.LogError("[LV_SHADER_ROUTE] texture absente pour Route_PBR : LVTextures/LV_ConcretePaving");
+            else
+                Debug.Log("[LV_SHADER_ROUTE] Route_PBR construit avec shader=" + shader.name
+                    + " texture=LVTextures/LV_ConcretePaving pbr=" + routePbrActif);
+        }
         if (material.HasProperty("_Tiling"))
         {
             float echelle = name == "Terrain" || name == "Dirt" ? 0.08f
@@ -588,12 +597,21 @@ public sealed class LibreViesGame : MonoBehaviour
     private Shader ChargerShader(string chemin)
     {
         Shader shader = Resources.Load<Shader>(chemin);
-        if (shader == null) return null;
-        if (!shader.isSupported)
+        if (shader == null)
         {
-            Debug.LogWarning("LibreVies : shader non supporte, repli : " + chemin);
+            Debug.LogError("[LV_SHADER] Resources.Load a echoue : " + chemin
+                + " | GPU=" + SystemInfo.graphicsDeviceName
+                + " | API=" + SystemInfo.graphicsDeviceType);
             return null;
         }
+        if (!shader.isSupported)
+        {
+            Debug.LogError("[LV_SHADER] shader non supporte : " + shader.name
+                + " (" + chemin + ") | GPU=" + SystemInfo.graphicsDeviceName
+                + " | API=" + SystemInfo.graphicsDeviceType);
+            return null;
+        }
+        Debug.Log("[LV_SHADER] shader charge : " + shader.name + " (" + chemin + ")");
         return shader;
     }
 
@@ -619,9 +637,20 @@ public sealed class LibreViesGame : MonoBehaviour
         if (routeShader != null) return routeShader;
         routeShader = ChargerShader("LVShaders/LVRealistic");
         if (routeShader != null)
-            Debug.Log("LibreVies : shader PBR de test applique a la route = " + routeShader.name);
+        {
+            routePbrActif = true;
+            Debug.Log("[LV_SHADER_ROUTE] PBR applique a la route : " + routeShader.name);
+        }
         else
-            Debug.LogError("LibreVies : shader PBR de test indisponible pour la route");
+        {
+            // Une route noire ne doit pas masquer le diagnostic. Elle revient
+            // temporairement au shader historique, et le journal conserve la
+            // raison exacte de l'echec PBR.
+            routeShader = ResoudreShader();
+            routePbrActif = false;
+            Debug.LogError("[LV_SHADER_ROUTE] PBR indisponible : route repassee sur "
+                + (routeShader == null ? "AUCUN SHADER" : routeShader.name));
+        }
         return routeShader;
     }
 
@@ -629,9 +658,6 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         for (int i = 0; i < materials.Count; i++)
             if (materials[i] != null && materials[i].name == name) return materials[i];
-        // Route_PBR doit rester strictement isole : ne pas lui donner en douce
-        // le premier materiau historique si le shader PBR est casse.
-        if (name == "Route_PBR") return null;
         for (int i = 0; i < materials.Count; i++)
             if (materials[i] != null) return materials[i];
         return null;

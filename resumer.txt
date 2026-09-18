@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 39 : version 0.5.39 et shader PBR
-                        limite a la route pour test isole
+Derniere mise a jour : 18/09/2026 - MAJ 40 : diagnostic du shader route
+                        et repli automatique non-noir
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1491,6 +1491,31 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     comparer : si tout le monde reapparait sauf la route, la panne est isolee
     au shader PBR ; si rien ne reapparait, elle est dans la creation/camera,
     independamment du shader.
+
+================================================================================
+8.29 MAJ 40 - DIAGNOSTIC DU PBR ROUTE
+================================================================================
+
+  - Controle utilisateur : les batiments sont revenus avec le rendu historique,
+    mais la route reste noire. Le probleme est donc maintenant isole au
+    materiau/shader de la route, et non plus a la construction generale du
+    monde.
+  - Version de ce lot : 0.5.40, selon la convention MAJ N -> 0.5.N.
+  - `ChargerShader()` journalise maintenant chaque cas : shader absent dans
+    Resources, shader non supporte avec GPU/API, ou shader charge correctement.
+  - `ResoudreShaderRoute()` journalise explicitement si RealistePBR est utilise.
+    Si le chargement echoue, Route_PBR revient automatiquement au shader
+    historique LVColor : la route ne doit plus devenir noire et le journal
+    conserve la cause exacte.
+  - `MakeMaterial()` journalise aussi la presence de
+    LVTextures/LV_ConcretePaving pour Route_PBR.
+  - Journal a lire apres lancement : `jeu\game\logs\LibreViesRuntime.log`.
+    Lignes importantes : `[LV_SHADER]`, `[LV_SHADER_ROUTE]`, `Route_PBR`
+    et `controle rendu`.
+  - Controle BAT/Python propre. Le parseur C# n'est pas disponible dans cet
+    environnement de controle, mais la version MAJ 39 precedente avait deja
+    passe ce controle et les modifications restent des appels Unity/.NET
+    connus.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
