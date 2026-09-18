@@ -118,6 +118,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         public GameObject Root;
         public float Age;
+        public Vector3 Origine;     // depart du texte : sert a l'arc
     }
 
     private sealed class EffetEtincelle
@@ -173,6 +174,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 Direction;   // direction de deplacement (errance / poursuite)
         public float WanderTimer;
         public float Speed = 1.6f;
+        public int PvMax = 50;          // souris 25, rat 50, araignee 75
+        public bool Souris;
+        public Transform Barre;         // barre de vie (orientee camera)
+        public Transform Remplissage;   // partie rouge de la barre
     }
 
     private sealed class PickupState
@@ -343,6 +348,9 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
         MakeMaterial("Arbre_Rond", new Color(0.22f, 0.58f, 0.20f));
         MakeMaterial("Cimier", new Color(0.75f, 0.15f, 0.15f));
+        // Barres de vie des monstres : fond sombre + partie rouge (reference).
+        MakeMaterial("Vie_Fond", new Color(0.15f, 0.05f, 0.05f));
+        MakeMaterial("Vie_Rouge", new Color(0.90f, 0.12f, 0.12f));
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false)
@@ -1552,69 +1560,140 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateEnemies()
     {
-        var random = new System.Random(8342);
-        for (int i = 0; i < 12; i++)
+        // 6 zones de 3 betes, exactement comme la reference : souris (25 PV),
+        // rats (50 PV), araignees (75 PV). Une bete qui naitrait dans le
+        // village protege est repoussee juste dehors.
+        string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
+        float[] centresX = { 25f, -25f, 30f, -30f, 15f, -18f };
+        float[] centresZ = { 20f, -20f, -25f, 25f, 35f, -38f };
+        for (int zone = 0; zone < types.Length; zone++)
         {
-            float angle = (float)random.NextDouble() * Mathf.PI * 2f;
-            float radius = VillageRadius + 8f + (float)random.NextDouble() * 32f;
-            CreateEnemy(new Vector3(Mathf.Cos(angle) * radius, 0, Mathf.Sin(angle) * radius), i % 3 == 0);
+            for (int i = 0; i < 3; i++)
+            {
+                float x = centresX[zone] + UnityEngine.Random.Range(-8f, 8f);
+                float z = centresZ[zone] + UnityEngine.Random.Range(-8f, 8f);
+                if (DansVillage(x, z))
+                {
+                    Vector2 pousse = new Vector2(x, z);
+                    if (pousse.magnitude < 0.001f) pousse = new Vector2(1f, 0f);
+                    pousse = pousse.normalized * (VillageRadius + 7f);
+                    x = pousse.x;
+                    z = pousse.y;
+                }
+                CreateEnemy(new Vector3(x, 0f, z), types[zone]);
+            }
         }
     }
 
-    private void CreateEnemy(Vector3 position, bool spider)
+    private void CreateEnemy(Vector3 position, string type)
     {
-        var enemyObject = new GameObject(spider ? "Araignee" : "Rat");
+        bool spider = type == "araignee";
+        bool souris = type == "souris";
+        var enemyObject = new GameObject(spider ? "Araignee" : (souris ? "Souris" : "Rat"));
         position.y = TerrainHeight(position.x, position.z);
         enemyObject.transform.position = position;
         EnemyState state = new EnemyState
         {
             Root = enemyObject,
             Spider = spider,
+            Souris = souris,
+            PvMax = spider ? 75 : (souris ? 25 : 50),
             Home = position,
             Legs = new Transform[spider ? 8 : 0],
-            Speed = spider ? 2.0f : 1.6f
+            // Vitesse tiree au hasard d'un monstre a l'autre (1,2 a 2,0 m/s),
+            // comme la reference : certaines betes sont plus vives.
+            Speed = UnityEngine.Random.Range(1.2f, 2.0f)
         };
+        state.Hp = state.PvMax;
         // Le corps de la bete est un obstacle : on ne la traverse pas. Il suit
         // ses deplacements (voir UpdateEnemies) et il est desactive a sa mort.
         state.Corps = new Obstacle
         {
             Cercle = true, X = position.x, Z = position.z,
-            Rayon = spider ? 0.5f : 0.45f, Portee = 1.5f,
+            Rayon = spider ? 0.5f : (souris ? 0.30f : 0.45f), Portee = 1.5f,
             Hauteur = spider ? 0.7f : 0.9f
         };
         obstacles.Add(state.Corps);
+        // La silhouette est dans un sous-objet : une souris est une petite bete.
+        var silhouette = new GameObject("Silhouette").transform;
+        silhouette.SetParent(enemyObject.transform, false);
+        silhouette.localScale = Vector3.one * (souris ? 0.7f : 1f);
         string material = spider ? "Spider" : "Enemy";
-        Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.45f : 0.55f, 0), spider ? new Vector3(0.85f, 0.35f, 0.85f) : new Vector3(0.65f, 0.45f, 1.0f), material, enemyObject.transform, "Corps");
-        Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.62f : 0.72f, -0.48f), new Vector3(0.24f, 0.24f, 0.24f), "Red", enemyObject.transform, "Yeux");
+        Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.45f : 0.55f, 0), spider ? new Vector3(0.85f, 0.35f, 0.85f) : new Vector3(0.65f, 0.45f, 1.0f), material, silhouette, "Corps");
+        Primitive(PrimitiveType.Sphere, new Vector3(0, spider ? 0.62f : 0.72f, -0.48f), new Vector3(0.24f, 0.24f, 0.24f), "Red", silhouette, "Yeux");
         if (spider)
         {
             for (int i = 0; i < 8; i++)
             {
                 float angle = i * Mathf.PI * 2f / 8f;
-                var leg = Box(new Vector3(Mathf.Cos(angle) * 0.75f, 0.35f, Mathf.Sin(angle) * 0.75f), new Vector3(0.10f, 0.10f, 1.1f), "Spider", enemyObject.transform, "Patte");
+                var leg = Box(new Vector3(Mathf.Cos(angle) * 0.75f, 0.35f, Mathf.Sin(angle) * 0.75f), new Vector3(0.10f, 0.10f, 1.1f), "Spider", silhouette, "Patte");
                 leg.transform.rotation = Quaternion.Euler(0, angle * Mathf.Rad2Deg, 25f * Mathf.Sin(angle));
                 state.Legs[i] = leg.transform;
             }
         }
+
+        // Barre de vie au-dessus de la bete (comme la reference) : fond sombre
+        // et partie rouge proportionnelle aux PV. Elle reste cachee tant que la
+        // bete est intacte, et se tourne vers la camera.
+        var barre = new GameObject("BarreVie").transform;
+        barre.SetParent(enemyObject.transform, false);
+        barre.localPosition = new Vector3(0f, spider ? 1.1f : 0.75f, 0f);
+        barre.gameObject.SetActive(false);
+        Box(new Vector3(0f, 0f, 0f), new Vector3(0.9f, 0.10f, 0.03f), "Vie_Fond", barre, "BarreVie_Fond");
+        var remplissage = Box(new Vector3(0f, 0f, 0.02f), new Vector3(0.86f, 0.07f, 0.03f), "Vie_Rouge", barre, "BarreVie_Remplissage");
+        state.Barre = barre;
+        state.Remplissage = remplissage.transform;
+
         enemies.Add(state);
     }
 
     private void CreatePickups()
     {
-        CreatePickup(new Vector3(7, 0, 4), false);
-        CreatePickup(new Vector3(-8, 0, 2), false);
-        CreatePickup(new Vector3(4, 0, -5), true);
-        CreatePickup(new Vector3(-5, 0, -16), true);
-        CreatePickup(new Vector3(18, 0, -20), true);
+        // 15 cailloux et 3 pieces, comme la reference : JAMAIS dans le village
+        // (il reste un refuge) et jamais sur la route. Quand on les ramasse, ils
+        // ne reviennent pas au meme endroit mais ailleurs, au hasard : c'est ce
+        // qui fait "apparaitre des choses" dans le monde au fil du temps.
+        for (int i = 0; i < 15; i++) CreatePickup(PositionRessource(50f, 3.0f), false);
+        for (int i = 0; i < 3; i++) CreatePickup(PositionRessource(40f, 3.0f), true);
+    }
+
+    // Position aleatoire hors du village et hors de la route : on retire tant
+    // que ce n'est pas le cas (comme le while de la reference), avec un nombre
+    // d'essais borne pour ne jamais pouvoir bloquer le jeu.
+    private Vector3 PositionRessource(float portee, float margeRoute)
+    {
+        for (int essai = 0; essai < 60; essai++)
+        {
+            float x = UnityEngine.Random.Range(-portee, portee);
+            float z = UnityEngine.Random.Range(-portee, portee);
+            if (new Vector2(x, z).magnitude < VillageRadius + 2f) continue;
+            if (DistRoute(new Vector2(x, z)) < margeRoute) continue;
+            return new Vector3(x, 0f, z);
+        }
+        // Repli : juste a l'exterieur de l'enceinte, jamais devant un portail.
+        float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+        return new Vector3(Mathf.Cos(angle) * (VillageRadius + 4f), 0f, Mathf.Sin(angle) * (VillageRadius + 4f));
     }
 
     private void CreatePickup(Vector3 position, bool coin)
     {
-        position.y = TerrainHeight(position.x, position.z) + 0.45f;
-        var root = Primitive(coin ? PrimitiveType.Cylinder : PrimitiveType.Sphere, position,
-            coin ? new Vector3(0.30f, 0.08f, 0.30f) : new Vector3(0.35f, 0.35f, 0.35f),
+        // Tailles de la reference : caillou 0,28 x 0,22 x 0,28 pose a 0,14 m,
+        // piece de 0,36 m de diametre et 0,05 m d'epaisseur posee a 0,12 m.
+        var root = Primitive(coin ? PrimitiveType.Cylinder : PrimitiveType.Sphere, Vector3.zero,
+            coin ? new Vector3(0.36f, 0.025f, 0.36f) : new Vector3(0.30f, 0.24f, 0.30f),
             coin ? "Gold" : "Stone", null, coin ? "Piece" : "Caillou");
-        pickups.Add(new PickupState { Root = root, Coin = coin, Home = position });
+        var pickup = new PickupState { Root = root, Coin = coin, Home = position };
+        pickups.Add(pickup);
+        PoserPickup(pickup, position);
+    }
+
+    // Pose un caillou (ou une piece) a l'endroit voulu, en le posant bien sur
+    // le terrain (les pieces sont plates, les cailloux plus epais).
+    private void PoserPickup(PickupState pickup, Vector3 position)
+    {
+        position.y = TerrainHeight(position.x, position.z) + (pickup.Coin ? 0.12f : 0.14f);
+        pickup.Root.transform.position = position;
+        pickup.Home = position;
     }
 
     private void UpdateClouds(float dt)
@@ -1749,8 +1828,21 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (enemy.Corps != null) enemy.Corps.Actif = false;
                 if (Time.time >= enemy.RespawnAt)
                 {
-                    enemy.Alive = true; enemy.Hp = MaxHp; enemy.Root.SetActive(true);
-                    enemy.Root.transform.position = enemy.Home;
+                    enemy.Alive = true;
+                    enemy.Hp = enemy.PvMax;
+                    enemy.Root.SetActive(true);
+                    // Reapparition decalee de 3 m au hasard autour du point de
+                    // depart, et jamais dans le village (reference).
+                    Vector2 retour = new Vector2(enemy.Home.x, enemy.Home.z)
+                        + new Vector2(UnityEngine.Random.Range(-3f, 3f), UnityEngine.Random.Range(-3f, 3f));
+                    if (retour.magnitude < VillageRadius + 1f)
+                    {
+                        if (retour.magnitude < 0.001f) retour = new Vector2(1f, 0f);
+                        retour = retour.normalized * (VillageRadius + 1f);
+                    }
+                    Vector3 reapparition = new Vector3(retour.x, TerrainHeight(retour.x, retour.y), retour.y);
+                    enemy.Root.transform.position = reapparition;
+                    enemy.Home = reapparition;
                     if (enemy.Corps != null)
                     {
                         enemy.Corps.Actif = true;
@@ -1832,6 +1924,26 @@ public sealed class LibreViesGame : MonoBehaviour
 
             if (enemy.Spider && enemy.Legs != null)
                 for (int i = 0; i < enemy.Legs.Length; i++) enemy.Legs[i].localRotation *= Quaternion.Euler(0, dt * 50f, 0);
+
+            // Barre de vie : visible des que la bete est blessee, tournee vers
+            // la camera, remplie proportionnellement (tailles et formules de la
+            // reference : 0,86 m de remplissage qui se retrecit vers la gauche).
+            // On voit enfin combien de coups il reste a donner.
+            if (enemy.Barre != null && enemy.Remplissage != null)
+            {
+                if (enemy.Alive && enemy.Hp < enemy.PvMax)
+                {
+                    enemy.Barre.gameObject.SetActive(true);
+                    enemy.Barre.LookAt(gameCamera.transform.position, Vector3.up);
+                    float proportion = Mathf.Clamp01(enemy.Hp / (float)enemy.PvMax);
+                    enemy.Remplissage.localScale = new Vector3(0.86f * Mathf.Max(proportion, 0.001f), 0.07f, 0.03f);
+                    enemy.Remplissage.localPosition = new Vector3(-(1f - proportion) * 0.43f, 0f, 0.02f);
+                }
+                else
+                {
+                    enemy.Barre.gameObject.SetActive(false);
+                }
+            }
         }
     }
 
@@ -1843,11 +1955,17 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 if (Time.time >= pickup.RespawnAt)
                 {
-                    pickup.Active = true; pickup.Root.SetActive(true); pickup.Root.transform.position = pickup.Home;
+                    // Il revient AILLEURS (jamais deux fois au meme endroit) :
+                    // cailloux dans +/-50 m, pieces dans +/-40 m, hors du
+                    // village et hors de la route, comme la reference.
+                    PoserPickup(pickup, PositionRessource(pickup.Coin ? 40f : 50f, 3.0f));
+                    pickup.Active = true;
+                    pickup.Root.SetActive(true);
                 }
                 continue;
             }
-            pickup.Root.transform.Rotate(Vector3.up, dt * (pickup.Coin ? 145f : 30f), Space.World);
+            // Seules les pieces tournent (2,5 rad/s dans la reference).
+            if (pickup.Coin) pickup.Root.transform.Rotate(Vector3.up, dt * 143f, Space.World);
         }
     }
 
@@ -2093,7 +2211,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         GameObject objet = CreerTexte3D(texte, position, couleur, 0.25f);
         if (objet == null) return;
-        floaters.Add(new EffetTexte { Root = objet, Age = 0f });
+        floaters.Add(new EffetTexte { Root = objet, Age = 0f, Origine = position });
     }
 
     private void SpawnSpark(Vector3 position)
@@ -2122,7 +2240,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 continue;
             }
             floater.Age += dt;
-            floater.Root.transform.position += Vector3.up * dt * 1.6f;
+            // Les degats MONTENT puis REDESCENDENT un peu (arc), au lieu de
+            // monter en ligne droite : le coup se lit tout de suite, comme un
+            // chiffre qui jaillit de la bete puis retombe. 1 s de vie.
+            float t = floater.Age;
+            floater.Root.transform.position = floater.Origine + Vector3.up * (1.9f * t - 1.7f * t * t);
             float opacite = 1f - floater.Age;
             if (opacite <= 0f)
             {

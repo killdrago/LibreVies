@@ -578,6 +578,43 @@ bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
     dira si le jeu se bloque (gel) ou s'il est simplement tres lent.
 
 
+  MAJ 14 - Degats en arc, barres de vie des monstres, ressources qui voyagent
+    Demande exacte de l'utilisateur (18/09/2026, dictee avec son correcteur) :
+    "le degats qui monte puis qui redescend un petit peu", "la barre de vie",
+    "des choses qui apparaissent dans le temps comme la pile de cristaux qui
+    apparait au milieu du village". Il precise : a faire de preference APRES le
+    plantage au demarrage (MAJ 13), mais autorise a les faire avant si c'est
+    rapide. Interpretation de la "pile de cristaux" : les ressources de
+    l'ancien code etaient 5 objets FIXES dont 3 plantaient AU MILIEU DU
+    VILLAGE ; la reference les seme dehors et les fait revenir ailleurs.
+    a) DEGATS FLOTTANTS EN ARC : position = depart + (1,9 t - 1,7 t^2) vers le
+       haut, au lieu d'une montee en ligne droite de 1,6 m/s. Le chiffre
+       jaillit, redescend un peu, et s'efface (1 s, comme avant).
+    b) BARRES DE VIE DES MONSTRES (port de la reference) : fond 0,9 x 0,10 x
+       0,03 m sombre (0,15/0,05/0,05) et remplissage 0,86 x 0,07 x 0,03 m rouge
+       (0,90/0,12/0,12) a 0,02 m devant. Hauteur 1,10 m pour les araignees,
+       0,75 m pour les autres. Cachee tant que les PV sont au maximum, orientee
+       vers la camera (LookAt), remplissage : scale.x = max(pv/max, 0,001) et
+       position.x = -(1 - pv/max) x 0,43 (le cote gauche ne bouge pas).
+    c) MONSTRES ALIGNES SUR LA REFERENCE : 18 betes (6 zones de 3, centres
+       (25,20) (-25,-20) souris / (30,-25) (-30,25) rats / (15,35) (-18,-38)
+       araignees, +/-8 m) au lieu de 12 au hasard. PV : souris 25, rat 50,
+       araignee 75 (le marteau fait 25 : une souris meurt en un coup, un rat en
+       deux, une araignee en trois). Vitesse tiree au hasard entre 1,2 et
+       2,0 m/s. La souris est une silhouette a 70 %. Reapparition 10 s apres la
+       mort, a +/-3 m du point de depart, jamais dans le village.
+    d) RESSOURCES QUI VOYAGENT : 15 cailloux (+/-50 m) et 3 pieces (+/-40 m),
+       JAMAIS dans le village (rayon + 2 m) ni sur la route (moins de 3 m).
+       Tailles de la reference (caillou 0,28 x 0,22 x 0,28 a 0,14 m ; piece de
+       0,36 m de diametre et 0,05 m d'epaisseur a 0,12 m). Quand on les
+       ramasse, ils reviennent AILLEURS, au hasard (caillou 20 s, piece 60 s,
+       portees de ramassage 3,0 m / 3,5 m). Seules les pieces tournent.
+       Fin de l'effet "pile de cristaux au milieu du village".
+    - VERIFIE : syntaxe C# (tree-sitter), appels a des methodes inconnues = 0,
+      accolades equilibrees. NON VERIFIE : rendu (pas d'Unity dans le bac a
+      sable) - a confirmer sur la capture de l'utilisateur.
+
+
 ================================================================================
 6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
    (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
@@ -939,13 +976,18 @@ INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
           d'importance visuelle) :
             a) Fait en MAJ 11 : gardes devant les portails, coup mortel ;
             b) Fait en MAJ 11 : degats flottants et etincelles d'impact ;
+               retouche en MAJ 14 : les degats montent puis redescendent ;
             c) Fait en MAJ 10 : lampadaires, panneaux, bannieres, herbe,
                rochers, barils, cloutures de route ;
             d) touches reconfigurables (panneau OPTIONS + clavier AZERTY) ;
             e) camouflage (changer la couleur du heros), resolution d'ecran,
                sauvegarde de configuration dans un fichier (aujourd'hui
                PlayerPrefs, ce qui suffit mais n'est pas la reference) ;
-            f) barres de vie au-dessus des monstres, interieur du chateau.
+            f) Fait en MAJ 14 : barres de vie au-dessus des monstres (et
+               monstres aux PV de la reference) ; reste l'INTERIEUR DU CHATEAU
+               (salle sombre, la reference n'a pas de herse) ;
+            g) Fait en MAJ 14 : ressources qui apparaissent et reapparaissent
+               ailleurs (15 cailloux + 3 pieces, hors du village).
           Chaque lot doit tenir dans un commit, avec la recette relancee et un
           controle des accolades (il n'y a pas de compilateur C# ici).
 
