@@ -913,8 +913,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector3 arriereD = new Vector3(x, 0f, z);
             Vector3 faItageAvant = new Vector3(0f, hauteur, -z);
             Vector3 faItageArriere = new Vector3(0f, hauteur, z);
-            Triangle(avantG, avantD, faItageAvant);
-            Triangle(arriereD, arriereG, faItageArriere);
+            Triangle(avantD, avantG, faItageAvant);
+            Triangle(arriereG, arriereD, faItageArriere);
             Quad(avantG, faItageAvant, faItageArriere, arriereG);
             Quad(avantD, arriereD, faItageArriere, faItageAvant);
             Quad(avantG, arriereG, arriereD, avantD);
