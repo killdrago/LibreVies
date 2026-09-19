@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 47 : douves elargies,
-                        lits colles au terrain et chateau eloigne ; version 0.5.47
+Derniere mise a jour : 19/09/2026 - MAJ 48 : eau conforme au relief,
+                        chateau nettoye et pont-levis au-dessus de l'eau ; version 0.5.48
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1667,6 +1667,28 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Les textes de la mini-carte repassent en blanc ; les commandes restent
     regroupees en haut a droite.
   - Version de la build : 0.5.47. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.37 MAJ 48 - EAU CONFORME AU RELIEF ET CHATEAU NETTOYE
+================================================================================
+
+  - La surface de la riviere et des douves est maintenant generee sur le
+    relief naturel echantillonne, et non plus comme une plaque horizontale.
+    Elle suit les montees et descentes du terrain.
+  - Le terrain sous l'eau est creuse a profondeur constante sous ce relief ;
+    le lit reste colle au sol sans eau qui disparait dans une bosse ou flotte
+    au-dessus d'un creux.
+  - Le pont-levis utilise la hauteur locale de l'eau et reste au-dessus de la
+    surface, meme si la plateforme change de niveau.
+  - La route ne traverse plus les douves ni la cour : elle s'arrete a la berge
+    exterieure du chateau.
+  - Les deux lampadaires/torches du chateau sont retires.
+  - Le sol du chateau et la plateforme autour des douves sont aplatis ; les
+    anciennes bosses de terrain ne peuvent plus remonter dans l'anneau.
+  - Les textes de degats utilisent l'orientation inverse du TextMesh pour que
+    les nombres soient lus dans le bon sens face a la camera.
+  - Version de la build : 0.5.48. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================

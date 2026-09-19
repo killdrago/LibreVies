@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.47",
-  "notes": "MAJ 47 : elargit les douves, suit le terrain et replace la riviere au nord.",
+  "game_version": "0.5.48",
+  "notes": "MAJ 48 : eau conforme au relief, chateau nettoye et pont-levis pose au-dessus de l eau.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
