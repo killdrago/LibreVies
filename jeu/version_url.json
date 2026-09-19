@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.52",
-  "notes": "MAJ 52 : retire le chateau, les douves et le pont-levis, fleuve conserve.",
+  "game_version": "0.5.53",
+  "notes": "MAJ 53 : fleuve continu et masquage reel de l eau sous la camera.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

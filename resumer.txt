@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 52 : chateau, douves et
-                        pont-levis retires ; fleuve conserve ; version 0.5.52
+Derniere mise a jour : 19/09/2026 - MAJ 53 : fleuve continu,
+                        eau masquee sous la camera ; version 0.5.53
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1754,6 +1754,21 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Pendant la nage, les surfaces opaques de l'eau sont masquees pour eviter
     le scintillement de la camera sous l'eau.
   - Version de la build : 0.5.52. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.42 MAJ 53 - FLEUVE CONTINU ET EAU MASQUEE SOUS LA CAMERA
+================================================================================
+
+  - La surface du fleuve utilise une hauteur unique par section, choisie au
+    niveau le plus haut de ses deux berges : les rubans ne se croisent plus et
+    le fleuve ne se fragmente plus en triangles.
+  - Le lit utilise la hauteur de son axe et reste sous la surface.
+  - Le lit est brun, sans couleur de gazon ; les touffes restent interdites
+    dans l'emprise du fleuve.
+  - L'eau est masquee si le joueur nage, si sa tete est sous l'eau ou si la
+    camera passe sous la surface : elle ne reste plus visible sous la camera.
+  - Version de la build : 0.5.53. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================

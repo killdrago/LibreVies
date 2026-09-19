@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.52";
+    private const string VersionJeu = "0.5.53";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -536,8 +536,8 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdateGuards(dt);
         UpdatePnj(dt);
         UpdatePlayer(dt);
-        MettreAJourVisibiliteEau();
         UpdateCamera();
+        MettreAJourVisibiliteEau();
         UpdateEffects(dt);
         UpdateHudState(dt);
     }
@@ -583,7 +583,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Textures dediees aux objets qui etaient encore trop plats : feuillage,
         // pierre, metal, drapeaux et eau partagent toujours StablePBR.
         MakeMaterial("Eau_Riviere", new Color(0.16f, 0.56f, 0.72f), true);
-        MakeMaterial("Lit_Eau", new Color(0.14f, 0.23f, 0.18f));
+        MakeMaterial("Lit_Eau", new Color(0.22f, 0.16f, 0.11f));
         MakeMaterial("Drapeau", Color.white);
         MakeMaterial("Pierre_Mur", new Color(0.46f, 0.48f, 0.50f));
         MakeMaterial("Feuillage", new Color(0.20f, 0.56f, 0.19f));
@@ -1277,7 +1277,15 @@ public sealed class LibreViesGame : MonoBehaviour
         // camera pendant la nage provoque un clignotement en mouvement ; les
         // surfaces sont masquees pendant toute la nage, tandis que le voile
         // bleu du HUD donne le rendu sous-marin stable.
-        bool visible = !playerInWater;
+        bool cameraSousEau = false;
+        if (gameCamera != null)
+        {
+            Vector3 positionCamera = gameCamera.transform.position;
+            cameraSousEau = DistancePolyligne(
+                new Vector2(positionCamera.x, positionCamera.z), RivierePrincipale) <= 4.5f
+                && positionCamera.y < HauteurSurfaceEau(positionCamera.x, positionCamera.z);
+        }
+        bool visible = !(playerInWater || playerUnderwater || cameraSousEau);
         for (int i = waterRenderers.Count - 1; i >= 0; i--)
         {
             if (waterRenderers[i] == null)
@@ -1551,10 +1559,21 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 droite = points[i] - normales[i] * demiLargeur;
             Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
             Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
-            ruban.Quad(new Vector3(gauche.x, HauteurSurfaceEau(gauche.x, gauche.y), gauche.y),
-                new Vector3(gauche2.x, HauteurSurfaceEau(gauche2.x, gauche2.y), gauche2.y),
-                new Vector3(droite2.x, HauteurSurfaceEau(droite2.x, droite2.y), droite2.y),
-                new Vector3(droite.x, HauteurSurfaceEau(droite.x, droite.y), droite.y));
+            // Une hauteur unique par section evite que les deux bords du
+            // ruban se croisent quand le terrain monte d'un cote : le fleuve
+            // reste un maillage continu au lieu de former des triangles.
+            float hauteur1 = Mathf.Max(
+                HauteurSurfaceEau(points[i].x, points[i].y),
+                HauteurSurfaceEau(gauche.x, gauche.y),
+                HauteurSurfaceEau(droite.x, droite.y));
+            float hauteur2 = Mathf.Max(
+                HauteurSurfaceEau(points[i + 1].x, points[i + 1].y),
+                HauteurSurfaceEau(gauche2.x, gauche2.y),
+                HauteurSurfaceEau(droite2.x, droite2.y));
+            ruban.Quad(new Vector3(gauche.x, hauteur1, gauche.y),
+                new Vector3(gauche2.x, hauteur2, gauche2.y),
+                new Vector3(droite2.x, hauteur2, droite2.y),
+                new Vector3(droite.x, hauteur1, droite.y));
         }
         return ruban.VersMesh(nom);
     }
@@ -1577,10 +1596,12 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 droite = points[i] - normales[i] * demiLargeur;
             Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
             Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
-            ruban.Quad(new Vector3(gauche.x, TerrainHeight(gauche.x, gauche.y) + WaterBedOffset, gauche.y),
-                new Vector3(gauche2.x, TerrainHeight(gauche2.x, gauche2.y) + WaterBedOffset, gauche2.y),
-                new Vector3(droite2.x, TerrainHeight(droite2.x, droite2.y) + WaterBedOffset, droite2.y),
-                new Vector3(droite.x, TerrainHeight(droite.x, droite.y) + WaterBedOffset, droite.y));
+            float lit1 = TerrainHeight(points[i].x, points[i].y) + WaterBedOffset;
+            float lit2 = TerrainHeight(points[i + 1].x, points[i + 1].y) + WaterBedOffset;
+            ruban.Quad(new Vector3(gauche.x, lit1, gauche.y),
+                new Vector3(gauche2.x, lit2, gauche2.y),
+                new Vector3(droite2.x, lit2, droite2.y),
+                new Vector3(droite.x, lit1, droite.y));
         }
         return ruban.VersMesh(nom);
     }
