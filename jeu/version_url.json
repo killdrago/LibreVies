@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.61",
-  "notes": "MAJ 61 : remplace Rogue par une héroïne humanoïde originale CC0 et corrige le shader de secours.",
+  "game_version": "0.5.62",
+  "notes": "MAJ 62 : héroïne humanoïde originale CC0, sans anciens éléments Rogue.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 61 : héroïne humanoïde originale
-                        CC0, shader de secours corrigé ; version 0.5.61
+Derniere mise a jour : 19/09/2026 - MAJ 62 : héroïne humanoïde originale
+                        CC0, sans anciens éléments Rogue ; version 0.5.62
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
