@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.54";
+    private const string VersionJeu = "0.5.55";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -26,8 +26,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float SwimSpeed = 3.6f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
-    private const float WaterDepth = 2.90f;
-    private const float WaterSurfaceOffset = 0.22f;
+    private const float WaterDepth = 3.20f;
+    private const float WaterSurfaceOffset = 0.03f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
@@ -813,7 +813,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float distanceEau = DistancePolyligne(new Vector2(x, z), RivierePrincipale);
             // Le creux revient a zero exactement sur la berge : le terrain
             // rejoint ainsi la surface de l'eau sans marche ni espace.
-            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 4.0f, distanceEau);
+            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 6.0f, distanceEau);
             profondeur = Mathf.Max(profondeur, WaterDepth * creuxRiviere);
         }
 
@@ -839,7 +839,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Le fleuve reste hors du village ; il n'y a plus de douves ni de
         // pont-levis a traiter.
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= 3.8f;
+        return DistancePolyligne(point, RivierePrincipale) <= 5.3f;
     }
 
     // ------------------------------------------------------------------
@@ -1483,7 +1483,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Il ne reste qu'un seul fleuve qui traverse la carte ; aucune
         // derivation ni autre surface d'eau n'est creee.
         ObjetMaillage("Riviere_Principale",
-            CreerRubanEau(RivierePrincipale, 3.70f, "Riviere_Principale"), "Eau_Riviere");
+            CreerRubanEau(RivierePrincipale, 5.20f, "Riviere_Principale"), "Eau_Riviere");
     }
 
     private Vector2[] EchantillonnerLigne(Vector2[] points)

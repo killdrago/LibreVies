@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 54 : fleuve continu,
-                        eau toujours visible sans lit colore ; version 0.5.54
+Derniere mise a jour : 19/09/2026 - MAJ 55 : fleuve pose dans le sol,
+                        eau visible pendant la nage ; version 0.5.55
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1782,6 +1782,22 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - L'eau n'est plus masquee lorsque le joueur entre dans le fleuve : elle
     reste visible autour de lui et le voile bleu accompagne l'immersion.
   - Version de la build : 0.5.54. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.44 MAJ 55 - FLEUVE POSE DANS LE SOL
+================================================================================
+
+  - Le sol sous le fleuve est maintenant abaisse sur une emprise plus large et
+    profonde : visuellement, le fleuve remplace le sol au lieu de flotter sur
+    une plaque.
+  - La surface est presque au niveau du sol naturel, avec seulement 3 cm de
+    marge, et couvre toute la largeur du chenal.
+  - Le lit separe colore reste retire : seul le maillage bleu de l'eau est
+    rendu.
+  - Le fleuve reste visible lorsque le joueur entre dans l'eau ; aucune logique
+    ne desactive plus son renderer pendant la nage.
+  - Version de la build : 0.5.55. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================

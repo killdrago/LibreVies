@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.54",
-  "notes": "MAJ 54 : fleuve continu, eau toujours visible et sans lit colore.",
+  "game_version": "0.5.55",
+  "notes": "MAJ 55 : fleuve pose dans le sol, eau visible pendant la nage.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
