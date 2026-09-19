@@ -2440,8 +2440,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Aucun cube, sphère ou primitive Unity n'est ajouté au personnage.
 
         // Le bras droit réel est utilisé par le système d'attaque existant.
-        brasAttaque = FindChildDeep(model.transform, "Rogue_ArmRight");
-        if (brasAttaque == null) brasAttaque = FindChildDeep(model.transform, "Sleeve");
+        brasAttaque = FindChildDeep(model.transform, "Sleeve");
         if (brasAttaque == null) brasAttaque = model.transform;
         ConfigurerAnimationsHeroine(model);
         Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj");
@@ -2480,88 +2479,6 @@ public sealed class LibreViesGame : MonoBehaviour
         animation.layer = 0;
         heroineAnimation.CrossFade(choix, 0.12f);
         heroineAnimationActuelle = choix;
-    }
-
-    private void CreateRedHair(Transform model)
-    {
-        // Le Rogue possède déjà une coupe, mais cette calotte et ses mèches
-        // rouges rendent clairement l'héroïne rousse sans la réduire à des
-        // cubes et des sphères. La géométrie suit le volume de la tête KayKit.
-        var cap = new List<Vector3>();
-        var triangles = new List<int>();
-        const int segments = 18;
-        float[] hauteurs = { 1.82f, 2.08f, 2.30f, 2.43f };
-        float[] rayons = { 0.47f, 0.57f, 0.42f, 0.06f };
-        for (int anneau = 0; anneau < hauteurs.Length; anneau++)
-        {
-            for (int i = 0; i < segments; i++)
-            {
-                float angle = i * Mathf.PI * 2f / segments;
-                cap.Add(new Vector3(Mathf.Cos(angle) * rayons[anneau], hauteurs[anneau],
-                    Mathf.Sin(angle) * rayons[anneau]));
-            }
-        }
-        for (int anneau = 0; anneau < hauteurs.Length - 1; anneau++)
-        {
-            for (int i = 0; i < segments; i++)
-            {
-                int a = anneau * segments + i;
-                int b = anneau * segments + (i + 1) % segments;
-                int c = (anneau + 1) * segments + (i + 1) % segments;
-                int d = (anneau + 1) * segments + i;
-                triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                triangles.Add(a); triangles.Add(c); triangles.Add(d);
-            }
-        }
-        var mesh = new Mesh { name = "Chevelure_Rousse_Humaine" };
-        mesh.SetVertices(cap);
-        mesh.SetTriangles(triangles, 0);
-        mesh.RecalculateNormals();
-        GameObject capObject = ObjetMaillage("Cheveux_Rouges_Calotte", mesh, "Hair_Rouge");
-        capObject.transform.SetParent(model, false);
-        CreateHairStrand(model, -0.48f);
-        CreateHairStrand(model, 0.48f);
-    }
-
-    private void CreateHairStrand(Transform model, float side)
-    {
-        const int sides = 6;
-        Vector3[] centres =
-        {
-            new Vector3(side * 0.46f, 2.10f, 0.02f),
-            new Vector3(side * 0.55f, 1.78f, 0.08f),
-            new Vector3(side * 0.47f, 1.43f, 0.13f)
-        };
-        float[] rayons = { 0.16f, 0.14f, 0.07f };
-        var vertices = new List<Vector3>();
-        var triangles = new List<int>();
-        for (int r = 0; r < centres.Length; r++)
-        {
-            for (int i = 0; i < sides; i++)
-            {
-                float angle = i * Mathf.PI * 2f / sides;
-                vertices.Add(centres[r] + new Vector3(Mathf.Cos(angle) * rayons[r],
-                    0f, Mathf.Sin(angle) * rayons[r]));
-            }
-        }
-        for (int r = 0; r < centres.Length - 1; r++)
-        {
-            for (int i = 0; i < sides; i++)
-            {
-                int a = r * sides + i;
-                int b = r * sides + (i + 1) % sides;
-                int c = (r + 1) * sides + (i + 1) % sides;
-                int d = (r + 1) * sides + i;
-                triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                triangles.Add(a); triangles.Add(c); triangles.Add(d);
-            }
-        }
-        var mesh = new Mesh { name = "Mèche_Rouge" };
-        mesh.SetVertices(vertices);
-        mesh.SetTriangles(triangles, 0);
-        mesh.RecalculateNormals();
-        GameObject strand = ObjetMaillage(side < 0f ? "Mèche_Rouge_Gauche" : "Mèche_Rouge_Droite", mesh, "Hair_Rouge");
-        strand.transform.SetParent(model, false);
     }
 
     private void CreatePlayer()

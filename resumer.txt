@@ -12,9 +12,8 @@ Branche de travail et publiee : arena/01a0b32c-librevies
 MAJ 61 — HÉROÏNE ORIGINALE CC0 ET SHADER DE SECOURS (19/09/2026)
 ================================================================================
 
-Le personnage KayKit Rogue a été retiré du projet pour ne pas dépendre d'un
-pack téléchargé depuis une page payante, même si la version gratuite du pack
-était annoncée CC0. LibreVies utilise maintenant le maillage original
+Le personnage KayKit a été retiré du projet afin de ne dépendre d'aucun pack
+externe. LibreVies utilise maintenant le maillage original
 LibreViesHeroine.obj et son fichier de matériaux LibreViesHeroine.mtl.
 
 Le maillage est généré par compilation/outils/generer_heroine_librevies.py :
