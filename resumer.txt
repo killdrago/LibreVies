@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 45 : compilation corrigee,
-                        monde exterieur agrandi ; version 0.5.45
+Derniere mise a jour : 19/09/2026 - MAJ 46 : village sec, douves elargies,
+                        nage, camera et textes corriges ; version 0.5.46
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1621,6 +1621,33 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     les douves du chateau.
   - Version de la build : 0.5.45. La compilation Windows reelle doit encore
     etre relancee sur le PC avant de remplir game_build et de publier.
+
+================================================================================
+8.35 MAJ 46 - VILLAGE SEC, DOUVES ET CAMERA CORRIGES
+================================================================================
+
+  - La riviere principale reste entierement a l'exterieur du cercle du village.
+    Un garde-fou dans EstDansEau et TerrainHeight interdit aussi toute future
+    intrusion d'eau ou d'abaissement du sol dans le village ; les maisons
+    retrouvent leur sol plat et leurs positions d'origine.
+  - Les douves sont elargies : rayon interieur 14,5 m, rayon exterieur 23,5 m.
+    Les murs du chateau restent sur une bande de terre seche et l'eau fait un
+    anneau complet. Le pont-levis relie maintenant la porte a la berge externe.
+  - Une dalle plane est ajoutee sous le chateau et des lits plats sous la
+    riviere, la branche et les douves pour supprimer les jours entre le sol et
+    l'eau.
+  - L'endurance descend des que le joueur entre dans l'eau. La noyade reste a
+    1 PV par seconde seulement sous la surface lorsque l'endurance est vide.
+  - Les commandes +, -, x1.00 et les points cardinaux de la mini-carte gardent
+    la mini-carte a sa taille d'origine, passent en noir et les commandes sont
+    regroupees dans son coin superieur droit.
+  - Les textes de degats sont billboardes vers la camera : 25 et -6 ne sont
+    plus lus a l'envers.
+  - En premiere personne, le corps, les bras et la tete du joueur sont caches.
+    Un vrai pitch independant permet maintenant de regarder vers le bas comme
+    vers le haut.
+  - Version de la build : 0.5.46. Relancer la compilation Windows et lire le
+    journal avant de remplir game_build.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

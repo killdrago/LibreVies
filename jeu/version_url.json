@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.45",
-  "notes": "MAJ 45 : corrige la compilation, agrandit le monde exterieur et conserve la mini-carte.",
+  "game_version": "0.5.46",
+  "notes": "MAJ 46 : retire l eau du village, corrige les douves, la nage, la camera et les textes.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
