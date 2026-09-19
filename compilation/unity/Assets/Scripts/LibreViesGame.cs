@@ -15,14 +15,14 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.44";
-    private const float WorldSize = 90f;
+    private const string VersionJeu = "0.5.45";
+    private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
     private const float TownRadius = 40f;
     private const float VillageRadius = 40f;
-    private const float PlayerSpeed = 5.8f;
-    private const float RunSpeed = 10.5f;
+    private const float PlayerSpeed = 5f;
+    private const float RunSpeed = 11f;
     private const float SwimSpeed = 3.6f;
     private const float WaterLevel = 0.35f;
     private const float WaterBed = -2.55f;
@@ -75,9 +75,9 @@ public sealed class LibreViesGame : MonoBehaviour
     // ouest alimente les douves du chateau.
     private static readonly Vector2[] RivierePrincipale =
     {
-        new Vector2(-86, 48), new Vector2(-64, 42), new Vector2(-40, 30),
-        new Vector2(-12, 20), new Vector2(18, 10), new Vector2(38, -8),
-        new Vector2(44, -29), new Vector2(63, -55), new Vector2(86, -78)
+        new Vector2(-118, 65), new Vector2(-90, 52), new Vector2(-58, 36),
+        new Vector2(-22, 20), new Vector2(18, 10), new Vector2(38, -8),
+        new Vector2(48, -30), new Vector2(80, -66), new Vector2(118, -104)
     };
     private static readonly Vector2[] RiviereVersChateau =
     {
@@ -2023,10 +2023,10 @@ public sealed class LibreViesGame : MonoBehaviour
         // jamais sur la route, jamais dans un batiment, jamais dans le village).
         var random = new System.Random(4217);
         int plantes = 0;
-        for (int i = 0; i < 220 && plantes < 80; i++)
+        for (int i = 0; i < 320 && plantes < 120; i++)
         {
-            float x = (float)(random.NextDouble() * 170 - 85);
-            float z = (float)(random.NextDouble() * 170 - 85);
+            float x = (float)(random.NextDouble() * 236 - 118);
+            float z = (float)(random.NextDouble() * 236 - 118);
             if (new Vector2(x, z).magnitude < VillageRadius + 4) continue;
             if (!EmplacementLibre(x, z, 1.5f)) continue;
             CreatePine(x, z, (float)(random.NextDouble() * 0.7 + 0.8));
@@ -2386,8 +2386,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // rats (50 PV), araignees (75 PV). Une bete qui naitrait dans le
         // village protege est repoussee juste dehors.
         string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
-        float[] centresX = { 25f, -25f, 30f, -30f, 15f, -18f };
-        float[] centresZ = { 20f, -20f, -25f, 25f, 35f, -38f };
+        float[] centresX = { 55f, -55f, 70f, -70f, 35f, -45f };
+        float[] centresZ = { 45f, -40f, -55f, 55f, 80f, -82f };
         for (int zone = 0; zone < types.Length; zone++)
         {
             for (int i = 0; i < 3; i++)
@@ -2475,8 +2475,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // (il reste un refuge) et jamais sur la route. Quand on les ramasse, ils
         // ne reviennent pas au meme endroit mais ailleurs, au hasard : c'est ce
         // qui fait "apparaitre des choses" dans le monde au fil du temps.
-        for (int i = 0; i < 15; i++) CreatePickup(PositionRessource(50f, 3.0f), false);
-        for (int i = 0; i < 3; i++) CreatePickup(PositionRessource(40f, 3.0f), true);
+        for (int i = 0; i < 22; i++) CreatePickup(PositionRessource(85f, 3.0f), false);
+        for (int i = 0; i < 5; i++) CreatePickup(PositionRessource(70f, 3.0f), true);
     }
 
     // Position aleatoire hors du village et hors de la route : on retire tant
@@ -2625,8 +2625,8 @@ public sealed class LibreViesGame : MonoBehaviour
             // Dans l'eau, ESPACE monte et CTRL/C descend. Le heros reste dans
             // le volume navigable au-dessus du lit, sans saut balistique.
             playerGrounded = false;
-            bool monter = Touche(toucheSaut) || Touche(KeyCode.UpArrow);
-            bool descendre = Touche(KeyCode.LeftControl) || Touche(KeyCode.C) || Touche(KeyCode.DownArrow);
+            bool monter = Touche(toucheSaut) || Input.GetKey(KeyCode.UpArrow);
+            bool descendre = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.DownArrow);
             float vitesseVerticale = monter ? SwimSpeed : (descendre ? -SwimSpeed : 0f);
             playerVelocity.y = Mathf.MoveTowards(playerVelocity.y, vitesseVerticale, dt * 12f);
             player.position += Vector3.up * playerVelocity.y * dt;
@@ -2956,9 +2956,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (Time.time >= pickup.RespawnAt)
                 {
                     // Il revient AILLEURS (jamais deux fois au meme endroit) :
-                    // cailloux dans +/-50 m, pieces dans +/-40 m, hors du
-                    // village et hors de la route, comme la reference.
-                    PoserPickup(pickup, PositionRessource(pickup.Coin ? 40f : 50f, 3.0f));
+                    // cailloux dans +/-85 m, pieces dans +/-70 m, hors du
+                    // village, de la route et de la riviere.
+                    PoserPickup(pickup, PositionRessource(pickup.Coin ? 70f : 85f, 3.0f));
                     pickup.Active = true;
                     pickup.Root.SetActive(true);
                 }
@@ -3200,10 +3200,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerMiniCarte()
     {
-        // 1,5 fois la taille precedente : elle reste lisible sans masquer le
-        // HUD et montre maintenant la riviere, le Y et le chateau.
-        const float taille = 231f;
-        Rect carte = new Rect(Screen.width - taille - 22f, 18f, taille, taille);
+        // La mini-carte garde sa taille d'origine. C'est le monde jouable qui
+        // est agrandi, pas l'interface.
+        const float taille = 154f;
+        Rect carte = new Rect(Screen.width - 190f, 18f, taille, taille);
         if (miniCarteTexture == null || Event.current.type == EventType.Repaint)
             MettreAJourMiniCarte();
         GUI.color = Color.white;
@@ -3219,12 +3219,11 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerPointCardinal(carte, "S", new Vector2(0f, 1f));
         DessinerPointCardinal(carte, "W", new Vector2(-1f, 0f));
         DessinerPointCardinal(carte, "E", new Vector2(1f, 0f));
-        float boutonX = carte.x + taille - 43f;
-        if (GUI.Button(new Rect(boutonX, carte.y + 18f, 24f, 24f), "+", buttonStyle))
+        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 18f, 24f, 24f), "+", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
-        if (GUI.Button(new Rect(boutonX, carte.y + 45f, 24f, 24f), "-", buttonStyle))
+        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 45f, 24f, 24f), "-", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
-        GUI.Label(new Rect(boutonX - 4f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
+        GUI.Label(new Rect(carte.x + 108f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
         GUI.color = Color.white;
     }
 
@@ -3235,15 +3234,14 @@ public sealed class LibreViesGame : MonoBehaviour
         float y = directionEcran.x * Mathf.Sin(radians) + directionEcran.y * Mathf.Cos(radians);
         float centreX = carte.x + carte.width * 0.5f;
         float centreY = carte.y + carte.height * 0.5f;
-        float rayonEtiquette = carte.width * 0.445f;
-        GUI.Label(new Rect(centreX + x * rayonEtiquette - 8f, centreY + y * rayonEtiquette - 11f, 18f, 22f), texte, smallStyle);
+        GUI.Label(new Rect(centreX + x * 69f - 8f, centreY + y * 69f - 11f, 18f, 22f), texte, smallStyle);
     }
 
     private void MettreAJourMiniCarte()
     {
-        const int taille = 192;
-        const int centre = 96;
-        const int rayon = 90;
+        const int taille = 128;
+        const int centre = 64;
+        const int rayon = 60;
         if (miniCarteTexture == null)
         {
             miniCarteTexture = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
@@ -3336,8 +3334,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerPointMiniCarte(Vector2 monde, Vector2 centreMonde, float rayonMonde,
         Color couleur, int epaisseur)
     {
-        const int centre = 96;
-        const int rayon = 90;
+        const int centre = 64;
+        const int rayon = 60;
         int x = centre + Mathf.RoundToInt((monde.x - centreMonde.x) / rayonMonde * rayon);
         int y = centre + Mathf.RoundToInt((monde.y - centreMonde.y) / rayonMonde * rayon);
         for (int oy = -epaisseur; oy <= epaisseur; oy++)
@@ -3345,7 +3343,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             int px = x + ox;
             int py = y + oy;
-            if (px < 0 || px >= 192 || py < 0 || py >= 192) continue;
+            if (px < 0 || px >= 128 || py < 0 || py >= 128) continue;
             if (Vector2.Distance(new Vector2(px, py), new Vector2(centre, centre)) <= rayon - 1)
                 miniCarteTexture.SetPixel(px, py, couleur);
         }

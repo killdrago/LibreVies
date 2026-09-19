@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 44 : eau, chateau, route continue,
-                        nage et textures dediees ; version 0.5.44
+Derniere mise a jour : 19/09/2026 - MAJ 45 : compilation corrigee,
+                        monde exterieur agrandi ; version 0.5.45
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1604,6 +1604,23 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Ajout de textures StablePBR pour les feuilles, la pierre, le metal, les
     drapeaux et l'eau ; caisse, lampadaire, fenetre, porte, caillou, sapin,
     panneau et joueur utilisent maintenant une famille texture appropriee.
+
+================================================================================
+8.34 MAJ 45 - COMPILATION ET MONDE EXTERIEUR AGRANDI
+================================================================================
+
+  - Correction de la compilation Unity 6.6 : les touches de nage fixes
+    utilisent maintenant Input.GetKey(KeyCode...) au lieu de passer un KeyCode
+    a la methode Touche(int). La build ne doit plus produire les quatre erreurs
+    CS1503 signalees dans build\unity.log.
+  - Vitesse demandee : marche conservee a 5 m/s ; course fixee a 11 m/s.
+  - La mini-carte conserve sa taille d'origine (154 px d'affichage et texture
+    128 px). Le monde jouable exterieur passe de 90 a 125 m de demi-taille.
+  - Les arbres, monstres, cailloux et pieces sont repartis dans cette zone plus
+    large. La riviere utilise l'espace exterieur et garde sa jonction en Y vers
+    les douves du chateau.
+  - Version de la build : 0.5.45. La compilation Windows reelle doit encore
+    etre relancee sur le PC avant de remplir game_build et de publier.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

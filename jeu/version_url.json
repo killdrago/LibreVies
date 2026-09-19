@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.44",
-  "notes": "MAJ 44 : route continue, riviere en Y, douves, pont-levis, nage et textures.",
+  "game_version": "0.5.45",
+  "notes": "MAJ 45 : corrige la compilation, agrandit le monde exterieur et conserve la mini-carte.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
