@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.59";
+    private const string VersionJeu = "0.5.60";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -473,7 +473,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
-        Renderer[] renderers = FindObjectsOfType<Renderer>();
+        Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
         Journal("controle rendu : " + renderers.Length + " renderer(s), shader "
                 + (cachedShader == null ? "AUCUN" : cachedShader.name));
         ControlerCouvertureShader(renderers);

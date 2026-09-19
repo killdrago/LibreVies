@@ -1,13 +1,29 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 59 : héroïne humaine CC0,
-                        cheveux rouges et route pavée détaillée ; version 0.5.59
+Derniere mise a jour : 19/09/2026 - MAJ 60 : correction shader Unity 6,
+                        héroïne humaine et route pavée ; version 0.5.60
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 60 — COMPILATION UNITY 6 ET SHADER PBR (19/09/2026)
+================================================================================
+
+Le journal de compilation Unity 6000.6.1f1 fourni par l'utilisateur indique
+que l'export Windows se termine avec Build Finished, Result: Success et un
+code de retour 0. Il révélait cependant une erreur de compilation du shader
+RealistePBR : les entrées worldNormal utilisées par un surface shader Unity 6
+n'avaient pas INTERNAL_DATA. Le shader utilise désormais WorldNormalVector
+avec INTERNAL_DATA. L'appel obsolète FindObjectsOfType a aussi été remplacé
+par FindObjectsByType avec tri désactivé.
+
+Le journal mentionne encore un shader sans nom avec une accolade inattendue.
+Aucun fichier correspondant n'existe dans l'état actuel du dépôt ; ce message
+provient probablement d'un shader local supplémentaire du checkout Windows et
+doit être recherché si l'erreur persiste après synchronisation.
 
 MAJ 58 — RENDU FANTASY ET ASSETS CC0 (19/09/2026)
 ================================================================================

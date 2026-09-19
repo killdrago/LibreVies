@@ -36,6 +36,7 @@ Shader "LibreVies/RealistePBR"
         {
             float3 worldPos;
             float3 worldNormal;
+            INTERNAL_DATA
         };
 
         fixed4 EchantillonnerTriplanaire(float3 position, float3 normale)
@@ -51,7 +52,8 @@ Shader "LibreVies/RealistePBR"
 
         void surf(Input IN, inout SurfaceOutputStandard o)
         {
-            fixed4 echantillon = EchantillonnerTriplanaire(IN.worldPos, IN.worldNormal);
+            float3 normaleMonde = normalize(WorldNormalVector(IN, float3(0, 0, 1)));
+            fixed4 echantillon = EchantillonnerTriplanaire(IN.worldPos, normaleMonde);
             fixed4 couleur = echantillon * _Color;
             o.Albedo = couleur.rgb;
             o.Alpha = couleur.a;
