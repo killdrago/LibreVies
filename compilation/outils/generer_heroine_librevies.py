@@ -41,7 +41,7 @@ def add_face(indices, material):
     face_objects.append(active_object)
 
 
-def add_ring_surface(name, material, rings, segments=16, phase=0.0):
+def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
     """Ajoute une surface fermée par anneaux, en un seul maillage OBJ."""
     global active_object
     active_object = name
@@ -60,18 +60,17 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0):
             # Face orientée vers l'extérieur.
             add_face((a, c, b), material)
             add_face((a, d, c), material)
-    # Fermetures planes pour éviter les trous dans les vêtements.
-    bottom = len(vertices) + 1
-    x, y, z, rx, rz = rings[0]
-    vertices.append((x, y, z))
-    top = len(vertices) + 1
-    x2, y2, z2, rx2, rz2 = rings[-1]
-    vertices.append((x2, y2, z2))
-    for i in range(segments):
-        # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
-        add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
-        add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
-
+    if caps:
+        bottom = len(vertices) + 1
+        x, y, z, _, _ = rings[0]
+        vertices.append((x, y, z))
+        top = len(vertices) + 1
+        x, y, z, _, _ = rings[-1]
+        vertices.append((x, y, z))
+        for i in range(segments):
+            # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
+            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+            add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
 def add_sphere(name, material, center, scale, segments=16, rings=8):
     global active_object
@@ -109,10 +108,10 @@ add_ring_surface("Boot_R", "Shoes", [(0.18, .11, .075, .14, .25), (0.18, .25, .0
 for side, suffix in ((-1, "L"), (1, "R")):
     add_ring_surface("JeansUpper_" + suffix, "Jeans", [
         (.18 * side, .66, 0, .135, .135), (.18 * side, .92, 0, .15, .15),
-        (.18 * side, 1.12, 0, .19, .17)], 16)
+        (.18 * side, 1.12, 0, .19, .17)], 16, caps=False)
     add_ring_surface("JeansLower_" + suffix, "Jeans", [
         (.18 * side, .28, 0, .13, .13), (.18 * side, .50, 0, .135, .135),
-        (.18 * side, .66, 0, .135, .135)], 16)
+        (.18 * side, .66, 0, .135, .135)], 16, caps=False)
 add_ring_surface("Belt", "Belt", [(0, 1.05, 0, .35, .19), (0, 1.13, 0, .37, .20)], 20)
 
 # Veste : volume trapézoïdal avec épaules marquées.
@@ -127,12 +126,12 @@ for side in (-1, 1):
     x = side
     add_ring_surface("SleeveUpper_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.40 * x, 1.58, 0, .13, .13), (.44 * x, 1.49, .01, .125, .125),
-        (.48 * x, 1.40, .02, .12, .12)], 14, pi / 14)
+        (.48 * x, 1.40, .02, .12, .12)], 14, pi / 14, caps=False)
     add_ring_surface("SleeveLower_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.48 * x, 1.40, .02, .12, .12), (.54 * x, 1.29, .03, .11, .11),
-        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14)
+        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14, caps=False)
     add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
-        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14)
+        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=False)
     add_sphere("Hand_" + ("L" if side < 0 else "R"), "SkinLight",
                (.62 * x, 1.05, .05), (.105, .13, .10), 14, 6)
 
@@ -149,6 +148,25 @@ add_ring_surface("HairCap", "Hair_Red", [(0, 2.07, -.005, .25, .21), (0, 2.18, -
 add_ring_surface("HairBack", "Hair_Red", [(0, 1.72, -.13, .28, .10), (0, 1.94, -.16, .31, .105), (0, 2.17, -.12, .30, .10)], 20)
 for side in (-1, 1):
     add_ring_surface("HairLock_" + ("L" if side < 0 else "R"), "Hair_Red_Light", [(side * .22, 2.16, .01, .085, .075), (side * .28, 1.92, .025, .085, .075), (side * .25, 1.67, .035, .065, .06), (side * .20, 1.48, .05, .035, .035)], 12, pi / 12)
+
+# Harmonise les normales par groupe. Les anneaux qui descendent (bras,
+# mèches) ne doivent pas être orientés vers l'intérieur, sinon leur face
+# avant disparaît dès que le shader utilise Cull Back.
+for object_name in dict.fromkeys(face_objects):
+    numeros = [i for i, nom in enumerate(face_objects) if nom == object_name]
+    volume = 0.0
+    for numero in numeros:
+        face = faces[numero]
+        if len(face) < 3:
+            continue
+        a, b, c = (vertices[face[k] - 1] for k in range(3))
+        volume += (a[0] * (b[1] * c[2] - b[2] * c[1])
+                   - a[1] * (b[0] * c[2] - b[2] * c[0])
+                   + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6.0
+    if volume < -1e-9:
+        for numero in numeros:
+            face = faces[numero]
+            faces[numero] = (face[0], face[2], face[1]) + tuple(face[3:])
 
 with MTL.open("w", encoding="utf-8") as f:
     f.write("# Matériaux originaux de LibreVies — CC0\n")

@@ -41,7 +41,7 @@ def add_face(indices, material):
     face_objects.append(active_object)
 
 
-def add_ring_surface(name, material, rings, segments=16, phase=0.0):
+def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
     global active_object
     active_object = name
     starts = []
@@ -58,17 +58,17 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0):
             d = starts[r + 1] + i
             add_face((a, c, b), material)
             add_face((a, d, c), material)
-    bottom = len(vertices) + 1
-    x, y, z, _, _ = rings[0]
-    vertices.append((x, y, z))
-    top = len(vertices) + 1
-    x, y, z, _, _ = rings[-1]
-    vertices.append((x, y, z))
-    for i in range(segments):
-        # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
-        add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
-        add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
-
+    if caps:
+        bottom = len(vertices) + 1
+        x, y, z, _, _ = rings[0]
+        vertices.append((x, y, z))
+        top = len(vertices) + 1
+        x, y, z, _, _ = rings[-1]
+        vertices.append((x, y, z))
+        for i in range(segments):
+            # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
+            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+            add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
 def add_sphere(name, material, center, scale, segments=16, rings=8):
     global active_object
@@ -118,11 +118,11 @@ def add_box(name, material, center, size):
 for side, suffix in ((-1, "L"), (1, "R")):
     x = 0.18 * side
     add_ring_surface("Guard_Boot_" + suffix, "GuardBoots",
-                     [(x, .06, .05, .16, .25), (x, .30, .04, .14, .21)], 16)
+                     [(x, .06, .05, .16, .25), (x, .30, .04, .14, .21)], 16, caps=False)
     add_ring_surface("Guard_LegLower_" + suffix, "GuardArmor",
-                     [(x, .30, 0, .13, .13), (x, .66, 0, .145, .145)], 16)
+                     [(x, .30, 0, .13, .13), (x, .66, 0, .145, .145)], 16, caps=False)
     add_ring_surface("Guard_LegUpper_" + suffix, "GuardCloth",
-                     [(x, .66, 0, .145, .145), (x, 1.12, 0, .20, .17)], 16)
+                     [(x, .66, 0, .145, .145), (x, 1.12, 0, .20, .17)], 16, caps=False)
 
 # Bassin, tunique blindée et épaulières.
 add_ring_surface("Guard_Belt", "GuardLeather",
@@ -137,9 +137,9 @@ add_ring_surface("Guard_ChestPlate", "GuardArmorLight",
 for side, suffix in ((-1, "L"), (1, "R")):
     x = side
     add_ring_surface("Guard_ArmUpper_" + suffix, "GuardArmorLight",
-                     [(.40 * x, 1.58, 0, .13, .13), (.48 * x, 1.40, .01, .115, .115)], 14)
+                     [(.40 * x, 1.58, 0, .13, .13), (.48 * x, 1.40, .01, .115, .115)], 14, caps=False)
     add_ring_surface("Guard_ArmLower_" + suffix, "GuardArmor",
-                     [(.48 * x, 1.40, .01, .115, .115), (.57 * x, 1.18, .03, .10, .10)], 14)
+                     [(.48 * x, 1.40, .01, .115, .115), (.57 * x, 1.18, .03, .10, .10)], 14, caps=False)
     add_sphere("Guard_Glove_" + suffix, "GuardLeather",
                (.59 * x, 1.10, .04), (.11, .13, .10), 14, 6)
     add_box("Guard_Shoulder_" + suffix, "GuardArmorLight",
@@ -160,6 +160,25 @@ add_box("Guard_HalberdBlade", "GuardMetal", (.42, 2.78, .08), (.11, .48, .20))
 add_box("Guard_HalberdHook", "GuardMetal", (.28, 2.58, .08), (.28, .10, .08))
 add_ring_surface("Guard_HalberdTip", "GuardMetal",
                  [(.42, 2.97, .08, .09, .09), (.42, 3.16, .08, .015, .015)], 10)
+
+# Harmonise les normales par groupe. Les anneaux qui descendent (bras,
+# mèches) ne doivent pas être orientés vers l'intérieur, sinon leur face
+# avant disparaît dès que le shader utilise Cull Back.
+for object_name in dict.fromkeys(face_objects):
+    numeros = [i for i, nom in enumerate(face_objects) if nom == object_name]
+    volume = 0.0
+    for numero in numeros:
+        face = faces[numero]
+        if len(face) < 3:
+            continue
+        a, b, c = (vertices[face[k] - 1] for k in range(3))
+        volume += (a[0] * (b[1] * c[2] - b[2] * c[1])
+                   - a[1] * (b[0] * c[2] - b[2] * c[0])
+                   + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6.0
+    if volume < -1e-9:
+        for numero in numeros:
+            face = faces[numero]
+            faces[numero] = (face[0], face[2], face[1]) + tuple(face[3:])
 
 with MTL.open("w", encoding="utf-8") as f:
     f.write("# Matériaux originaux du garde LibreVies — CC0\n")
