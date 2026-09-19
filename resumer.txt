@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 40 : diagnostic du shader route
-                        et repli automatique non-noir
+Derniere mise a jour : 18/09/2026 - MAJ 43 : StablePBR verifie sur tous les
+                        renderers du monde et version 0.5.43
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1559,6 +1559,28 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
     sandbox. Recompiler puis verifier le journal `[LV_SHADER] shader general
     applique = LibreVies/StablePBR`.
+
+================================================================================
+8.32 MAJ 43 - STABLEPBR SUR TOUS LES RENDERERS DU MONDE
+================================================================================
+
+  - La route en 0.5.41 est visible avec `LibreVies/StablePBR`. Le meme shader
+    vertex/fragment stable est maintenant le shader general pour toutes les
+    geometries : murs, toits, terrain, route, bois, pierres, gazon, arbres,
+    lampadaires, fontaine, balustrades, personnages, PNJ, armes, monstres et
+    objets du decor.
+  - Les textures originales restent affectees par famille via le mapping
+    triplanaire, et l'emission des lanternes reste disponible.
+  - Route_PBR partage maintenant exactement le shader general : il n'y a plus
+    un rendu special route qui masquerait une difference de shader.
+  - Le controle de fin de construction journalise le nombre de renderers
+    `StablePBR` et les eventuels autres renderers (les textes 3D sont exclus,
+    car ils utilisent la texture de police ; le skybox et le post-traitement
+    restent eux aussi des passes dediees, pas des surfaces du monde).
+  - Version de la build : 0.5.43. Attendu dans le journal :
+    `couverture shader monde : N/N renderer(s) StablePBR`.
+  - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
+    sandbox.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

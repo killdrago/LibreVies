@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.42";
+    private const string VersionJeu = "0.5.43";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -447,9 +447,41 @@ public sealed class LibreViesGame : MonoBehaviour
         Renderer[] renderers = FindObjectsOfType<Renderer>();
         Journal("controle rendu : " + renderers.Length + " renderer(s), shader "
                 + (cachedShader == null ? "AUCUN" : cachedShader.name));
+        ControlerCouvertureShader(renderers);
         avancement = 1f;
         etapeChargement = "";
         mondePret = true;
+    }
+
+    private void ControlerCouvertureShader(Renderer[] renderers)
+    {
+        int geometries = 0;
+        int stables = 0;
+        int autres = 0;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer rendu = renderers[i];
+            if (rendu == null || rendu.GetComponent<TextMesh>() != null) continue;
+            geometries++;
+            Material[] mats = rendu.sharedMaterials;
+            bool stable = mats != null && mats.Length > 0;
+            if (stable)
+            {
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    if (mats[m] == null || mats[m].shader == null
+                        || mats[m].shader.name != "LibreVies/StablePBR")
+                    {
+                        stable = false;
+                        break;
+                    }
+                }
+            }
+            if (stable) stables++; else autres++;
+        }
+        Journal("couverture shader monde : " + stables + "/" + geometries
+                + " renderer(s) StablePBR, " + autres + " autre(s)"
+                + " (textes 3D exclus)");
     }
 
     private void Update()
@@ -526,8 +558,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // Barres de vie des monstres : fond sombre + partie rouge (reference).
         MakeMaterial("Vie_Fond", new Color(0.15f, 0.05f, 0.05f));
         MakeMaterial("Vie_Rouge", new Color(0.90f, 0.12f, 0.12f));
-        // Test isole du nouveau shader : seule la route utilise le PBR pour
-        // l'instant. Tous les autres materiaux restent sur le rendu d'avant.
+        // Le shader stable est maintenant commun a toutes les surfaces du
+        // monde. Route_PBR garde son nom historique pour le diagnostic, mais
+        // utilise exactement le meme shader que les murs, arbres et PNJ.
         MakeMaterial("Route_PBR", new Color(0.42f, 0.45f, 0.48f), false, true);
     }
 
@@ -544,8 +577,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
     {
-        // Les materiaux ordinaires reviennent au shader couleur de la version
-        // precedente. Le shader PBR est reserve a Route_PBR pour isoler le test.
+        // Toutes les geometries du monde utilisent StablePBR. Le parametre pbr
+        // reste conserve pour identifier Route_PBR dans le journal, sans
+        // retirer les autres familles du rendu texture.
         Shader shader = pbr ? ResoudreShaderRoute() : ResoudreShader();
         if (shader == null)
         {
@@ -637,25 +671,15 @@ public sealed class LibreViesGame : MonoBehaviour
     private Shader ResoudreShaderRoute()
     {
         if (routeShader != null) return routeShader;
-        // Le log 0.5.40 a confirme que RealistePBR etait bien charge mais
-        // produisait une route noire sur l'AMD R7 200. On conserve ce shader
-        // dans le projet, mais le test route passe a un chemin vertex/fragment
-        // stable et eclaire, sans surface shader Standard.
-        routeShader = ChargerShader("LVShaders/LVRouteStable");
+        // Route_PBR partage exactement le shader general : le meme rendu
+        // stable est donc applique aux murs, toits, sol, vegetation, PNJ,
+        // monstres, balustrades et route.
+        routeShader = ResoudreShader();
+        routePbrActif = routeShader != null && routeShader.name == "LibreVies/StablePBR";
         if (routeShader != null)
-        {
-            routePbrActif = true;
-            Debug.Log("[LV_SHADER_ROUTE] PBR stable applique a la route : " + routeShader.name);
-        }
+            Debug.Log("[LV_SHADER_ROUTE] meme shader global applique a la route : " + routeShader.name);
         else
-        {
-            // Une route noire ne doit jamais masquer le diagnostic : repli
-            // final sur le shader historique, avec cause conservee dans le log.
-            routeShader = ResoudreShader();
-            routePbrActif = false;
-            Debug.LogError("[LV_SHADER_ROUTE] RoutePBRStable indisponible : route repassee sur "
-                + (routeShader == null ? "AUCUN SHADER" : routeShader.name));
-        }
+            Debug.LogError("[LV_SHADER_ROUTE] aucun shader global disponible");
         return routeShader;
     }
 

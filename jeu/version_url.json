@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.42",
-  "notes": "MAJ 42 : shader PBR Stable applique a toutes les surfaces, avec repli LVColor si indisponible.",
+  "game_version": "0.5.43",
+  "notes": "MAJ 43 : StablePBR verifie et applique a tous les renderers du monde.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
