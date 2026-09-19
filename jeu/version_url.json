@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.64",
-  "notes": "MAJ 64 : héroïne articulée, gardes humanoïdes importés et monstres conservés.",
+  "game_version": "0.5.65",
+  "notes": "MAJ 65 : animation par OBJ séparés, surfaces opaques et gardes importés.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.64";
+    private const string VersionJeu = "0.5.65";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -1774,59 +1774,60 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerGarde(Vector2 poste, Vector2 portail)
     {
+        const string dossier = "Characters/LibreViesGuardParts";
         float y = TerrainHeight(poste.x, poste.y);
         var root = new GameObject("Garde").transform;
         root.position = new Vector3(poste.x, y, poste.y);
         var state = new GardeState { Root = root.gameObject, Poste = poste, Portail = portail };
-        GameObject prefab = Resources.Load<GameObject>("Characters/LibreViesGuard");
-        if (prefab == null)
-        {
-            Debug.LogError("[LV] LibreViesGuard.obj absent : aucun garde en primitives ne sera créé");
-            Destroy(root.gameObject);
-            return;
-        }
-
-        GameObject model = Instantiate(prefab, root);
-        model.name = "Garde_Humanoide_Original_CC0";
+        GameObject model = new GameObject("Garde_Humanoide_Original_CC0");
+        model.transform.SetParent(root, false);
         state.Model = model.transform;
         state.Model.localPosition = Vector3.zero;
         state.Model.localRotation = Quaternion.identity;
         state.Model.localScale = Vector3.one;
-        TeinterGarde(state.Model, gardes.Count % 2 == 0
-            ? new Color(0.18f, 0.34f, 0.78f)
-            : new Color(0.72f, 0.16f, 0.12f));
 
-        // Le garde possède lui aussi des segments OBJ séparés : ses bras et
-        // ses genoux sont donc visibles en mouvement, sans primitives Unity.
-        state.JambeG = CreerPivotHeroine(state.Model,
-            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_G", true,
-            "Guard_LegUpper_L");
-        state.JambeD = CreerPivotHeroine(state.Model,
-            new Vector3(0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_D", false,
-            "Guard_LegUpper_R");
-        state.GenouG = CreerPivotHeroine(state.Model,
-            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Garde_Genou_G", true,
+        string[] partiesFixes =
+        {
+            "Guard_Belt", "Guard_Torso", "Guard_ChestPlate", "Guard_Shoulder_L",
+            "Guard_Shoulder_R", "Guard_Head", "Guard_Helmet", "Guard_Visor", "Guard_Crest"
+        };
+        for (int i = 0; i < partiesFixes.Length; i++)
+            ChargerPartieImportee(state.Model, dossier, partiesFixes[i]);
+
+        // Les gardes sont maintenant des maillages humanoïdes importés, pas des
+        // cubes/capsules Godot ou Unity. Les segments inférieurs sont attachés
+        // aux genoux et les avant-bras aux coudes.
+        state.JambeG = CreerPivotImporte(state.Model, dossier,
+            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_G", "Guard_LegUpper_L");
+        state.JambeD = CreerPivotImporte(state.Model, dossier,
+            new Vector3(0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_D", "Guard_LegUpper_R");
+        state.GenouG = CreerPivotImporte(state.Model, dossier,
+            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Garde_Genou_G",
             "Guard_LegLower_L", "Guard_Boot_L");
-        state.GenouD = CreerPivotHeroine(state.Model,
-            new Vector3(0.18f, 0.66f, 0f), "Pivot_Garde_Genou_D", false,
+        state.GenouD = CreerPivotImporte(state.Model, dossier,
+            new Vector3(0.18f, 0.66f, 0f), "Pivot_Garde_Genou_D",
             "Guard_LegLower_R", "Guard_Boot_R");
         state.GenouG.SetParent(state.JambeG, true);
         state.GenouD.SetParent(state.JambeD, true);
-        state.BrasG = CreerPivotHeroine(state.Model,
-            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Garde_Bras_G", true,
-            "Guard_ArmUpper_L");
-        state.BrasD = CreerPivotHeroine(state.Model,
-            new Vector3(0.40f, 1.58f, 0f), "Pivot_Garde_Bras_D", false,
-            "Guard_ArmUpper_R");
-        state.CoudeG = CreerPivotHeroine(state.Model,
-            new Vector3(-0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_G", true,
+        state.BrasG = CreerPivotImporte(state.Model, dossier,
+            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Garde_Bras_G", "Guard_ArmUpper_L");
+        state.BrasD = CreerPivotImporte(state.Model, dossier,
+            new Vector3(0.40f, 1.58f, 0f), "Pivot_Garde_Bras_D", "Guard_ArmUpper_R");
+        state.CoudeG = CreerPivotImporte(state.Model, dossier,
+            new Vector3(-0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_G",
             "Guard_ArmLower_L", "Guard_Glove_L");
-        state.CoudeD = CreerPivotHeroine(state.Model,
-            new Vector3(0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_D", false,
+        state.CoudeD = CreerPivotImporte(state.Model, dossier,
+            new Vector3(0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_D",
             "Guard_ArmLower_R", "Guard_Glove_R");
         state.CoudeG.SetParent(state.BrasG, true);
         state.CoudeD.SetParent(state.BrasD, true);
-        state.Hallebarde = FindChildDeep(state.Model, "Guard_HalberdShaft");
+        state.Hallebarde = CreerPivotImporte(state.Model, dossier,
+            new Vector3(0.42f, 1.25f, 0.08f), "Pivot_Garde_Hallebarde",
+            "Guard_HalberdShaft", "Guard_HalberdBlade", "Guard_HalberdHook", "Guard_HalberdTip");
+        AppliquerShaderPersonnage(state.Model);
+        TeinterGarde(state.Model, gardes.Count % 2 == 0
+            ? new Color(0.18f, 0.34f, 0.78f)
+            : new Color(0.72f, 0.16f, 0.12f));
 
         state.Corps = new Obstacle
         {
@@ -1835,6 +1836,7 @@ public sealed class LibreViesGame : MonoBehaviour
         };
         obstacles.Add(state.Corps);
         gardes.Add(state);
+        Debug.Log("[LV] garde humanoïde OBJ séparé chargé et articulé");
     }
 
     // Les gardes : poste fixe, regard vers l'exterieur, et coup mortel sur tout
@@ -2480,70 +2482,61 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private Transform FindChildDeep(Transform parent, string name)
+    private Transform ChargerPartieImportee(Transform parent, string dossier, string nom)
     {
-        if (parent == null) return null;
-        if (parent.name == name) return parent;
-        for (int i = 0; i < parent.childCount; i++)
+        GameObject prefab = Resources.Load<GameObject>(dossier + "/" + nom);
+        if (prefab == null)
         {
-            Transform trouve = FindChildDeep(parent.GetChild(i), name);
-            if (trouve != null) return trouve;
+            Debug.LogError("[LV] partie OBJ absente : " + dossier + "/" + nom);
+            return null;
         }
-        return null;
+        GameObject instance = Instantiate(prefab, parent);
+        instance.name = nom;
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localScale = Vector3.one;
+        return instance.transform;
     }
 
-    private void CollectHeroineParts(Transform parent, string prefix, List<Transform> result)
+    private void AppliquerShaderPersonnage(Transform model)
     {
-        if (parent == null) return;
-        for (int i = 0; i < parent.childCount; i++)
+        Shader shader = ChargerShader("LVShaders/LVCharacterOpaque");
+        if (shader == null || model == null) return;
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
         {
-            Transform child = parent.GetChild(i);
-            if (child.name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                result.Add(child);
-            CollectHeroineParts(child, prefix, result);
+            Material[] materiaux = renderers[i].materials;
+            for (int j = 0; j < materiaux.Length; j++)
+            {
+                if (materiaux[j] == null) continue;
+                Color couleur = materiaux[j].HasProperty("_Color")
+                    ? materiaux[j].color : Color.white;
+                Texture texture = materiaux[j].HasProperty("_MainTex")
+                    ? materiaux[j].GetTexture("_MainTex") : null;
+                materiaux[j].shader = shader;
+                if (materiaux[j].HasProperty("_Color")) materiaux[j].color = couleur;
+                if (texture != null && materiaux[j].HasProperty("_MainTex"))
+                    materiaux[j].SetTexture("_MainTex", texture);
+            }
+            renderers[i].materials = materiaux;
         }
     }
 
-    private List<Transform> FindHeroineParts(Transform model, string prefix, bool gauche)
-    {
-        var candidats = new List<Transform>();
-        CollectHeroineParts(model, prefix, candidats);
-        var resultats = new List<Transform>();
-        for (int i = 0; i < candidats.Count; i++)
-        {
-            Transform candidat = candidats[i];
-            MeshFilter filtre = candidat.GetComponent<MeshFilter>();
-            float centreX = 0f;
-            if (filtre != null && filtre.sharedMesh != null)
-                centreX = filtre.sharedMesh.bounds.center.x;
-            else
-                centreX = candidat.localPosition.x;
-            if ((gauche && centreX < -0.001f) || (!gauche && centreX > 0.001f))
-                resultats.Add(candidat);
-        }
-        // Jeans_L, Jeans_R, Boot_L et Boot_R sont déjà univoques. Pour les
-        // deux manches et les deux mains, le signe du centre du maillage sépare
-        // réellement le côté gauche du côté droit même si Unity ajoute un
-        // suffixe au nom du second objet OBJ.
-        return resultats;
-    }
-
-    private Transform CreerPivotHeroine(Transform model, Vector3 position, string nom,
-        bool gauche, params string[] prefixes)
+    private Transform CreerPivotImporte(Transform model, string dossier, Vector3 position,
+        string nom, params string[] parties)
     {
         var pivot = new GameObject(nom).transform;
         pivot.SetParent(model, false);
         pivot.localPosition = position;
         pivot.localRotation = Quaternion.identity;
-        for (int p = 0; p < prefixes.Length; p++)
+        for (int i = 0; i < parties.Length; i++)
         {
-            List<Transform> parties = FindHeroineParts(model, prefixes[p], gauche);
-            for (int i = 0; i < parties.Count; i++)
+            Transform partie = ChargerPartieImportee(model, dossier, parties[i]);
+            if (partie != null)
             {
-                Transform partie = parties[i];
-                if (partie == pivot || partie == model || partie.IsChildOf(pivot)) continue;
-                // Les vertices OBJ restent à leur place : seul le pivot change,
-                // ce qui évite de faire tourner un bras autour des pieds.
+                // Chaque partie provient maintenant d'un OBJ indépendant :
+                // Unity ne peut plus la fusionner avec le torse ou un autre
+                // membre dans le même Mesh.
                 partie.SetParent(pivot, true);
             }
         }
@@ -2552,67 +2545,62 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private bool CreateHumanHeroine(Transform body)
     {
-        GameObject prefab = Resources.Load<GameObject>("Characters/LibreViesHeroine");
-        if (prefab == null)
-        {
-            Debug.LogError("[LV] LibreViesHeroine.obj absent : aucune héroïne procédurale ne sera créée");
-            return false;
-        }
-        GameObject model = Instantiate(prefab, body);
-        model.name = "Heroine_Humaine_Originale_CC0";
+        const string dossier = "Characters/LibreViesHeroineParts";
+        GameObject model = new GameObject("Heroine_Humaine_Originale_CC0");
+        model.transform.SetParent(body, false);
         heroineModel = model.transform;
         heroineModel.localPosition = Vector3.zero;
-        // Le maillage est généré verticalement sur Y. Cette rotation explicite
-        // et son rappel dans AnimerHeroine empêchent un ancien clip ou un
-        // importeur OBJ de laisser l'héroïne pencher vers l'avant.
         heroineModel.localRotation = Quaternion.identity;
         heroineModel.localScale = Vector3.one * 1.05f;
-        // Le maillage CC0 contient déjà la chevelure rousse et les vêtements.
-        // Aucun cube, sphère ou primitive Unity n'est ajouté au personnage.
 
-        // L'OBJ expose des groupes séparés : on leur donne de vrais pivots
-        // d'épaule et de hanche pour obtenir marche, course et attaque sans
-        // prétendre que ce maillage sans squelette possède des clips FBX.
-        brasHeroineGauche = CreerPivotHeroine(heroineModel,
-            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Bras_Gauche", true,
-            "SleeveUpper_L");
-        brasHeroineDroit = CreerPivotHeroine(heroineModel,
-            new Vector3(0.40f, 1.58f, 0f), "Pivot_Bras_Droit", false,
-            "SleeveUpper_R");
-        coudeHeroineGauche = CreerPivotHeroine(heroineModel,
-            new Vector3(-0.48f, 1.40f, 0.02f), "Pivot_Coude_Gauche", true,
+        // Les éléments fixes sont eux aussi des OBJ importés indépendants :
+        // aucune primitive Unity n'est utilisée pour reconstituer le modèle.
+        string[] partiesFixes =
+        {
+            "Belt", "Jacket", "Neck", "Collar", "Head", "Ear_L", "Ear_R",
+            "Eye_L", "Eye_R", "Nose", "HairCap", "HairBack", "HairLock_L", "HairLock_R"
+        };
+        int piecesChargees = 0;
+        for (int i = 0; i < partiesFixes.Length; i++)
+            if (ChargerPartieImportee(heroineModel, dossier, partiesFixes[i]) != null) piecesChargees++;
+
+        // Les pivots ne peuvent plus être ignorés par l'importeur : chaque
+        // segment visible est un fichier OBJ distinct dans Resources.
+        brasHeroineGauche = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Bras_Gauche", "SleeveUpper_L");
+        brasHeroineDroit = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(0.40f, 1.58f, 0f), "Pivot_Bras_Droit", "SleeveUpper_R");
+        coudeHeroineGauche = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(-0.48f, 1.40f, 0.02f), "Pivot_Coude_Gauche",
             "SleeveLower_L", "Cuff_L", "Hand_L");
-        coudeHeroineDroit = CreerPivotHeroine(heroineModel,
-            new Vector3(0.48f, 1.40f, 0.02f), "Pivot_Coude_Droit", false,
+        coudeHeroineDroit = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(0.48f, 1.40f, 0.02f), "Pivot_Coude_Droit",
             "SleeveLower_R", "Cuff_R", "Hand_R");
         coudeHeroineGauche.SetParent(brasHeroineGauche, true);
         coudeHeroineDroit.SetParent(brasHeroineDroit, true);
-        jambeHeroineGauche = CreerPivotHeroine(heroineModel,
-            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", true,
-            "JeansUpper_L");
-        jambeHeroineDroite = CreerPivotHeroine(heroineModel,
-            new Vector3(0.18f, 1.12f, 0f), "Pivot_Cuisse_Droite", false,
-            "JeansUpper_R");
-        genouHeroineGauche = CreerPivotHeroine(heroineModel,
-            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Genou_Gauche", true,
+        jambeHeroineGauche = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", "JeansUpper_L");
+        jambeHeroineDroite = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(0.18f, 1.12f, 0f), "Pivot_Cuisse_Droite", "JeansUpper_R");
+        genouHeroineGauche = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Genou_Gauche",
             "JeansLower_L", "Boot_L", "Shoe_L");
-        genouHeroineDroit = CreerPivotHeroine(heroineModel,
-            new Vector3(0.18f, 0.66f, 0f), "Pivot_Genou_Droit", false,
+        genouHeroineDroit = CreerPivotImporte(heroineModel, dossier,
+            new Vector3(0.18f, 0.66f, 0f), "Pivot_Genou_Droit",
             "JeansLower_R", "Boot_R", "Shoe_R");
         genouHeroineGauche.SetParent(jambeHeroineGauche, true);
         genouHeroineDroit.SetParent(jambeHeroineDroite, true);
         brasAttaque = brasHeroineDroit;
-        heroineRigPret = brasHeroineGauche != null && brasHeroineGauche.childCount > 0
-            && brasHeroineDroit != null && brasHeroineDroit.childCount > 0
-            && coudeHeroineGauche != null && coudeHeroineGauche.childCount > 0
-            && coudeHeroineDroit != null && coudeHeroineDroit.childCount > 0
-            && jambeHeroineGauche != null && jambeHeroineGauche.childCount > 0
-            && jambeHeroineDroite != null && jambeHeroineDroite.childCount > 0
-            && genouHeroineGauche != null && genouHeroineGauche.childCount > 0
-            && genouHeroineDroit != null && genouHeroineDroit.childCount > 0;
+        AppliquerShaderPersonnage(heroineModel);
+        heroineRigPret = piecesChargees > 0
+            && brasHeroineGauche.childCount > 0 && brasHeroineDroit.childCount > 0
+            && coudeHeroineGauche.childCount > 0 && coudeHeroineDroit.childCount > 0
+            && jambeHeroineGauche.childCount > 0 && jambeHeroineDroite.childCount > 0
+            && genouHeroineGauche.childCount > 0 && genouHeroineDroit.childCount > 0;
         ConfigurerAnimationsHeroine(model);
-        Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj ; animation procédurale=" + heroineRigPret);
-        return true;
+        Debug.Log("[LV] héroïne CC0 assemblée avec " + piecesChargees
+            + " OBJ fixes ; animation par OBJ séparés=" + heroineRigPret);
+        return heroineRigPret;
     }
 
     private void ConfigurerAnimationsHeroine(GameObject model)

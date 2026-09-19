@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 64 : héroïne articulée, gardes humanoïdes importés
-                        monstres conservés ; version 0.5.64
+Derniere mise a jour : 19/09/2026 - MAJ 65 : animation par OBJ séparés, surfaces opaques
+                        gardes importés ; version 0.5.65
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies

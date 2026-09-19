@@ -68,8 +68,9 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0):
     x2, y2, z2, rx2, rz2 = rings[-1]
     vertices.append((x2, y2, z2))
     for i in range(segments):
-        add_face((bottom, starts[0] + (i + 1) % segments, starts[0] + i), material)
-        add_face((top, starts[-1] + i, starts[-1] + (i + 1) % segments), material)
+        # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
+        add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+        add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
 
 def add_sphere(name, material, center, scale, segments=16, rings=8):
@@ -147,7 +148,7 @@ add_sphere("Nose", "SkinLight", (0, 1.975, .205), (.035, .055, .045), 12, 5)
 add_ring_surface("HairCap", "Hair_Red", [(0, 2.07, -.005, .25, .21), (0, 2.18, -.005, .29, .22), (0, 2.29, -.005, .22, .17), (0, 2.36, -.005, .055, .045)], 20)
 add_ring_surface("HairBack", "Hair_Red", [(0, 1.72, -.13, .28, .10), (0, 1.94, -.16, .31, .105), (0, 2.17, -.12, .30, .10)], 20)
 for side in (-1, 1):
-    add_ring_surface("HairLock", "Hair_Red_Light", [(side * .22, 2.16, .01, .085, .075), (side * .28, 1.92, .025, .085, .075), (side * .25, 1.67, .035, .065, .06), (side * .20, 1.48, .05, .035, .035)], 12, pi / 12)
+    add_ring_surface("HairLock_" + ("L" if side < 0 else "R"), "Hair_Red_Light", [(side * .22, 2.16, .01, .085, .075), (side * .28, 1.92, .025, .085, .075), (side * .25, 1.67, .035, .065, .06), (side * .20, 1.48, .05, .035, .035)], 12, pi / 12)
 
 with MTL.open("w", encoding="utf-8") as f:
     f.write("# Matériaux originaux de LibreVies — CC0\n")
@@ -173,3 +174,58 @@ with OBJ.open("w", encoding="utf-8", newline="\n") as f:
         f.write("f " + " ".join(str(i) for i in face) + "\n")
 
 print(f"Généré : {OBJ} ({len(vertices)} sommets, {len(faces)} faces)")
+
+# Exporte aussi chaque groupe dans un OBJ indépendant. Unity conserve ainsi
+# une vraie Transform par membre, même lorsque son importeur fusionne les
+# groupes d'un OBJ multi-matériaux en un seul Mesh.
+PARTS = OUT / "LibreViesHeroineParts"
+PARTS.mkdir(parents=True, exist_ok=True)
+for ancien in PARTS.glob("*.obj"):
+    ancien.unlink()
+PARTS_MTL = PARTS / "LibreViesHeroineParts.mtl"
+with PARTS_MTL.open("w", encoding="utf-8") as f:
+    f.write("# Matériaux originaux de LibreViesHeroine — CC0\n")
+    for name, (r, g, b) in materials.items():
+        f.write(f"newmtl {name}\nKd {r:.4f} {g:.4f} {b:.4f}\nKa 0.05 0.05 0.05\nKs 0.18 0.18 0.18\nNs 32.0\nd 1.0\n\n")
+
+objets = []
+for object_name in face_objects:
+    if object_name not in objets:
+        objets.append(object_name)
+for object_name in objets:
+    numeros = [i for i, nom in enumerate(face_objects) if nom == object_name]
+    remap = {}
+    sommets_locaux = []
+    faces_locales = []
+    materiaux_locaux = []
+    for numero in numeros:
+        face = faces[numero]
+        face_locale = []
+        for indice in face:
+            if indice not in remap:
+                remap[indice] = len(sommets_locaux) + 1
+                sommets_locaux.append(vertices[indice - 1])
+            face_locale.append(remap[indice])
+        faces_locales.append(face_locale)
+        materiaux_locaux.append(face_mats[numero])
+    sortie = PARTS / (object_name + ".obj")
+    with sortie.open("w", encoding="utf-8", newline="\n") as f:
+        f.write("# LibreViesHeroine — groupe importé indépendant, CC0\n")
+        f.write("# Généré par compilation/outils/generer_heroine_librevies.py\n")
+        f.write("mtllib LibreViesHeroineParts.mtl\n")
+        for x, y, z in sommets_locaux:
+            f.write(f"v {x:.6f} {y:.6f} {z:.6f}\n")
+        f.write("o " + object_name + "\n")
+        dernier = None
+        for face, material in zip(faces_locales, materiaux_locaux):
+            if material != dernier:
+                f.write("usemtl " + material + "\n")
+                dernier = material
+            f.write("f " + " ".join(str(i) for i in face) + "\n")
+(PARTS / "LibreViesHeroineParts_LICENSE.txt").write_text(
+    "LibreViesHeroineParts est une déclinaison technique du maillage original LibreViesHeroine, sous CC0 1.0.\n"
+    "Les groupes séparés de ce dossier sont générés à partir du maillage CC0 "
+    "principal pour permettre l'animation par articulations dans Unity.\n",
+    encoding="utf-8",
+)
+print(f"Groupes indépendants : {len(objets)} dans {PARTS}")
