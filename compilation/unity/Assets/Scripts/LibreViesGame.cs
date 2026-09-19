@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.53";
+    private const string VersionJeu = "0.5.54";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -27,8 +27,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
     private const float WaterDepth = 2.90f;
-    private const float WaterSurfaceOffset = 0.08f;
-    private const float WaterBedOffset = -0.04f;
+    private const float WaterSurfaceOffset = 0.22f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
@@ -96,7 +95,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<EnemyState> enemies = new List<EnemyState>();
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
-    private readonly List<Renderer> waterRenderers = new List<Renderer>();
     private readonly List<Material> materials = new List<Material>();
     private readonly Dictionary<Renderer, Material[]> materiauxOriginaux = new Dictionary<Renderer, Material[]>();
     private bool camouflage;
@@ -537,7 +535,6 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdatePnj(dt);
         UpdatePlayer(dt);
         UpdateCamera();
-        MettreAJourVisibiliteEau();
         UpdateEffects(dt);
         UpdateHudState(dt);
     }
@@ -583,7 +580,6 @@ public sealed class LibreViesGame : MonoBehaviour
         // Textures dediees aux objets qui etaient encore trop plats : feuillage,
         // pierre, metal, drapeaux et eau partagent toujours StablePBR.
         MakeMaterial("Eau_Riviere", new Color(0.16f, 0.56f, 0.72f), true);
-        MakeMaterial("Lit_Eau", new Color(0.22f, 0.16f, 0.11f));
         MakeMaterial("Drapeau", Color.white);
         MakeMaterial("Pierre_Mur", new Color(0.46f, 0.48f, 0.50f));
         MakeMaterial("Feuillage", new Color(0.20f, 0.56f, 0.19f));
@@ -817,7 +813,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float distanceEau = DistancePolyligne(new Vector2(x, z), RivierePrincipale);
             // Le creux revient a zero exactement sur la berge : le terrain
             // rejoint ainsi la surface de l'eau sans marche ni espace.
-            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 3.5f, distanceEau);
+            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 4.0f, distanceEau);
             profondeur = Mathf.Max(profondeur, WaterDepth * creuxRiviere);
         }
 
@@ -843,7 +839,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Le fleuve reste hors du village ; il n'y a plus de douves ni de
         // pont-levis a traiter.
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= 3.4f;
+        return DistancePolyligne(point, RivierePrincipale) <= 3.8f;
     }
 
     // ------------------------------------------------------------------
@@ -1264,39 +1260,6 @@ public sealed class LibreViesGame : MonoBehaviour
         return objet;
     }
 
-    private void EnregistrerSurfaceEau(GameObject objet)
-    {
-        if (objet == null) return;
-        Renderer rendu = objet.GetComponent<Renderer>();
-        if (rendu != null) waterRenderers.Add(rendu);
-    }
-
-    private void MettreAJourVisibiliteEau()
-    {
-        // Le shader du monde est opaque. Une surface opaque qui traverse la
-        // camera pendant la nage provoque un clignotement en mouvement ; les
-        // surfaces sont masquees pendant toute la nage, tandis que le voile
-        // bleu du HUD donne le rendu sous-marin stable.
-        bool cameraSousEau = false;
-        if (gameCamera != null)
-        {
-            Vector3 positionCamera = gameCamera.transform.position;
-            cameraSousEau = DistancePolyligne(
-                new Vector2(positionCamera.x, positionCamera.z), RivierePrincipale) <= 4.5f
-                && positionCamera.y < HauteurSurfaceEau(positionCamera.x, positionCamera.z);
-        }
-        bool visible = !(playerInWater || playerUnderwater || cameraSousEau);
-        for (int i = waterRenderers.Count - 1; i >= 0; i--)
-        {
-            if (waterRenderers[i] == null)
-            {
-                waterRenderers.RemoveAt(i);
-                continue;
-            }
-            waterRenderers[i].enabled = visible;
-        }
-    }
-
     // Un emplacement est libre s'il n'est ni dans un batiment, ni sur la route,
     // ni dans la fontaine. Sert a poser le decor sans qu'un arbre pousse dans
     // un mur, dans le fleuve ou au milieu de la route.
@@ -1517,15 +1480,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateWaterways()
     {
-        // Il ne reste qu'un seul fleuve qui traverse la carte. Le chateau,
-        // les douves, le pont-levis et leur derivation sont retires.
-        EnregistrerSurfaceEau(ObjetMaillage("Riviere_Principale",
-            CreerRubanEau(RivierePrincipale, 3.35f, "Riviere_Principale"), "Eau_Riviere"));
-
-        // Le lit suit chaque sommet de la surface et n'utilise pas la texture
-        // d'herbe du terrain.
-        EnregistrerSurfaceEau(ObjetMaillage("Lit_Riviere_Principale",
-            CreerLitEau(RivierePrincipale, 3.43f, "Lit_Riviere_Principale"), "Lit_Eau"));
+        // Il ne reste qu'un seul fleuve qui traverse la carte ; aucune
+        // derivation ni autre surface d'eau n'est creee.
+        ObjetMaillage("Riviere_Principale",
+            CreerRubanEau(RivierePrincipale, 3.70f, "Riviere_Principale"), "Eau_Riviere");
     }
 
     private Vector2[] EchantillonnerLigne(Vector2[] points)
@@ -1574,34 +1532,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 new Vector3(gauche2.x, hauteur2, gauche2.y),
                 new Vector3(droite2.x, hauteur2, droite2.y),
                 new Vector3(droite.x, hauteur1, droite.y));
-        }
-        return ruban.VersMesh(nom);
-    }
-
-    private Mesh CreerLitEau(Vector2[] points, float demiLargeur, string nom)
-    {
-        points = EchantillonnerLigne(points);
-        var ruban = new Maillage();
-        Vector2[] normales = new Vector2[points.Length];
-        for (int i = 0; i < points.Length; i++)
-        {
-            Vector2 avant = points[Mathf.Max(0, i - 1)];
-            Vector2 apres = points[Mathf.Min(points.Length - 1, i + 1)];
-            Vector2 direction = (apres - avant).normalized;
-            normales[i] = new Vector2(-direction.y, direction.x);
-        }
-        for (int i = 0; i < points.Length - 1; i++)
-        {
-            Vector2 gauche = points[i] + normales[i] * demiLargeur;
-            Vector2 droite = points[i] - normales[i] * demiLargeur;
-            Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
-            Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
-            float lit1 = TerrainHeight(points[i].x, points[i].y) + WaterBedOffset;
-            float lit2 = TerrainHeight(points[i + 1].x, points[i + 1].y) + WaterBedOffset;
-            ruban.Quad(new Vector3(gauche.x, lit1, gauche.y),
-                new Vector3(gauche2.x, lit2, gauche2.y),
-                new Vector3(droite2.x, lit2, droite2.y),
-                new Vector3(droite.x, lit1, droite.y));
         }
         return ruban.VersMesh(nom);
     }

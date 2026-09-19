@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 53 : fleuve continu,
-                        eau masquee sous la camera ; version 0.5.53
+Derniere mise a jour : 19/09/2026 - MAJ 54 : fleuve continu,
+                        eau toujours visible sans lit colore ; version 0.5.54
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1769,6 +1769,19 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - L'eau est masquee si le joueur nage, si sa tete est sous l'eau ou si la
     camera passe sous la surface : elle ne reste plus visible sous la camera.
   - Version de la build : 0.5.53. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.43 MAJ 54 - EAU TOUJOURS VISIBLE, SANS LIT SEPARE
+================================================================================
+
+  - Le lit colore separe est retire : seul le ruban d'eau est rendu.
+  - Le fleuve est elargi et sa hauteur de section est stabilisee au niveau de
+    la berge la plus haute, afin d'eviter les ruptures et les zones qui passent
+    sous le terrain.
+  - L'eau n'est plus masquee lorsque le joueur entre dans le fleuve : elle
+    reste visible autour de lui et le voile bleu accompagne l'immersion.
+  - Version de la build : 0.5.54. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================
