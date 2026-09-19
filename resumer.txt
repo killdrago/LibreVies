@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 48 : eau conforme au relief,
-                        chateau nettoye et pont-levis au-dessus de l'eau ; version 0.5.48
+Derniere mise a jour : 19/09/2026 - MAJ 49 : eau sans herbe,
+                        nage stable et village/chateau nettoyes ; version 0.5.49
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1689,6 +1689,24 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Les textes de degats utilisent l'orientation inverse du TextMesh pour que
     les nombres soient lus dans le bon sens face a la camera.
   - Version de la build : 0.5.48. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.38 MAJ 49 - EAU SANS HERBE ET INTERFACE STABLE
+================================================================================
+
+  - Les touffes d'herbe ne sont plus generees dans les rivieres ni les douves.
+    Le lit utilise un materiau de vase uni, sans texture de gazon.
+  - Les surfaces d'eau et leurs lits sont masques pendant la nage sous-marine :
+    le shader opaque ne peut plus traverser la camera et faire scintiller l'image.
+  - Les boutons +, - et x1.00 sont places a droite, hors de la texture de la
+    mini-carte, sans la recouvrir.
+  - Le panneau AUBERGE est elargi et son texte agrandi pour afficher le mot
+    complet. La Maison_Sud est decalee de 1,5 m vers la gauche pour ne plus
+    deborder sur la route.
+  - Les lampadaires restent reserves au village et aucun ancien objet de lampe
+    ne peut etre recree dans la zone du chateau.
+  - Version de la build : 0.5.49. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================

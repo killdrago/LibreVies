@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.48";
+    private const string VersionJeu = "0.5.49";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -112,6 +112,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<EnemyState> enemies = new List<EnemyState>();
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
+    private readonly List<Renderer> waterRenderers = new List<Renderer>();
     private readonly List<Material> materials = new List<Material>();
     private readonly Dictionary<Renderer, Material[]> materiauxOriginaux = new Dictionary<Renderer, Material[]>();
     private bool camouflage;
@@ -551,6 +552,7 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdateGuards(dt);
         UpdatePnj(dt);
         UpdatePlayer(dt);
+        MettreAJourVisibiliteEau();
         UpdateCamera();
         UpdateEffects(dt);
         UpdateHudState(dt);
@@ -597,6 +599,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Textures dediees aux objets qui etaient encore trop plats : feuillage,
         // pierre, metal, drapeaux et eau partagent toujours StablePBR.
         MakeMaterial("Eau_Riviere", new Color(0.16f, 0.56f, 0.72f), true);
+        MakeMaterial("Lit_Eau", new Color(0.14f, 0.23f, 0.18f));
         MakeMaterial("Drapeau", Color.white);
         MakeMaterial("Pierre_Mur", new Color(0.46f, 0.48f, 0.50f));
         MakeMaterial("Feuillage", new Color(0.20f, 0.56f, 0.19f));
@@ -1309,6 +1312,31 @@ public sealed class LibreViesGame : MonoBehaviour
         return objet;
     }
 
+    private void EnregistrerSurfaceEau(GameObject objet)
+    {
+        if (objet == null) return;
+        Renderer rendu = objet.GetComponent<Renderer>();
+        if (rendu != null) waterRenderers.Add(rendu);
+    }
+
+    private void MettreAJourVisibiliteEau()
+    {
+        // Le shader du monde est opaque. Une surface opaque qui traverse la
+        // camera pendant la nage provoque un clignotement en mouvement ; les
+        // surfaces sont donc masquees une fois la tete sous l'eau, tandis que
+        // le voile bleu du HUD donne le rendu sous-marin stable.
+        bool visible = !playerUnderwater;
+        for (int i = waterRenderers.Count - 1; i >= 0; i--)
+        {
+            if (waterRenderers[i] == null)
+            {
+                waterRenderers.RemoveAt(i);
+                continue;
+            }
+            waterRenderers[i].enabled = visible;
+        }
+    }
+
     // Un emplacement est libre s'il n'est ni dans un batiment, ni sur la route,
     // ni dans le chateau, ni dans la fontaine. Sert a poser le decor sans
     // qu'un arbre pousse dans un mur ou au milieu de la route.
@@ -1401,7 +1429,7 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Maison_Nord");
         // Maison_Sud est remise sur le terrain plat du village, loin de la
         // colline du chateau : son socle ne s'enfonce plus dans la pente.
-        CreateBuilding(new Vector3(8, 0, -6), new Vector3(7, 4, 6), "Maison_Sud");
+        CreateBuilding(new Vector3(6.5f, 0, -6), new Vector3(7, 4, 6), "Maison_Sud");
         // Fontaine sur le terrain libre directement devant la mairie.
         CreateFountain(new Vector3(-8, 0, 24));
         // Les PNJ sont a moins d'une largeur de porte de leur batiment.
@@ -1479,9 +1507,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreerAfficheMaison(Transform parent, Vector3 taille, string nom)
     {
         float z = taille.z * 0.525f;
-        Box(new Vector3(0f, 2.62f, z), new Vector3(2.8f, 0.48f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
+        float largeur = nom == "Auberge" ? 4.2f : 2.8f;
+        float tailleTexte = nom == "Auberge" ? 0.15f : 0.12f;
+        Box(new Vector3(0f, 2.62f, z), new Vector3(largeur, 0.56f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
         Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
-        GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), 0.12f);
+        GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), tailleTexte);
         if (texte != null)
         {
             // Le TextMesh devait etre retourne pour que le nom soit lisible
@@ -1573,18 +1603,22 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         // La riviere principale et la derivation forment un vrai Y. La seconde
         // branche se raccorde aux douves au nord-est du chateau.
-        ObjetMaillage("Riviere_Principale", CreerRubanEau(RivierePrincipale, 3.0f, "Riviere_Principale"), "Eau_Riviere");
-        ObjetMaillage("Riviere_Branche_Chateau", CreerRubanEau(RiviereVersChateau, 2.7f, "Riviere_Branche_Chateau"), "Eau_Riviere");
-        ObjetMaillage("Douves_Chateau", CreerAnneauEau("Douves_Chateau"), "Eau_Riviere");
+        EnregistrerSurfaceEau(ObjetMaillage("Riviere_Principale",
+            CreerRubanEau(RivierePrincipale, 3.35f, "Riviere_Principale"), "Eau_Riviere"));
+        EnregistrerSurfaceEau(ObjetMaillage("Riviere_Branche_Chateau",
+            CreerRubanEau(RiviereVersChateau, 3.05f, "Riviere_Branche_Chateau"), "Eau_Riviere"));
+        EnregistrerSurfaceEau(ObjetMaillage("Douves_Chateau",
+            CreerAnneauEau("Douves_Chateau"), "Eau_Riviere"));
 
         // Le lit est recalcule sous chaque sommet de la surface : il suit le
         // relief et reste colle au terrain, sans plaque horizontale ni vide.
-        ObjetMaillage("Lit_Riviere_Principale",
-            CreerLitEau(RivierePrincipale, 3.08f, "Lit_Riviere_Principale"), "Dirt");
-        ObjetMaillage("Lit_Riviere_Chateau",
-            CreerLitEau(RiviereVersChateau, 2.78f, "Lit_Riviere_Chateau"), "Dirt");
-        ObjetMaillage("Lit_Douves_Chateau",
-            CreerAnneauLit("Lit_Douves_Chateau"), "Dirt");
+        // Son materiau n'utilise pas la texture d'herbe du terrain.
+        EnregistrerSurfaceEau(ObjetMaillage("Lit_Riviere_Principale",
+            CreerLitEau(RivierePrincipale, 3.43f, "Lit_Riviere_Principale"), "Lit_Eau"));
+        EnregistrerSurfaceEau(ObjetMaillage("Lit_Riviere_Chateau",
+            CreerLitEau(RiviereVersChateau, 3.13f, "Lit_Riviere_Chateau"), "Lit_Eau"));
+        EnregistrerSurfaceEau(ObjetMaillage("Lit_Douves_Chateau",
+            CreerAnneauLit("Lit_Douves_Chateau"), "Lit_Eau"));
         CreateDrawbridge();
     }
 
@@ -2219,12 +2253,16 @@ public sealed class LibreViesGame : MonoBehaviour
                 x = Mathf.Clamp(x, -WorldSize + 4, WorldSize - 4);
                 z = Mathf.Clamp(z, -WorldSize + 4, WorldSize - 4);
                 int garde = 0;
-                while (DistRoute(new Vector2(x, z)) < 3.2f && garde < 8)
+                while ((DistRoute(new Vector2(x, z)) < 3.2f
+                    || EstDansEau(new Vector2(x, z))) && garde < 16)
                 {
                     x = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
                     z = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+                    x = Mathf.Clamp(x, -WorldSize + 4, WorldSize - 4);
+                    z = Mathf.Clamp(z, -WorldSize + 4, WorldSize - 4);
                     garde++;
                 }
+                if (EstDansEau(new Vector2(x, z))) continue;
                 maillage.Touffe(new Vector3(x, TerrainHeight(x, z) - 0.02f, z),
                     (float)(rng.NextDouble() * 0.8 + 0.8),
                     (float)(rng.NextDouble() * Mathf.PI * 2f), rng);
@@ -2408,6 +2446,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 suivant = RoutePoints[i + 1];
             parcouru += Vector2.Distance(p, suivant);
             if (p.magnitude > VillageRadius - 2f) continue; // hors du village
+            if (Vector2.Distance(p, new Vector2(0f, CastleCenterZ)) < CastleMoatOuterRadius + 6f)
+                continue; // aucun ancien lampadaire ne doit revenir au chateau
             if (parcouru < prochain) continue;
             // 13 m dans la reference ; 9 m ici car notre trace de route a peu
             // de sommets : cela donne 3 lampadaires bien repartis dans le
@@ -3359,14 +3399,14 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerPointCardinal(carte, "S", new Vector2(0f, 1f));
         DessinerPointCardinal(carte, "W", new Vector2(-1f, 0f));
         DessinerPointCardinal(carte, "E", new Vector2(1f, 0f));
-        // Les commandes sont regroupees dans l'angle superieur droit de la
-        // carte, avec un texte noir lisible sur le fond clair.
-        float commandesX = carte.x + carte.width - 30f;
+        // Les commandes sont sorties de la texture, sur sa droite : elles ne
+        // recouvrent plus la carte et restent alignees sur son cote nord.
+        float commandesX = carte.x + carte.width + 6f;
         if (GUI.Button(new Rect(commandesX, carte.y + 5f, 24f, 24f), "+", miniCarteButtonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
         if (GUI.Button(new Rect(commandesX, carte.y + 32f, 24f, 24f), "-", miniCarteButtonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
-        GUI.Label(new Rect(commandesX - 10f, carte.y + 58f, 40f, 20f), "x" + miniCarteZoom.ToString("0.00"), miniCarteTextStyle);
+        GUI.Label(new Rect(commandesX - 3f, carte.y + 58f, 30f, 20f), "x" + miniCarteZoom.ToString("0.00"), miniCarteTextStyle);
         GUI.color = Color.white;
     }
 
