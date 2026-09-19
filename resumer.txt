@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 18/09/2026 - MAJ 43 : StablePBR verifie sur tous les
-                        renderers du monde et version 0.5.43
+Derniere mise a jour : 18/09/2026 - MAJ 44 : eau, chateau, route continue,
+                        nage et textures dediees ; version 0.5.44
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1581,6 +1581,29 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     `couverture shader monde : N/N renderer(s) StablePBR`.
   - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
     sandbox.
+
+================================================================================
+8.33 MAJ 44 - CARTE AGRANDIE, EAU ET NAGE
+================================================================================
+
+  - Version de la build : 0.5.44. La mini-carte passe a 231 px d'affichage
+    et sa texture interne passe de 128 a 192 px ; riviere, branche en Y,
+    douves et chateau sont dessines avec l'orientation de la camera.
+  - La colline du chateau est retiree. Le chateau repose sur une plaine et
+    ses douves forment un anneau d'eau avec un pont-levis en bois et chaines.
+  - La riviere principale et sa derivation vers les douves partagent une
+    jonction visible en Y. Le lit est abaisse pour que l'eau ne disparaisse
+    pas sous le terrain ; les objets et ressources ne se placent pas dedans.
+  - Les bandes de route sont maintenant des maillages continus a normales
+    partagees, avec un soubassement plus large : les trous verts des virages
+    entre deux carres obliques sont supprimes.
+  - Le joueur peut entrer dans l'eau et nager : ESPACE monte, CTRL ou C
+    descend. Sous l'eau, l'endurance se vide ; a endurance nulle, la noyade
+    retire 1 PV par seconde. La vitesse a pied et la course sont legerement
+    augmentees.
+  - Ajout de textures StablePBR pour les feuilles, la pierre, le metal, les
+    drapeaux et l'eau ; caisse, lampadaire, fenetre, porte, caillou, sapin,
+    panneau et joueur utilisent maintenant une famille texture appropriee.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)

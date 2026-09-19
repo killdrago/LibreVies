@@ -15,14 +15,21 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.43";
+    private const string VersionJeu = "0.5.44";
     private const float WorldSize = 90f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
     private const float TownRadius = 40f;
     private const float VillageRadius = 40f;
-    private const float PlayerSpeed = 5f;
-    private const float RunSpeed = 9f;
+    private const float PlayerSpeed = 5.8f;
+    private const float RunSpeed = 10.5f;
+    private const float SwimSpeed = 3.6f;
+    private const float WaterLevel = 0.35f;
+    private const float WaterBed = -2.55f;
+    private const float CastleCenterZ = -67f;
+    private const float CastleGroundHeight = 0.35f;
+    private const float CastleMoatInnerRadius = 11.5f;
+    private const float CastleMoatOuterRadius = 17.5f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
@@ -61,6 +68,21 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         new Vector2(0, 44), new Vector2(4, 28), new Vector2(-2, 6), new Vector2(1, -8),
         new Vector2(4, -20), new Vector2(-1, -34), new Vector2(1, -48), new Vector2(0, -67)
+    };
+
+    // La riviere passe a l'est du monde. Le point de jonction est commun aux
+    // deux branches : la branche sud-est continue son cours et la branche
+    // ouest alimente les douves du chateau.
+    private static readonly Vector2[] RivierePrincipale =
+    {
+        new Vector2(-86, 48), new Vector2(-64, 42), new Vector2(-40, 30),
+        new Vector2(-12, 20), new Vector2(18, 10), new Vector2(38, -8),
+        new Vector2(44, -29), new Vector2(63, -55), new Vector2(86, -78)
+    };
+    private static readonly Vector2[] RiviereVersChateau =
+    {
+        new Vector2(44, -29), new Vector2(32, -36), new Vector2(22, -45),
+        new Vector2(13, -55), new Vector2(8, -59)
     };
 
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
@@ -164,6 +186,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private int toucheQuete = (int)KeyCode.Q;
     private int toucheCamera = (int)KeyCode.V;
     private int toucheRenaître = (int)KeyCode.R;
+    private bool playerInWater;
+    private bool playerUnderwater;
+    private bool playerWasUnderwater;
+    private float underwaterDamageClock;
 
     private readonly Vector2Int[] resolutions =
     {
@@ -414,14 +440,14 @@ public sealed class LibreViesGame : MonoBehaviour
         string[] noms =
         {
             "materiaux", "environnement", "terrain", "route", "village", "chateau",
-            "cloture et portails", "arbres", "herbe", "rochers",
+            "riviere, douves et pont-levis", "cloture et portails", "arbres", "herbe", "rochers",
             "decor (barils, caisses)", "lampadaires", "nuages", "heros",
             "monstres", "gardes", "objets a ramasser"
         };
         System.Action[] travaux =
         {
             CreateMaterials, CreateEnvironment, CreateTerrain, CreateRoad, CreateTown,
-            CreateCastle, CreateFence, CreateTreesAndProps, CreateGrassTufts, CreateRocks,
+            CreateCastle, CreateWaterways, CreateFence, CreateTreesAndProps, CreateGrassTufts, CreateRocks,
             CreateProps, CreateLampposts, CreateClouds, CreatePlayer, CreateEnemies,
             CreateGuards, CreatePickups
         };
@@ -555,6 +581,12 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
         MakeMaterial("Arbre_Rond", new Color(0.22f, 0.58f, 0.20f));
         MakeMaterial("Cimier", new Color(0.75f, 0.15f, 0.15f));
+        // Textures dediees aux objets qui etaient encore trop plats : feuillage,
+        // pierre, metal, drapeaux et eau partagent toujours StablePBR.
+        MakeMaterial("Eau_Riviere", new Color(0.16f, 0.56f, 0.72f), true);
+        MakeMaterial("Drapeau", Color.white);
+        MakeMaterial("Pierre_Mur", new Color(0.46f, 0.48f, 0.50f));
+        MakeMaterial("Feuillage", new Color(0.20f, 0.56f, 0.19f));
         // Barres de vie des monstres : fond sombre + partie rouge (reference).
         MakeMaterial("Vie_Fond", new Color(0.15f, 0.05f, 0.05f));
         MakeMaterial("Vie_Rouge", new Color(0.90f, 0.12f, 0.12f));
@@ -571,7 +603,12 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
         else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Route_PBR") chemin = "LVTextures/LV_ConcretePaving";
+        else if (nom == "Route_PBR") chemin = "LVTextures/LV_ConcretePaving";
+        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Metal" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
+        else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Arbre_Rond" || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
+        else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
+        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass") chemin = "LVTextures/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
     }
 
@@ -602,7 +639,11 @@ public sealed class LibreViesGame : MonoBehaviour
         if (material.HasProperty("_Tiling"))
         {
             float echelle = name == "Terrain" || name == "Dirt" ? 0.08f
-                : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f : 0.28f));
+                : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f
+                : (name == "Water" || name == "Eau_Riviere" ? 0.16f
+                : (name == "Leaf" || name.StartsWith("Sapin") || name == "Arbre_Rond" || name == "Feuillage" ? 0.22f
+                : (name == "Metal" || name == "Lanterne" ? 0.30f
+                : (name.Contains("Banniere") || name == "Drapeau" ? 0.42f : 0.28f))))));
             material.SetFloat("_Tiling", echelle);
         }
         if (material.HasProperty("_BumpStrength"))
@@ -614,7 +655,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (material.HasProperty("_Metallic"))
             material.SetFloat("_Metallic", name == "Metal" ? 0.82f : (name == "Gold" ? 0.72f : 0f));
         if (material.HasProperty("_Smoothness"))
-            material.SetFloat("_Smoothness", name == "Metal" || name == "Gold" ? 0.76f : (name == "Water" ? 0.90f : 0.32f));
+            material.SetFloat("_Smoothness", name == "Metal" || name == "Gold" ? 0.76f
+                : (name == "Water" || name == "Eau_Riviere" || name == "Glass" ? 0.90f : 0.32f));
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -751,11 +793,62 @@ public sealed class LibreViesGame : MonoBehaviour
         float hills = Mathf.Sin(x * 0.09f) * Mathf.Cos(z * 0.07f) * 2.2f;
         hills += Mathf.Sin(x * 0.21f + 1.7f) * Mathf.Cos(z * 0.17f + 0.6f) * 0.9f;
         hills += Mathf.Sin((x + z) * 0.05f) * 1.4f;
-        float castleDistance = new Vector2(x, z + 67f).magnitude;
-        // Colline large et douce : le chateau repose sur un plateau, pas sur
-        // une petite pointe de terre.
-        float plateau = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(50f, 13f, castleDistance));
-        return Mathf.Lerp(hills * townBlend, 11f, plateau);
+        float hauteur = hills * townBlend;
+
+        // Le chateau est maintenant dans une plaine : l'ancienne colline de
+        // onze metres est supprimee pour laisser voir les douves et le pont.
+        float castleDistance = new Vector2(x, z - CastleCenterZ).magnitude;
+        float plaineChateau = 1f - Mathf.SmoothStep(17f, 30f, castleDistance);
+        hauteur = Mathf.Lerp(hauteur, CastleGroundHeight, plaineChateau);
+
+        // Les lits de la riviere et de sa derivation sont creuses avant la
+        // creation du maillage du terrain. L'eau reste donc visible au lieu de
+        // passer sous une bosse de terrain.
+        float distanceEau = Mathf.Min(
+            DistancePolyligne(new Vector2(x, z), RivierePrincipale),
+            DistancePolyligne(new Vector2(x, z), RiviereVersChateau));
+        float creuxRiviere = 1f - Mathf.SmoothStep(2.0f, 8.5f, distanceEau);
+        hauteur = Mathf.Lerp(hauteur, WaterBed, creuxRiviere);
+
+        // Meme traitement pour l'anneau des douves, avec une berge douce a
+        // l'interieur et a l'exterieur.
+        float distanceAnneau = Mathf.Abs(castleDistance - (CastleMoatInnerRadius + CastleMoatOuterRadius) * 0.5f);
+        float creuxDouves = 1f - Mathf.SmoothStep(2.3f, 5.0f, distanceAnneau);
+        hauteur = Mathf.Lerp(hauteur, WaterBed, creuxDouves);
+        return hauteur;
+    }
+
+    private float DistancePolyligne(Vector2 point, Vector2[] ligne)
+    {
+        float meilleur = 100000f;
+        for (int i = 0; i < ligne.Length - 1; i++)
+        {
+            Vector2 a = ligne[i];
+            Vector2 b = ligne[i + 1];
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(point - a, ab) / Mathf.Max(ab.sqrMagnitude, 0.001f));
+            meilleur = Mathf.Min(meilleur, Vector2.Distance(point, a + ab * t));
+        }
+        return meilleur;
+    }
+
+    private bool SurPontLevis(Vector2 point)
+    {
+        return Mathf.Abs(point.x) < 3.0f
+            && point.y > CastleCenterZ + CastleMoatInnerRadius - 1.5f
+            && point.y < CastleCenterZ + CastleMoatOuterRadius + 1.5f;
+    }
+
+    private bool EstDansEau(Vector2 point)
+    {
+        float distanceRiviere = Mathf.Min(
+            DistancePolyligne(point, RivierePrincipale),
+            DistancePolyligne(point, RiviereVersChateau));
+        float distanceChateau = Vector2.Distance(point, new Vector2(0f, CastleCenterZ));
+        bool dansDouves = distanceChateau >= CastleMoatInnerRadius - 0.65f
+            && distanceChateau <= CastleMoatOuterRadius + 0.65f;
+        bool dansRiviere = distanceRiviere <= 3.4f;
+        return (dansDouves || dansRiviere) && !SurPontLevis(point);
     }
 
     // ------------------------------------------------------------------
@@ -904,6 +997,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // La route est pavee (sommet ~ +0,10) : les pieds ne s'enfoncent plus.
         float dr = DistRoute(new Vector2(x, z));
         if (dr < 2.9f) sol += 0.10f * Mathf.Clamp01((2.9f - dr) / 0.6f);
+        if (SurPontLevis(new Vector2(x, z))) sol = Mathf.Max(sol, WaterLevel + 0.34f);
         for (int i = 0; i < obstacles.Count; i++)
         {
             Obstacle c = obstacles[i];
@@ -1189,7 +1283,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 return false;
         }
         if (DistRoute(new Vector2(x, z)) < 3.0f + marge) return false;
-        if (Mathf.Abs(z + 67f) < 20f && Mathf.Abs(x) < 26f) return false;   // chateau
+        if (EstDansEau(new Vector2(x, z))) return false;
+        if (Mathf.Abs(z - CastleCenterZ) < 20f && Mathf.Abs(x) < 26f) return false;   // chateau
         if (new Vector2(x - 9f, z + 15f).magnitude < 3.2f + marge) return false;  // fontaine
         return true;
     }
@@ -1210,38 +1305,47 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateRoad()
     {
-        // Ruban Catmull-Rom : les paves suivent une vraie courbe et ne sont
-        // plus une suite de gros carres qui se chevauchent aux virages.
+        // Le ruban est construit avec un bord gauche/droit commun a chaque
+        // echantillon. L'ancien code calculait une normale differente a chaque
+        // carre : dans les virages, deux carres obliques ne se touchaient pas
+        // et laissaient voir l'herbe. Le maillage continu supprime ces fentes.
+        var fond = new Maillage();
         var bord = new Maillage();
         var pave = new Maillage();
-        const int echantillons = 72;
+        const int echantillons = 120;
+        Vector2[] centres = new Vector2[echantillons + 1];
+        Vector2[] normales = new Vector2[echantillons + 1];
+        for (int i = 0; i <= echantillons; i++)
+        {
+            float t = i / (float)echantillons;
+            centres[i] = CourbeRoute(t);
+            float avant = Mathf.Max(0f, t - 0.002f);
+            float apres = Mathf.Min(1f, t + 0.002f);
+            Vector2 direction = (CourbeRoute(apres) - CourbeRoute(avant)).normalized;
+            normales[i] = new Vector2(-direction.y, direction.x);
+        }
         for (int i = 0; i < echantillons; i++)
         {
-            float t0 = i / (float)echantillons;
-            float t1 = (i + 1) / (float)echantillons;
-            Vector2 a = CourbeRoute(t0);
-            Vector2 b = CourbeRoute(t1);
-            Vector2 direction = (b - a).normalized;
-            Vector2 normale = new Vector2(-direction.y, direction.x);
-            Vector2 gauche = a + normale * 2.65f;
-            Vector2 droite = a - normale * 2.65f;
-            Vector2 gauche2 = b + normale * 2.65f;
-            Vector2 droite2 = b - normale * 2.65f;
-            bord.Quad(new Vector3(gauche.x, TerrainHeight(gauche.x, gauche.y) + 0.045f, gauche.y),
-                new Vector3(gauche2.x, TerrainHeight(gauche2.x, gauche2.y) + 0.045f, gauche2.y),
-                new Vector3(droite2.x, TerrainHeight(droite2.x, droite2.y) + 0.045f, droite2.y),
-                new Vector3(droite.x, TerrainHeight(droite.x, droite.y) + 0.045f, droite.y));
-            Vector2 pavG = a + normale * 2.05f;
-            Vector2 pavD = a - normale * 2.05f;
-            Vector2 pavG2 = b + normale * 2.05f;
-            Vector2 pavD2 = b - normale * 2.05f;
-            pave.Quad(new Vector3(pavG.x, TerrainHeight(pavG.x, pavG.y) + 0.095f, pavG.y),
-                new Vector3(pavG2.x, TerrainHeight(pavG2.x, pavG2.y) + 0.095f, pavG2.y),
-                new Vector3(pavD2.x, TerrainHeight(pavD2.x, pavD2.y) + 0.095f, pavD2.y),
-                new Vector3(pavD.x, TerrainHeight(pavD.x, pavD.y) + 0.095f, pavD.y));
+            AjouterBandeRoute(fond, centres, normales, i, 3.05f, 0.025f);
+            AjouterBandeRoute(bord, centres, normales, i, 2.68f, 0.055f);
+            AjouterBandeRoute(pave, centres, normales, i, 2.08f, 0.105f);
         }
+        ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Route_PBR");
         ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_PBR");
         ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Route_PBR");
+    }
+
+    private void AjouterBandeRoute(Maillage maillage, Vector2[] centres, Vector2[] normales,
+        int index, float demiLargeur, float hauteur)
+    {
+        Vector2 gauche = centres[index] + normales[index] * demiLargeur;
+        Vector2 droite = centres[index] - normales[index] * demiLargeur;
+        Vector2 gauche2 = centres[index + 1] + normales[index + 1] * demiLargeur;
+        Vector2 droite2 = centres[index + 1] - normales[index + 1] * demiLargeur;
+        maillage.Quad(new Vector3(gauche.x, TerrainHeight(gauche.x, gauche.y) + hauteur, gauche.y),
+            new Vector3(gauche2.x, TerrainHeight(gauche2.x, gauche2.y) + hauteur, gauche2.y),
+            new Vector3(droite2.x, TerrainHeight(droite2.x, droite2.y) + hauteur, droite2.y),
+            new Vector3(droite.x, TerrainHeight(droite.x, droite.y) + hauteur, droite.y));
     }
 
     private void CreateTown()
@@ -1384,7 +1488,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreateCastle()
     {
         var root = new GameObject("Chateau").transform;
-        Vector3 center = new Vector3(0, TerrainHeight(0, -67), -67);
+        Vector3 center = new Vector3(0, CastleGroundHeight, CastleCenterZ);
         root.position = center;
         // Donjon ouvert sur sa face nord : la porte est un vrai passage vers
         // une petite salle interieure, et non un bloc qui empeche d'entrer.
@@ -1415,14 +1519,92 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // Collisions de la salle, avec le passage de 4 m au centre de la facade.
         ColBoite(0, -72.8f, 21, 1f, 5f);
-        ColBoite(-10, -67, 1f, 12f, 5f);
-        ColBoite(10, -67, 1f, 12f, 5f);
+        ColBoite(-10, CastleCenterZ, 1f, 12f, 5f);
+        ColBoite(10, CastleCenterZ, 1f, 12f, 5f);
         ColBoite(-7.4f, -61.3f, 5.2f, 1f, 5f);
         ColBoite(7.4f, -61.3f, 5.2f, 1f, 5f);
         ColCercle(-10, -73, 1.0f, 7.6f);
         ColCercle(10, -73, 1.0f, 7.6f);
-        ColCercle(-10, -61, 1.0f, 7.6f);
-        ColCercle(10, -61, 1.0f, 7.6f);
+        ColCercle(-10, CastleCenterZ + 6f, 1.0f, 7.6f);
+        ColCercle(10, CastleCenterZ + 6f, 1.0f, 7.6f);
+    }
+
+    private void CreateWaterways()
+    {
+        // La riviere principale et la derivation forment un vrai Y. La seconde
+        // branche se raccorde aux douves au nord-est du chateau.
+        ObjetMaillage("Riviere_Principale", CreerRubanEau(RivierePrincipale, 3.0f, "Riviere_Principale"), "Eau_Riviere");
+        ObjetMaillage("Riviere_Branche_Chateau", CreerRubanEau(RiviereVersChateau, 2.7f, "Riviere_Branche_Chateau"), "Eau_Riviere");
+        ObjetMaillage("Douves_Chateau", CreerAnneauEau("Douves_Chateau"), "Eau_Riviere");
+        CreateDrawbridge();
+    }
+
+    private Mesh CreerRubanEau(Vector2[] points, float demiLargeur, string nom)
+    {
+        var ruban = new Maillage();
+        Vector2[] normales = new Vector2[points.Length];
+        for (int i = 0; i < points.Length; i++)
+        {
+            Vector2 avant = points[Mathf.Max(0, i - 1)];
+            Vector2 apres = points[Mathf.Min(points.Length - 1, i + 1)];
+            Vector2 direction = (apres - avant).normalized;
+            normales[i] = new Vector2(-direction.y, direction.x);
+        }
+        for (int i = 0; i < points.Length - 1; i++)
+        {
+            Vector2 gauche = points[i] + normales[i] * demiLargeur;
+            Vector2 droite = points[i] - normales[i] * demiLargeur;
+            Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
+            Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
+            ruban.Quad(new Vector3(gauche.x, WaterLevel, gauche.y),
+                new Vector3(gauche2.x, WaterLevel, gauche2.y),
+                new Vector3(droite2.x, WaterLevel, droite2.y),
+                new Vector3(droite.x, WaterLevel, droite.y));
+        }
+        return ruban.VersMesh(nom);
+    }
+
+    private Mesh CreerAnneauEau(string nom)
+    {
+        var anneau = new Maillage();
+        const int segments = 128;
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / segments;
+            float a1 = (i + 1) * Mathf.PI * 2f / segments;
+            Vector2 interieur = new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * CastleMoatInnerRadius;
+            Vector2 exterieur = new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * CastleMoatOuterRadius;
+            Vector2 interieur2 = new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * CastleMoatInnerRadius;
+            Vector2 exterieur2 = new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * CastleMoatOuterRadius;
+            interieur.y += CastleCenterZ; exterieur.y += CastleCenterZ;
+            interieur2.y += CastleCenterZ; exterieur2.y += CastleCenterZ;
+            anneau.Quad(new Vector3(interieur.x, WaterLevel, interieur.y),
+                new Vector3(interieur2.x, WaterLevel, interieur2.y),
+                new Vector3(exterieur2.x, WaterLevel, exterieur2.y),
+                new Vector3(exterieur.x, WaterLevel, exterieur.y));
+        }
+        return anneau.VersMesh(nom);
+    }
+
+    private void CreateDrawbridge()
+    {
+        float centreZ = CastleCenterZ + (CastleMoatInnerRadius + CastleMoatOuterRadius) * 0.5f;
+        var pont = Box(new Vector3(0f, WaterLevel + 0.18f, centreZ),
+            new Vector3(5.8f, 0.32f, CastleMoatOuterRadius - CastleMoatInnerRadius + 1.2f),
+            "Wood", null, "Pont_Levis", false);
+        for (int i = -2; i <= 2; i++)
+        {
+            Box(new Vector3(i * 1.05f, WaterLevel + 0.37f, centreZ),
+                new Vector3(0.16f, 0.10f, CastleMoatOuterRadius - CastleMoatInnerRadius + 1.35f),
+                "Bois_Clair", null, "Planche_Pont");
+        }
+        float poteauZ = CastleCenterZ + CastleMoatOuterRadius + 0.3f;
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Box(new Vector3(side * 3.3f, 2.1f, poteauZ), new Vector3(0.18f, 4.2f, 0.18f), "Wood", null, "Poteau_Pont");
+            Box(new Vector3(side * 2.1f, 2.1f, poteauZ - 1.5f), new Vector3(0.10f, 0.10f, 3.2f), "Metal", null, "Chaine_Pont", false,
+                Quaternion.Euler(side * 32f, 0f, 0f));
+        }
     }
 
     private void CreateFence()
@@ -2308,6 +2490,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float z = UnityEngine.Random.Range(-portee, portee);
             if (new Vector2(x, z).magnitude < VillageRadius + 2f) continue;
             if (DistRoute(new Vector2(x, z)) < margeRoute) continue;
+            if (EstDansEau(new Vector2(x, z))) continue;
             return new Vector3(x, 0f, z);
         }
         // Repli : juste a l'exterieur de l'enceinte, jamais devant un portail.
@@ -2374,11 +2557,36 @@ public sealed class LibreViesGame : MonoBehaviour
         if (playerProtection > 0) playerProtection -= dt;
         if (invincibility > 0) invincibility -= dt;
         if (speedBoost > 0) speedBoost -= dt;
-        regenClock += dt;
-        if (regenClock > 3f)
+        playerInWater = player != null && EstDansEau(new Vector2(player.position.x, player.position.z));
+        playerUnderwater = playerInWater && player.position.y + 2.35f < WaterLevel;
+        if (playerUnderwater && !playerWasUnderwater)
+            ShowInfo("Sous l'eau : remontez avec ESPACE");
+        playerWasUnderwater = playerUnderwater;
+        if (!playerUnderwater)
         {
-            regenClock = 0;
-            if (hp < MaxHp) hp++;
+            underwaterDamageClock = 0f;
+            regenClock += dt;
+            if (regenClock > 3f)
+            {
+                regenClock = 0;
+                if (hp < MaxHp) hp++;
+            }
+        }
+        else
+        {
+            // L'endurance se vide pendant l'immersion. Une fois vide, chaque
+            // seconde retire exactement 1 PV jusqu'a la sortie de l'eau.
+            regenClock = 0f;
+            endurance = Mathf.MoveTowards(endurance, 0f, dt * 11f);
+            if (endurance <= 0.01f)
+            {
+                underwaterDamageClock += dt;
+                while (underwaterDamageClock >= 1f && !dead)
+                {
+                    underwaterDamageClock -= 1f;
+                    DamagePlayer(1);
+                }
+            }
         }
 
         Vector3 input = Vector3.zero;
@@ -2391,11 +2599,12 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 right = gameCamera.transform.right; right.y = 0; right.Normalize();
         Vector3 direction = forward * input.z + right * input.x;
         bool courseDemandee = Touche(toucheCourir) && direction.sqrMagnitude > 0.01f;
-        bool courseActive = courseDemandee && endurance > 0.5f;
-        float speed = courseActive ? RunSpeed : PlayerSpeed;
-        endurance = Mathf.MoveTowards(endurance, courseActive ? 0f : 100f,
-            dt * (courseActive ? 22f : 16f));
-        if (speedBoost > 0) speed += 3f;
+        bool courseActive = courseDemandee && endurance > 0.5f && !playerInWater;
+        float speed = playerInWater ? SwimSpeed : (courseActive ? RunSpeed : PlayerSpeed);
+        if (!playerUnderwater)
+            endurance = Mathf.MoveTowards(endurance, courseActive ? 0f : 100f,
+                dt * (courseActive ? 22f : 16f));
+        if (speedBoost > 0) speed += playerInWater ? 0.8f : 3f;
         if (direction.sqrMagnitude > 0.01f)
         {
             direction.Normalize();
@@ -2411,20 +2620,38 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else walkClock = 0;
 
-        if (ToucheDown(toucheSaut) && playerGrounded)
+        if (playerInWater)
         {
-            playerVelocity.y = ForceSaut;
+            // Dans l'eau, ESPACE monte et CTRL/C descend. Le heros reste dans
+            // le volume navigable au-dessus du lit, sans saut balistique.
             playerGrounded = false;
+            bool monter = Touche(toucheSaut) || Touche(KeyCode.UpArrow);
+            bool descendre = Touche(KeyCode.LeftControl) || Touche(KeyCode.C) || Touche(KeyCode.DownArrow);
+            float vitesseVerticale = monter ? SwimSpeed : (descendre ? -SwimSpeed : 0f);
+            playerVelocity.y = Mathf.MoveTowards(playerVelocity.y, vitesseVerticale, dt * 12f);
+            player.position += Vector3.up * playerVelocity.y * dt;
+            float lit = TerrainHeight(player.position.x, player.position.z) + 0.08f;
+            float plafond = WaterLevel - 2.35f;
+            if (player.position.y < lit) player.position = new Vector3(player.position.x, lit, player.position.z);
+            if (player.position.y > plafond) player.position = new Vector3(player.position.x, plafond, player.position.z);
         }
-        playerVelocity.y -= Gravite * dt;
-        player.position += Vector3.up * playerVelocity.y * dt;
-        // Le sol n'est pas que le terrain : route pavee et dessus des caisses.
-        float ground = HauteurSupport(player.position.x, player.position.z, player.position.y);
-        if (player.position.y <= ground)
+        else
         {
-            player.position = new Vector3(player.position.x, ground, player.position.z);
-            playerVelocity.y = 0;
-            playerGrounded = true;
+            if (ToucheDown(toucheSaut) && playerGrounded)
+            {
+                playerVelocity.y = ForceSaut;
+                playerGrounded = false;
+            }
+            playerVelocity.y -= Gravite * dt;
+            player.position += Vector3.up * playerVelocity.y * dt;
+            // Le sol n'est pas que le terrain : route pavee, pont et dessus des caisses.
+            float ground = HauteurSupport(player.position.x, player.position.z, player.position.y);
+            if (player.position.y <= ground)
+            {
+                player.position = new Vector3(player.position.x, ground, player.position.z);
+                playerVelocity.y = 0;
+                playerGrounded = true;
+            }
         }
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
@@ -2807,6 +3034,11 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         dead = false;
         hp = MaxHp;
+        endurance = 100f;
+        underwaterDamageClock = 0f;
+        playerInWater = false;
+        playerUnderwater = false;
+        playerWasUnderwater = false;
         invincibility = 30f;
         playerProtection = 0.45f;
         player.position = new Vector3(0, TerrainHeight(0, 6), 6);
@@ -2896,6 +3128,14 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         DessinerCorrectionCouleur();
+        if (playerUnderwater)
+        {
+            GUI.color = new Color(0.04f, 0.30f, 0.46f, 0.24f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(Screen.width * 0.5f - 100f, 92f, 200f, 28f),
+                endurance > 0.01f ? "SOUS L'EAU" : "REMONTÉE URGENTE", titleStyle);
+        }
         // Les barres restent le premier encadre en haut a gauche. La fenetre
         // de quete vient juste SOUS ce cadre, avec une croix pour la fermer.
         GUI.Box(new Rect(20, 18, 270, 124), "", boxStyle);
@@ -2960,15 +3200,16 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerMiniCarte()
     {
-        const float taille = 154f;
-        Rect carte = new Rect(Screen.width - 190f, 18f, taille, taille);
+        // 1,5 fois la taille precedente : elle reste lisible sans masquer le
+        // HUD et montre maintenant la riviere, le Y et le chateau.
+        const float taille = 231f;
+        Rect carte = new Rect(Screen.width - taille - 22f, 18f, taille, taille);
         if (miniCarteTexture == null || Event.current.type == EventType.Repaint)
             MettreAJourMiniCarte();
         GUI.color = Color.white;
         if (miniCarteTexture != null)
         {
-            // La carte tourne avec l'orientation du heros : le nord, l'est,
-            // le sud et l'ouest tournent avec le monde affiche.
+            // La carte tourne avec l'orientation de la camera.
             Vector2 centreEcran = new Vector2(carte.x + taille * 0.5f, carte.y + taille * 0.5f);
             GUIUtility.RotateAroundPivot(-miniCarteOrientation, centreEcran);
             GUI.DrawTexture(carte, miniCarteTexture, ScaleMode.StretchToFill, true);
@@ -2978,11 +3219,12 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerPointCardinal(carte, "S", new Vector2(0f, 1f));
         DessinerPointCardinal(carte, "W", new Vector2(-1f, 0f));
         DessinerPointCardinal(carte, "E", new Vector2(1f, 0f));
-        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 18f, 24f, 24f), "+", buttonStyle))
+        float boutonX = carte.x + taille - 43f;
+        if (GUI.Button(new Rect(boutonX, carte.y + 18f, 24f, 24f), "+", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom + 0.25f, 0.75f, 3f);
-        if (GUI.Button(new Rect(carte.x + 112f, carte.y + 45f, 24f, 24f), "-", buttonStyle))
+        if (GUI.Button(new Rect(boutonX, carte.y + 45f, 24f, 24f), "-", buttonStyle))
             miniCarteZoom = Mathf.Clamp(miniCarteZoom - 0.25f, 0.75f, 3f);
-        GUI.Label(new Rect(carte.x + 108f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
+        GUI.Label(new Rect(boutonX - 4f, carte.y + 75f, 42f, 20f), "x" + miniCarteZoom.ToString("0.00"), smallStyle);
         GUI.color = Color.white;
     }
 
@@ -2993,14 +3235,15 @@ public sealed class LibreViesGame : MonoBehaviour
         float y = directionEcran.x * Mathf.Sin(radians) + directionEcran.y * Mathf.Cos(radians);
         float centreX = carte.x + carte.width * 0.5f;
         float centreY = carte.y + carte.height * 0.5f;
-        GUI.Label(new Rect(centreX + x * 69f - 8f, centreY + y * 69f - 11f, 18f, 22f), texte, smallStyle);
+        float rayonEtiquette = carte.width * 0.445f;
+        GUI.Label(new Rect(centreX + x * rayonEtiquette - 8f, centreY + y * rayonEtiquette - 11f, 18f, 22f), texte, smallStyle);
     }
 
     private void MettreAJourMiniCarte()
     {
-        const int taille = 128;
-        const int centre = 64;
-        const int rayon = 60;
+        const int taille = 192;
+        const int centre = 96;
+        const int rayon = 90;
         if (miniCarteTexture == null)
         {
             miniCarteTexture = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
@@ -3030,6 +3273,24 @@ public sealed class LibreViesGame : MonoBehaviour
             float t1 = (i + 1) / 120f;
             DessinerLigneMiniCarte(CourbeRoute(t0), CourbeRoute(t1), centreMonde, rayonMonde,
                 new Color(0.72f, 0.58f, 0.30f, 1f), 2);
+        }
+        for (int i = 0; i < RivierePrincipale.Length - 1; i++)
+            DessinerLigneMiniCarte(RivierePrincipale[i], RivierePrincipale[i + 1], centreMonde, rayonMonde,
+                new Color(0.18f, 0.66f, 0.88f, 1f), 3);
+        for (int i = 0; i < RiviereVersChateau.Length - 1; i++)
+            DessinerLigneMiniCarte(RiviereVersChateau[i], RiviereVersChateau[i + 1], centreMonde, rayonMonde,
+                new Color(0.18f, 0.66f, 0.88f, 1f), 3);
+        const int douvesCarte = 64;
+        for (int i = 0; i < douvesCarte; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / douvesCarte;
+            float a1 = (i + 1) * Mathf.PI * 2f / douvesCarte;
+            DessinerLigneMiniCarte(
+                new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * (CastleMoatInnerRadius + CastleMoatOuterRadius) * 0.5f
+                    + new Vector2(0f, CastleCenterZ),
+                new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * (CastleMoatInnerRadius + CastleMoatOuterRadius) * 0.5f
+                    + new Vector2(0f, CastleCenterZ), centreMonde, rayonMonde,
+                new Color(0.18f, 0.66f, 0.88f, 1f), 2);
         }
         // Limite de l'enceinte du village.
         const int cerclePoints = 96;
@@ -3075,8 +3336,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerPointMiniCarte(Vector2 monde, Vector2 centreMonde, float rayonMonde,
         Color couleur, int epaisseur)
     {
-        const int centre = 64;
-        const int rayon = 60;
+        const int centre = 96;
+        const int rayon = 90;
         int x = centre + Mathf.RoundToInt((monde.x - centreMonde.x) / rayonMonde * rayon);
         int y = centre + Mathf.RoundToInt((monde.y - centreMonde.y) / rayonMonde * rayon);
         for (int oy = -epaisseur; oy <= epaisseur; oy++)
@@ -3084,7 +3345,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             int px = x + ox;
             int py = y + oy;
-            if (px < 0 || px >= 128 || py < 0 || py >= 128) continue;
+            if (px < 0 || px >= 192 || py < 0 || py >= 192) continue;
             if (Vector2.Distance(new Vector2(px, py), new Vector2(centre, centre)) <= rayon - 1)
                 miniCarteTexture.SetPixel(px, py, couleur);
         }
