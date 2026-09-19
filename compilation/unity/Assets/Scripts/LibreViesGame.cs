@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.56";
+    private const string VersionJeu = "0.5.57";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -1006,11 +1006,14 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateTerrain()
     {
-        const int cells = 36;
+        // Une grille plus fine evite qu'une cellule complete de terrain
+        // traverse le fleuve et laisse du gazon au milieu de l'eau.
+        const int cells = 96;
         const float step = WorldSize * 2f / cells;
         var mesh = new Mesh { name = "LibreViesTerrain" };
         var vertices = new Vector3[(cells + 1) * (cells + 1)];
-        var triangles = new int[cells * cells * 6];
+        var trianglesSol = new List<int>();
+        var trianglesEau = new List<int>();
         for (int z = 0; z <= cells; z++)
         {
             for (int x = 0; x <= cells; x++)
@@ -1020,7 +1023,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 vertices[z * (cells + 1) + x] = new Vector3(wx, TerrainHeight(wx, wz), wz);
             }
         }
-        int index = 0;
         for (int z = 0; z < cells; z++)
         {
             for (int x = 0; x < cells; x++)
@@ -1029,18 +1031,24 @@ public sealed class LibreViesGame : MonoBehaviour
                 int b = a + 1;
                 int c = a + cells + 1;
                 int d = c + 1;
-                triangles[index++] = a; triangles[index++] = c; triangles[index++] = b;
-                triangles[index++] = b; triangles[index++] = c; triangles[index++] = d;
+                float centreX = -WorldSize + (x + 0.5f) * step;
+                float centreZ = -WorldSize + (z + 0.5f) * step;
+                bool zoneEau = !DansVillage(centreX, centreZ)
+                    && DistancePolyligne(new Vector2(centreX, centreZ), RivierePrincipale) <= 5.8f;
+                List<int> destination = zoneEau ? trianglesEau : trianglesSol;
+                destination.Add(a); destination.Add(c); destination.Add(b);
+                destination.Add(b); destination.Add(c); destination.Add(d);
             }
         }
         mesh.vertices = vertices;
-        mesh.triangles = triangles;
+        mesh.subMeshCount = 2;
+        mesh.SetTriangles(trianglesSol, 0);
+        mesh.SetTriangles(trianglesEau, 1);
         mesh.RecalculateNormals();
         var terrain = new GameObject("Terrain_Unity");
         terrain.AddComponent<MeshFilter>().sharedMesh = mesh;
         var terrainRenderer = terrain.AddComponent<MeshRenderer>();
-        var terrainMaterial = Mat("Terrain");
-        if (terrainMaterial != null) terrainRenderer.sharedMaterial = terrainMaterial;
+        terrainRenderer.sharedMaterials = new[] { Mat("Terrain"), Mat("Eau_Riviere") };
         terrain.AddComponent<MeshCollider>().sharedMesh = mesh;
     }
 

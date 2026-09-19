@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 56 : joueur en surface,
-                        chenal sans herbe ; version 0.5.56
+Derniere mise a jour : 19/09/2026 - MAJ 57 : texture d'eau dans le
+                        chenal et joueur en surface ; version 0.5.57
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1814,6 +1814,20 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le lit separe colore reste absent ; seule l'eau recouvre le chenal.
   - L'eau reste rendue pendant toute la nage.
   - Version de la build : 0.5.56. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.46 MAJ 57 - TEXTURE D'EAU DANS LE CHENAL
+================================================================================
+
+  - Le terrain est maintenant une grille plus fine et possede deux sous-meshes :
+    terrain avec la texture de gazon hors du fleuve, texture d'eau dans toute
+    la zone du chenal. Il ne peut donc plus y avoir de gazon au milieu de l'eau.
+  - La surface bleue reste seule visible au-dessus : aucun lit brun, vert ou
+    noir n'est cree.
+  - Le joueur reste a la surface dans les zones peu profondes et l'eau reste
+    rendue pendant toute la nage.
+  - Version de la build : 0.5.57. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================
