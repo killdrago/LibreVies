@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.62";
+    private const string VersionJeu = "0.5.63";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -107,10 +107,15 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform player;
     private Transform cameraPivot;
     private Transform heroBody;
+    private Transform heroineModel;
     private Transform brasAttaque;
+    private Transform brasHeroineGauche;
+    private Transform brasHeroineDroit;
+    private Transform jambeHeroineGauche;
+    private Transform jambeHeroineDroite;
+    private bool heroineRigPret;
     private CapsuleCollider joueurCollider;
-    private Animation heroineAnimation;
-    private string heroineAnimationActuelle;
+    private string heroineAnimationActuelle = "Idle";
     private Camera gameCamera;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
@@ -253,6 +258,11 @@ public sealed class LibreViesGame : MonoBehaviour
         public GameObject Root;
         public Transform JambeG;
         public Transform JambeD;
+        public Transform CorpsVisuel;
+        public Transform Tete;
+        public Transform BrasG;
+        public Transform BrasD;
+        public Transform Hallebarde;
         public Obstacle Corps;
         public Vector2 Poste;      // la ou il revient quand tout est calme
         public Vector2 Portail;    // la porte qu'il surveille
@@ -999,9 +1009,14 @@ public sealed class LibreViesGame : MonoBehaviour
     private float HauteurSupport(float x, float z, float pieds)
     {
         float sol = TerrainHeight(x, z);
-        // La route est pavee (sommet ~ +0,15) : les pieds ne s'enfoncent plus.
+        // La route est entièrement pavée : le support suit aussi ses bords
+        // pour éviter que les pieds ne s'enfoncent dans le raccord extérieur.
         float dr = DistRoute(new Vector2(x, z));
-        if (dr < 2.9f) sol += 0.15f * Mathf.Clamp01((2.9f - dr) / 0.6f);
+        if (dr < 3.55f)
+        {
+            float bordRoute = Mathf.InverseLerp(3.55f, 2.75f, dr);
+            sol += Mathf.Lerp(0.025f, 0.15f, bordRoute);
+        }
         for (int i = 0; i < obstacles.Count; i++)
         {
             Obstacle c = obstacles[i];
@@ -1316,10 +1331,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateRoad()
     {
-        // Le ruban est construit avec un bord gauche/droit commun a chaque
-        // echantillon. L'ancien code calculait une normale differente a chaque
-        // carre : dans les virages, deux carres obliques ne se touchaient pas
-        // et laissaient voir l'herbe. Le maillage continu supprime ces fentes.
+        // Route entièrement pavée : le soubassement ne sert qu'à boucher les
+        // raccords avec le terrain, et toute la surface visible reçoit la
+        // pierre. Les dalles sont assez rapprochées pour que le chemin ne
+        // redevienne jamais une bande de terre entre deux pavés.
         var fond = new Maillage();
         var bord = new Maillage();
         var pave = new Maillage();
@@ -1338,21 +1353,24 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         for (int i = 0; i < echantillons; i++)
         {
-            AjouterBandeRoute(fond, centres, normales, i, 3.45f, 0.025f);
-            AjouterBandeRoute(bord, centres, normales, i, 3.08f, 0.065f);
-            AjouterBandeRoute(pave, centres, normales, i, 2.66f, 0.105f);
-            if (i % 4 == 0)
+            AjouterBandeRoute(fond, centres, normales, i, 3.62f, 0.025f);
+            AjouterBandeRoute(bord, centres, normales, i, 3.52f, 0.075f);
+            AjouterBandeRoute(pave, centres, normales, i, 3.34f, 0.13f);
+            if (i % 2 == 0)
             {
-                // Dalles irrégulières visibles : la route devient un chemin
-                // pavé détaillé au lieu d'un simple ruban gris uniforme.
-                AjouterDalleRoute(dalles, centres, normales, i, -0.74f, 0.64f, 0.28f);
-                AjouterDalleRoute(dalles, centres, normales, i, 0.00f, 0.72f, 0.30f);
-                AjouterDalleRoute(dalles, centres, normales, i, 0.74f, 0.61f, 0.27f);
+                // Quatre rangées par travée donnent un pavage continu, avec
+                // des joints visibles mais sans trous d'herbe ou de terre.
+                AjouterDalleRoute(dalles, centres, normales, i, -2.48f, 0.82f, 0.70f);
+                AjouterDalleRoute(dalles, centres, normales, i, -0.83f, 0.82f, 0.70f);
+                AjouterDalleRoute(dalles, centres, normales, i, 0.83f, 0.82f, 0.70f);
+                AjouterDalleRoute(dalles, centres, normales, i, 2.48f, 0.82f, 0.70f);
             }
         }
-        ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Route_Terre");
+        // Même la bordure et le fond restent minéraux : aucune bande brune ne
+        // doit réapparaître au milieu de la route si la caméra s'abaisse.
+        ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Pave_Route");
         ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_Bord");
-        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Route_Terre");
+        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Pave_Route");
         ObjetMaillage("Dalles_Route", dalles.VersMesh("Dalles_Route"), "Pave_Route");
     }
 
@@ -1741,17 +1759,20 @@ public sealed class LibreViesGame : MonoBehaviour
         state.JambeD = CreerJambe(root, 0.12f);
 
         Box(new Vector3(0, 0.70f, 0), new Vector3(0.38f, 0.20f, 0.26f), "Stone", root, "Bassin");
-        Box(new Vector3(0, 0.98f, 0), new Vector3(0.44f, 0.52f, 0.28f), "Stone", root, "Cuirasse");
+        state.CorpsVisuel = Box(new Vector3(0, 0.98f, 0), new Vector3(0.44f, 0.52f, 0.28f), "Stone", root, "Cuirasse").transform;
         Box(new Vector3(0, 0.80f, 0), new Vector3(0.46f, 0.10f, 0.30f), "Dirt", root, "Ceinturon");
         Box(new Vector3(0, 1.02f, 0.15f), new Vector3(0.30f, 0.30f, 0.05f), "White", root, "Plastron");
-        Box(new Vector3(0, 1.0f, 0), new Vector3(0.46f, 0.09f, 0.30f), "Cimier", root, "Baudrier", false, Quaternion.Euler(0f, 0f, 35f));
+        // Les deux portails portent des couleurs différentes pour qu'on
+        // distingue immédiatement les gardes, même lorsqu'ils sont au repos.
+        string heraldique = gardes.Count % 2 == 0 ? "Banniere_Bleue" : "Banniere_Rouge";
+        Box(new Vector3(0, 1.0f, 0), new Vector3(0.46f, 0.09f, 0.30f), heraldique, root, "Baudrier", false, Quaternion.Euler(0f, 0f, 35f));
         Primitive(PrimitiveType.Sphere, new Vector3(-0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereG");
         Primitive(PrimitiveType.Sphere, new Vector3(0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereD");
-        Primitive(PrimitiveType.Capsule, new Vector3(-0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasG");
-        Primitive(PrimitiveType.Capsule, new Vector3(0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasD");
+        state.BrasG = Primitive(PrimitiveType.Capsule, new Vector3(-0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasG").transform;
+        state.BrasD = Primitive(PrimitiveType.Capsule, new Vector3(0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasD").transform;
         Primitive(PrimitiveType.Sphere, new Vector3(-0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainG");
         Primitive(PrimitiveType.Sphere, new Vector3(0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainD");
-        Box(new Vector3(0, 1.42f, 0), new Vector3(0.30f, 0.30f, 0.28f), "Skin", root, "Visage");
+        state.Tete = Box(new Vector3(0, 1.42f, 0), new Vector3(0.30f, 0.30f, 0.28f), "Skin", root, "Visage").transform;
         Box(new Vector3(-0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilG");
         Box(new Vector3(0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilD");
         Box(new Vector3(0, 1.59f, 0), new Vector3(0.34f, 0.16f, 0.32f), "Stone", root, "Casque");
@@ -1761,6 +1782,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Hallebarde verticale, bien visible (manche clair, fer, croc, talon).
         var hallebarde = new GameObject("Hallebarde").transform;
         hallebarde.SetParent(root, false);
+        state.Hallebarde = hallebarde;
         hallebarde.localPosition = new Vector3(0.34f, 1.25f, 0.05f);
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 0, 0), new Vector3(0.08f, 1.25f, 0.08f), "Bois_Clair", hallebarde, "Manche");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.55f, 0), new Vector3(0.11f, 0.025f, 0.11f), "Metal", hallebarde, "Bague");
@@ -1869,6 +1891,19 @@ public sealed class LibreViesGame : MonoBehaviour
             float balancement = marche ? Mathf.Sin(garde.Phase * 8f) * 0.45f : 0f;
             if (garde.JambeG != null) garde.JambeG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
             if (garde.JambeD != null) garde.JambeD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+            // Même à son poste, le garde respire, balance légèrement son arme
+            // et garde les bras vivants. En déplacement, la pose de marche
+            // reprend le dessus : les gardes ne paraissent plus figés.
+            float gardeIdle = Mathf.Sin(garde.Phase * 2.2f);
+            float bras = marche ? Mathf.Sin(garde.Phase * 8f) * 15f : gardeIdle * 4f;
+            if (garde.BrasG != null) garde.BrasG.localRotation = Quaternion.Euler(bras, 0f, 0f);
+            if (garde.BrasD != null) garde.BrasD.localRotation = Quaternion.Euler(-bras, 0f, 0f);
+            if (garde.CorpsVisuel != null)
+                garde.CorpsVisuel.localPosition = new Vector3(0f, 0.98f + gardeIdle * 0.012f, 0f);
+            if (garde.Tete != null)
+                garde.Tete.localPosition = new Vector3(0f, 1.42f + gardeIdle * 0.018f, 0f);
+            if (garde.Hallebarde != null)
+                garde.Hallebarde.localRotation = Quaternion.Euler(0f, 0f, marche ? -bras * 0.35f : gardeIdle * 4f);
         }
     }
 
@@ -2423,62 +2458,153 @@ public sealed class LibreViesGame : MonoBehaviour
         return null;
     }
 
+    private void CollectHeroineParts(Transform parent, string prefix, List<Transform> result)
+    {
+        if (parent == null) return;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child.name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                result.Add(child);
+            CollectHeroineParts(child, prefix, result);
+        }
+    }
+
+    private List<Transform> FindHeroineParts(Transform model, string prefix, bool gauche)
+    {
+        var candidats = new List<Transform>();
+        CollectHeroineParts(model, prefix, candidats);
+        var resultats = new List<Transform>();
+        for (int i = 0; i < candidats.Count; i++)
+        {
+            Transform candidat = candidats[i];
+            MeshFilter filtre = candidat.GetComponent<MeshFilter>();
+            float centreX = 0f;
+            if (filtre != null && filtre.sharedMesh != null)
+                centreX = filtre.sharedMesh.bounds.center.x;
+            else
+                centreX = candidat.localPosition.x;
+            if ((gauche && centreX < -0.001f) || (!gauche && centreX > 0.001f))
+                resultats.Add(candidat);
+        }
+        // Jeans_L, Jeans_R, Boot_L et Boot_R sont déjà univoques. Pour les
+        // deux manches et les deux mains, le signe du centre du maillage sépare
+        // réellement le côté gauche du côté droit même si Unity ajoute un
+        // suffixe au nom du second objet OBJ.
+        return resultats;
+    }
+
+    private Transform CreerPivotHeroine(Transform model, Vector3 position, string nom,
+        bool gauche, params string[] prefixes)
+    {
+        var pivot = new GameObject(nom).transform;
+        pivot.SetParent(model, false);
+        pivot.localPosition = position;
+        pivot.localRotation = Quaternion.identity;
+        for (int p = 0; p < prefixes.Length; p++)
+        {
+            List<Transform> parties = FindHeroineParts(model, prefixes[p], gauche);
+            for (int i = 0; i < parties.Count; i++)
+            {
+                Transform partie = parties[i];
+                if (partie == pivot || partie == model || partie.IsChildOf(pivot)) continue;
+                // Les vertices OBJ restent à leur place : seul le pivot change,
+                // ce qui évite de faire tourner un bras autour des pieds.
+                partie.SetParent(pivot, true);
+            }
+        }
+        return pivot;
+    }
+
     private bool CreateHumanHeroine(Transform body)
     {
         GameObject prefab = Resources.Load<GameObject>("Characters/LibreViesHeroine");
         if (prefab == null)
         {
-            Debug.LogWarning("[LV] LibreViesHeroine.obj absent : héroïne procédurale utilisée");
+            Debug.LogError("[LV] LibreViesHeroine.obj absent : aucune héroïne procédurale ne sera créée");
             return false;
         }
         GameObject model = Instantiate(prefab, body);
         model.name = "Heroine_Humaine_Originale_CC0";
-        model.transform.localPosition = Vector3.zero;
-        model.transform.localRotation = Quaternion.identity;
-        model.transform.localScale = Vector3.one * 1.05f;
+        heroineModel = model.transform;
+        heroineModel.localPosition = Vector3.zero;
+        // Le maillage est généré verticalement sur Y. Cette rotation explicite
+        // et son rappel dans AnimerHeroine empêchent un ancien clip ou un
+        // importeur OBJ de laisser l'héroïne pencher vers l'avant.
+        heroineModel.localRotation = Quaternion.identity;
+        heroineModel.localScale = Vector3.one * 1.05f;
         // Le maillage CC0 contient déjà la chevelure rousse et les vêtements.
         // Aucun cube, sphère ou primitive Unity n'est ajouté au personnage.
 
-        // Le bras droit réel est utilisé par le système d'attaque existant.
-        brasAttaque = FindChildDeep(model.transform, "Sleeve");
-        if (brasAttaque == null) brasAttaque = model.transform;
+        // L'OBJ expose des groupes séparés : on leur donne de vrais pivots
+        // d'épaule et de hanche pour obtenir marche, course et attaque sans
+        // prétendre que ce maillage sans squelette possède des clips FBX.
+        brasHeroineGauche = CreerPivotHeroine(heroineModel,
+            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Bras_Gauche", true,
+            "Sleeve", "Cuff", "Hand");
+        brasHeroineDroit = CreerPivotHeroine(heroineModel,
+            new Vector3(0.40f, 1.58f, 0f), "Pivot_Bras_Droit", false,
+            "Sleeve", "Cuff", "Hand");
+        jambeHeroineGauche = CreerPivotHeroine(heroineModel,
+            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Jambe_Gauche", true,
+            "Jeans_L", "Boot_L", "Shoe_L");
+        jambeHeroineDroite = CreerPivotHeroine(heroineModel,
+            new Vector3(0.18f, 1.12f, 0f), "Pivot_Jambe_Droite", false,
+            "Jeans_R", "Boot_R", "Shoe_R");
+        brasAttaque = brasHeroineDroit;
+        heroineRigPret = brasHeroineGauche != null && brasHeroineGauche.childCount > 0
+            && brasHeroineDroit != null && brasHeroineDroit.childCount > 0
+            && jambeHeroineGauche != null && jambeHeroineGauche.childCount > 0
+            && jambeHeroineDroite != null && jambeHeroineDroite.childCount > 0;
         ConfigurerAnimationsHeroine(model);
-        Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj");
+        Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj ; animation procédurale=" + heroineRigPret);
         return true;
     }
 
     private void ConfigurerAnimationsHeroine(GameObject model)
     {
-        heroineAnimation = model.GetComponent<Animation>();
-        if (heroineAnimation == null) heroineAnimation = model.AddComponent<Animation>();
-        AnimationClip[] clips = Resources.LoadAll<AnimationClip>("Characters/LibreViesHeroine");
-        for (int i = 0; i < clips.Length; i++)
-        {
-            AnimationClip clip = clips[i];
-            if (clip == null || heroineAnimation.GetClip(clip.name) != null) continue;
-            heroineAnimation.AddClip(clip, clip.name);
-        }
+        // LibreViesHeroine.obj est volontairement sans squelette. Les groupes
+        // OBJ sont donc animés par AnimerHeroine, tandis qu'un futur FBX/glTF
+        // pourra remplacer ce chemin par un Animator sans modifier le gameplay.
         JouerAnimationHeroine("Idle", true);
     }
 
     private void JouerAnimationHeroine(string recherche, bool boucle)
     {
-        if (heroineAnimation == null) return;
-        string choix = null;
-        foreach (AnimationState state in heroineAnimation)
+        heroineAnimationActuelle = recherche;
+    }
+
+    private void AnimerHeroine(bool enMouvement, bool enCourse)
+    {
+        if (heroineModel == null) return;
+        // Ne jamais incliner le personnage : la rotation de joueur ne contient
+        // que le lacet horizontal, et l'animation ne touche qu'aux pivots.
+        heroineModel.localRotation = Quaternion.identity;
+        if (!heroineRigPret)
         {
-            if (state.name.IndexOf(recherche, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                choix = state.name;
-                break;
-            }
+            heroineModel.localPosition = Vector3.zero;
+            return;
         }
-        if (choix == null || choix == heroineAnimationActuelle) return;
-        AnimationState animation = heroineAnimation[choix];
-        animation.wrapMode = boucle ? WrapMode.Loop : WrapMode.Once;
-        animation.layer = 0;
-        heroineAnimation.CrossFade(choix, 0.12f);
-        heroineAnimationActuelle = choix;
+
+        float cycle = enMouvement ? Mathf.Sin(walkClock) : 0f;
+        float balancementJambe = (enCourse ? 32f : 23f) * cycle;
+        float balancementBras = (enCourse ? 24f : 17f) * cycle;
+        if (attackAnimation > 0f)
+        {
+            float phase = 1f - attackAnimation / 0.30f;
+            brasHeroineDroit.localRotation = Quaternion.Euler(
+                Mathf.Lerp(-92f, 48f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
+            brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+        }
+        else
+        {
+            brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
+            brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
+        }
+        jambeHeroineGauche.localRotation = Quaternion.Euler(balancementJambe, 0f, 0f);
+        jambeHeroineDroite.localRotation = Quaternion.Euler(-balancementJambe, 0f, 0f);
+        float rebond = enMouvement ? Mathf.Abs(Mathf.Sin(walkClock * 2f)) * 0.025f : 0f;
+        heroineModel.localPosition = new Vector3(0f, rebond, 0f);
     }
 
     private void CreatePlayer()
@@ -2672,12 +2798,9 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (attackCooldown > 0) attackCooldown -= dt;
         if (attackAnimation > 0) attackAnimation -= dt;
-        if (brasAttaque != null)
-        {
-            float phaseAttaque = attackAnimation > 0f ? 1f - attackAnimation / 0.30f : 1f;
-            float angle = attackAnimation > 0f ? Mathf.Lerp(-72f, 8f, phaseAttaque) : 8f;
-            brasAttaque.localRotation = Quaternion.Euler(angle, Mathf.Lerp(-35f, 0f, phaseAttaque), 0f);
-        }
+        // Le joueur ne reçoit qu'un lacet horizontal. Le corps reste donc
+        // toujours droit, même lorsque la camera regarde vers le bas.
+        if (heroBody != null) heroBody.localRotation = Quaternion.identity;
         if (playerProtection > 0) playerProtection -= dt;
         if (invincibility > 0) invincibility -= dt;
         if (speedBoost > 0) speedBoost -= dt;
@@ -2755,10 +2878,12 @@ public sealed class LibreViesGame : MonoBehaviour
             walkClock += dt * (Touche(toucheCourir) ? 14f : 9f);
         }
         else walkClock = 0;
-        if (!playerInWater && direction.sqrMagnitude > 0.01f)
+        bool heroineEnMouvement = !playerInWater && direction.sqrMagnitude > 0.01f;
+        if (heroineEnMouvement)
             JouerAnimationHeroine(courseActive ? "Running" : "Walking", true);
         else if (!playerInWater)
             JouerAnimationHeroine("Idle", true);
+        AnimerHeroine(heroineEnMouvement, courseActive);
 
         if (playerInWater)
         {
