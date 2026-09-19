@@ -1,13 +1,33 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 60 : correction shader Unity 6,
-                        héroïne humaine et route pavée ; version 0.5.60
+Derniere mise a jour : 19/09/2026 - MAJ 61 : héroïne humanoïde originale
+                        CC0, shader de secours corrigé ; version 0.5.61
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 61 — HÉROÏNE ORIGINALE CC0 ET SHADER DE SECOURS (19/09/2026)
+================================================================================
+
+Le personnage KayKit Rogue a été retiré du projet pour ne pas dépendre d'un
+pack téléchargé depuis une page payante, même si la version gratuite du pack
+était annoncée CC0. LibreVies utilise maintenant le maillage original
+LibreViesHeroine.obj et son fichier de matériaux LibreViesHeroine.mtl.
+
+Le maillage est généré par compilation/outils/generer_heroine_librevies.py :
+une héroïne humanoïde complète avec veste, jeans, chaussures, visage, yeux et
+chevelure rousse. C'est un asset importé par Unity, pas un assemblage de
+primitives Unity. Le modèle, le générateur et ses matériaux sont dédiés au
+projet sous CC0. L'image de référence sert uniquement de direction visuelle,
+elle n'est pas utilisée comme décor ni recopiée comme modèle.
+
+Le shader Assets/Resources/LVShaders/LVVisibleFallback.shader a été ajouté
+avec le nom LibreVies/RenduVisibleSecours. Il remplace le shader local qui
+apparaissait dans le rapport sous le nom vide et provoquait l'accolade
+inattendue à la ligne 59.
 
 MAJ 60 — COMPILATION UNITY 6 ET SHADER PBR (19/09/2026)
 ================================================================================

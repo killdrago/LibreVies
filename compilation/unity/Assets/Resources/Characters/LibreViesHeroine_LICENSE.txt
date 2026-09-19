@@ -1,0 +1,7 @@
+LibreViesHeroine — licence CC0 1.0
+
+Ce maillage humanoïde, ses matériaux et le script qui les génère ont été
+créés pour LibreVies et sont dédiés au domaine public selon CC0 1.0.
+
+Aucune texture, image de référence ou géométrie tierce n'est incorporée.
+Le modèle est un asset original importé dans Unity au format OBJ.

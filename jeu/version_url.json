@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.60",
-  "notes": "MAJ 60 : corrige le shader PBR pour Unity 6 et supprime l avertissement de recherche des renderers.",
+  "game_version": "0.5.61",
+  "notes": "MAJ 61 : remplace Rogue par une héroïne humanoïde originale CC0 et corrige le shader de secours.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

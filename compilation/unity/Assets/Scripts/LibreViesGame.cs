@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.60";
+    private const string VersionJeu = "0.5.61";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -2425,24 +2425,26 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private bool CreateHumanHeroine(Transform body)
     {
-        GameObject prefab = Resources.Load<GameObject>("Characters/Rogue");
+        GameObject prefab = Resources.Load<GameObject>("Characters/LibreViesHeroine");
         if (prefab == null)
         {
-            Debug.LogWarning("[LV] Rogue.fbx absent : héroïne procédurale utilisée");
+            Debug.LogWarning("[LV] LibreViesHeroine.obj absent : héroïne procédurale utilisée");
             return false;
         }
         GameObject model = Instantiate(prefab, body);
-        model.name = "Heroine_Humaine_Rogue_CC0";
+        model.name = "Heroine_Humaine_Originale_CC0";
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
         model.transform.localScale = Vector3.one * 1.05f;
-        CreateRedHair(model.transform);
+        // Le maillage CC0 contient déjà la chevelure rousse et les vêtements.
+        // Aucun cube, sphère ou primitive Unity n'est ajouté au personnage.
 
         // Le bras droit réel est utilisé par le système d'attaque existant.
         brasAttaque = FindChildDeep(model.transform, "Rogue_ArmRight");
+        if (brasAttaque == null) brasAttaque = FindChildDeep(model.transform, "Sleeve");
         if (brasAttaque == null) brasAttaque = model.transform;
         ConfigurerAnimationsHeroine(model);
-        Debug.Log("[LV] héroïne humaine KayKit chargée : Rogue.fbx");
+        Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj");
         return true;
     }
 
@@ -2450,7 +2452,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         heroineAnimation = model.GetComponent<Animation>();
         if (heroineAnimation == null) heroineAnimation = model.AddComponent<Animation>();
-        AnimationClip[] clips = Resources.LoadAll<AnimationClip>("Characters/Rogue");
+        AnimationClip[] clips = Resources.LoadAll<AnimationClip>("Characters/LibreViesHeroine");
         for (int i = 0; i < clips.Length; i++)
         {
             AnimationClip clip = clips[i];
@@ -2572,32 +2574,12 @@ public sealed class LibreViesGame : MonoBehaviour
         heroBody = new GameObject("Heros_LowPoly").transform;
         heroBody.SetParent(player, false);
         var body = heroBody;
-        // Priorité au vrai modèle humain CC0. Le personnage procédural n'est
-        // conservé qu'en repli si Unity n'a pas importé le FBX.
+        // Le maillage humanoïde original CC0 est obligatoire : aucun cube,
+        // sphère ou assemblage procédural ne doit remplacer le personnage.
         if (!CreateHumanHeroine(body))
         {
-        // Silhouette d'aventurière stylisée : tunique ajustée, ceinture,
-        // visage rond et mèches rouges séparées pour éviter l'aspect cube.
-        Primitive(PrimitiveType.Capsule, new Vector3(0, 1.15f, 0), new Vector3(0.48f, 1.02f, 0.42f), "Player", body, "Tunique");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.86f, 0), new Vector3(0.54f, 0.10f, 0.48f), "Ceinture_Heros", body, "Ceinture");
-        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.26f, 0), new Vector3(0.56f, 0.62f, 0.52f), "Skin", body, "Visage");
-        // Chevelure rouge : calotte, frange et longues mèches latérales.
-        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.54f, 0.02f), new Vector3(0.66f, 0.46f, 0.62f), "Hair_Rouge", body, "Cheveux_Rouges_Calotte");
-        Primitive(PrimitiveType.Sphere, new Vector3(-0.37f, 2.23f, 0.03f), new Vector3(0.24f, 0.62f, 0.30f), "Hair_Rouge", body, "Mèche_Gauche");
-        Primitive(PrimitiveType.Sphere, new Vector3(0.37f, 2.23f, 0.03f), new Vector3(0.24f, 0.62f, 0.30f), "Hair_Rouge", body, "Mèche_Droite");
-        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.42f, -0.46f), new Vector3(0.36f, 0.28f, 0.18f), "Hair_Rouge", body, "Frange");
-        // Deux yeux très discrets donnent un visage lisible en vue rapprochée.
-        Primitive(PrimitiveType.Sphere, new Vector3(-0.18f, 2.29f, -0.49f), new Vector3(0.055f, 0.07f, 0.035f), "Yeux_Heros", body, "Oeil_G");
-        Primitive(PrimitiveType.Sphere, new Vector3(0.18f, 2.29f, -0.49f), new Vector3(0.055f, 0.07f, 0.035f), "Yeux_Heros", body, "Oeil_D");
-        Box(new Vector3(-0.22f, 0.35f, 0), new Vector3(0.22f, 0.70f, 0.28f), "Stone", body, "JambeG");
-        Box(new Vector3(0.22f, 0.35f, 0), new Vector3(0.22f, 0.70f, 0.28f), "Stone", body, "JambeD");
-        brasAttaque = new GameObject("BrasDroit_Attaque").transform;
-        brasAttaque.SetParent(body, false);
-        brasAttaque.localPosition = new Vector3(0.52f, 1.58f, 0.18f);
-        Primitive(PrimitiveType.Capsule, new Vector3(0f, -0.28f, 0f), new Vector3(0.22f, 0.32f, 0.22f), "Skin", brasAttaque, "BrasD");
-        // Marteau sans manche : seule la tete massive est visible.
-        Box(new Vector3(0f, -0.78f, 0.10f), new Vector3(0.62f, 0.30f, 0.38f), "Metal", brasAttaque, "Tete_Marteau");
-        Box(new Vector3(-0.75f, 1.35f, 0), new Vector3(0.22f, 0.85f, 0.22f), "Skin", body, "BrasG");
+            Debug.LogError("[LV] Modèle humanoïde introuvable : LibreViesHeroine.obj doit être importé par Unity.");
+            brasAttaque = body;
         }
         joueurCollider = player.gameObject.AddComponent<CapsuleCollider>();
         joueurCollider.center = new Vector3(0, 1.15f, 0);
