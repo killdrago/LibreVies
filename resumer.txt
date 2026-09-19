@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 55 : fleuve pose dans le sol,
-                        eau visible pendant la nage ; version 0.5.55
+Derniere mise a jour : 19/09/2026 - MAJ 56 : joueur en surface,
+                        chenal sans herbe ; version 0.5.56
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1798,6 +1798,22 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Le fleuve reste visible lorsque le joueur entre dans l'eau ; aucune logique
     ne desactive plus son renderer pendant la nage.
   - Version de la build : 0.5.55. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.45 MAJ 56 - JOUEUR EN SURFACE ET CHENAL SANS HERBE
+================================================================================
+
+  - Le joueur n'est plus teleporte sous la surface des qu'il entre dans la
+    zone horizontale du fleuve. La limite haute est maintenant la surface plus
+    35 cm : il peut rester debout dans une eau peu profonde.
+  - Le creusement du chenal reste profond sous la largeur du fleuve, puis
+    remonte hors du lit : le sol ne remonte plus au milieu de l'eau.
+  - La surface du fleuve suit l'axe naturel du terrain sans etre remontee au
+    niveau d'une berge plus haute.
+  - Le lit separe colore reste absent ; seule l'eau recouvre le chenal.
+  - L'eau reste rendue pendant toute la nage.
+  - Version de la build : 0.5.56. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================

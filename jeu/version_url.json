@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.55",
-  "notes": "MAJ 55 : fleuve pose dans le sol, eau visible pendant la nage.",
+  "game_version": "0.5.56",
+  "notes": "MAJ 56 : joueur en surface, herbe retiree du chenal et eau posee au sol.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

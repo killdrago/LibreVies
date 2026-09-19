@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.55";
+    private const string VersionJeu = "0.5.56";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -813,7 +813,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float distanceEau = DistancePolyligne(new Vector2(x, z), RivierePrincipale);
             // Le creux revient a zero exactement sur la berge : le terrain
             // rejoint ainsi la surface de l'eau sans marche ni espace.
-            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 6.0f, distanceEau);
+            float creuxRiviere = 1f - Mathf.SmoothStep(4.5f, 7.0f, distanceEau);
             profondeur = Mathf.Max(profondeur, WaterDepth * creuxRiviere);
         }
 
@@ -1518,16 +1518,11 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
             Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
             // Une hauteur unique par section evite que les deux bords du
-            // ruban se croisent quand le terrain monte d'un cote : le fleuve
-            // reste un maillage continu au lieu de former des triangles.
-            float hauteur1 = Mathf.Max(
-                HauteurSurfaceEau(points[i].x, points[i].y),
-                HauteurSurfaceEau(gauche.x, gauche.y),
-                HauteurSurfaceEau(droite.x, droite.y));
-            float hauteur2 = Mathf.Max(
-                HauteurSurfaceEau(points[i + 1].x, points[i + 1].y),
-                HauteurSurfaceEau(gauche2.x, gauche2.y),
-                HauteurSurfaceEau(droite2.x, droite2.y));
+            // ruban se croisent quand le terrain monte d'un cote. Elle est
+            // prise sur l'axe du chenal : l'eau reste posee au niveau du sol
+            // naturel, sans etre remontee artificiellement sur une berge.
+            float hauteur1 = HauteurSurfaceEau(points[i].x, points[i].y);
+            float hauteur2 = HauteurSurfaceEau(points[i + 1].x, points[i + 1].y);
             ruban.Quad(new Vector3(gauche.x, hauteur1, gauche.y),
                 new Vector3(gauche2.x, hauteur2, gauche2.y),
                 new Vector3(droite2.x, hauteur2, droite2.y),
@@ -2576,7 +2571,10 @@ public sealed class LibreViesGame : MonoBehaviour
             playerVelocity.y = Mathf.MoveTowards(playerVelocity.y, vitesseVerticale, dt * 12f);
             player.position += Vector3.up * playerVelocity.y * dt;
             float lit = TerrainHeight(player.position.x, player.position.z) + 0.08f;
-            float plafond = HauteurSurfaceEau(player.position.x, player.position.z) - 2.35f;
+            // L'eau n'enfonce plus automatiquement le personnage : dans une
+            // zone peu profonde il peut rester debout, avec la tete au-dessus
+            // de la surface. Il ne descend que s'il demande a plonger.
+            float plafond = HauteurSurfaceEau(player.position.x, player.position.z) + 0.35f;
             if (player.position.y < lit) player.position = new Vector3(player.position.x, lit, player.position.z);
             if (player.position.y > plafond) player.position = new Vector3(player.position.x, plafond, player.position.z);
         }
