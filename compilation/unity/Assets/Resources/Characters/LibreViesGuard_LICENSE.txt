@@ -1,0 +1,3 @@
+LibreViesGuard.obj et LibreViesGuard.mtl sont des créations originales du projet LibreVies.
+Licence : CC0 1.0 Universal (domaine public), sans restriction de modification, usage commercial ou redistribution.
+Générateur : compilation/outils/generer_garde_librevies.py

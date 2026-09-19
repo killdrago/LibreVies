@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.63",
-  "notes": "MAJ 63 : route entièrement pavée, animation procédurale de l’héroïne et gardes animés.",
+  "game_version": "0.5.64",
+  "notes": "MAJ 64 : héroïne articulée, gardes humanoïdes importés et monstres conservés.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

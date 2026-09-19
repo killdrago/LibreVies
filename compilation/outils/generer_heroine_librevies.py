@@ -103,9 +103,15 @@ add_ring_surface("Shoe_R", "Sole", [(0.18, 0.055, 0.075, .17, .30), (0.18, .13, 
 add_ring_surface("Boot_L", "Shoes", [(-0.18, .11, .075, .14, .25), (-0.18, .25, .055, .13, .21), (-0.18, .34, .045, .12, .18)], 16)
 add_ring_surface("Boot_R", "Shoes", [(0.18, .11, .075, .14, .25), (0.18, .25, .055, .13, .21), (0.18, .34, .045, .12, .18)], 16)
 
-# Jean : deux jambes légèrement fuselées, puis la ceinture.
-add_ring_surface("Jeans_L", "Jeans", [(-.18, .28, 0, .13, .13), (-.18, .55, 0, .135, .135), (-.18, .92, 0, .15, .15), (-.18, 1.12, 0, .19, .17)], 16)
-add_ring_surface("Jeans_R", "Jeans", [(.18, .28, 0, .13, .13), (.18, .55, 0, .135, .135), (.18, .92, 0, .15, .15), (.18, 1.12, 0, .19, .17)], 16)
+# Jean : cuisses et bas de jambes séparés, avec un genou visible
+# quand les pivots d'animation font marcher ou courir l'héroïne.
+for side, suffix in ((-1, "L"), (1, "R")):
+    add_ring_surface("JeansUpper_" + suffix, "Jeans", [
+        (.18 * side, .66, 0, .135, .135), (.18 * side, .92, 0, .15, .15),
+        (.18 * side, 1.12, 0, .19, .17)], 16)
+    add_ring_surface("JeansLower_" + suffix, "Jeans", [
+        (.18 * side, .28, 0, .13, .13), (.18 * side, .50, 0, .135, .135),
+        (.18 * side, .66, 0, .135, .135)], 16)
 add_ring_surface("Belt", "Belt", [(0, 1.05, 0, .35, .19), (0, 1.13, 0, .37, .20)], 20)
 
 # Veste : volume trapézoïdal avec épaules marquées.
@@ -114,12 +120,20 @@ add_ring_surface("Jacket", "Jacket", [(0, 1.08, 0, .34, .18), (0, 1.30, 0, .36, 
 add_ring_surface("Neck", "SkinLight", [(0, 1.62, 0, .105, .105), (0, 1.78, 0, .11, .11)], 14)
 add_ring_surface("Collar", "JacketLight", [(0, 1.58, .005, .18, .12), (0, 1.70, .005, .15, .10)], 14)
 
-# Bras inclinés, séparés mais contenus dans le même fichier mesh.
+# Bras en deux segments : l'épaule et le coude sont des groupes OBJ
+# distincts afin que le balancement soit réellement visible en jeu.
 for side in (-1, 1):
     x = side
-    add_ring_surface("Sleeve", "JacketLight", [(.40 * x, 1.58, 0, .13, .13), (.48 * x, 1.40, .02, .12, .12), (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14)
-    add_ring_surface("Cuff", "Jacket", [(.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14)
-    add_sphere("Hand", "SkinLight", (.62 * x, 1.05, .05), (.105, .13, .10), 14, 6)
+    add_ring_surface("SleeveUpper_" + ("L" if side < 0 else "R"), "JacketLight", [
+        (.40 * x, 1.58, 0, .13, .13), (.44 * x, 1.49, .01, .125, .125),
+        (.48 * x, 1.40, .02, .12, .12)], 14, pi / 14)
+    add_ring_surface("SleeveLower_" + ("L" if side < 0 else "R"), "JacketLight", [
+        (.48 * x, 1.40, .02, .12, .12), (.54 * x, 1.29, .03, .11, .11),
+        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14)
+    add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
+        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14)
+    add_sphere("Hand_" + ("L" if side < 0 else "R"), "SkinLight",
+               (.62 * x, 1.05, .05), (.105, .13, .10), 14, 6)
 
 # Tête, oreilles et yeux : proportions humaines plutôt que tête cartoon.
 add_sphere("Head", "SkinLight", (0, 1.98, .01), (.235, .29, .205), 20, 10)

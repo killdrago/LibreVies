@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.63";
+    private const string VersionJeu = "0.5.64";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -111,8 +111,12 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform brasAttaque;
     private Transform brasHeroineGauche;
     private Transform brasHeroineDroit;
+    private Transform coudeHeroineGauche;
+    private Transform coudeHeroineDroit;
     private Transform jambeHeroineGauche;
     private Transform jambeHeroineDroite;
+    private Transform genouHeroineGauche;
+    private Transform genouHeroineDroit;
     private bool heroineRigPret;
     private CapsuleCollider joueurCollider;
     private string heroineAnimationActuelle = "Idle";
@@ -256,12 +260,15 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class GardeState
     {
         public GameObject Root;
+        public Transform Model;
         public Transform JambeG;
         public Transform JambeD;
-        public Transform CorpsVisuel;
-        public Transform Tete;
+        public Transform GenouG;
+        public Transform GenouD;
         public Transform BrasG;
         public Transform BrasD;
+        public Transform CoudeG;
+        public Transform CoudeD;
         public Transform Hallebarde;
         public Obstacle Corps;
         public Vector2 Poste;      // la ou il revient quand tout est calme
@@ -1747,66 +1754,87 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void TeinterGarde(Transform model, Color couleur)
+    {
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Material[] materiaux = renderers[i].materials;
+            bool modifie = false;
+            for (int j = 0; j < materiaux.Length; j++)
+            {
+                if (materiaux[j] == null || materiaux[j].name.IndexOf("GuardCloth", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                materiaux[j].color = couleur;
+                modifie = true;
+            }
+            if (modifie) renderers[i].materials = materiaux;
+        }
+    }
+
     private void CreerGarde(Vector2 poste, Vector2 portail)
     {
         float y = TerrainHeight(poste.x, poste.y);
         var root = new GameObject("Garde").transform;
         root.position = new Vector3(poste.x, y, poste.y);
         var state = new GardeState { Root = root.gameObject, Poste = poste, Portail = portail };
+        GameObject prefab = Resources.Load<GameObject>("Characters/LibreViesGuard");
+        if (prefab == null)
+        {
+            Debug.LogError("[LV] LibreViesGuard.obj absent : aucun garde en primitives ne sera créé");
+            Destroy(root.gameObject);
+            return;
+        }
 
-        // Jambes : chacune est un pivot anime (comme jg / jd de la reference).
-        state.JambeG = CreerJambe(root, -0.12f);
-        state.JambeD = CreerJambe(root, 0.12f);
+        GameObject model = Instantiate(prefab, root);
+        model.name = "Garde_Humanoide_Original_CC0";
+        state.Model = model.transform;
+        state.Model.localPosition = Vector3.zero;
+        state.Model.localRotation = Quaternion.identity;
+        state.Model.localScale = Vector3.one;
+        TeinterGarde(state.Model, gardes.Count % 2 == 0
+            ? new Color(0.18f, 0.34f, 0.78f)
+            : new Color(0.72f, 0.16f, 0.12f));
 
-        Box(new Vector3(0, 0.70f, 0), new Vector3(0.38f, 0.20f, 0.26f), "Stone", root, "Bassin");
-        state.CorpsVisuel = Box(new Vector3(0, 0.98f, 0), new Vector3(0.44f, 0.52f, 0.28f), "Stone", root, "Cuirasse").transform;
-        Box(new Vector3(0, 0.80f, 0), new Vector3(0.46f, 0.10f, 0.30f), "Dirt", root, "Ceinturon");
-        Box(new Vector3(0, 1.02f, 0.15f), new Vector3(0.30f, 0.30f, 0.05f), "White", root, "Plastron");
-        // Les deux portails portent des couleurs différentes pour qu'on
-        // distingue immédiatement les gardes, même lorsqu'ils sont au repos.
-        string heraldique = gardes.Count % 2 == 0 ? "Banniere_Bleue" : "Banniere_Rouge";
-        Box(new Vector3(0, 1.0f, 0), new Vector3(0.46f, 0.09f, 0.30f), heraldique, root, "Baudrier", false, Quaternion.Euler(0f, 0f, 35f));
-        Primitive(PrimitiveType.Sphere, new Vector3(-0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereG");
-        Primitive(PrimitiveType.Sphere, new Vector3(0.33f, 1.18f, 0), new Vector3(0.26f, 0.26f, 0.26f), "Stone", root, "SpalliereD");
-        state.BrasG = Primitive(PrimitiveType.Capsule, new Vector3(-0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasG").transform;
-        state.BrasD = Primitive(PrimitiveType.Capsule, new Vector3(0.31f, 0.96f, 0), new Vector3(0.15f, 0.20f, 0.15f), "Stone", root, "BrasD").transform;
-        Primitive(PrimitiveType.Sphere, new Vector3(-0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainG");
-        Primitive(PrimitiveType.Sphere, new Vector3(0.31f, 0.74f, 0), new Vector3(0.15f, 0.15f, 0.15f), "Skin", root, "MainD");
-        state.Tete = Box(new Vector3(0, 1.42f, 0), new Vector3(0.30f, 0.30f, 0.28f), "Skin", root, "Visage").transform;
-        Box(new Vector3(-0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilG");
-        Box(new Vector3(0.07f, 1.45f, 0.145f), new Vector3(0.05f, 0.05f, 0.02f), "Metal", root, "OeilD");
-        Box(new Vector3(0, 1.59f, 0), new Vector3(0.34f, 0.16f, 0.32f), "Stone", root, "Casque");
-        Box(new Vector3(0, 1.49f, 0.16f), new Vector3(0.26f, 0.05f, 0.06f), "Metal", root, "Visiere");
-        Box(new Vector3(0, 1.74f, 0), new Vector3(0.06f, 0.18f, 0.32f), "Cimier", root, "Cimier");
-
-        // Hallebarde verticale, bien visible (manche clair, fer, croc, talon).
-        var hallebarde = new GameObject("Hallebarde").transform;
-        hallebarde.SetParent(root, false);
-        state.Hallebarde = hallebarde;
-        hallebarde.localPosition = new Vector3(0.34f, 1.25f, 0.05f);
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0, 0), new Vector3(0.08f, 1.25f, 0.08f), "Bois_Clair", hallebarde, "Manche");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.55f, 0), new Vector3(0.11f, 0.025f, 0.11f), "Metal", hallebarde, "Bague");
-        Box(new Vector3(0, 1.10f, 0), new Vector3(0.12f, 0.50f, 0.20f), "White", hallebarde, "Fer");
-        CreateCone(hallebarde, new Vector3(0, 1.50f, 0), 0.10f, 0.32f, "White", "Pointe_Hallebarde");
-        Box(new Vector3(-0.16f, 0.90f, 0), new Vector3(0.22f, 0.32f, 0.07f), "White", hallebarde, "Croc");
-        Box(new Vector3(0, -1.20f, 0), new Vector3(0.10f, 0.14f, 0.10f), "Stone", hallebarde, "Talon");
+        // Le garde possède lui aussi des segments OBJ séparés : ses bras et
+        // ses genoux sont donc visibles en mouvement, sans primitives Unity.
+        state.JambeG = CreerPivotHeroine(state.Model,
+            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_G", true,
+            "Guard_LegUpper_L");
+        state.JambeD = CreerPivotHeroine(state.Model,
+            new Vector3(0.18f, 1.12f, 0f), "Pivot_Garde_Cuisse_D", false,
+            "Guard_LegUpper_R");
+        state.GenouG = CreerPivotHeroine(state.Model,
+            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Garde_Genou_G", true,
+            "Guard_LegLower_L", "Guard_Boot_L");
+        state.GenouD = CreerPivotHeroine(state.Model,
+            new Vector3(0.18f, 0.66f, 0f), "Pivot_Garde_Genou_D", false,
+            "Guard_LegLower_R", "Guard_Boot_R");
+        state.GenouG.SetParent(state.JambeG, true);
+        state.GenouD.SetParent(state.JambeD, true);
+        state.BrasG = CreerPivotHeroine(state.Model,
+            new Vector3(-0.40f, 1.58f, 0f), "Pivot_Garde_Bras_G", true,
+            "Guard_ArmUpper_L");
+        state.BrasD = CreerPivotHeroine(state.Model,
+            new Vector3(0.40f, 1.58f, 0f), "Pivot_Garde_Bras_D", false,
+            "Guard_ArmUpper_R");
+        state.CoudeG = CreerPivotHeroine(state.Model,
+            new Vector3(-0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_G", true,
+            "Guard_ArmLower_L", "Guard_Glove_L");
+        state.CoudeD = CreerPivotHeroine(state.Model,
+            new Vector3(0.48f, 1.40f, 0.01f), "Pivot_Garde_Coude_D", false,
+            "Guard_ArmLower_R", "Guard_Glove_R");
+        state.CoudeG.SetParent(state.BrasG, true);
+        state.CoudeD.SetParent(state.BrasD, true);
+        state.Hallebarde = FindChildDeep(state.Model, "Guard_HalberdShaft");
 
         state.Corps = new Obstacle
         {
-            Cercle = true, X = poste.x, Z = poste.y, Rayon = 0.4f, Portee = 1.4f, Hauteur = 1.8f
+            Cercle = true, X = poste.x, Z = poste.y, Rayon = 0.48f,
+            Portee = 1.5f, Hauteur = 2.2f
         };
         obstacles.Add(state.Corps);
         gardes.Add(state);
-    }
-
-    private Transform CreerJambe(Transform parent, float decalageX)
-    {
-        var jambe = new GameObject(decalageX < 0f ? "JambeG" : "JambeD").transform;
-        jambe.SetParent(parent, false);
-        jambe.localPosition = new Vector3(decalageX, 0.62f, 0f);
-        Primitive(PrimitiveType.Capsule, new Vector3(0, -0.26f, 0), new Vector3(0.19f, 0.26f, 0.19f), "Stone", jambe, "Jambard");
-        Box(new Vector3(0, -0.55f, -0.03f), new Vector3(0.17f, 0.16f, 0.26f), "Metal", jambe, "Soleret");
-        return jambe;
     }
 
     // Les gardes : poste fixe, regard vers l'exterieur, et coup mortel sur tout
@@ -1888,22 +1916,28 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             if (regard.sqrMagnitude > 0.0001f)
                 garde.Root.transform.rotation = Quaternion.LookRotation(new Vector3(regard.x, 0f, regard.y));
-            float balancement = marche ? Mathf.Sin(garde.Phase * 8f) * 0.45f : 0f;
-            if (garde.JambeG != null) garde.JambeG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
-            if (garde.JambeD != null) garde.JambeD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
-            // Même à son poste, le garde respire, balance légèrement son arme
-            // et garde les bras vivants. En déplacement, la pose de marche
-            // reprend le dessus : les gardes ne paraissent plus figés.
-            float gardeIdle = Mathf.Sin(garde.Phase * 2.2f);
-            float bras = marche ? Mathf.Sin(garde.Phase * 8f) * 15f : gardeIdle * 4f;
-            if (garde.BrasG != null) garde.BrasG.localRotation = Quaternion.Euler(bras, 0f, 0f);
-            if (garde.BrasD != null) garde.BrasD.localRotation = Quaternion.Euler(-bras, 0f, 0f);
-            if (garde.CorpsVisuel != null)
-                garde.CorpsVisuel.localPosition = new Vector3(0f, 0.98f + gardeIdle * 0.012f, 0f);
-            if (garde.Tete != null)
-                garde.Tete.localPosition = new Vector3(0f, 1.42f + gardeIdle * 0.018f, 0f);
+            float cycle = marche ? Mathf.Sin(garde.Phase * 8f) : 0f;
+            float balancement = marche ? cycle * 34f : 0f;
+            float flexionGenouG = marche ? Mathf.Max(0f, -cycle) * 44f : 0f;
+            float flexionGenouD = marche ? Mathf.Max(0f, cycle) * 44f : 0f;
+            float bras = marche ? cycle * 28f : Mathf.Sin(garde.Phase * 2.2f) * 4f;
+            float flexionCoudeG = marche ? Mathf.Max(0f, cycle) * 18f : 0f;
+            float flexionCoudeD = marche ? Mathf.Max(0f, -cycle) * 18f : 0f;
+            if (garde.JambeG != null) garde.JambeG.localRotation = Quaternion.Euler(balancement, 0f, 0f);
+            if (garde.JambeD != null) garde.JambeD.localRotation = Quaternion.Euler(-balancement, 0f, 0f);
+            if (garde.GenouG != null) garde.GenouG.localRotation = Quaternion.Euler(flexionGenouG, 0f, 0f);
+            if (garde.GenouD != null) garde.GenouD.localRotation = Quaternion.Euler(flexionGenouD, 0f, 0f);
+            if (garde.BrasG != null) garde.BrasG.localRotation = Quaternion.Euler(-bras, 0f, 0f);
+            if (garde.BrasD != null) garde.BrasD.localRotation = Quaternion.Euler(bras, 0f, 0f);
+            if (garde.CoudeG != null) garde.CoudeG.localRotation = Quaternion.Euler(flexionCoudeG, 0f, 0f);
+            if (garde.CoudeD != null) garde.CoudeD.localRotation = Quaternion.Euler(flexionCoudeD, 0f, 0f);
+            if (garde.Model != null)
+            {
+                garde.Model.localRotation = Quaternion.identity;
+                garde.Model.localPosition = new Vector3(0f, marche ? Mathf.Abs(cycle) * 0.018f : 0f, 0f);
+            }
             if (garde.Hallebarde != null)
-                garde.Hallebarde.localRotation = Quaternion.Euler(0f, 0f, marche ? -bras * 0.35f : gardeIdle * 4f);
+                garde.Hallebarde.localRotation = Quaternion.Euler(0f, 0f, marche ? -bras * 0.35f : bras);
         }
     }
 
@@ -2541,21 +2575,41 @@ public sealed class LibreViesGame : MonoBehaviour
         // prétendre que ce maillage sans squelette possède des clips FBX.
         brasHeroineGauche = CreerPivotHeroine(heroineModel,
             new Vector3(-0.40f, 1.58f, 0f), "Pivot_Bras_Gauche", true,
-            "Sleeve", "Cuff", "Hand");
+            "SleeveUpper_L");
         brasHeroineDroit = CreerPivotHeroine(heroineModel,
             new Vector3(0.40f, 1.58f, 0f), "Pivot_Bras_Droit", false,
-            "Sleeve", "Cuff", "Hand");
+            "SleeveUpper_R");
+        coudeHeroineGauche = CreerPivotHeroine(heroineModel,
+            new Vector3(-0.48f, 1.40f, 0.02f), "Pivot_Coude_Gauche", true,
+            "SleeveLower_L", "Cuff_L", "Hand_L");
+        coudeHeroineDroit = CreerPivotHeroine(heroineModel,
+            new Vector3(0.48f, 1.40f, 0.02f), "Pivot_Coude_Droit", false,
+            "SleeveLower_R", "Cuff_R", "Hand_R");
+        coudeHeroineGauche.SetParent(brasHeroineGauche, true);
+        coudeHeroineDroit.SetParent(brasHeroineDroit, true);
         jambeHeroineGauche = CreerPivotHeroine(heroineModel,
-            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Jambe_Gauche", true,
-            "Jeans_L", "Boot_L", "Shoe_L");
+            new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", true,
+            "JeansUpper_L");
         jambeHeroineDroite = CreerPivotHeroine(heroineModel,
-            new Vector3(0.18f, 1.12f, 0f), "Pivot_Jambe_Droite", false,
-            "Jeans_R", "Boot_R", "Shoe_R");
+            new Vector3(0.18f, 1.12f, 0f), "Pivot_Cuisse_Droite", false,
+            "JeansUpper_R");
+        genouHeroineGauche = CreerPivotHeroine(heroineModel,
+            new Vector3(-0.18f, 0.66f, 0f), "Pivot_Genou_Gauche", true,
+            "JeansLower_L", "Boot_L", "Shoe_L");
+        genouHeroineDroit = CreerPivotHeroine(heroineModel,
+            new Vector3(0.18f, 0.66f, 0f), "Pivot_Genou_Droit", false,
+            "JeansLower_R", "Boot_R", "Shoe_R");
+        genouHeroineGauche.SetParent(jambeHeroineGauche, true);
+        genouHeroineDroit.SetParent(jambeHeroineDroite, true);
         brasAttaque = brasHeroineDroit;
         heroineRigPret = brasHeroineGauche != null && brasHeroineGauche.childCount > 0
             && brasHeroineDroit != null && brasHeroineDroit.childCount > 0
+            && coudeHeroineGauche != null && coudeHeroineGauche.childCount > 0
+            && coudeHeroineDroit != null && coudeHeroineDroit.childCount > 0
             && jambeHeroineGauche != null && jambeHeroineGauche.childCount > 0
-            && jambeHeroineDroite != null && jambeHeroineDroite.childCount > 0;
+            && jambeHeroineDroite != null && jambeHeroineDroite.childCount > 0
+            && genouHeroineGauche != null && genouHeroineGauche.childCount > 0
+            && genouHeroineDroit != null && genouHeroineDroit.childCount > 0;
         ConfigurerAnimationsHeroine(model);
         Debug.Log("[LV] héroïne humaine originale CC0 chargée : LibreViesHeroine.obj ; animation procédurale=" + heroineRigPret);
         return true;
@@ -2587,22 +2641,41 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         float cycle = enMouvement ? Mathf.Sin(walkClock) : 0f;
-        float balancementJambe = (enCourse ? 32f : 23f) * cycle;
-        float balancementBras = (enCourse ? 24f : 17f) * cycle;
+        float balancementJambe = (enCourse ? 38f : 30f) * cycle;
+        float balancementBras = (enCourse ? 32f : 24f) * cycle;
+        float amplitudeGenou = enCourse ? 48f : 36f;
+        float flexionGenouGauche = enMouvement
+            ? amplitudeGenou * Mathf.Max(0f, -cycle)
+            : 0f;
+        float flexionGenouDroit = enMouvement
+            ? amplitudeGenou * Mathf.Max(0f, cycle)
+            : 0f;
+        float flexionCoudeGauche = enMouvement
+            ? (enCourse ? 22f : 14f) * Mathf.Max(0f, cycle)
+            : 0f;
+        float flexionCoudeDroit = enMouvement
+            ? (enCourse ? 22f : 14f) * Mathf.Max(0f, -cycle)
+            : 0f;
         if (attackAnimation > 0f)
         {
             float phase = 1f - attackAnimation / 0.30f;
             brasHeroineDroit.localRotation = Quaternion.Euler(
-                Mathf.Lerp(-92f, 48f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
+                Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
+            coudeHeroineDroit.localRotation = Quaternion.Euler(Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
             brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+            coudeHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
         }
         else
         {
             brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
             brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
+            coudeHeroineGauche.localRotation = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
+            coudeHeroineDroit.localRotation = Quaternion.Euler(flexionCoudeDroit, 0f, 0f);
         }
         jambeHeroineGauche.localRotation = Quaternion.Euler(balancementJambe, 0f, 0f);
         jambeHeroineDroite.localRotation = Quaternion.Euler(-balancementJambe, 0f, 0f);
+        genouHeroineGauche.localRotation = Quaternion.Euler(flexionGenouGauche, 0f, 0f);
+        genouHeroineDroit.localRotation = Quaternion.Euler(flexionGenouDroit, 0f, 0f);
         float rebond = enMouvement ? Mathf.Abs(Mathf.Sin(walkClock * 2f)) * 0.025f : 0f;
         heroineModel.localPosition = new Vector3(0f, rebond, 0f);
     }
@@ -2655,6 +2728,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 CreateEnemy(new Vector3(x, 0f, z), types[zone]);
             }
         }
+        Debug.Log("[LV] monstres créés : " + enemies.Count + " (6 zones de 3, quantité conservée)");
     }
 
     private void CreateEnemy(Vector3 position, string type)
