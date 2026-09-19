@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 46 : village sec, douves elargies,
-                        nage, camera et textes corriges ; version 0.5.46
+Derniere mise a jour : 19/09/2026 - MAJ 47 : douves elargies,
+                        lits colles au terrain et chateau eloigne ; version 0.5.47
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1648,6 +1648,26 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     vers le haut.
   - Version de la build : 0.5.46. Relancer la compilation Windows et lire le
     journal avant de remplir game_build.
+
+================================================================================
+8.36 MAJ 47 - LITS D'EAU, CHATEAU ET RIVIERE NORD
+================================================================================
+
+  - Le lit de la riviere, de la branche et des douves est maintenant calcule
+    avec TerrainHeight a chaque bord : il suit les baisses et les bosses du sol
+    au lieu de rester une plaque horizontale decalee.
+  - Le nord du village reste sec : le cours d'eau passe droit au nord, sans
+    couper l'entree. Le village conserve ses maisons, ses positions et son sol.
+  - Le chateau est eloigne vers le sud (centre z = -90). La route, les
+    collisions, la branche de riviere et la carte suivent ce nouveau centre.
+  - Les rayons des douves sont agrandis de 50 pour cent : interieur 21,75 m,
+    exterieur 35,25 m. L'eau fait un tour complet, y compris le cote droit,
+    avec une bande de terre seche autour des murs et un pont-levis prolonge.
+  - Le sol interieur du chateau et la plaine autour sont plats et continus.
+  - Les textes de la mini-carte repassent en blanc ; les commandes restent
+    regroupees en haut a droite.
+  - Version de la build : 0.5.47. Relancer la compilation Windows avant la
+    publication.
 
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
