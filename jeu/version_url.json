@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.50",
-  "notes": "MAJ 50 : dalle complete du chateau et correction finale du sol des douves.",
+  "game_version": "0.5.51",
+  "notes": "MAJ 51 : corrige les berges, le scintillement sous l eau et le sol du chateau.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

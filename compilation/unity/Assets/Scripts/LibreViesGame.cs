@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.50";
+    private const string VersionJeu = "0.5.51";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -838,20 +838,18 @@ public sealed class LibreViesGame : MonoBehaviour
             float distanceEau = Mathf.Min(
                 DistancePolyligne(new Vector2(x, z), RivierePrincipale),
                 DistancePolyligne(new Vector2(x, z), RiviereVersChateau));
-            float creuxRiviere = 1f - Mathf.SmoothStep(2.0f, 8.5f, distanceEau);
+            // Le creux revient a zero exactement sur la berge : le terrain
+            // rejoint ainsi la surface de l'eau sans marche ni espace.
+            float creuxRiviere = 1f - Mathf.SmoothStep(0f, 3.5f, distanceEau);
             profondeur = Mathf.Max(profondeur, WaterDepth * creuxRiviere);
         }
 
-        // Meme traitement pour l'anneau des douves : le sol est creuse a la
-        // meme profondeur tout autour, y compris sur le cote droit.
+        // Meme profil pour l'anneau : le centre des douves est profond, mais
+        // ses deux bords remontent jusqu'au sol naturel sous l'eau.
         float castleDistance = new Vector2(x, z - CastleCenterZ).magnitude;
         float distanceAnneau = Mathf.Abs(castleDistance - (CastleMoatInnerRadius + CastleMoatOuterRadius) * 0.5f);
-        float creuxDouves = 1f - Mathf.SmoothStep(2.3f, 7.0f, distanceAnneau);
-        if (castleDistance >= CastleMoatInnerRadius - 0.8f
-            && castleDistance <= CastleMoatOuterRadius + 0.8f)
-            profondeur = Mathf.Max(profondeur, WaterDepth);
-        else
-            profondeur = Mathf.Max(profondeur, WaterDepth * creuxDouves);
+        float creuxDouves = 1f - Mathf.SmoothStep(0f, 7.0f, distanceAnneau);
+        profondeur = Mathf.Max(profondeur, WaterDepth * creuxDouves);
         return hauteur - profondeur;
     }
 
@@ -1323,9 +1321,9 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         // Le shader du monde est opaque. Une surface opaque qui traverse la
         // camera pendant la nage provoque un clignotement en mouvement ; les
-        // surfaces sont donc masquees une fois la tete sous l'eau, tandis que
-        // le voile bleu du HUD donne le rendu sous-marin stable.
-        bool visible = !playerUnderwater;
+        // surfaces sont masquees pendant toute la nage, tandis que le voile
+        // bleu du HUD donne le rendu sous-marin stable.
+        bool visible = !playerInWater;
         for (int i = waterRenderers.Count - 1; i >= 0; i--)
         {
             if (waterRenderers[i] == null)
@@ -1429,7 +1427,9 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Maison_Nord");
         // Maison_Sud est remise sur le terrain plat du village, loin de la
         // colline du chateau : son socle ne s'enfonce plus dans la pente.
-        CreateBuilding(new Vector3(6.5f, 0, -6), new Vector3(7, 4, 6), "Maison_Sud");
+        // La maison devant l'auberge revient a son axe d'origine puis est
+        // decalee legerement vers la droite, a l'oppose du dernier essai.
+        CreateBuilding(new Vector3(9.5f, 0, -6), new Vector3(7, 4, 6), "Maison_Sud");
         // Fontaine sur le terrain libre directement devant la mairie.
         CreateFountain(new Vector3(-8, 0, 24));
         // Les PNJ sont a moins d'une largeur de porte de leur batiment.
@@ -1561,9 +1561,10 @@ public sealed class LibreViesGame : MonoBehaviour
         root.position = center;
         // Dalle parfaitement plane sous le chateau : elle evite que le sol
         // procedural en pente laisse apparaitre des jours sous les murs.
-        // La dalle depasse le rayon interieur : aucun coin de la cour ne
-        // retombe dans un trou avant la berge des douves.
-        Box(new Vector3(0f, CastleGroundHeight - 0.04f, CastleCenterZ),
+        // Une dalle ronde couvre toute l'enceinte jusqu'a la berge. Aucun
+        // morceau de terrain vert ne peut remonter entre les paves et l'eau.
+        Primitive(PrimitiveType.Cylinder,
+            new Vector3(0f, CastleGroundHeight - 0.06f, CastleCenterZ),
             new Vector3(CastleMoatInnerRadius * 2.08f, 0.12f, CastleMoatInnerRadius * 2.08f),
             "Stone", null, "Sol_Lisse_Chateau");
         // Donjon ouvert sur sa face nord : la porte est un vrai passage vers
@@ -2716,8 +2717,16 @@ public sealed class LibreViesGame : MonoBehaviour
         // L'immersion est mesurée sur la hauteur de la tete. L'endurance, elle,
         // descend dès que les pieds sont dans l'eau, afin de ne pas dépendre
         // d'un seul point de détection lorsque le joueur entre par la berge.
-        playerUnderwater = playerInWater
-            && player.position.y + 2.35f < HauteurSurfaceEau(player.position.x, player.position.z);
+        float hauteurTete = player.position.y + 2.35f;
+        float hauteurEau = HauteurSurfaceEau(player.position.x, player.position.z);
+        // Hysteresis de 15 cm : le voile ne clignote pas lorsque la tete
+        // touche exactement la surface pendant une nage ou un mouvement.
+        if (!playerInWater)
+            playerUnderwater = false;
+        else if (playerWasUnderwater)
+            playerUnderwater = hauteurTete < hauteurEau + 0.15f;
+        else
+            playerUnderwater = hauteurTete < hauteurEau - 0.15f;
         if (playerUnderwater && !playerWasUnderwater)
             ShowInfo("Sous l'eau : remontez avec ESPACE");
         playerWasUnderwater = playerUnderwater;
