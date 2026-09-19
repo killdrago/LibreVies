@@ -9,13 +9,14 @@ using UnityEngine;
 
 /// <summary>
 /// Jeu LibreVies autonome pour Unity.
-/// Le monde est construit en primitives afin que la build Windows ne dépende
-/// d'aucun asset ou plugin externe. Le launcher n'a besoin que de l'exécutable
+/// Le monde combine une base procédurale autonome et des modèles de nature
+/// CC0 importés dans Resources ; les primitives restent le repli si un asset
+/// manque. Le launcher n'a besoin que de l'exécutable
 /// produit par Unity dans game/LibreViesGame.exe.
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.57";
+    private const string VersionJeu = "0.5.58";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -96,6 +97,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
     private readonly List<Material> materials = new List<Material>();
+    // Assets CC0 convertis en OBJ pour rester importables sans plugin Unity.
+    // Le cache évite de relire Resources à chaque instance du décor.
+    private readonly Dictionary<string, GameObject> naturePrefabs = new Dictionary<string, GameObject>();
+    private int natureInstances;
     private readonly Dictionary<Renderer, Material[]> materiauxOriginaux = new Dictionary<Renderer, Material[]>();
     private bool camouflage;
 
@@ -551,8 +556,11 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
         MakeMaterial("Leaf", new Color(0.08f, 0.31f, 0.10f));
-        MakeMaterial("Player", new Color(0.16f, 0.35f, 0.70f));
+        MakeMaterial("Player", new Color(0.12f, 0.28f, 0.52f));
         MakeMaterial("Skin", new Color(0.86f, 0.59f, 0.40f));
+        MakeMaterial("Hair_Rouge", new Color(0.72f, 0.055f, 0.025f));
+        MakeMaterial("Yeux_Heros", new Color(0.025f, 0.035f, 0.06f));
+        MakeMaterial("Ceinture_Heros", new Color(0.22f, 0.10f, 0.045f));
         MakeMaterial("Enemy", new Color(0.28f, 0.18f, 0.12f));
         MakeMaterial("Spider", new Color(0.12f, 0.08f, 0.07f));
         MakeMaterial("Gold", new Color(1f, 0.65f, 0.08f), true);
@@ -1081,11 +1089,11 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // ------------------------------------------------------------------
-    // MAILLAGE PROCEDURAL
+    // MAILLAGE PROCEDURAL DE SECOURS
     // L'herbe en touffes et les rochers de la reference sont des maillages
     // faits a la main (MultiMesh cote reference, un seul maillage ici). Les
-    // sapins ont besoin de cones : Unity n'a que des primitives simples, donc
-    // on fabrique les triangles nous-memes. Aucun asset externe.
+    // sapins de secours ont besoin de cones : Unity n'a que des primitives
+    // simples, donc on fabrique les triangles nous-memes.
     // ------------------------------------------------------------------
     private sealed class Maillage
     {
@@ -1961,9 +1969,16 @@ public sealed class LibreViesGame : MonoBehaviour
             float z = (float)(random.NextDouble() * 236 - 118);
             if (new Vector2(x, z).magnitude < VillageRadius + 4) continue;
             if (!EmplacementLibre(x, z, 1.5f)) continue;
-            CreatePine(x, z, (float)(random.NextDouble() * 0.7 + 0.8));
+            string asset = (plantes % 3 == 0) ? "CommonTree_1" : "Pine_1";
+            float taille = (float)(random.NextDouble() * 0.24 + 0.92);
+            if (!CreateNatureInstance(asset, x, z, taille, true))
+                CreatePine(x, z, (float)(random.NextDouble() * 0.7 + 0.8));
             plantes++;
         }
+        // La nature CC0 ajoute plusieurs couches de détail : buissons, fougères,
+        // fleurs, plantes et rochers. Les primitives restent le repli si une
+        // installation Unity ne retrouve pas les fichiers Resources.
+        CreateImportedNatureDetails();
         // Quelques arbres ronds aux positions de la reference.
         foreach (float[] p in new[]
         {
@@ -1973,6 +1988,76 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (EmplacementLibre(p[0], p[1], 1.5f)) CreateRoundTree(p[0], p[1]);
         }
+    }
+
+    private GameObject NaturePrefab(string asset)
+    {
+        GameObject prefab;
+        if (naturePrefabs.TryGetValue(asset, out prefab)) return prefab;
+        prefab = Resources.Load<GameObject>("WorldAssets/" + asset + "/" + asset);
+        naturePrefabs[asset] = prefab;
+        if (prefab == null)
+            Debug.LogWarning("[LV] asset nature introuvable : Resources/WorldAssets/" + asset);
+        return prefab;
+    }
+
+    private bool CreateNatureInstance(string asset, float x, float z, float scale, bool collision)
+    {
+        GameObject prefab = NaturePrefab(asset);
+        if (prefab == null) return false;
+        float baseY = TerrainHeight(x, z) + (asset.StartsWith("CommonTree") || asset.StartsWith("Pine") ? 0.24f : 0.08f);
+        GameObject instance = Instantiate(prefab, new Vector3(x, baseY, z),
+            Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+        instance.name = "Asset_CC0_" + asset;
+        instance.transform.localScale = Vector3.one * scale;
+        natureInstances++;
+        objetsCrees++;
+
+        // Les collisions de déplacement du jeu restent mathématiques, mais le
+        // modèle possède aussi un collider Unity exploitable par les outils et
+        // les futures interactions physiques.
+        if (collision)
+        {
+            if (asset.StartsWith("CommonTree") || asset.StartsWith("Pine"))
+            {
+                CapsuleCollider tronc = instance.AddComponent<CapsuleCollider>();
+                tronc.center = new Vector3(0f, 2.5f, 0f);
+                tronc.radius = 0.65f;
+                tronc.height = 5.2f;
+                ColCercle(x, z, 0.72f * scale, 6.8f * scale);
+            }
+            else if (asset.StartsWith("Rock"))
+            {
+                BoxCollider rocher = instance.AddComponent<BoxCollider>();
+                rocher.center = new Vector3(0f, 0.75f, 0f);
+                rocher.size = new Vector3(2.2f, 1.6f, 2.2f);
+                ColCercle(x, z, 1.0f * scale, 2.0f * scale);
+            }
+        }
+        return true;
+    }
+
+    private void CreateImportedNatureDetails()
+    {
+        var random = new System.Random(5817);
+        string[] assets = { "Bush_Common", "Fern_1", "Flower_3_Group", "Plant_1_Big", "Grass_Common_Tall", "Rock_Medium_1" };
+        int[] limites = { 18, 22, 18, 16, 24, 18 };
+        for (int type = 0; type < assets.Length; type++)
+        {
+            int poses = 0;
+            for (int essai = 0; essai < limites[type] * 8 && poses < limites[type]; essai++)
+            {
+                float x = (float)(random.NextDouble() * 226f - 113f);
+                float z = (float)(random.NextDouble() * 226f - 113f);
+                if (new Vector2(x, z).magnitude < VillageRadius + 3.5f) continue;
+                if (!EmplacementLibre(x, z, type == 5 ? 1.4f : 0.65f)) continue;
+                float scale = type == 5
+                    ? (float)(random.NextDouble() * 0.55f + 0.75f)
+                    : (float)(random.NextDouble() * 0.45f + 0.82f);
+                if (CreateNatureInstance(assets[type], x, z, scale, type == 5)) poses++;
+            }
+        }
+        Journal("nature CC0 : " + natureInstances + " instances importees");
     }
 
     // Sapin de la reference : tronc epais bien visible, 4 renforts et 3 cones
@@ -2299,10 +2384,21 @@ public sealed class LibreViesGame : MonoBehaviour
         heroBody = new GameObject("Heros_LowPoly").transform;
         heroBody.SetParent(player, false);
         var body = heroBody;
-        Primitive(PrimitiveType.Capsule, new Vector3(0, 1.15f, 0), new Vector3(0.55f, 1.15f, 0.55f), "Player", body, "Tunique");
-        Primitive(PrimitiveType.Cube, new Vector3(0, 2.25f, 0), new Vector3(0.62f, 0.62f, 0.62f), "Skin", body, "Tete");
-        Box(new Vector3(-0.26f, 0.35f, 0), new Vector3(0.25f, 0.7f, 0.3f), "Stone", body, "JambeG");
-        Box(new Vector3(0.26f, 0.35f, 0), new Vector3(0.25f, 0.7f, 0.3f), "Stone", body, "JambeD");
+        // Silhouette d'aventurière stylisée : tunique ajustée, ceinture,
+        // visage rond et mèches rouges séparées pour éviter l'aspect cube.
+        Primitive(PrimitiveType.Capsule, new Vector3(0, 1.15f, 0), new Vector3(0.48f, 1.02f, 0.42f), "Player", body, "Tunique");
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.86f, 0), new Vector3(0.54f, 0.10f, 0.48f), "Ceinture_Heros", body, "Ceinture");
+        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.26f, 0), new Vector3(0.56f, 0.62f, 0.52f), "Skin", body, "Visage");
+        // Chevelure rouge : calotte, frange et longues mèches latérales.
+        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.54f, 0.02f), new Vector3(0.66f, 0.46f, 0.62f), "Hair_Rouge", body, "Cheveux_Rouges_Calotte");
+        Primitive(PrimitiveType.Sphere, new Vector3(-0.37f, 2.23f, 0.03f), new Vector3(0.24f, 0.62f, 0.30f), "Hair_Rouge", body, "Mèche_Gauche");
+        Primitive(PrimitiveType.Sphere, new Vector3(0.37f, 2.23f, 0.03f), new Vector3(0.24f, 0.62f, 0.30f), "Hair_Rouge", body, "Mèche_Droite");
+        Primitive(PrimitiveType.Sphere, new Vector3(0, 2.42f, -0.46f), new Vector3(0.36f, 0.28f, 0.18f), "Hair_Rouge", body, "Frange");
+        // Deux yeux très discrets donnent un visage lisible en vue rapprochée.
+        Primitive(PrimitiveType.Sphere, new Vector3(-0.18f, 2.29f, -0.49f), new Vector3(0.055f, 0.07f, 0.035f), "Yeux_Heros", body, "Oeil_G");
+        Primitive(PrimitiveType.Sphere, new Vector3(0.18f, 2.29f, -0.49f), new Vector3(0.055f, 0.07f, 0.035f), "Yeux_Heros", body, "Oeil_D");
+        Box(new Vector3(-0.22f, 0.35f, 0), new Vector3(0.22f, 0.70f, 0.28f), "Stone", body, "JambeG");
+        Box(new Vector3(0.22f, 0.35f, 0), new Vector3(0.22f, 0.70f, 0.28f), "Stone", body, "JambeD");
         brasAttaque = new GameObject("BrasDroit_Attaque").transform;
         brasAttaque.SetParent(body, false);
         brasAttaque.localPosition = new Vector3(0.52f, 1.58f, 0.18f);

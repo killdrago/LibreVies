@@ -1,13 +1,36 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 57 : texture d'eau dans le
-                        chenal et joueur en surface ; version 0.5.57
+Derniere mise a jour : 19/09/2026 - MAJ 58 : décor fantasy avec assets CC0
+                        et héroïne stylisée aux cheveux rouges ; version 0.5.58
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 58 — RENDU FANTASY ET ASSETS CC0 (19/09/2026)
+================================================================================
+
+Le rendu du monde a été enrichi sans retirer les règles de gameplay de la MAJ
+57. Le dossier compilation/unity/Assets/Resources/WorldAssets contient une
+première sélection de modèles de nature provenant du Stylized Nature MegaKit
+Standard de Quaternius, sous licence CC0 : arbre, pin, buisson, fougère, fleurs,
+plante, herbe et rocher. Les GLB ont été convertis en OBJ avec leurs textures
+pour rester importables par Unity sans plugin externe. README_CC0.txt conserve
+la provenance et la licence.
+
+LibreViesGame.cs charge ces modèles par Resources.Load, les instancie dans le
+monde hors des bâtiments, de la route, du village et du fleuve, et ajoute des
+colliders Unity pour les arbres et rochers. Les primitives procédurales restent
+le repli si un asset manque. Le personnage est maintenant une aventurière
+stylisée avec tunique, visage, yeux, ceinture et cheveux rouges détaillés par
+plusieurs volumes.
+
+Important : cette MAJ n'est pas une compilation Windows Unity validée. La
+validation du rendu visuel et des importations OBJ doit encore être faite dans
+Unity Editor ; aucune exportation Windows ne doit être annoncée comme valide
+avant cette étape.
 
 COMMENT UTILISER CE FICHIER
 ---------------------------
@@ -1827,7 +1850,7 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
     noir n'est cree.
   - Le joueur reste a la surface dans les zones peu profondes et l'eau reste
     rendue pendant toute la nage.
-  - Version de la build : 0.5.57. Relancer la compilation Windows avant la
+  - Version de la build : 0.5.58. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================
