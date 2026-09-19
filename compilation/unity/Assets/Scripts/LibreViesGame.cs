@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.58";
+    private const string VersionJeu = "0.5.59";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -109,6 +109,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform heroBody;
     private Transform brasAttaque;
     private CapsuleCollider joueurCollider;
+    private Animation heroineAnimation;
+    private string heroineAnimationActuelle;
     private Camera gameCamera;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
@@ -598,6 +600,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // monde. Route_PBR garde son nom historique pour le diagnostic, mais
         // utilise exactement le meme shader que les murs, arbres et PNJ.
         MakeMaterial("Route_PBR", new Color(0.42f, 0.45f, 0.48f), false, true);
+        MakeMaterial("Route_Terre", new Color(0.46f, 0.30f, 0.16f));
+        MakeMaterial("Route_Bord", new Color(0.36f, 0.34f, 0.31f));
+        MakeMaterial("Pave_Route", new Color(0.58f, 0.53f, 0.43f));
     }
 
     private Texture2D TextureRealiste(string nom)
@@ -607,7 +612,8 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
         else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Route_PBR") chemin = "LVTextures/LV_ConcretePaving";
+        else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
         else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
         else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Arbre_Rond" || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
@@ -642,7 +648,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (material.HasProperty("_Tiling"))
         {
-            float echelle = name == "Terrain" || name == "Dirt" ? 0.08f
+            float echelle = name == "Terrain" || name == "Dirt" || name == "Route_Terre" ? 0.08f
                 : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f
                 : (name == "Water" || name == "Eau_Riviere" ? 0.16f
                 : (name == "Leaf" || name.StartsWith("Sapin") || name == "Arbre_Rond" || name == "Feuillage" ? 0.22f
@@ -652,7 +658,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (material.HasProperty("_BumpStrength"))
         {
-            float relief = name == "Terrain" || name == "Dirt" ? 0.20f
+            float relief = name == "Terrain" || name == "Dirt" || name == "Route_Terre" ? 0.20f
                 : (name.Contains("Roof") ? 0.16f : 0.11f);
             material.SetFloat("_BumpStrength", relief);
         }
@@ -993,9 +999,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private float HauteurSupport(float x, float z, float pieds)
     {
         float sol = TerrainHeight(x, z);
-        // La route est pavee (sommet ~ +0,10) : les pieds ne s'enfoncent plus.
+        // La route est pavee (sommet ~ +0,15) : les pieds ne s'enfoncent plus.
         float dr = DistRoute(new Vector2(x, z));
-        if (dr < 2.9f) sol += 0.10f * Mathf.Clamp01((2.9f - dr) / 0.6f);
+        if (dr < 2.9f) sol += 0.15f * Mathf.Clamp01((2.9f - dr) / 0.6f);
         for (int i = 0; i < obstacles.Count; i++)
         {
             Obstacle c = obstacles[i];
@@ -1317,6 +1323,7 @@ public sealed class LibreViesGame : MonoBehaviour
         var fond = new Maillage();
         var bord = new Maillage();
         var pave = new Maillage();
+        var dalles = new Maillage();
         const int echantillons = 120;
         Vector2[] centres = new Vector2[echantillons + 1];
         Vector2[] normales = new Vector2[echantillons + 1];
@@ -1331,13 +1338,43 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         for (int i = 0; i < echantillons; i++)
         {
-            AjouterBandeRoute(fond, centres, normales, i, 3.05f, 0.025f);
-            AjouterBandeRoute(bord, centres, normales, i, 2.68f, 0.055f);
-            AjouterBandeRoute(pave, centres, normales, i, 2.08f, 0.105f);
+            AjouterBandeRoute(fond, centres, normales, i, 3.45f, 0.025f);
+            AjouterBandeRoute(bord, centres, normales, i, 3.08f, 0.065f);
+            AjouterBandeRoute(pave, centres, normales, i, 2.66f, 0.105f);
+            if (i % 4 == 0)
+            {
+                // Dalles irrégulières visibles : la route devient un chemin
+                // pavé détaillé au lieu d'un simple ruban gris uniforme.
+                AjouterDalleRoute(dalles, centres, normales, i, -0.74f, 0.64f, 0.28f);
+                AjouterDalleRoute(dalles, centres, normales, i, 0.00f, 0.72f, 0.30f);
+                AjouterDalleRoute(dalles, centres, normales, i, 0.74f, 0.61f, 0.27f);
+            }
         }
-        ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Route_PBR");
-        ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_PBR");
-        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Route_PBR");
+        ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Route_Terre");
+        ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_Bord");
+        ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Route_Terre");
+        ObjetMaillage("Dalles_Route", dalles.VersMesh("Dalles_Route"), "Pave_Route");
+    }
+
+    private void AjouterDalleRoute(Maillage maillage, Vector2[] centres, Vector2[] normales,
+        int index, float decalage, float demiLongueur, float demiLargeur)
+    {
+        Vector2 centre = centres[index] + normales[index] * decalage;
+        Vector2 tangent = index < centres.Length - 1
+            ? (centres[index + 1] - centres[index]).normalized
+            : (centres[index] - centres[index - 1]).normalized;
+        Vector2 normale = normales[index];
+        Vector2 avant = centre + tangent * demiLongueur;
+        Vector2 arriere = centre - tangent * demiLongueur;
+        Vector2 gauche = avant + normale * demiLargeur;
+        Vector2 droite = avant - normale * demiLargeur;
+        Vector2 gaucheArriere = arriere + normale * demiLargeur;
+        Vector2 droiteArriere = arriere - normale * demiLargeur;
+        float hauteur = 0.15f;
+        maillage.Quad(new Vector3(gauche.x, TerrainHeight(gauche.x, gauche.y) + hauteur, gauche.y),
+            new Vector3(gaucheArriere.x, TerrainHeight(gaucheArriere.x, gaucheArriere.y) + hauteur, gaucheArriere.y),
+            new Vector3(droiteArriere.x, TerrainHeight(droiteArriere.x, droiteArriere.y) + hauteur, droiteArriere.y),
+            new Vector3(droite.x, TerrainHeight(droite.x, droite.y) + hauteur, droite.y));
     }
 
     private void AjouterBandeRoute(Maillage maillage, Vector2[] centres, Vector2[] normales,
@@ -2374,6 +2411,157 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private Transform FindChildDeep(Transform parent, string name)
+    {
+        if (parent == null) return null;
+        if (parent.name == name) return parent;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform trouve = FindChildDeep(parent.GetChild(i), name);
+            if (trouve != null) return trouve;
+        }
+        return null;
+    }
+
+    private bool CreateHumanHeroine(Transform body)
+    {
+        GameObject prefab = Resources.Load<GameObject>("Characters/Rogue");
+        if (prefab == null)
+        {
+            Debug.LogWarning("[LV] Rogue.fbx absent : héroïne procédurale utilisée");
+            return false;
+        }
+        GameObject model = Instantiate(prefab, body);
+        model.name = "Heroine_Humaine_Rogue_CC0";
+        model.transform.localPosition = Vector3.zero;
+        model.transform.localRotation = Quaternion.identity;
+        model.transform.localScale = Vector3.one * 1.05f;
+        CreateRedHair(model.transform);
+
+        // Le bras droit réel est utilisé par le système d'attaque existant.
+        brasAttaque = FindChildDeep(model.transform, "Rogue_ArmRight");
+        if (brasAttaque == null) brasAttaque = model.transform;
+        ConfigurerAnimationsHeroine(model);
+        Debug.Log("[LV] héroïne humaine KayKit chargée : Rogue.fbx");
+        return true;
+    }
+
+    private void ConfigurerAnimationsHeroine(GameObject model)
+    {
+        heroineAnimation = model.GetComponent<Animation>();
+        if (heroineAnimation == null) heroineAnimation = model.AddComponent<Animation>();
+        AnimationClip[] clips = Resources.LoadAll<AnimationClip>("Characters/Rogue");
+        for (int i = 0; i < clips.Length; i++)
+        {
+            AnimationClip clip = clips[i];
+            if (clip == null || heroineAnimation.GetClip(clip.name) != null) continue;
+            heroineAnimation.AddClip(clip, clip.name);
+        }
+        JouerAnimationHeroine("Idle", true);
+    }
+
+    private void JouerAnimationHeroine(string recherche, bool boucle)
+    {
+        if (heroineAnimation == null) return;
+        string choix = null;
+        foreach (AnimationState state in heroineAnimation)
+        {
+            if (state.name.IndexOf(recherche, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                choix = state.name;
+                break;
+            }
+        }
+        if (choix == null || choix == heroineAnimationActuelle) return;
+        AnimationState animation = heroineAnimation[choix];
+        animation.wrapMode = boucle ? WrapMode.Loop : WrapMode.Once;
+        animation.layer = 0;
+        heroineAnimation.CrossFade(choix, 0.12f);
+        heroineAnimationActuelle = choix;
+    }
+
+    private void CreateRedHair(Transform model)
+    {
+        // Le Rogue possède déjà une coupe, mais cette calotte et ses mèches
+        // rouges rendent clairement l'héroïne rousse sans la réduire à des
+        // cubes et des sphères. La géométrie suit le volume de la tête KayKit.
+        var cap = new List<Vector3>();
+        var triangles = new List<int>();
+        const int segments = 18;
+        float[] hauteurs = { 1.82f, 2.08f, 2.30f, 2.43f };
+        float[] rayons = { 0.47f, 0.57f, 0.42f, 0.06f };
+        for (int anneau = 0; anneau < hauteurs.Length; anneau++)
+        {
+            for (int i = 0; i < segments; i++)
+            {
+                float angle = i * Mathf.PI * 2f / segments;
+                cap.Add(new Vector3(Mathf.Cos(angle) * rayons[anneau], hauteurs[anneau],
+                    Mathf.Sin(angle) * rayons[anneau]));
+            }
+        }
+        for (int anneau = 0; anneau < hauteurs.Length - 1; anneau++)
+        {
+            for (int i = 0; i < segments; i++)
+            {
+                int a = anneau * segments + i;
+                int b = anneau * segments + (i + 1) % segments;
+                int c = (anneau + 1) * segments + (i + 1) % segments;
+                int d = (anneau + 1) * segments + i;
+                triangles.Add(a); triangles.Add(b); triangles.Add(c);
+                triangles.Add(a); triangles.Add(c); triangles.Add(d);
+            }
+        }
+        var mesh = new Mesh { name = "Chevelure_Rousse_Humaine" };
+        mesh.SetVertices(cap);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        GameObject capObject = ObjetMaillage("Cheveux_Rouges_Calotte", mesh, "Hair_Rouge");
+        capObject.transform.SetParent(model, false);
+        CreateHairStrand(model, -0.48f);
+        CreateHairStrand(model, 0.48f);
+    }
+
+    private void CreateHairStrand(Transform model, float side)
+    {
+        const int sides = 6;
+        Vector3[] centres =
+        {
+            new Vector3(side * 0.46f, 2.10f, 0.02f),
+            new Vector3(side * 0.55f, 1.78f, 0.08f),
+            new Vector3(side * 0.47f, 1.43f, 0.13f)
+        };
+        float[] rayons = { 0.16f, 0.14f, 0.07f };
+        var vertices = new List<Vector3>();
+        var triangles = new List<int>();
+        for (int r = 0; r < centres.Length; r++)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = i * Mathf.PI * 2f / sides;
+                vertices.Add(centres[r] + new Vector3(Mathf.Cos(angle) * rayons[r],
+                    0f, Mathf.Sin(angle) * rayons[r]));
+            }
+        }
+        for (int r = 0; r < centres.Length - 1; r++)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                int a = r * sides + i;
+                int b = r * sides + (i + 1) % sides;
+                int c = (r + 1) * sides + (i + 1) % sides;
+                int d = (r + 1) * sides + i;
+                triangles.Add(a); triangles.Add(b); triangles.Add(c);
+                triangles.Add(a); triangles.Add(c); triangles.Add(d);
+            }
+        }
+        var mesh = new Mesh { name = "Mèche_Rouge" };
+        mesh.SetVertices(vertices);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        GameObject strand = ObjetMaillage(side < 0f ? "Mèche_Rouge_Gauche" : "Mèche_Rouge_Droite", mesh, "Hair_Rouge");
+        strand.transform.SetParent(model, false);
+    }
+
     private void CreatePlayer()
     {
         player = new GameObject("Joueur").transform;
@@ -2384,6 +2572,10 @@ public sealed class LibreViesGame : MonoBehaviour
         heroBody = new GameObject("Heros_LowPoly").transform;
         heroBody.SetParent(player, false);
         var body = heroBody;
+        // Priorité au vrai modèle humain CC0. Le personnage procédural n'est
+        // conservé qu'en repli si Unity n'a pas importé le FBX.
+        if (!CreateHumanHeroine(body))
+        {
         // Silhouette d'aventurière stylisée : tunique ajustée, ceinture,
         // visage rond et mèches rouges séparées pour éviter l'aspect cube.
         Primitive(PrimitiveType.Capsule, new Vector3(0, 1.15f, 0), new Vector3(0.48f, 1.02f, 0.42f), "Player", body, "Tunique");
@@ -2406,6 +2598,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Marteau sans manche : seule la tete massive est visible.
         Box(new Vector3(0f, -0.78f, 0.10f), new Vector3(0.62f, 0.30f, 0.38f), "Metal", brasAttaque, "Tete_Marteau");
         Box(new Vector3(-0.75f, 1.35f, 0), new Vector3(0.22f, 0.85f, 0.22f), "Skin", body, "BrasG");
+        }
         joueurCollider = player.gameObject.AddComponent<CapsuleCollider>();
         joueurCollider.center = new Vector3(0, 1.15f, 0);
         joueurCollider.height = 2.3f;
@@ -2663,6 +2856,10 @@ public sealed class LibreViesGame : MonoBehaviour
             walkClock += dt * (Touche(toucheCourir) ? 14f : 9f);
         }
         else walkClock = 0;
+        if (!playerInWater && direction.sqrMagnitude > 0.01f)
+            JouerAnimationHeroine(courseActive ? "Running" : "Walking", true);
+        else if (!playerInWater)
+            JouerAnimationHeroine("Idle", true);
 
         if (playerInWater)
         {
@@ -3044,6 +3241,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (attackCooldown > 0 || dead) return;
         attackCooldown = 0.5f;          // meme cadence que la reference
         attackAnimation = 0.3f;
+        JouerAnimationHeroine("1H_Melee_Attack", false);
         Vector3 forward = player.forward; forward.y = 0;
         forward = forward.normalized;
         int touches = 0;

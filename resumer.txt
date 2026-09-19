@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 58 : décor fantasy avec assets CC0
-                        et héroïne stylisée aux cheveux rouges ; version 0.5.58
+Derniere mise a jour : 19/09/2026 - MAJ 59 : héroïne humaine CC0,
+                        cheveux rouges et route pavée détaillée ; version 0.5.59
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -31,6 +31,28 @@ Important : cette MAJ n'est pas une compilation Windows Unity validée. La
 validation du rendu visuel et des importations OBJ doit encore être faite dans
 Unity Editor ; aucune exportation Windows ne doit être annoncée comme valide
 avant cette étape.
+
+MAJ 59 — VRAIE HÉROÏNE HUMAINE ET ROUTE (19/09/2026)
+================================================================================
+
+La primitive composée de cubes, sphères et capsules n'est plus utilisée quand
+le modèle est correctement importé. L'héroïne charge maintenant Rogue.fbx du
+KayKit Character Pack: Adventurers, sous licence CC0, avec corps humain,
+visage, vêtements, cape, accessoires et rigging. Le projet ajoute une
+chevelure rouge stylisée composée d'un volume de cheveux et de mèches courbes.
+Les animations Idle, Walking, Running et attaque sont recherchées dans les
+clips du FBX ; le repli procédural reste uniquement pour les installations où
+Unity n'aurait pas importé le modèle.
+
+La route a aussi été refaite : elle possède désormais une base terreuse, des
+bordures minérales et des dalles pavées répétées suivant toute la courbe. Le
+support du joueur est ajusté à la nouvelle hauteur des dalles. La rivière, le
+village, Maison_Sud et la mini-carte ne sont pas déplacés.
+
+Cette MAJ n'est toujours pas une compilation Windows Unity validée. Il faut
+ouvrir le projet dans Unity pour contrôler l'import FBX, l'orientation du
+modèle, les clips d'animation et le rendu de la route avant d'annoncer une
+exportation.
 
 COMMENT UTILISER CE FICHIER
 ---------------------------
