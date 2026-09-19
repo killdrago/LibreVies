@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.49";
+    private const string VersionJeu = "0.5.50";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -1561,9 +1561,11 @@ public sealed class LibreViesGame : MonoBehaviour
         root.position = center;
         // Dalle parfaitement plane sous le chateau : elle evite que le sol
         // procedural en pente laisse apparaitre des jours sous les murs.
+        // La dalle depasse le rayon interieur : aucun coin de la cour ne
+        // retombe dans un trou avant la berge des douves.
         Box(new Vector3(0f, CastleGroundHeight - 0.04f, CastleCenterZ),
-            new Vector3(CastleMoatInnerRadius * 1.85f, 0.10f, CastleMoatInnerRadius * 1.85f),
-            "Dirt", null, "Sol_Lisse_Chateau");
+            new Vector3(CastleMoatInnerRadius * 2.08f, 0.12f, CastleMoatInnerRadius * 2.08f),
+            "Stone", null, "Sol_Lisse_Chateau");
         // Donjon ouvert sur sa face nord : la porte est un vrai passage vers
         // une petite salle interieure, et non un bloc qui empeche d'entrer.
         Box(new Vector3(0, 0.10f, 0), new Vector3(24f, 0.20f, 16f), "Stone", root, "Sol_Interieur");

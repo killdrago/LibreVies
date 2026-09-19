@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 49 : eau sans herbe,
-                        nage stable et village/chateau nettoyes ; version 0.5.49
+Derniere mise a jour : 19/09/2026 - MAJ 50 : dalle complete du chateau
+                        et sol des douves corrige ; version 0.5.50
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -1707,6 +1707,17 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Les lampadaires restent reserves au village et aucun ancien objet de lampe
     ne peut etre recree dans la zone du chateau.
   - Version de la build : 0.5.49. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.39 MAJ 50 - DALLE COMPLETE DU CHATEAU
+================================================================================
+
+  - La dalle de cour du chateau est agrandie au-dela du rayon interieur des
+    douves et utilise maintenant un materiau de pierre/paves, pas de gazon.
+  - Toute la cour reste plane sous les murs, les angles et l'interieur : aucun
+    vide ne reste entre le sol pave et le lit de l'eau.
+  - Version de la build : 0.5.50. Relancer la compilation Windows avant la
     publication.
 
 ================================================================================
