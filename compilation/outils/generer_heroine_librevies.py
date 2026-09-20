@@ -46,7 +46,8 @@ def add_face(indices, material):
     face_objects.append(active_object)
 
 
-def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
+def add_ring_surface(name, material, rings, segments=16, phase=0.0,
+                     caps=True, cap_start=None, cap_end=None):
     """Ajoute une surface fermée par anneaux, en un seul maillage OBJ."""
     global active_object
     active_object = name
@@ -65,16 +66,23 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
             # Face orientée vers l'extérieur.
             add_face((a, c, b), material)
             add_face((a, d, c), material)
-    if caps:
+    if cap_start is None:
+        cap_start = caps
+    if cap_end is None:
+        cap_end = caps
+    if cap_start:
         bottom = len(vertices) + 1
         x, y, z, _, _ = rings[0]
         vertices.append((x, y, z))
+        for i in range(segments):
+            # Normale du bouchon de départ vers l'extérieur.
+            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+    if cap_end:
         top = len(vertices) + 1
         x, y, z, _, _ = rings[-1]
         vertices.append((x, y, z))
         for i in range(segments):
-            # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
-            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+            # Normale du bouchon final vers l'extérieur.
             add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
 def add_box(name, material, center, size):
@@ -151,12 +159,13 @@ for side in (-1, 1):
     x = side
     add_ring_surface("SleeveUpper_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.40 * x, 1.58, 0, .13, .13), (.45 * x, 1.46, .01, .125, .125),
-        (.53 * x, 1.30, .02, .12, .12)], 14, pi / 14, caps=True)
+        (.53 * x, 1.30, .02, .12, .12)], 14, pi / 14, caps=False, cap_start=True)
     add_ring_surface("SleeveLower_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.43 * x, 1.48, .02, .13, .13), (.54 * x, 1.29, .03, .11, .11),
-        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14, caps=True)
+        (.57 * x, 1.16, .04, .11, .11)], 14, pi / 14, caps=False)
     add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
-        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=True)
+        (.57 * x, 1.21, .04, .11, .11), (.59 * x, 1.10, .045, .105, .105)],
+        14, caps=False, cap_end=True)
     add_sphere("Hand_" + ("L" if side < 0 else "R"), "SkinLight",
                (.62 * x, 1.05, .05), (.105, .13, .10), 20, 8)
 

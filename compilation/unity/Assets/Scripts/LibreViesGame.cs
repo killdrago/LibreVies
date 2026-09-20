@@ -16,12 +16,15 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.70";
+    private const string VersionJeu = "0.5.71";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
     private const float TownRadius = 40f;
     private const float VillageRadius = 40f;
+    private const float LargeurOuverturePortail = 7f;
+    private const float RayonPoteauPortail = 0.15f;
+    private const float DemiOuverturePortail = LargeurOuverturePortail * 0.5f + RayonPoteauPortail;
     private const float PlayerSpeed = 5f;
     private const float RunSpeed = 11f;
     private const float SwimSpeed = 3.6f;
@@ -160,6 +163,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool inventoryOpen;
     private bool optionsOpen;
     private bool questOpen = true;
+    private bool notationOpen;
     private bool conversationOpen;
     private PnjState conversationPnj;
     private bool conversationFocusRequested;
@@ -1062,7 +1066,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (DansVillage(a.x, a.z) == DansVillage(b.x, b.z)) return false;
         var milieu = new Vector2((a.x + b.x) * 0.5f, (a.z + b.z) * 0.5f);
-        return DistRoute(milieu) > 3.4f;
+        return DistRoute(milieu) > DemiOuverturePortail;
     }
 
     // 'ignorer' sert aux monstres : leur propre corps est un obstacle (le heros
@@ -1115,7 +1119,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float dl = p.magnitude;
             if (pieds <= TerrainHeight(p.x, p.y) + HauteurCloture - 0.05f
                 && Mathf.Abs(dl - VillageRadius) < 0.4f + rayon
-                && DistRoute(p) > 3.4f)
+                && DistRoute(p) > DemiOuverturePortail)
             {
                 if (dl < 0.001f) p = new Vector2(VillageRadius + 0.4f + rayon, 0f);
                 else if (dl >= VillageRadius) p = p / dl * (VillageRadius + 0.4f + rayon);
@@ -1536,7 +1540,7 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(-17, 0, -14), new Vector3(7, 3.5f, 7), "Atelier");
         CreateBuilding(new Vector3(18, 0, -15), new Vector3(9, 4, 7), "Auberge");
         CreateBuilding(new Vector3(-28, 0, -1), new Vector3(6, 3.5f, 6), "Entrepot");
-        CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3, 6), "Forge");
+        CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3.5f, 6), "Forge");
         // La mairie est proche du centre, mais decalee de la route.
         CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
         // Cette maison devient le salon d'esthétique : le nom est porté par
@@ -1754,7 +1758,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i <= pas; i++)
         {
             float a = i * Mathf.PI * 2f / pas;
-            bool trou = DistRoute(new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius)) < 3.0f;
+            bool trou = DistRoute(new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius)) < DemiOuverturePortail;
             if (trou && !dansTrou) { dansTrou = true; debut = a; }
             else if (!trou && dansTrou)
             {
@@ -1769,7 +1773,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float angle = i * Mathf.PI * 2f / posts;
             float x = Mathf.Cos(angle) * VillageRadius;
             float z = Mathf.Sin(angle) * VillageRadius;
-            if (DistRoute(new Vector2(x, z)) < 3.0f) continue;
+            if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
             float y = TerrainHeight(x, z);
             Primitive(PrimitiveType.Cylinder, new Vector3(x, y + 0.65f, z), new Vector3(0.14f, 0.65f, 0.14f), "Wood", null, "Cloture");
         }
@@ -1778,7 +1782,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float angle = (i + 0.5f) * Mathf.PI * 2f / posts;
             float x = Mathf.Cos(angle) * VillageRadius;
             float z = Mathf.Sin(angle) * VillageRadius;
-            if (DistRoute(new Vector2(x, z)) < 3.2f) continue;
+            if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
             float y = TerrainHeight(x, z) + 0.85f;
             var rail = Box(new Vector3(x, y, z), new Vector3(0.12f, 0.14f, 2.8f), "Wood", null, "Traverse");
             rail.transform.rotation = Quaternion.Euler(0, -angle * Mathf.Rad2Deg, 0);
@@ -1796,8 +1800,8 @@ public sealed class LibreViesGame : MonoBehaviour
             // la gauche. Les faces internes des deux poteaux laissent 5 m.
             Vector2 tangente = TangenteRouteProche(passage);
             Vector2 travers = new Vector2(-tangente.y, tangente.x).normalized;
-            const float largeurLibre = 5.0f;
-            const float demiPoteau = 0.15f; // cylindre scale .30 => rayon .15
+            const float largeurLibre = LargeurOuverturePortail;
+            const float demiPoteau = RayonPoteauPortail; // cylindre scale .30 => rayon .15
             float demiEspacementCentres = largeurLibre * 0.5f + demiPoteau;
             Vector2 pilierGauche = passage - travers * demiEspacementCentres;
             Vector2 pilierDroit = passage + travers * demiEspacementCentres;
@@ -2118,7 +2122,7 @@ public sealed class LibreViesGame : MonoBehaviour
         racine.SetParent(parent, false);
         // Le socle commence au niveau du terrain ; le plateau est à hauteur
         // des coups du marteau, au lieu de flotter comme l'ancien cube.
-        racine.localPosition = new Vector3(0f, 0f, 0.32f);
+        racine.localPosition = new Vector3(0.80f, 0f, 0.45f);
 
         var socle = new Maillage();
         socle.BoiteBiseautee(0.62f, 0.48f, 0.42f, 0.08f);
@@ -2314,7 +2318,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 // avance vers l'enclume, et inversement.
                 pnj.Marteau.position = pnj.Main.position;
                 pnj.Marteau.rotation = pnj.Root.transform.rotation
-                    * Quaternion.Euler(-18f - balancement * Mathf.Rad2Deg * 0.65f, 0f, 0f);
+                    * Quaternion.Euler(-18f - balancement * Mathf.Rad2Deg * 1.25f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
@@ -3245,7 +3249,12 @@ public sealed class LibreViesGame : MonoBehaviour
 
         bool clicGauche = Input.GetMouseButtonDown(0);
         bool clicNpc = clicGauche && TryOuvrirConversation();
-        if (!conversationOpen && !clicNpc && (clicGauche || ToucheDown(toucheAttaque))) Attack();
+        bool clicMonstre = clicGauche && !clicNpc && TryAttaquerMonstreClique();
+        bool attaqueClavier = toucheAttaque != (int)KeyCode.Mouse0 && ToucheDown(toucheAttaque);
+        // Un clic gauche sur le sol ne déclenche plus l'animation d'attaque.
+        // Le clic doit viser un monstre ; une touche d'attaque remappée reste
+        // disponible séparément.
+        if (!conversationOpen && (clicMonstre || attaqueClavier)) Attack();
         if (ToucheDown(toucheRamasser)) CollectNearby();
         if (ToucheDown(toucheInventaire)) inventoryOpen = !inventoryOpen;
         if (ToucheDown(toucheOptions)) optionsOpen = !optionsOpen;
@@ -3746,6 +3755,55 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    private bool TryAttaquerMonstreClique()
+    {
+        if (gameCamera == null) return false;
+        Vector2 souris = Input.mousePosition;
+        souris.y = Screen.height - souris.y;
+        float meilleureProfondeur = 100000f;
+        EnemyState cible = null;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyState ennemi = enemies[i];
+            if (ennemi == null || !ennemi.Alive || ennemi.Root == null || !ennemi.Root.activeInHierarchy)
+                continue;
+            Vector3 origine = ennemi.Root.transform.position;
+            float largeur = ennemi.Spider ? 0.95f : 0.70f;
+            Vector3[] points =
+            {
+                origine + Vector3.up * 0.05f,
+                origine + Vector3.up * (ennemi.Spider ? 0.95f : 1.20f),
+                origine + Vector3.left * largeur + Vector3.up * 0.55f,
+                origine + Vector3.right * largeur + Vector3.up * 0.55f
+            };
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minY = float.MaxValue;
+            float maxY = float.MinValue;
+            float profondeur = 100000f;
+            bool visible = true;
+            for (int point = 0; point < points.Length; point++)
+            {
+                Vector3 ecran = gameCamera.WorldToScreenPoint(points[point]);
+                if (ecran.z <= 0f) { visible = false; break; }
+                float y = Screen.height - ecran.y;
+                minX = Mathf.Min(minX, ecran.x);
+                maxX = Mathf.Max(maxX, ecran.x);
+                minY = Mathf.Min(minY, y);
+                maxY = Mathf.Max(maxY, y);
+                profondeur = Mathf.Min(profondeur, ecran.z);
+            }
+            if (!visible) continue;
+            Rect zone = Rect.MinMaxRect(minX - 16f, minY - 16f, maxX + 16f, maxY + 16f);
+            if (zone.Contains(souris) && profondeur < meilleureProfondeur)
+            {
+                meilleureProfondeur = profondeur;
+                cible = ennemi;
+            }
+        }
+        return cible != null;
+    }
+
     private string NomAffichePnj(PnjState pnj)
     {
         if (pnj == null || string.IsNullOrEmpty(pnj.Metier)) return "Habitant";
@@ -3921,7 +3979,28 @@ public sealed class LibreViesGame : MonoBehaviour
         if (optionsOpen) DessinerOptions();
         if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur " + NomTouche(toucheRenaître) + " pour renaître", boxStyle);
         if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 128, 300, 35), infoMessage, titleStyle);
+        if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
+            "NOTER L'ÉDITION", buttonStyle))
+            notationOpen = !notationOpen;
+        if (notationOpen) DessinerNotationEdition();
         if (conversationOpen) DessinerConversation();
+    }
+
+    private void DessinerNotationEdition()
+    {
+        Rect cadre = new Rect(Screen.width - 270f, Screen.height - 178f, 256f, 126f);
+        GUI.Box(cadre, "NOTER L'ÉDITION", boxStyle);
+        GUI.Label(new Rect(cadre.x + 12f, cadre.y + 32f, 232f, 24f),
+            "Votre note :", smallStyle);
+        for (int i = 0; i < 5; i++)
+        {
+            if (GUI.Button(new Rect(cadre.x + 12f + i * 46f, cadre.y + 68f, 38f, 30f),
+                (i + 1).ToString(), buttonStyle))
+            {
+                notationOpen = false;
+                ShowInfo("Note enregistrée : " + (i + 1) + "/5");
+            }
+        }
     }
 
     private void DessinerCorrectionCouleur()

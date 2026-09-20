@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 70 : portique élargi et personnages opaques
-                        ; version 0.5.70
+Derniere mise a jour : 20/09/2026 - MAJ 71 : portail 7 m et attaque ciblée
+                        ; version 0.5.71
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -27,6 +27,27 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
   coudes et des genoux afin de fermer les raccords pendant les flexions, sans
   réintroduire les bouchons circulaires qui étaient visibles aux articulations.
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 71 — PORTAIL 7 M, ATTAQUE CIBLEE ET JONCTIONS DES BRAS (20/09/2026)
+================================================================================
+
+- Les ouvertures nord et sud du village font maintenant 7 m de passage libre.
+  La détection de la clôture et les barrières exclues utilisent la même largeur
+  pour que le portique parte réellement des deux côtés de l'enclos.
+- Le bâtiment de la Forge est rehaussé de 50 cm.
+- Un clic gauche sur le sol ne déclenche plus le bras d'attaque : l'attaque à
+  la souris se déclenche seulement si le clic vise le corps d'un monstre. Le
+  bouton d'attaque remappé au clavier reste disponible.
+- Les bras utilisent des bouchons uniquement à leurs extrémités extérieures,
+  avec des recouvrements plus longs entre les segments pour supprimer les
+  jonctions cylindriques visibles et les trous aux épaules.
+- L'enclume est avancée et décalée vers la Forge pour dégager les jambes ; le
+  marteau est resynchronisé avec une amplitude inverse plus nette par rapport
+  au bras.
+- Un bouton « NOTER L'ÉDITION » apparaît en bas à droite avec un petit choix
+  de note de 1 à 5.
+- Version de cette MAJ : 0.5.71. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 70 — PORTIQUE ELARGI, PERSONNAGES OPAQUES ET ATELIER DU FORGERON (20/09/2026)

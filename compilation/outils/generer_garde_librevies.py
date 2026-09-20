@@ -41,7 +41,8 @@ def add_face(indices, material):
     face_objects.append(active_object)
 
 
-def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
+def add_ring_surface(name, material, rings, segments=16, phase=0.0,
+                     caps=True, cap_start=None, cap_end=None):
     global active_object
     active_object = name
     starts = []
@@ -58,16 +59,21 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
             d = starts[r + 1] + i
             add_face((a, c, b), material)
             add_face((a, d, c), material)
-    if caps:
+    if cap_start is None:
+        cap_start = caps
+    if cap_end is None:
+        cap_end = caps
+    if cap_start:
         bottom = len(vertices) + 1
         x, y, z, _, _ = rings[0]
         vertices.append((x, y, z))
+        for i in range(segments):
+            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
+    if cap_end:
         top = len(vertices) + 1
         x, y, z, _, _ = rings[-1]
         vertices.append((x, y, z))
         for i in range(segments):
-            # Normales des bouchons vers l'extérieur : bas vers -Y, haut vers +Y.
-            add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
             add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
 def add_sphere(name, material, center, scale, segments=16, rings=8):
@@ -137,9 +143,11 @@ add_ring_surface("Guard_ChestPlate", "GuardArmorLight",
 for side, suffix in ((-1, "L"), (1, "R")):
     x = side
     add_ring_surface("Guard_ArmUpper_" + suffix, "GuardArmorLight",
-                     [(.40 * x, 1.58, 0, .13, .13), (.53 * x, 1.30, .01, .115, .115)], 14, caps=True)
+                     [(.40 * x, 1.58, 0, .13, .13), (.53 * x, 1.30, .01, .115, .115)],
+                     14, caps=False, cap_start=True)
     add_ring_surface("Guard_ArmLower_" + suffix, "GuardArmor",
-                     [(.43 * x, 1.48, .01, .125, .125), (.57 * x, 1.18, .03, .10, .10)], 14, caps=True)
+                     [(.43 * x, 1.48, .01, .125, .125), (.57 * x, 1.14, .03, .10, .10)],
+                     14, caps=False)
     add_sphere("Guard_Glove_" + suffix, "GuardLeather",
                (.59 * x, 1.10, .04), (.11, .13, .10), 14, 6)
     add_box("Guard_Shoulder_" + suffix, "GuardArmorLight",
