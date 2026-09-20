@@ -50,10 +50,21 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "nouvelleDimension" in CS
     assert "ModifierTailleMur" in CS
     assert "CadreEditionMaison" in CS
+    assert "editionOutilMaison" in CS
+    assert "MODIFIER LES FENETRES" in CS
+    assert "MODIFIER LA PORTE" in CS
+    assert "MODIFIER LE TOIT" in CS
+    assert "AppliquerMateriauMaison" in CS
+    assert "MaisonSousToitSouris" in CS
     assert "DessinerEditionMaison" in CS
     assert 'GUI.Button(new Rect(cadre.x + 242f' in CS
     assert 'GUI.Button(new Rect(cadre.x + 304f' in CS
-    assert "editionModeMurs" in CS
+    assert "editionOutilMaison" in CS
+    assert "MODIFIER LES FENETRES" in CS
+    assert "MODIFIER LA PORTE" in CS
+    assert "MODIFIER LE TOIT" in CS
+    assert "AppliquerMateriauMaison" in CS
+    assert "MaisonSousToitSouris" in CS
     assert "Stack<HistoriqueEdition>" in CS
     assert "AjouterHistoriqueEdition" in CS
     assert "SupprimerFichierHistoriqueEdition" in CS

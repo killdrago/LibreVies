@@ -104,7 +104,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly Stack<HistoriqueEdition> historiqueEdition = new Stack<HistoriqueEdition>();
     private bool editionMaisonEnDeplacement;
     private bool editionRedimensionnement;
-    private bool editionModeMurs;
+    // 0 = deplacement, 1 = murs, 2 = fenetres, 3 = porte, 4 = toit.
+    private int editionOutilMaison;
     private int coteRedimensionnement;
     private Vector3 pointDepartRedimensionnement;
     private Vector3 decalageLocalMaisonEdition;
@@ -284,6 +285,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public Color CouleurPancarte;
         public int StylePancarte;
         public bool SoulignePancarte;
+        public string MateriauMur;
+        public string MateriauFenetre;
+        public string MateriauPorte;
+        public string MateriauToit;
     }
 
     [Serializable]
@@ -361,6 +366,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public float ProfondeurInitiale;
         public float Hauteur;
         public float SolY;
+        public string MateriauMur;
+        public string MateriauFenetre;
+        public string MateriauPorte;
+        public string MateriauToit;
         public bool EditionSoulevee;
         public Obstacle Collision;
     }
@@ -974,6 +983,17 @@ public sealed class LibreViesGame : MonoBehaviour
                     element.Facade.Souligne = coordonnee.SoulignePancarte;
                     AppliquerStylePancarte(element.Facade);
                 }
+                if (element != null && element.Maison != null)
+                {
+                    if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
+                        AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
+                    if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
+                        AppliquerMateriauMaison(element.Maison, "fenetre", coordonnee.MateriauFenetre);
+                    if (!string.IsNullOrEmpty(coordonnee.MateriauPorte))
+                        AppliquerMateriauMaison(element.Maison, "porte", coordonnee.MateriauPorte);
+                    if (!string.IsNullOrEmpty(coordonnee.MateriauToit))
+                        AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
+                }
                 utilisees.Add(objet);
             }
             SynchroniserTousLesBatiments();
@@ -1004,7 +1024,11 @@ public sealed class LibreViesGame : MonoBehaviour
                     Position = objet.position,
                     Rotation = objet.rotation,
                     Echelle = objet.localScale,
-                    TextePancarte = null
+                    TextePancarte = null,
+                    MateriauMur = null,
+                    MateriauFenetre = null,
+                    MateriauPorte = null,
+                    MateriauToit = null
                 };
                 ElementEdition element = TrouverElementEdition(objet);
                 if (element != null && element.Facade != null)
@@ -1014,6 +1038,13 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.StylePancarte = element.Facade.Texte == null
                         ? (int)FontStyle.Normal : (int)element.Facade.Texte.fontStyle;
                     coordonnee.SoulignePancarte = element.Facade.Souligne;
+                }
+                if (element != null && element.Maison != null)
+                {
+                    coordonnee.MateriauMur = element.Maison.MateriauMur;
+                    coordonnee.MateriauFenetre = element.Maison.MateriauFenetre;
+                    coordonnee.MateriauPorte = element.Maison.MateriauPorte;
+                    coordonnee.MateriauToit = element.Maison.MateriauToit;
                 }
                 fichier.Objets.Add(coordonnee);
             }
@@ -1042,6 +1073,8 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
         MakeMaterial("Carton", new Color(0.62f, 0.35f, 0.12f));
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
+        MakeMaterial("Brique", new Color(0.58f, 0.18f, 0.10f));
+        MakeMaterial("Moquette", new Color(0.30f, 0.12f, 0.28f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
@@ -2058,7 +2091,10 @@ public sealed class LibreViesGame : MonoBehaviour
             Root = root,
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z,
             LargeurInitiale = size.x, ProfondeurInitiale = size.z,
-            Hauteur = size.y, SolY = root.position.y, Collision = collisionMaison
+            Hauteur = size.y, SolY = root.position.y,
+            MateriauMur = "Wall", MateriauFenetre = "Glass",
+            MateriauPorte = "Wood", MateriauToit = materiauToit,
+            Collision = collisionMaison
         };
         batiments.Add(batiment);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
@@ -2198,9 +2234,44 @@ public sealed class LibreViesGame : MonoBehaviour
             + NomCoteRedimensionnement(cote));
     }
 
+    private void AppliquerMateriauMaison(Batiment batiment, string cible, string materiau)
+    {
+        if (batiment == null || batiment.Root == null || string.IsNullOrEmpty(materiau)) return;
+        if (cible == "mur") batiment.MateriauMur = materiau;
+        else if (cible == "fenetre") batiment.MateriauFenetre = materiau;
+        else if (cible == "porte") batiment.MateriauPorte = materiau;
+        else if (cible == "toit") batiment.MateriauToit = materiau;
+        Material materiel = Mat(materiau);
+        if (materiel == null) return;
+        Transform[] enfants = batiment.Root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < enfants.Length; i++)
+        {
+            string nom = enfants[i].name ?? "";
+            bool concerne = cible == "mur"
+                ? (nom == "Murs" || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
+                : (cible == "fenetre" ? nom == "Fenetre"
+                : (cible == "porte" ? nom == "Porte" : nom.StartsWith("Toit_")));
+            if (!concerne) continue;
+            Renderer rendu = enfants[i].GetComponent<Renderer>();
+            if (rendu != null) rendu.sharedMaterial = materiel;
+        }
+    }
+
+    private void DessinerChoixMateriaux(Batiment batiment, string cible,
+        string[] libelles, string[] materiaux, float y)
+    {
+        GUI.Label(new Rect(34f, y, 150f, 24f), "Couleur / revetement :", smallStyle);
+        for (int i = 0; i < libelles.Length; i++)
+        {
+            float x = 174f + i * 59f;
+            if (GUI.Button(new Rect(x, y - 2f, 54f, 28f), libelles[i], buttonStyle))
+                AppliquerMateriauMaison(batiment, cible, materiaux[i]);
+        }
+    }
+
     private Rect CadreEditionMaison()
     {
-        return new Rect(18f, Screen.height - 255f, 390f, 235f);
+        return new Rect(18f, Screen.height - 360f, 430f, 340f);
     }
 
     private bool SourisSurPanneauMaison()
@@ -2219,30 +2290,68 @@ public sealed class LibreViesGame : MonoBehaviour
             || elementEditionDernierSelectionne.Maison == null
             || elementEditionDernierSelectionne.Facade != null) return;
         Rect cadre = CadreEditionMaison();
+        Batiment batiment = elementEditionDernierSelectionne.Maison;
         GUI.Box(cadre, "MAISON SELECTIONNEE", boxStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 350f, 22f),
-            editionModeMurs ? "MODE MURS : chaque clic vaut 0,5 m" : "MODE DEPLACEMENT : maintenez le clic",
-            smallStyle);
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 56f, 358f, 30f),
-            editionModeMurs ? "REVENIR AU DEPLACEMENT" : "MODIFIER LES MURS",
-            buttonStyle))
-            editionModeMurs = !editionModeMurs;
-        if (!editionModeMurs)
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
+            "Choisissez une action : une seule action a la fois.", smallStyle);
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 56f, 190f, 30f),
+            "DEPLACER LA MAISON", buttonStyle)) editionOutilMaison = 0;
+        if (GUI.Button(new Rect(cadre.x + 216f, cadre.y + 56f, 190f, 30f),
+            "MODIFIER LES MURS", buttonStyle)) editionOutilMaison = 1;
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 91f, 190f, 30f),
+            "MODIFIER LES FENETRES", buttonStyle)) editionOutilMaison = 2;
+        if (GUI.Button(new Rect(cadre.x + 216f, cadre.y + 91f, 190f, 30f),
+            "MODIFIER LA PORTE", buttonStyle)) editionOutilMaison = 3;
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 126f, 190f, 30f),
+            "MODIFIER LE TOIT", buttonStyle)) editionOutilMaison = 4;
+        if (editionOutilMaison == 0)
         {
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 98f, 350f, 72f),
-                "Cliquez la maison puis maintenez le clic pour la\ndeplacer. Les murs se modifient dans le\nmode dedie, sans melanger les deux actions.", smallStyle);
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 176f, 390f, 54f),
+                "Maintenez le clic sur la maison pour la deplacer.\n"
+                    + "Les autres boutons ne deplacent pas la maison.", smallStyle);
             return;
         }
-        string[] noms = { "MUR GAUCHE", "MUR DROIT", "FACE ARRIERE", "FACE AVANT" };
-        int[] cotes = { -1, 1, -2, 2 };
-        for (int i = 0; i < noms.Length; i++)
+        if (editionOutilMaison == 1)
         {
-            float y = cadre.y + 94f + i * 31f;
-            GUI.Label(new Rect(cadre.x + 16f, y, 170f, 27f), noms[i], smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 27f), "<", buttonStyle))
-                ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], false);
-            if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 27f), ">", buttonStyle))
-                ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], true);
+            string[] noms = { "MUR GAUCHE", "MUR DROIT", "FACE ARRIERE", "FACE AVANT" };
+            int[] cotes = { -1, 1, -2, 2 };
+            for (int i = 0; i < noms.Length; i++)
+            {
+                float y = cadre.y + 166f + i * 29f;
+                bool inverse = cotes[i] == 1 || cotes[i] == 2;
+                GUI.Label(new Rect(cadre.x + 16f, y, 165f, 26f), noms[i], smallStyle);
+                if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 26f), "<", buttonStyle))
+                    ModifierTailleMur(batiment, cotes[i], inverse);
+                if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 26f), ">", buttonStyle))
+                    ModifierTailleMur(batiment, cotes[i], !inverse);
+            }
+            DessinerChoixMateriaux(batiment, "mur",
+                new[] { "MUR", "BOIS", "BRIQUE", "MOQUET" },
+                new[] { "Wall", "Wood", "Brique", "Moquette" }, cadre.y + 287f);
+        }
+        else if (editionOutilMaison == 2)
+        {
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+                "Les fenetres restent attachees a la maison.", smallStyle);
+            DessinerChoixMateriaux(batiment, "fenetre",
+                new[] { "VERRE", "BLEU", "BOIS", "METAL" },
+                new[] { "Glass", "GlassBleu", "Wood", "Metal" }, cadre.y + 220f);
+        }
+        else if (editionOutilMaison == 3)
+        {
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+                "La porte reste a sa hauteur et sur la maison.", smallStyle);
+            DessinerChoixMateriaux(batiment, "porte",
+                new[] { "BOIS", "CLAIR", "METAL", "BRIQUE" },
+                new[] { "Wood", "Bois_Clair", "Metal", "Brique" }, cadre.y + 220f);
+        }
+        else
+        {
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+                "Le toit s'adapte automatiquement aux dimensions.", smallStyle);
+            DessinerChoixMateriaux(batiment, "toit",
+                new[] { "TUILE", "BLEU", "ROUGE", "BOIS" },
+                new[] { "Roof", "RoofBlue", "RoofRed", "Wood" }, cadre.y + 220f);
         }
     }
 
@@ -2318,10 +2427,35 @@ public sealed class LibreViesGame : MonoBehaviour
         return true;
     }
 
+    private ElementEdition MaisonSousToitSouris()
+    {
+        if (gameCamera == null) return null;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        RaycastHit touche;
+        if (!Physics.Raycast(rayon, out touche, 1000f, ~0,
+            QueryTriggerInteraction.Ignore)) return null;
+        Transform toucheTransform = touche.transform;
+        if (toucheTransform == null || !toucheTransform.name.StartsWith("Toit_")) return null;
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            if (toucheTransform == batiment.Root || toucheTransform.IsChildOf(batiment.Root))
+                return TrouverElementEdition(batiment.Root);
+        }
+        return null;
+    }
+
     private bool TryTrouverElementEdition(out ElementEdition cible)
     {
         cible = null;
         if (gameCamera == null) return false;
+        ElementEdition maisonSousToit = MaisonSousToitSouris();
+        if (maisonSousToit != null)
+        {
+            cible = maisonSousToit;
+            return true;
+        }
         Vector2 souris = Input.mousePosition;
         float meilleureAire = float.MaxValue;
         float meilleureProfondeur = float.MaxValue;
@@ -2502,7 +2636,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!TryTrouverElementEdition(out cible)) return;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
-        if (editionModeMurs)
+        if (editionOutilMaison != 0)
         {
             if (cible.Maison != null)
                 elementEditionDernierSelectionne = cible;
@@ -2663,7 +2797,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             elementEditionSelectionne = null;
             elementEditionDernierSelectionne = null;
-            editionModeMurs = false;
+            editionOutilMaison = 0;
         }
         if (modeEdition)
             ShowInfo("MODE EDITION : clic maintenu pour deplacer, ECHAP pour annuler");
