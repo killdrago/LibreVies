@@ -994,14 +994,19 @@ public sealed class LibreViesGame : MonoBehaviour
             objet.AddComponent<MeshRenderer>();
         }
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
-        float hauteurBasse = Mathf.Min(batiment.HauteurInitiale, 1f / echelleY);
+        float hauteurPorte = batiment.PorteHauteur > 0.001f
+            ? batiment.PorteHauteur : HauteurPorteConfortable;
+        // La hauteur du mur interieur correspond a la moitie de la porte,
+        // en metres dans le monde meme si la maison a ete redimensionnee.
+        float hauteurBasse = Mathf.Min(batiment.HauteurInitiale,
+            hauteurPorte * 0.5f / echelleY);
         var maillageBas = new Maillage();
-        // Aucun plafond horizontal : depuis l'interieur, le centre de la
-        // maison doit rester le sol normal. Seuls les cotes du mur bas de 1 m
-        // sont conserves.
+        // Le centre de la maison doit rester le sol normal : le dessus est
+        // ajoute uniquement sur l'epaisseur des murs perimetriques, jamais
+        // comme une plaque qui couvrirait toute la maison.
         maillageBas.MurAvecOuvertures(batiment.LargeurInitiale,
             batiment.ProfondeurInitiale, hauteurBasse,
-            centres.ToArray(), tailles.ToArray(), false);
+            centres.ToArray(), tailles.ToArray(), false, true);
         MeshFilter filtreBas = batiment.MursBasRoot.GetComponent<MeshFilter>();
         MeshRenderer renduBas = batiment.MursBasRoot.GetComponent<MeshRenderer>();
         filtreBas.sharedMesh = maillageBas.VersMesh("Murs_Bas_Interieur_"
@@ -2162,7 +2167,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // avant. Le verre ne masque donc plus un cube de mur derriere lui,
         // tandis que la face arriere reste une paroi pleine.
         public void MurAvecOuvertures(float largeur, float profondeur, float hauteur,
-            Vector2[] centres, Vector2[] tailles, bool avecDessus = true)
+            Vector2[] centres, Vector2[] tailles, bool avecDessus = true,
+            bool dessusPerimetre = false)
         {
             float x = largeur * 0.5f;
             float z = profondeur * 0.5f;
@@ -2184,6 +2190,55 @@ public sealed class LibreViesGame : MonoBehaviour
             // reste plein : aucune fausse porte/fenetre ni ombre projetee ne
             // peut apparaitre au fond de la maison.
             FaceAvecOuvertures(largeur, z, hauteur, centres, tailles, true);
+            if (dessusPerimetre)
+                AjouterDessusPerimetre(largeur, profondeur, hauteur, centres, tailles);
+        }
+
+        private void AjouterDessusPerimetre(float largeur, float profondeur,
+            float hauteur, Vector2[] centres, Vector2[] tailles)
+        {
+            float x = largeur * 0.5f;
+            float z = profondeur * 0.5f;
+            const float epaisseur = 0.18f;
+            float e = Mathf.Min(epaisseur, Mathf.Min(x, z) * 0.45f);
+
+            // Dessus du mur arriere, des deux murs lateraux et des seuls
+            // segments pleins de la facade avant. Ces petites bandes ferment
+            // l'epaisseur du mur vues d'en haut sans recouvrir le sol central.
+            Quad(new Vector3(-x, hauteur, -z), new Vector3(x, hauteur, -z),
+                new Vector3(x, hauteur, -z + e), new Vector3(-x, hauteur, -z + e));
+            Quad(new Vector3(-x, hauteur, -z), new Vector3(-x, hauteur, z),
+                new Vector3(-x + e, hauteur, z), new Vector3(-x + e, hauteur, -z));
+            Quad(new Vector3(x, hauteur, -z), new Vector3(x - e, hauteur, -z),
+                new Vector3(x - e, hauteur, z), new Vector3(x, hauteur, z));
+
+            var bornesX = new List<float> { -x, x };
+            for (int i = 0; i < centres.Length && i < tailles.Length; i++)
+            {
+                AjouterBorne(bornesX, centres[i].x - tailles[i].x * 0.5f);
+                AjouterBorne(bornesX, centres[i].x + tailles[i].x * 0.5f);
+            }
+            bornesX.Sort();
+            for (int i = 0; i < bornesX.Count - 1; i++)
+            {
+                float centreX = (bornesX[i] + bornesX[i + 1]) * 0.5f;
+                bool ouverture = false;
+                for (int j = 0; j < centres.Length && j < tailles.Length; j++)
+                {
+                    if (Mathf.Abs(centreX - centres[j].x) < tailles[j].x * 0.5f
+                        && hauteur > centres[j].y - tailles[j].y * 0.5f
+                        && hauteur < centres[j].y + tailles[j].y * 0.5f)
+                    {
+                        ouverture = true;
+                        break;
+                    }
+                }
+                if (ouverture) continue;
+                Quad(new Vector3(bornesX[i], hauteur, z),
+                    new Vector3(bornesX[i + 1], hauteur, z),
+                    new Vector3(bornesX[i + 1], hauteur, z - e),
+                    new Vector3(bornesX[i], hauteur, z - e));
+            }
         }
 
         private void FaceAvecOuvertures(float largeur, float z, float hauteur,
@@ -5375,8 +5430,9 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int j = 0; j < rendus.Length; j++)
         {
             Renderer rendu = rendus[j];
-            // Le mur bas de 1 m remplace le mur complet. La porte reste,
-            // elle, entierement visible pour que le joueur retrouve la sortie.
+            // Le mur bas, haut de la moitie de la porte, remplace le mur
+            // complet. La porte reste, elle, entierement visible pour que le
+            // joueur retrouve la sortie.
             if (maisonInterieure.MursBasRoot != null
                 && rendu.transform.IsChildOf(maisonInterieure.MursBasRoot)) continue;
             if (maisonInterieure.PorteRoot != null
