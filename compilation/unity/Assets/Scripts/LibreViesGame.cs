@@ -2492,7 +2492,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // La dalle couvre toute l'empreinte du mur et depasse tres
         // legerement sous celui-ci : elle ne laisse aucun jour visible depuis
         // le dessus, sur aucun des quatre cotes de la maison.
-        const float recouvrementDalle = 0.10f;
+        const float recouvrementDalle = 0.02f;
         Box(new Vector3(0f, 0.31f, 0f),
             new Vector3(Mathf.Max(size.x + recouvrementDalle, 1.2f), 0.08f,
                 Mathf.Max(size.z + recouvrementDalle, 1.2f)), "Wood", root, "Sol_Interieur");
