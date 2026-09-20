@@ -151,12 +151,12 @@ for side in (-1, 1):
     x = side
     add_ring_surface("SleeveUpper_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.40 * x, 1.58, 0, .13, .13), (.45 * x, 1.46, .01, .125, .125),
-        (.53 * x, 1.30, .02, .12, .12)], 14, pi / 14, caps=False)
+        (.53 * x, 1.30, .02, .12, .12)], 14, pi / 14, caps=True)
     add_ring_surface("SleeveLower_" + ("L" if side < 0 else "R"), "JacketLight", [
         (.43 * x, 1.48, .02, .13, .13), (.54 * x, 1.29, .03, .11, .11),
-        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14, caps=False)
+        (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14, caps=True)
     add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
-        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=False)
+        (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=True)
     add_sphere("Hand_" + ("L" if side < 0 else "R"), "SkinLight",
                (.62 * x, 1.05, .05), (.105, .13, .10), 20, 8)
 
@@ -180,19 +180,10 @@ for side in (-1, 1):
     add_sphere("Brow_" + suffix, "Brow",
                (side * .085, 2.095, .194), (.050, .014, .010), 16, 5)
 
-# Details de veste et de jean : fermeture, poches et boutons. Ils suivent le
-# torse fixe comme sur une tenue civile, au lieu d'un simple tube colore.
+# Détails de veste : uniquement la fermeture et les boutons. Les anciennes
+# poches et plaques rapportées ont été retirées pour garder une silhouette
+# souple et éviter les volumes rigides sur le torse et les genoux.
 add_box("JacketZip", "JacketTrim", (0, 1.43, .216), (.025, .48, .026))
-for side in (-1, 1):
-    suffix = "L" if side < 0 else "R"
-    # Details très fins : ils doivent lire comme des revers et des poches,
-    # pas comme des plaques rigides collées au torse ou aux genoux.
-    add_box("JacketLapel_" + suffix, "JacketLight",
-            (side * .145, 1.53, .205), (.075, .30, .012))
-    add_box("JacketPocket_" + suffix, "JacketLight",
-            (side * .205, 1.25, .218), (.18, .085, .010))
-    add_box("JeansPocket_" + suffix, "JeansLight",
-            (side * .235, .88, .149), (.13, .070, .008))
 for y in (1.31, 1.45, 1.59):
     add_sphere("JacketButton_" + str(y).replace(".", "_"), "JacketTrim",
                (0, y, .222), (.020, .020, .012), 12, 5)

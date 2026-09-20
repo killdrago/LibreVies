@@ -137,9 +137,9 @@ add_ring_surface("Guard_ChestPlate", "GuardArmorLight",
 for side, suffix in ((-1, "L"), (1, "R")):
     x = side
     add_ring_surface("Guard_ArmUpper_" + suffix, "GuardArmorLight",
-                     [(.40 * x, 1.58, 0, .13, .13), (.53 * x, 1.30, .01, .115, .115)], 14, caps=False)
+                     [(.40 * x, 1.58, 0, .13, .13), (.53 * x, 1.30, .01, .115, .115)], 14, caps=True)
     add_ring_surface("Guard_ArmLower_" + suffix, "GuardArmor",
-                     [(.43 * x, 1.48, .01, .125, .125), (.57 * x, 1.18, .03, .10, .10)], 14, caps=False)
+                     [(.43 * x, 1.48, .01, .125, .125), (.57 * x, 1.18, .03, .10, .10)], 14, caps=True)
     add_sphere("Guard_Glove_" + suffix, "GuardLeather",
                (.59 * x, 1.10, .04), (.11, .13, .10), 14, 6)
     add_box("Guard_Shoulder_" + suffix, "GuardArmorLight",

@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 69 : portails réalignes et conversations PNJ
-                        ; version 0.5.69
+Derniere mise a jour : 20/09/2026 - MAJ 70 : portique élargi et personnages opaques
+                        ; version 0.5.70
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -29,13 +29,37 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
+MAJ 70 — PORTIQUE ELARGI, PERSONNAGES OPAQUES ET ATELIER DU FORGERON (20/09/2026)
+================================================================================
+
+- Les sorties nord et sud ont maintenant 5 m de passage libre entre les faces
+  internes des poteaux. Les linteaux, pancartes et textes sont recalcules sur
+  cette largeur ; les gardes restent décalés sur le côté de la route.
+- Les poches, revers rapportés et plaques trop visibles ont été retirés des
+  personnages. Les extrémités des bras importés sont fermées par des faces
+  orientées vers l'extérieur afin de supprimer les trous transparents aux
+  épaules et juste au-dessus des mains.
+- La maison de l'Entrepôt est 50 cm plus haute. La maison Esthétique est 1 m
+  plus large pour accueillir sa pancarte.
+- Le PNJ devant l'Entrepôt ne saute plus. Sa table est remplacée par des
+  cartons posés au sol.
+- Tous les PNJ restent maintenant à leur hauteur de terrain, sans oscillation
+  verticale. La feuille du maire est attachée à sa main.
+- Le marteau du forgeron suit la main avec un mouvement inverse du bras. Son
+  ancienne table-cube est remplacée par une enclume modélisée avec socle,
+  col, plateau et corne, posée au sol et plus haute.
+- Un clic gauche n'importe où sur le corps visible d'un PNJ ouvre la
+  conversation, et non plus seulement un clic sur ses pieds.
+- Version de cette MAJ : 0.5.70. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
 MAJ 69 — PORTAILS REALIGNES, MEDECIN ET CONVERSATIONS PNJ (20/09/2026)
 ================================================================================
 
 - La route traverse maintenant l'enceinte au nord et au sud. Chaque portail
   est recentre sur sa sortie, avec 50 cm de passage libre entre les faces
-  internes des poteaux. Le linteau et la pancarte sont dimensionnes sur l'encombrement des poteaux afin
-  de les rejoindre sans décalage latéral.
+  internes des poteaux. Le linteau et la pancarte sont dimensionnes sur
+  l'encombrement des poteaux afin de les rejoindre sans décalage latéral.
 - Les gardes restent à leur portail, mais sont décalés de 2 m sur le côté de
   la route pour ne plus bloquer le passage au milieu des pavés.
 - Une maison du nord est renommée « ESTHÉTIQUE » avec une pancarte agrandie.

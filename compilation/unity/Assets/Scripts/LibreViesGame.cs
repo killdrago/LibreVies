@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.69";
+    private const string VersionJeu = "0.5.70";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -588,6 +588,7 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Dirt", new Color(0.45f, 0.30f, 0.17f));
         MakeMaterial("Stone", new Color(0.42f, 0.45f, 0.48f));
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
+        MakeMaterial("Carton", new Color(0.62f, 0.35f, 0.12f));
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
@@ -1534,13 +1535,13 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(19, 0, 10), new Vector3(8, 5, 8), "Maison_Est");
         CreateBuilding(new Vector3(-17, 0, -14), new Vector3(7, 3.5f, 7), "Atelier");
         CreateBuilding(new Vector3(18, 0, -15), new Vector3(9, 4, 7), "Auberge");
-        CreateBuilding(new Vector3(-28, 0, -1), new Vector3(6, 3, 6), "Entrepot");
+        CreateBuilding(new Vector3(-28, 0, -1), new Vector3(6, 3.5f, 6), "Entrepot");
         CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3, 6), "Forge");
         // La mairie est proche du centre, mais decalee de la route.
         CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
         // Cette maison devient le salon d'esthétique : le nom est porté par
         // sa pancarte et le médecin attend juste devant sa façade.
-        CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Esthetique");
+        CreateBuilding(new Vector3(-27, 0, 20), new Vector3(6, 3.5f, 5), "Esthetique");
         // Maison_Sud est remise sur le terrain plat du village, loin de la
         // colline du chateau : son socle ne s'enfonce plus dans la pente.
         // La maison devant l'auberge revient a son axe d'origine puis est
@@ -1792,10 +1793,10 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 passage = new Vector2(Mathf.Cos(am) * VillageRadius, Mathf.Sin(am) * VillageRadius);
             // Le portique est recentré exactement sur la sortie : aucun
             // décalage latéral ne doit repousser la sortie nord (ou sud) vers
-            // la gauche. Les faces internes des deux poteaux laissent 50 cm.
+            // la gauche. Les faces internes des deux poteaux laissent 5 m.
             Vector2 tangente = TangenteRouteProche(passage);
             Vector2 travers = new Vector2(-tangente.y, tangente.x).normalized;
-            const float largeurLibre = 0.50f;
+            const float largeurLibre = 5.0f;
             const float demiPoteau = 0.15f; // cylindre scale .30 => rayon .15
             float demiEspacementCentres = largeurLibre * 0.5f + demiPoteau;
             Vector2 pilierGauche = passage - travers * demiEspacementCentres;
@@ -1851,8 +1852,8 @@ public sealed class LibreViesGame : MonoBehaviour
         float hauteur = position.y + 0.14f;
         Vector3 faceExterieure = new Vector3(position.x, hauteur, position.z) + normale * 0.22f;
         Vector3 faceInterieure = new Vector3(position.x, hauteur, position.z) - normale * 0.22f;
-        GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.065f);
-        GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.065f);
+        GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.12f);
+        GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.12f);
         if (exterieur != null)
         {
             exterieur.name = "Texte_Portail_Exterieur";
@@ -1885,9 +1886,9 @@ public sealed class LibreViesGame : MonoBehaviour
             if (distance < 0.001f) continue;
             Vector2 tangente = TangenteRouteProche(portail);
             Vector2 coteRoute = new Vector2(-tangente.y, tangente.x).normalized;
-            // Le garde reste à l'intérieur de la clôture, mais à 2 m du
-            // centre de la route : le passage et les dalles restent lisibles.
-            Vector2 poste = portail.normalized * (VillageRadius * 0.95f) + coteRoute * 2.0f;
+            // Le garde reste à l'intérieur de la clôture, au-delà de la
+            // bordure de la route : le passage et les dalles restent libres.
+            Vector2 poste = portail.normalized * (VillageRadius * 0.95f) + coteRoute * 4.2f;
             CreerGarde(poste, portail);
         }
     }
@@ -2111,6 +2112,48 @@ public sealed class LibreViesGame : MonoBehaviour
         // donne pas d'experience au heros (c'est le garde qui l'a tue).
     }
 
+    private void CreerEnclumeForgeron(Transform parent)
+    {
+        var racine = new GameObject("Enclume_Forgeron").transform;
+        racine.SetParent(parent, false);
+        // Le socle commence au niveau du terrain ; le plateau est à hauteur
+        // des coups du marteau, au lieu de flotter comme l'ancien cube.
+        racine.localPosition = new Vector3(0f, 0f, 0.32f);
+
+        var socle = new Maillage();
+        socle.BoiteBiseautee(0.62f, 0.48f, 0.42f, 0.08f);
+        GameObject socleObjet = ObjetMaillage("Enclume_Socle", socle.VersMesh("Enclume_Socle"), "Metal");
+        socleObjet.transform.SetParent(racine, false);
+
+        var col = new Maillage();
+        col.BoiteBiseautee(0.36f, 0.32f, 0.30f, 0.06f);
+        GameObject colObjet = ObjetMaillage("Enclume_Col", col.VersMesh("Enclume_Col"), "Metal");
+        colObjet.transform.SetParent(racine, false);
+        colObjet.transform.localPosition = new Vector3(0f, 0.42f, 0f);
+
+        var plateau = new Maillage();
+        plateau.BoiteBiseautee(0.92f, 0.42f, 0.14f, 0.07f);
+        GameObject plateauObjet = ObjetMaillage("Enclume_Plateau", plateau.VersMesh("Enclume_Plateau"), "Metal");
+        plateauObjet.transform.SetParent(racine, false);
+        plateauObjet.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+
+        // Corne conique orientée vers l'avant de l'établi.
+        var corne = new Maillage();
+        Vector3 baseG = new Vector3(-0.18f, 0.76f, 0.14f);
+        Vector3 baseD = new Vector3(0.18f, 0.76f, 0.14f);
+        Vector3 hautD = new Vector3(0.18f, 0.85f, 0.14f);
+        Vector3 hautG = new Vector3(-0.18f, 0.85f, 0.14f);
+        Vector3 pointe = new Vector3(0f, 0.81f, 0.64f);
+        corne.Triangle(baseG, baseD, pointe);
+        corne.Triangle(baseD, hautD, pointe);
+        corne.Triangle(hautD, hautG, pointe);
+        corne.Triangle(hautG, baseG, pointe);
+        corne.Triangle(baseG, hautG, hautD);
+        corne.Triangle(baseG, hautD, baseD);
+        GameObject corneObjet = ObjetMaillage("Enclume_Corne", corne.VersMesh("Enclume_Corne"), "Metal");
+        corneObjet.transform.SetParent(racine, false);
+    }
+
     private void CreerPnj(Vector3 position, string metier)
     {
         float y = TerrainHeight(position.x, position.z);
@@ -2132,8 +2175,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             "Belt", "Jacket", "Neck", "Collar", "Head", "Ear_L", "Ear_R",
             "EyeWhite_L", "EyeWhite_R", "Eye_L", "Eye_R", "Brow_L", "Brow_R",
-            "Nose", "Mouth", "JacketZip", "JacketLapel_L", "JacketLapel_R",
-            "JacketPocket_L", "JacketPocket_R", "JeansPocket_L", "JeansPocket_R",
+            "Nose", "Mouth", "JacketZip",
             "JacketButton_1_31", "JacketButton_1_45", "JacketButton_1_59",
             "HairCap", "HairBack", "HairLock_L", "HairLock_R"
         };
@@ -2184,41 +2226,40 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else if (metier == "Forgeron")
         {
-            // Enclume et marteau : le marteau est un pivot independant anime
-            // dans UpdatePnj, pour que le geste soit lisible de loin.
-            Box(new Vector3(0f, 0.72f, 0.58f), new Vector3(0.90f, 0.22f, 0.54f), "Metal", root, "Enclume");
-            Box(new Vector3(0f, 0.92f, 0.58f), new Vector3(0.42f, 0.25f, 0.34f), "Metal", root, "Enclume_Tete");
+            // Enclume sur pied, avec plateau et pointe : ce n'est plus un
+            // simple cube flottant. Le marteau est parenté au point de la main.
+            CreerEnclumeForgeron(root);
             pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
-            // Le marteau reste a l'echelle normale du PNJ et son point de
-            // contact est recalculé dans la main importée à chaque image.
-            pnj.Marteau.SetParent(root, false);
-            pnj.Marteau.position = pnj.Main.position;
-            Box(new Vector3(0f, -0.20f, 0f), new Vector3(0.09f, 0.40f, 0.09f), "Bois_Clair", pnj.Marteau, "Manche_Marteau");
-            Box(new Vector3(0f, -0.43f, 0f), new Vector3(0.40f, 0.16f, 0.18f), "Metal", pnj.Marteau, "Tete_Marteau");
+            pnj.Marteau.SetParent(pnj.Main, false);
+            pnj.Marteau.localPosition = Vector3.zero;
+            Box(new Vector3(0f, -0.15f, 0f), new Vector3(0.09f, 0.42f, 0.09f),
+                "Bois_Clair", pnj.Marteau, "Manche_Marteau");
+            Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
+                "Metal", pnj.Marteau, "Tete_Marteau");
         }
         else if (metier == "Maire")
         {
             // La feuille est tenue devant le maire et bouge legerement comme
             // une presentation au public.
             pnj.Feuille = new GameObject("Feuille_Maire").transform;
-            pnj.Feuille.SetParent(root, false);
-            pnj.Feuille.localPosition = new Vector3(0f, 1.33f, 0.47f);
+            pnj.Feuille.SetParent(pnj.Main, false);
+            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, 0.10f);
             Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
             Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
         else if (metier == "Vendeur" || metier == "Marchand")
         {
-            // Un petit etal complet rend le geste du vendeur comprehensible,
-            // meme sans texte : plateau, pieds et marchandises colorees.
-            pnj.Etal = new GameObject("Etal_" + metier).transform;
+            // Le marchand devant l'entrepôt n'a plus de table : les cartons
+            // reposent directement au sol et restent des accessoires du décor.
+            pnj.Etal = new GameObject("Cartons_" + metier).transform;
             pnj.Etal.SetParent(root, false);
             pnj.Etal.localPosition = new Vector3(0f, 0f, 0.72f);
-            Box(new Vector3(0f, 0.83f, 0f), new Vector3(1.45f, 0.16f, 0.72f), "Wood", pnj.Etal, "Plateau_Etal");
-            Box(new Vector3(-0.58f, 0.40f, 0f), new Vector3(0.12f, 0.80f, 0.12f), "Wood", pnj.Etal, "Pied_Etal");
-            Box(new Vector3(0.58f, 0.40f, 0f), new Vector3(0.12f, 0.80f, 0.12f), "Wood", pnj.Etal, "Pied_Etal");
-            Primitive(PrimitiveType.Sphere, new Vector3(-0.38f, 1.02f, 0f), new Vector3(0.22f, 0.22f, 0.22f), "RoofRed", pnj.Etal, "Marchandise");
-            Primitive(PrimitiveType.Sphere, new Vector3(0f, 1.04f, 0.05f), new Vector3(0.22f, 0.18f, 0.22f), "RoofBlue", pnj.Etal, "Marchandise");
-            Primitive(PrimitiveType.Sphere, new Vector3(0.38f, 1.02f, 0f), new Vector3(0.20f, 0.25f, 0.20f), "Lanterne", pnj.Etal, "Marchandise");
+            Box(new Vector3(-0.28f, 0.24f, 0f), new Vector3(0.52f, 0.48f, 0.52f),
+                "Carton", pnj.Etal, "Carton_Bas_Gauche");
+            Box(new Vector3(0.25f, 0.20f, 0.08f), new Vector3(0.44f, 0.40f, 0.46f),
+                "Carton", pnj.Etal, "Carton_Bas_Droit");
+            Box(new Vector3(-0.02f, 0.67f, 0.02f), new Vector3(0.48f, 0.34f, 0.46f),
+                "Bois_Clair", pnj.Etal, "Carton_Haut");
         }
         ColCercle(position.x, position.z, 0.42f, 2.2f);
         pnjs.Add(pnj);
@@ -2240,22 +2281,22 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (pnj.Metier == "Medecin")
             {
                 balancement = Mathf.Sin(pnj.Phase * 0.8f) * 0.045f;
-                hauteur = Mathf.Sin(pnj.Phase * 0.8f) * 0.012f;
+                hauteur = 0f;
             }
-            else if (pnj.Metier == "Vendeur")
+            else if (pnj.Metier == "Vendeur" || pnj.Metier == "Marchand")
             {
-                balancement = Mathf.Sin(pnj.Phase * 2.2f) * 0.16f;
-                hauteur = Mathf.Sin(pnj.Phase * 2.2f) * 0.025f;
+                balancement = Mathf.Sin(pnj.Phase * 1.4f) * 0.08f;
+                hauteur = 0f;
             }
             else if (pnj.Metier == "Maire")
             {
                 balancement = Mathf.Sin(pnj.Phase * 0.5f) * 0.20f;
-                hauteur = Mathf.Sin(pnj.Phase * 0.5f) * 0.06f;
+                hauteur = 0f;
             }
             else
             {
                 balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
-                hauteur = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.06f;
+                hauteur = 0f;
             }
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
@@ -2268,12 +2309,12 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.GenouD != null) pnj.GenouD.localRotation = Quaternion.Euler(Mathf.Max(0f, Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);
             if (pnj.Marteau != null && pnj.Main != null)
             {
-                float frappe = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f));
-                // Le manche et la tête du marteau suivent le point de la main
-                // importée, au lieu de traverser l'épaule du PNJ.
+                // Le marteau suit la main. Son angle est volontairement
+                // inverse à celui du bras : quand le bras recule, le marteau
+                // avance vers l'enclume, et inversement.
                 pnj.Marteau.position = pnj.Main.position;
                 pnj.Marteau.rotation = pnj.Root.transform.rotation
-                    * Quaternion.Euler(-18f - frappe * 72f, 0f, 0f);
+                    * Quaternion.Euler(-18f - balancement * Mathf.Rad2Deg * 0.65f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
@@ -2281,9 +2322,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     Mathf.Sin(pnj.Phase * 0.6f) * 5f, Mathf.Sin(pnj.Phase * 0.9f) * 4f);
             }
             if (pnj.Etal != null)
-            {
-                pnj.Etal.localRotation = Quaternion.Euler(0f, Mathf.Sin(pnj.Phase * 0.7f) * 2f, 0f);
-            }
+                pnj.Etal.localRotation = Quaternion.identity;
         }
     }
 
@@ -2762,8 +2801,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             "Belt", "Jacket", "Neck", "Collar", "Head", "Ear_L", "Ear_R",
             "EyeWhite_L", "EyeWhite_R", "Eye_L", "Eye_R", "Brow_L", "Brow_R",
-            "Nose", "Mouth", "JacketZip", "JacketLapel_L", "JacketLapel_R",
-            "JacketPocket_L", "JacketPocket_R", "JeansPocket_L", "JeansPocket_R",
+            "Nose", "Mouth", "JacketZip",
             "JacketButton_1_31", "JacketButton_1_45", "JacketButton_1_59",
             "HairCap", "HairBack", "HairLock_L", "HairLock_R"
         };
@@ -3722,21 +3760,43 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (conversationOpen || gameCamera == null || player == null) return false;
         Vector2 souris = Input.mousePosition;
-        float meilleur = 64f;
+        souris.y = Screen.height - souris.y;
+        float meilleureProfondeur = 100000f;
         PnjState cible = null;
         for (int i = 0; i < pnjs.Count; i++)
         {
             PnjState pnj = pnjs[i];
             if (pnj == null || pnj.Root == null || !pnj.Root.activeInHierarchy) continue;
-            Vector3 positionMonde = pnj.Root.transform.position + Vector3.up * 1.10f;
-            if (Vector3.Distance(player.position, positionMonde) > 11f) continue;
-            Vector3 positionEcran = gameCamera.WorldToScreenPoint(positionMonde);
-            if (positionEcran.z <= 0f) continue;
-            Vector2 positionGui = new Vector2(positionEcran.x, Screen.height - positionEcran.y);
-            float distance = Vector2.Distance(souris, positionGui);
-            if (distance < meilleur)
+            Vector3 origine = pnj.Root.transform.position;
+            Vector3[] points =
             {
-                meilleur = distance;
+                origine + Vector3.up * 0.02f,
+                origine + Vector3.up * 2.35f,
+                origine + Vector3.left * 0.72f + Vector3.up * 1.45f,
+                origine + Vector3.right * 0.72f + Vector3.up * 1.45f
+            };
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minY = float.MaxValue;
+            float maxY = float.MinValue;
+            float profondeur = 100000f;
+            bool visible = true;
+            for (int point = 0; point < points.Length; point++)
+            {
+                Vector3 ecran = gameCamera.WorldToScreenPoint(points[point]);
+                if (ecran.z <= 0f) { visible = false; break; }
+                float y = Screen.height - ecran.y;
+                minX = Mathf.Min(minX, ecran.x);
+                maxX = Mathf.Max(maxX, ecran.x);
+                minY = Mathf.Min(minY, y);
+                maxY = Mathf.Max(maxY, y);
+                profondeur = Mathf.Min(profondeur, ecran.z);
+            }
+            if (!visible) continue;
+            Rect zone = Rect.MinMaxRect(minX - 18f, minY - 18f, maxX + 18f, maxY + 18f);
+            if (zone.Contains(souris) && profondeur < meilleureProfondeur)
+            {
+                meilleureProfondeur = profondeur;
                 cible = pnj;
             }
         }
