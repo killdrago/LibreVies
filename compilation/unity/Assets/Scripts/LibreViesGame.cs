@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.74";
+    private const string VersionJeu = "0.5.75";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -91,6 +91,10 @@ public sealed class LibreViesGame : MonoBehaviour
     // Rectangles des batiments : le decor (arbres, lampadaires, caisses...)
     // ne doit jamais etre pose dans un mur.
     private readonly List<Batiment> batiments = new List<Batiment>();
+    // Premier outil du mode edition : les maisons entieres sont encadrees
+    // par un grillage visible, sans modifier leur position ni leur collision.
+    private bool modeEdition;
+    private Material materiauGrillageEdition;
     // Portails du village (position du portail) et gardes qui les surveillent.
     private readonly List<Vector2> portails = new List<Vector2>();
     private readonly List<GardeState> gardes = new List<GardeState>();
@@ -293,6 +297,8 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private sealed class Batiment
     {
+        public Transform Root;
+        public GameObject Grillage;
         public float X;
         public float Z;
         public float Largeur;
@@ -641,6 +647,29 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Route_Terre", new Color(0.46f, 0.30f, 0.16f));
         MakeMaterial("Route_Bord", new Color(0.36f, 0.34f, 0.31f));
         MakeMaterial("Pave_Route", new Color(0.58f, 0.53f, 0.43f));
+        CreerMateriauGrillageEdition();
+    }
+
+    private void CreerMateriauGrillageEdition()
+    {
+        // Le grillage doit rester lisible sur les murs, le toit et le sol.
+        // Unlit est privilegie pour garder une couleur vive quelle que soit
+        // la lumiere ; les replis permettent aux anciennes versions Unity de
+        // conserver le mode edition utilisable.
+        Shader shader = Shader.Find("Unlit/Color");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = ResoudreShader();
+        if (shader == null) return;
+        materiauGrillageEdition = new Material(shader) { name = "Grillage_Mode_Edition" };
+        Color couleur = new Color(0.10f, 0.92f, 1.00f, 1f);
+        if (materiauGrillageEdition.HasProperty("_Color"))
+            materiauGrillageEdition.color = couleur;
+        if (materiauGrillageEdition.HasProperty("_EmissionColor"))
+        {
+            materiauGrillageEdition.EnableKeyword("_EMISSION");
+            materiauGrillageEdition.SetColor("_EmissionColor", couleur);
+        }
+        materiauGrillageEdition.renderQueue = 3000;
     }
 
     private Texture2D TextureRealiste(string nom)
@@ -1599,10 +1628,13 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
         ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
-        batiments.Add(new Batiment
+        Batiment batiment = new Batiment
         {
+            Root = root,
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z
-        });
+        };
+        batiments.Add(batiment);
+        CreerGrillageMaison(batiment, size);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
         // est le cote +z. Les panneaux suivent exactement cette facade.
         Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
@@ -1611,6 +1643,97 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Glass", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
+    }
+
+    private void CreerLigneGrillage(Transform parent, Vector3[] points, string nom)
+    {
+        if (materiauGrillageEdition == null) return;
+        GameObject objet = new GameObject(nom);
+        objet.transform.SetParent(parent, false);
+        LineRenderer ligne = objet.AddComponent<LineRenderer>();
+        ligne.useWorldSpace = false;
+        ligne.positionCount = points.Length;
+        for (int i = 0; i < points.Length; i++) ligne.SetPosition(i, points[i]);
+        ligne.startWidth = 0.055f;
+        ligne.endWidth = 0.055f;
+        ligne.sharedMaterial = materiauGrillageEdition;
+        ligne.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        ligne.receiveShadows = false;
+        ligne.enabled = modeEdition;
+    }
+
+    private void CreerGrillageMaison(Batiment batiment, Vector3 taille)
+    {
+        if (batiment == null || batiment.Root == null || materiauGrillageEdition == null) return;
+        Transform parent = batiment.Root;
+        GameObject grillage = new GameObject("Grillage_Maison_Complete");
+        grillage.transform.SetParent(parent, false);
+        batiment.Grillage = grillage;
+        // La cage depasse de la maison sur les six faces : murs, toit,
+        // cheminee, socle et enseigne restent donc dans la meme selection.
+        float demiX = taille.x * 0.5f + 0.45f;
+        float demiZ = taille.z * 0.5f + 0.45f;
+        float bas = 0.05f;
+        float haut = taille.y + 2.72f;
+        float milieu = taille.y + 1.36f;
+        Vector3[] basRectangle =
+        {
+            new Vector3(-demiX, bas, -demiZ), new Vector3(-demiX, bas, demiZ),
+            new Vector3(demiX, bas, demiZ), new Vector3(demiX, bas, -demiZ),
+            new Vector3(-demiX, bas, -demiZ)
+        };
+        Vector3[] milieuRectangle =
+        {
+            new Vector3(-demiX, milieu, -demiZ), new Vector3(-demiX, milieu, demiZ),
+            new Vector3(demiX, milieu, demiZ), new Vector3(demiX, milieu, -demiZ),
+            new Vector3(-demiX, milieu, -demiZ)
+        };
+        Vector3[] hautRectangle =
+        {
+            new Vector3(-demiX, haut, -demiZ), new Vector3(-demiX, haut, demiZ),
+            new Vector3(demiX, haut, demiZ), new Vector3(demiX, haut, -demiZ),
+            new Vector3(-demiX, haut, -demiZ)
+        };
+        CreerLigneGrillage(grillage.transform, basRectangle, "Grillage_Bas");
+        CreerLigneGrillage(grillage.transform, milieuRectangle, "Grillage_Milieu");
+        CreerLigneGrillage(grillage.transform, hautRectangle, "Grillage_Haut");
+        float[] xs = { -demiX, 0f, demiX };
+        float[] zs = { -demiZ, 0f, demiZ };
+        for (int i = 0; i < xs.Length; i++)
+        {
+            CreerLigneGrillage(grillage.transform, new Vector3[]
+            {
+                new Vector3(xs[i], bas, -demiZ), new Vector3(xs[i], haut, -demiZ)
+            }, "Grillage_Face_Avant_" + i);
+            CreerLigneGrillage(grillage.transform, new Vector3[]
+            {
+                new Vector3(xs[i], bas, demiZ), new Vector3(xs[i], haut, demiZ)
+            }, "Grillage_Face_Arriere_" + i);
+            CreerLigneGrillage(grillage.transform, new Vector3[]
+            {
+                new Vector3(-demiX, bas, zs[i]), new Vector3(-demiX, haut, zs[i])
+            }, "Grillage_Face_Gauche_" + i);
+            CreerLigneGrillage(grillage.transform, new Vector3[]
+            {
+                new Vector3(demiX, bas, zs[i]), new Vector3(demiX, haut, zs[i])
+            }, "Grillage_Face_Droite_" + i);
+        }
+        grillage.SetActive(modeEdition);
+    }
+
+    private void BasculerModeEdition()
+    {
+        modeEdition = !modeEdition;
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment != null && batiment.Grillage != null)
+                batiment.Grillage.SetActive(modeEdition);
+        }
+        if (modeEdition)
+            ShowInfo("MODE EDITION : maisons entieres selectionnees");
+        else
+            ShowInfo("MODE NORMAL");
     }
 
     private string LibelleMaison(string nom)
@@ -2261,10 +2384,12 @@ public sealed class LibreViesGame : MonoBehaviour
             // exactement le bras et ne peut plus rester suspendue au torse.
             pnj.Feuille = new GameObject("Feuille_Maire").transform;
             pnj.Feuille.SetParent(pnj.Main, false);
-            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, 0.10f);
+            // Inversion avant/arriere demandee : la feuille passe du cote
+            // arriere au cote avant de la main, sans quitter son parent anime.
+            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, -0.10f);
             pnj.Feuille.localRotation = Quaternion.identity;
             Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
-            Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
+            Box(new Vector3(0f, 0.18f, 0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
         else if (metier == "Vendeur" || metier == "Marchand")
         {
@@ -2332,7 +2457,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 // recalcule donc pas sa position dans le monde : le parent
                 // entraîne automatiquement position, rotation et animation.
                 pnj.Marteau.localPosition = Vector3.zero;
-                pnj.Marteau.localRotation = Quaternion.Euler(-18f, 0f, 0f);
+                // Inversion avant/arriere du marteau : la tete reste dans
+                // la paume mais bascule du mauvais cote vers le cote avant.
+                pnj.Marteau.localRotation = Quaternion.Euler(18f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
@@ -3261,14 +3388,14 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
 
-        bool clicGauche = Input.GetMouseButtonDown(0);
+        bool clicGauche = !modeEdition && Input.GetMouseButtonDown(0);
         bool clicNpc = clicGauche && TryOuvrirConversation();
         bool clicMonstre = clicGauche && !clicNpc && TryAttaquerMonstreClique();
-        bool attaqueClavier = toucheAttaque != (int)KeyCode.Mouse0 && ToucheDown(toucheAttaque);
+        bool attaqueClavier = !modeEdition && toucheAttaque != (int)KeyCode.Mouse0 && ToucheDown(toucheAttaque);
         // Un clic gauche sur le sol ne déclenche plus l'animation d'attaque.
         // Le clic doit viser un monstre ; une touche d'attaque remappée reste
         // disponible séparément.
-        if (!conversationOpen && (clicMonstre || attaqueClavier)) Attack();
+        if (!modeEdition && !conversationOpen && (clicMonstre || attaqueClavier)) Attack();
         if (ToucheDown(toucheRamasser)) CollectNearby();
         if (ToucheDown(toucheInventaire)) inventoryOpen = !inventoryOpen;
         if (ToucheDown(toucheOptions)) optionsOpen = !optionsOpen;
@@ -3993,9 +4120,16 @@ public sealed class LibreViesGame : MonoBehaviour
         if (optionsOpen) DessinerOptions();
         if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur " + NomTouche(toucheRenaître) + " pour renaître", boxStyle);
         if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 128, 300, 35), infoMessage, titleStyle);
+        if (modeEdition)
+        {
+            GUI.color = new Color(0.10f, 0.92f, 1.00f, 1f);
+            GUI.Box(new Rect(Screen.width - 250f, Screen.height - 82f, 228f, 30f),
+                "MODE EDITION — MAISONS", boxStyle);
+            GUI.color = Color.white;
+        }
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "EDITION", buttonStyle))
-            ShowInfo("Édition " + VersionJeu);
+            BasculerModeEdition();
         if (conversationOpen) DessinerConversation();
     }
 

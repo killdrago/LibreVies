@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.74",
-  "notes": "MAJ 66 : corrige les faces internes et les raccords visibles des membres.",
+  "game_version": "0.5.75",
+  "notes": "MAJ 75 : inverse l avant/arriere du marteau et de la feuille, et affiche un grillage autour des maisons en mode EDITION.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
