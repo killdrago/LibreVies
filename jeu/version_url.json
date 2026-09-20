@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.78",
-  "notes": "MAJ 78 : synchronise les accessoires avec le bras droit, permet de déplacer une maison en maintenant le clic et enregistre les positions dans edition/coordonee chiffré.",
+  "game_version": "0.5.79",
+  "notes": "MAJ 79 : corrige la compilation Unity 6 du système de coordonnées et conserve le déplacement des maisons par maintien du clic.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

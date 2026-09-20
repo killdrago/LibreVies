@@ -18,7 +18,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.78";
+    private const string VersionJeu = "0.5.79";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -557,7 +557,7 @@ public sealed class LibreViesGame : MonoBehaviour
         ChargerCoordonneesEdition();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
-        Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        Renderer[] renderers = FindObjectsByType<Renderer>();
         Journal("controle rendu : " + renderers.Length + " renderer(s), shader "
                 + (cachedShader == null ? "AUCUN" : cachedShader.name));
         ControlerCouvertureShader(renderers);
@@ -643,7 +643,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private List<Transform> RacinesObjetsEdition()
     {
-        Transform[] transforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+        Transform[] transforms = FindObjectsByType<Transform>();
         var racines = new List<Transform>();
         for (int i = 0; i < transforms.Length; i++)
             if (RacineAEnregistrer(transforms[i])) racines.Add(transforms[i]);
@@ -711,7 +711,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private Transform TrouverRacineCoordonnee(string nom, Vector3 position, HashSet<int> utilisees)
+    private Transform TrouverRacineCoordonnee(string nom, Vector3 position, HashSet<Transform> utilisees)
     {
         Transform meilleur = null;
         float meilleureDistance = float.MaxValue;
@@ -719,7 +719,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < racines.Count; i++)
         {
             Transform racine = racines[i];
-            if (racine.name != nom || utilisees.Contains(racine.GetInstanceID())) continue;
+            if (racine.name != nom || utilisees.Contains(racine)) continue;
             float distance = (racine.position - position).sqrMagnitude;
             if (distance < meilleureDistance)
             {
@@ -740,7 +740,7 @@ public sealed class LibreViesGame : MonoBehaviour
             string json = Encoding.UTF8.GetString(donnees);
             FichierCoordonneesEdition fichier = JsonUtility.FromJson<FichierCoordonneesEdition>(json);
             if (fichier == null || fichier.Objets == null) return;
-            var utilisees = new HashSet<int>();
+            var utilisees = new HashSet<Transform>();
             for (int i = 0; i < fichier.Objets.Count; i++)
             {
                 CoordonneeObjetEdition coordonnee = fichier.Objets[i];
@@ -751,7 +751,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 objet.position = coordonnee.Position;
                 objet.rotation = coordonnee.Rotation;
                 objet.localScale = coordonnee.Echelle;
-                utilisees.Add(objet.GetInstanceID());
+                utilisees.Add(objet);
             }
             SynchroniserTousLesBatiments();
             Journal("coordonnees edition chargees : " + fichier.Objets.Count + " objet(s)");

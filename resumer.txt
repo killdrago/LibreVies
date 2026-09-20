@@ -1,13 +1,21 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 78 : bras droit, déplacement des maisons et sauvegarde chiffrée
-                        ; version 0.5.78
+Derniere mise a jour : 20/09/2026 - MAJ 79 : correction de compilation Unity 6 pour les coordonnées
+                        ; version 0.5.79
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 79 — CORRECTION DE COMPILATION UNITY 6 POUR LES COORDONNEES (20/09/2026)
+- Unity 6 refusait de compiler GetInstanceID(), devenu une erreur obsolete.
+- Le suivi des objets deja utilises lors du chargement utilise maintenant leurs
+  references Transform, sans API obsolete.
+- Les appels FindObjectsByType utilisent la forme sans FindObjectsSortMode,
+  ce qui retire aussi les avertissements du compilateur Unity 6.
+- Version de cette MAJ : 0.5.79. La compilation Windows doit etre relancee.
 
 MAJ 78 — BRAS DROIT, DEPLACEMENT DES MAISONS ET SAUVEGARDE CHIFFREE (20/09/2026)
 - Le marteau est maintenant calcule depuis la transform Hand_R et le vecteur
