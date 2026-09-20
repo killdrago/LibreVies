@@ -2377,16 +2377,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
         Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
             "Stone", root, "Soubassement");
-        for (int sx = -1; sx <= 1; sx += 2)
-        {
-            for (int sz = -1; sz <= 1; sz += 2)
-            {
-                Box(new Vector3(sx * (size.x * 0.5f - 0.12f), size.y * 0.5f,
-                    sz * (size.z * 0.5f - 0.12f)), new Vector3(0.24f, size.y - 0.30f, 0.24f),
-                    "Bois_Clair", root, "Chaine_Angle");
-            }
-        }
-        string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
+        // Les anciens chaînages verticaux en bois sont retires : ils
+        // produisaient des ombres tres dures sur les façades et alourdissaient
+        // les cotes de la maison.        string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
         CreerToitTriangle(root, size, materiauToit, "Toit_" + name);
         Box(new Vector3(0f, size.y - 0.10f, (size.z + 0.72f) * 0.5f),
             new Vector3(size.x + 0.95f, 0.18f, 0.20f), "Wood", root, "Rive_Avant");
@@ -2419,12 +2412,20 @@ public sealed class LibreViesGame : MonoBehaviour
                 size.z * 0.51f),
             new Vector3(1.2f, HauteurPorteConfortable, 0.12f),
             "Bois_Clair", root, "Porte").transform;
+        Renderer renduPorte = porte.GetComponent<Renderer>();
+        if (renduPorte != null)
+            renduPorte.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         batiment.PorteRoot = porte;
         batiment.PorteLargeur = 1.2f;
         batiment.PorteHauteur = HauteurPorteConfortable;
         for (int side = -1; side <= 1; side += 2)
         {
-            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "GlassBleu", root, "Fenetre");
+            GameObject fenetre = Box(new Vector3(side * size.x * 0.27f, 1.8f,
+                size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f),
+                "GlassBleu", root, "Fenetre");
+            Renderer renduFenetre = fenetre.GetComponent<Renderer>();
+            if (renduFenetre != null)
+                renduFenetre.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
         CreerAfficheMaison(root, size, name);
     }
@@ -5227,6 +5228,8 @@ public sealed class LibreViesGame : MonoBehaviour
             gameCamera.transform.position = player.position + Vector3.up * 1.80f;
             gameCamera.transform.rotation = Quaternion.Euler(firstPersonPitch, cameraYaw, 0f);
             MettreAJourVisibiliteAffiches(gameCamera.transform.position);
+            RendreObstaclesTranslucides(player.position + Vector3.up * 1.1f,
+                gameCamera.transform.position);
             return;
         }
         RendreJoueurVisible(true);
@@ -5252,8 +5255,27 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < rendus.Length; i++) rendus[i].enabled = visible;
     }
 
+    private bool PointDansInterieurMaison(Vector3 point)
+    {
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            Vector3 local = batiment.Root.InverseTransformPoint(point);
+            if (local.x > -batiment.LargeurInitiale * 0.5f
+                && local.x < batiment.LargeurInitiale * 0.5f
+                && local.z > -batiment.ProfondeurInitiale * 0.5f
+                && local.z < batiment.ProfondeurInitiale * 0.5f
+                && local.y > -0.05f && local.y < batiment.HauteurInitiale + 0.15f)
+                return true;
+        }
+        return false;
+    }
+
     private void MettreAJourVisibiliteAffiches(Vector3 cameraPosition)
     {
+        bool interieurMaison = PointDansInterieurMaison(cameraPosition)
+            || (player != null && PointDansInterieurMaison(player.position));
         for (int i = textesFacades.Count - 1; i >= 0; i--)
         {
             FacadeTextState affiche = textesFacades[i];
@@ -5272,7 +5294,8 @@ public sealed class LibreViesGame : MonoBehaviour
             // Une affiche de facade n'existe visuellement que du cote de sa
             // propre facade : le cube opaque de la maison ne laisse plus son
             // envers apparaitre quand on regarde depuis l'arriere.
-            bool visible = Vector3.Dot(cameraPosition - affiche.Position, affiche.DirectionFacade) > 0.02f;
+            bool visible = !interieurMaison
+                && Vector3.Dot(cameraPosition - affiche.Position, affiche.DirectionFacade) > 0.02f;
             if (visible)
             {
                 Vector3 versAffiche = affiche.Position - cameraPosition;
@@ -5330,7 +5353,9 @@ public sealed class LibreViesGame : MonoBehaviour
             if (touche.name != "Murs" && !touche.name.StartsWith("Toit_")) continue;
             Renderer rendu = touche.GetComponent<Renderer>();
             if (rendu == null) rendu = touche.GetComponentInParent<Renderer>();
-            if (rendu != null) RendreTranslucide(rendu, 0.30f);
+            // Un obstacle qui coupe la ligne camera-joueur devient presque
+            // invisible, sans rectangle gris qui masque encore le heros.
+            if (rendu != null) RendreTranslucide(rendu, 0.08f);
         }
     }
 
