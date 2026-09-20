@@ -20,6 +20,8 @@ def test_bat_publishes_before_sync():
     assert "git -C" in publisher and " add -- jeu/edition" in publisher
     assert "commit" in publisher and "push origin" in publisher
     assert "if errorlevel 1" in publisher
+    assert "preparer_depot_git" in publisher
+    assert "reset --mixed FETCH_HEAD" in BAT
     assert "diff --cached --quiet -- jeu\\edition" in publisher or "diff --cached --quiet -- jeu/edition" in publisher
 
 
@@ -31,6 +33,9 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "objetsEdition" in CS
     assert "element.Root.position = new Vector3(position.x" in CS
     assert "sol + HauteurSoulevementMaisonEdition" in CS
+    assert "Input.GetKeyDown(KeyCode.Escape)" in CS
+    assert "AnnulerDeplacementEdition" in CS
+    assert "PositionAvant" in CS
 
 
 def test_requested_objects_are_registered():

@@ -253,18 +253,75 @@ exit /b 0
 
 
 rem ==========================================================================
-rem  PUBLICATION DES COORDONNEES D'EDITION
-rem  Cette etape est appelee avant synchroniser_sources.ps1. Elle ne committe
-rem  jamais les autres fichiers locaux et ne fait rien si edition est propre.
+rem  PREPARATION DU DEPOT GIT LOCAL
+rem  Une copie distribuee sans .git est rattachee a la branche GitHub sans
+rem  remplacer ses fichiers locaux. La publication reste limitee a jeu\edition.
 rem ==========================================================================
-:publier_edition
+:preparer_depot_git
 set "LV_GIT_ROOT=%ROOT%.."
-if not exist "%JEU%\edition" exit /b 0
+if exist "%LV_GIT_ROOT%\.git" goto :depot_git_existant
+echo        Depot Git absent : initialisation locale sans remplacer les sources...
+git -C "%LV_GIT_ROOT%" init
+if errorlevel 1 (
+    echo ERREUR : impossible d'initialiser le depot Git local.
+    exit /b 1
+)
+git -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
+if errorlevel 1 (
+    echo ERREUR : impossible de configurer origin.
+    exit /b 1
+)
+git -C "%LV_GIT_ROOT%" fetch --no-tags origin "%BRANCHE%"
+if errorlevel 1 (
+    echo ERREUR : impossible de recuperer la branche GitHub de reference.
+    exit /b 1
+)
+rem Le reset --mixed ne touche pas aux fichiers locaux : il ne fait que
+rem preparer l'index avec le commit GitHub avant le commit d'edition.
+git -C "%LV_GIT_ROOT%" reset --mixed FETCH_HEAD
+if errorlevel 1 (
+    echo ERREUR : impossible de preparer l'index Git local.
+    exit /b 1
+)
+git -C "%LV_GIT_ROOT%" branch -M "%BRANCHE%"
+if errorlevel 1 (
+    echo ERREUR : impossible de positionner la branche locale.
+    exit /b 1
+)
+:depot_git_existant
 git -C "%LV_GIT_ROOT%" rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 (
     echo ERREUR : le dossier parent n'est pas un depot Git exploitable.
     exit /b 1
 )
+git -C "%LV_GIT_ROOT%" remote get-url origin >nul 2>&1
+if errorlevel 1 (
+    git -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
+    if errorlevel 1 (
+        echo ERREUR : impossible de configurer origin.
+        exit /b 1
+    )
+)
+git -C "%LV_GIT_ROOT%" config user.name >nul 2>&1
+if errorlevel 1 git -C "%LV_GIT_ROOT%" config user.name "LibreVies Build"
+git -C "%LV_GIT_ROOT%" config user.email >nul 2>&1
+if errorlevel 1 git -C "%LV_GIT_ROOT%" config user.email "librevies-build@users.noreply.github.com"
+exit /b 0
+
+rem ==========================================================================
+rem  PUBLICATION DES COORDONNEES D'EDITION
+rem ==========================================================================
+:publier_edition
+set "LV_GIT_ROOT=%ROOT%.."
+if not exist "%JEU%\edition" exit /b 0
+set "LV_EDITION_FICHIER="
+for /f "delims=" %%F in ('dir /b /a-d "%JEU%\edition" 2^>nul') do if /I not "%%F"==".gitkeep" set "LV_EDITION_FICHIER=%%F"
+if not defined LV_EDITION_FICHIER (
+    echo        Edition locale : aucun changement a publier.
+    exit /b 0
+)
+call :preparer_depot_git
+if errorlevel 1 exit /b 1
 git -C "%LV_GIT_ROOT%" add -- jeu/edition
 if errorlevel 1 (
     echo ERREUR : git add jeu\edition a echoue.

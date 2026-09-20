@@ -355,6 +355,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public string Type;
         public float SolY;
         public Obstacle Collision;
+        public Vector3 PositionAvant;
+        public Quaternion RotationAvant;
+        public Vector3 EchelleAvant;
         public bool Souleve;
     }
 
@@ -2154,6 +2157,9 @@ public sealed class LibreViesGame : MonoBehaviour
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
         elementEditionSelectionne = cible;
+        cible.PositionAvant = cible.Root.position;
+        cible.RotationAvant = cible.Root.rotation;
+        cible.EchelleAvant = cible.Root.localScale;
         float sol = SolElementEdition(cible);
         cible.Souleve = true;
         if (cible.Maison != null) cible.Maison.EditionSoulevee = true;
@@ -2188,6 +2194,21 @@ public sealed class LibreViesGame : MonoBehaviour
         SynchroniserElementEdition(element);
     }
 
+    private void AnnulerDeplacementEdition()
+    {
+        if (!editionMaisonEnDeplacement || elementEditionSelectionne == null) return;
+        ElementEdition element = elementEditionSelectionne;
+        element.Root.position = element.PositionAvant;
+        element.Root.rotation = element.RotationAvant;
+        element.Root.localScale = element.EchelleAvant;
+        element.Souleve = false;
+        if (element.Maison != null) element.Maison.EditionSoulevee = false;
+        SynchroniserElementEdition(element);
+        editionMaisonEnDeplacement = false;
+        elementEditionSelectionne = null;
+        ShowInfo("Mouvement annule : position precedente restauree");
+    }
+
     private void TerminerDeplacementMaisonEdition()
     {
         if (!editionMaisonEnDeplacement) return;
@@ -2199,6 +2220,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void GererSourisEdition()
     {
+        if (editionMaisonEnDeplacement && Input.GetKeyDown(KeyCode.Escape))
+        {
+            AnnulerDeplacementEdition();
+            return;
+        }
         if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0))
             CommencerDeplacementMaisonEdition();
         if (editionMaisonEnDeplacement && Input.GetMouseButton(0))
@@ -2227,7 +2253,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 batiment.Grillage.SetActive(modeEdition);
         }
         if (modeEdition)
-            ShowInfo("MODE EDITION : maintenez le clic pour deplacer un objet");
+            ShowInfo("MODE EDITION : clic maintenu pour deplacer, ECHAP pour annuler");
         else
             ShowInfo("MODE NORMAL : positions enregistrees");
     }
@@ -4650,8 +4676,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (modeEdition)
         {
             GUI.color = new Color(0.10f, 0.92f, 1.00f, 1f);
-            GUI.Box(new Rect(Screen.width - 250f, Screen.height - 82f, 228f, 30f),
-                "MODE EDITION — MAINTENEZ LE CLIC", boxStyle);
+            GUI.Box(new Rect(Screen.width - 292f, Screen.height - 100f, 278f, 48f),
+                "MODE EDITION\nCLIC MAINTENU : DEPLACER | ECHAP : ANNULER", boxStyle);
             GUI.color = Color.white;
         }
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
