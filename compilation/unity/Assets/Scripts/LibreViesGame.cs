@@ -2164,6 +2164,94 @@ public sealed class LibreViesGame : MonoBehaviour
         SynchroniserBatiment(batiment);
     }
 
+    private bool TryRectFlecheMaison(Batiment batiment, int cote, bool agrandir,
+        out Rect rect)
+    {
+        rect = new Rect();
+        if (batiment == null || batiment.Root == null || gameCamera == null) return false;
+        float y = batiment.Hauteur * 0.55f;
+        Vector3 centre = batiment.Root.position;
+        Vector3 axe = cote == -1 || cote == 1 ? batiment.Root.right : batiment.Root.forward;
+        float signe = cote == -1 || cote == -2 ? -1f : 1f;
+        float distance = cote == -1 || cote == 1 ? batiment.Largeur * 0.5f : batiment.Profondeur * 0.5f;
+        Vector3 monde = centre + axe.normalized * signe * distance + Vector3.up * y;
+        Vector3 ecran = gameCamera.WorldToScreenPoint(monde);
+        if (ecran.z <= 0f) return false;
+        float guiX = ecran.x + (agrandir ? 8f : -42f);
+        float guiY = Screen.height - ecran.y - 14f;
+        rect = new Rect(guiX, guiY, 34f, 28f);
+        return true;
+    }
+
+    private void ModifierTailleMur(ElementEdition element, int cote, bool agrandir)
+    {
+        if (element == null || element.Maison == null) return;
+        Batiment batiment = element.Maison;
+        CapturerEtatAvantEdition(element);
+        bool axeX = cote == -1 || cote == 1;
+        float ancienneDimension = axeX ? batiment.Largeur : batiment.Profondeur;
+        float nouvelleDimension = Mathf.Max(2.5f,
+            ancienneDimension + (agrandir ? 0.5f : -0.5f));
+        if (Mathf.Abs(nouvelleDimension - ancienneDimension) < 0.001f) return;
+        Vector3 echelle = batiment.Root.localScale;
+        if (axeX)
+            echelle.x *= nouvelleDimension / ancienneDimension;
+        else
+            echelle.z *= nouvelleDimension / ancienneDimension;
+        batiment.Root.localScale = echelle;
+        float signe = cote == -1 || cote == -2 ? -1f : 1f;
+        Vector3 axeMonde = (batiment.Root.rotation
+            * (axeX ? Vector3.right : Vector3.forward)).normalized;
+        batiment.Root.position += axeMonde * signe
+            * ((nouvelleDimension - ancienneDimension) * 0.5f);
+        if (axeX) batiment.Largeur = nouvelleDimension;
+        else batiment.Profondeur = nouvelleDimension;
+        ActualiserDimensionsBatiment(batiment);
+        SynchroniserBatiment(batiment);
+        elementEditionDernierSelectionne = element;
+        AjouterHistoriqueEdition(element);
+        ShowInfo((agrandir ? "Mur agrandi de 0,5 m : " : "Mur reduit de 0,5 m : ")
+            + NomCoteRedimensionnement(cote));
+    }
+
+    private bool SourisSurFlecheMaison()
+    {
+        if (!modeEdition || elementEditionDernierSelectionne == null
+            || elementEditionDernierSelectionne.Maison == null) return false;
+        Vector2 souris = new Vector2(Input.mousePosition.x,
+            Screen.height - Input.mousePosition.y);
+        int[] cotes = { -1, 1, -2, 2 };
+        for (int i = 0; i < cotes.Length; i++)
+        {
+            Rect rect;
+            if (TryRectFlecheMaison(elementEditionDernierSelectionne.Maison,
+                cotes[i], false, out rect) && rect.Contains(souris)) return true;
+            if (TryRectFlecheMaison(elementEditionDernierSelectionne.Maison,
+                cotes[i], true, out rect) && rect.Contains(souris)) return true;
+        }
+        return false;
+    }
+
+    private void DessinerFlechesMaison()
+    {
+        if (!modeEdition || editionMaisonEnDeplacement
+            || elementEditionDernierSelectionne == null
+            || elementEditionDernierSelectionne.Maison == null) return;
+        Batiment batiment = elementEditionDernierSelectionne.Maison;
+        int[] cotes = { -1, 1, -2, 2 };
+        for (int i = 0; i < cotes.Length; i++)
+        {
+            Rect reduire;
+            Rect agrandir;
+            if (!TryRectFlecheMaison(batiment, cotes[i], false, out reduire)
+                || !TryRectFlecheMaison(batiment, cotes[i], true, out agrandir)) continue;
+            if (GUI.Button(reduire, "<", buttonStyle))
+                ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], false);
+            if (GUI.Button(agrandir, ">", buttonStyle))
+                ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], true);
+        }
+    }
+
     private bool TryZoneEcranElementEdition(ElementEdition element,
         out Rect zone, out float profondeur)
     {
@@ -2420,15 +2508,6 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!TryTrouverElementEdition(out cible)) return;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
-        if (cible.Maison != null)
-        {
-            int cote;
-            if (TryTrouverCoteRedimensionnement(cible, out cote))
-            {
-                CommencerRedimensionnementEdition(cible, cote);
-                return;
-            }
-        }
         elementEditionSelectionne = cible;
         elementEditionDernierSelectionne = cible;
         CapturerEtatAvantEdition(cible);
@@ -2553,6 +2632,7 @@ public sealed class LibreViesGame : MonoBehaviour
             && elementEditionDernierSelectionne.Facade != null
             && new Rect(18f, Screen.height - 278f, 365f, 242f).Contains(souris))
             return true;
+        if (SourisSurFlecheMaison()) return true;
         return new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f).Contains(souris);
     }
 
@@ -5163,6 +5243,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "MODE EDITION\nCLIC MAINTENU : DEPLACER | " + annulation, boxStyle);
             GUI.color = Color.white;
         }
+        DessinerFlechesMaison();
         DessinerEditionPancarte();
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "EDITION", buttonStyle))
