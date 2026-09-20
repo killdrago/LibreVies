@@ -36,6 +36,7 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "Input.GetKeyDown(KeyCode.Escape)" in CS
     assert "AnnulerDeplacementEdition" in CS
     assert "PositionAvant" in CS
+    assert "Grillage" not in CS
 
 
 def test_requested_objects_are_registered():

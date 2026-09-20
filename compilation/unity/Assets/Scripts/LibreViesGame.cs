@@ -337,7 +337,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class Batiment
     {
         public Transform Root;
-        public GameObject Grillage;
         public float X;
         public float Z;
         public float Largeur;
@@ -630,6 +629,12 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             return;
         }
+        // L'annulation est traitee au debut de la frame, avant les retours
+        // eventuels du joueur (mort, conversation, nage), afin que Echap
+        // fonctionne toujours pendant un deplacement EDITION.
+        if (modeEdition && editionMaisonEnDeplacement
+            && Input.GetKeyDown(KeyCode.Escape))
+            AnnulerDeplacementEdition();
         if (Time.realtimeSinceStartup >= prochainBattement)
         {
             prochainBattement = Time.realtimeSinceStartup + 60f;
@@ -968,10 +973,6 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Route_Terre", new Color(0.46f, 0.30f, 0.16f));
         MakeMaterial("Route_Bord", new Color(0.36f, 0.34f, 0.31f));
         MakeMaterial("Pave_Route", new Color(0.58f, 0.53f, 0.43f));
-        // Le grillage est compose de fines boites et reutilise le meme shader
-        // que le reste du monde : il reste visible meme si LineRenderer ou
-        // Unlit/Color n'est pas disponible dans une ancienne build Unity.
-        MakeMaterial("GrillageEdition", new Color(0.10f, 0.92f, 1.00f), true);
     }
 
     private Texture2D TextureRealiste(string nom)
@@ -1942,7 +1943,6 @@ public sealed class LibreViesGame : MonoBehaviour
             Hauteur = size.y, SolY = root.position.y, Collision = collisionMaison
         };
         batiments.Add(batiment);
-        CreerGrillageMaison(batiment, size);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
         // est le cote +z. Les panneaux suivent exactement cette facade.
         Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
@@ -1951,61 +1951,6 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Glass", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
-    }
-
-    private void CreerBarreGrillage(Transform parent, Vector3 position,
-        Vector3 taille, string nom)
-    {
-        // Une petite boite est plus fiable qu'un LineRenderer sur les builds
-        // Windows anciennes et reste visible comme une vraie cage 3D.
-        Box(position, taille, "GrillageEdition", parent, nom, false);
-    }
-
-    private void CreerGrillageMaison(Batiment batiment, Vector3 taille)
-    {
-        if (batiment == null || batiment.Root == null) return;
-        Transform parent = batiment.Root;
-        GameObject grillage = new GameObject("Grillage_Maison_Complete");
-        grillage.transform.SetParent(parent, false);
-        batiment.Grillage = grillage;
-        // La cage depasse de la maison sur les six faces : murs, toit,
-        // cheminee, socle et enseigne restent donc dans la meme selection.
-        float demiX = taille.x * 0.5f + 0.45f;
-        float demiZ = taille.z * 0.5f + 0.45f;
-        float bas = 0.05f;
-        float haut = taille.y + 2.72f;
-        float hauteur = haut - bas;
-        float epaisseur = 0.075f;
-        float milieu = (bas + haut) * 0.5f;
-        float longueurX = demiX * 2f;
-        float longueurZ = demiZ * 2f;
-        float[] niveaux = { bas, milieu, haut };
-        for (int i = 0; i < niveaux.Length; i++)
-        {
-            float y = niveaux[i];
-            CreerBarreGrillage(grillage.transform, new Vector3(0f, y, -demiZ),
-                new Vector3(longueurX, epaisseur, epaisseur), "Grillage_Face_Avant_H_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(0f, y, demiZ),
-                new Vector3(longueurX, epaisseur, epaisseur), "Grillage_Face_Arriere_H_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(-demiX, y, 0f),
-                new Vector3(epaisseur, epaisseur, longueurZ), "Grillage_Face_Gauche_H_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(demiX, y, 0f),
-                new Vector3(epaisseur, epaisseur, longueurZ), "Grillage_Face_Droite_H_" + i);
-        }
-        float[] xs = { -demiX, 0f, demiX };
-        float[] zs = { -demiZ, 0f, demiZ };
-        for (int i = 0; i < xs.Length; i++)
-        {
-            CreerBarreGrillage(grillage.transform, new Vector3(xs[i], milieu, -demiZ),
-                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Avant_V_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(xs[i], milieu, demiZ),
-                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Arriere_V_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(-demiX, milieu, zs[i]),
-                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Gauche_V_" + i);
-            CreerBarreGrillage(grillage.transform, new Vector3(demiX, milieu, zs[i]),
-                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Droite_V_" + i);
-        }
-        grillage.SetActive(modeEdition);
     }
 
     private bool TryZoneEcranElementEdition(ElementEdition element,
@@ -2220,11 +2165,6 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void GererSourisEdition()
     {
-        if (editionMaisonEnDeplacement && Input.GetKeyDown(KeyCode.Escape))
-        {
-            AnnulerDeplacementEdition();
-            return;
-        }
         if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0))
             CommencerDeplacementMaisonEdition();
         if (editionMaisonEnDeplacement && Input.GetMouseButton(0))
@@ -2246,12 +2186,6 @@ public sealed class LibreViesGame : MonoBehaviour
         modeEdition = !modeEdition;
         if (modeEdition)
             elementEditionSelectionne = null;
-        for (int i = 0; i < batiments.Count; i++)
-        {
-            Batiment batiment = batiments[i];
-            if (batiment != null && batiment.Grillage != null)
-                batiment.Grillage.SetActive(modeEdition);
-        }
         if (modeEdition)
             ShowInfo("MODE EDITION : clic maintenu pour deplacer, ECHAP pour annuler");
         else
