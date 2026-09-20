@@ -16,13 +16,13 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.71";
+    private const string VersionJeu = "0.5.72";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
     private const float TownRadius = 40f;
     private const float VillageRadius = 40f;
-    private const float LargeurOuverturePortail = 7f;
+    private const float LargeurOuverturePortail = 8f;
     private const float RayonPoteauPortail = 0.15f;
     private const float DemiOuverturePortail = LargeurOuverturePortail * 0.5f + RayonPoteauPortail;
     private const float PlayerSpeed = 5f;
@@ -72,8 +72,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // deux extremites traversent l'enceinte au nord et au sud.
     private static readonly Vector2[] RoutePoints =
     {
-        new Vector2(0, 44), new Vector2(4, 28), new Vector2(-2, 6),
-        new Vector2(1, -8), new Vector2(1, -44)
+        new Vector2(0, 44), new Vector2(0, 28), new Vector2(0, 0),
+        new Vector2(0, -28), new Vector2(0, -44)
     };
 
     // Le fleuve traverse le monde du nord-ouest vers le sud-est et reste hors
@@ -163,7 +163,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool inventoryOpen;
     private bool optionsOpen;
     private bool questOpen = true;
-    private bool notationOpen;
     private bool conversationOpen;
     private PnjState conversationPnj;
     private bool conversationFocusRequested;
@@ -2317,8 +2316,10 @@ public sealed class LibreViesGame : MonoBehaviour
                 // inverse à celui du bras : quand le bras recule, le marteau
                 // avance vers l'enclume, et inversement.
                 pnj.Marteau.position = pnj.Main.position;
-                pnj.Marteau.rotation = pnj.Root.transform.rotation
-                    * Quaternion.Euler(-18f - balancement * Mathf.Rad2Deg * 1.25f, 0f, 0f);
+                // Même phase que le bras droit : sa rotation mondiale est
+                // dérivée du pivot du bras, jamais d'une oscillation séparée.
+                pnj.Marteau.rotation = pnj.BrasD.rotation
+                    * Quaternion.Euler(-18f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
@@ -3980,27 +3981,9 @@ public sealed class LibreViesGame : MonoBehaviour
         if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur " + NomTouche(toucheRenaître) + " pour renaître", boxStyle);
         if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 128, 300, 35), infoMessage, titleStyle);
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
-            "NOTER L'ÉDITION", buttonStyle))
-            notationOpen = !notationOpen;
-        if (notationOpen) DessinerNotationEdition();
+            "EDITION", buttonStyle))
+            ShowInfo("Édition " + VersionJeu);
         if (conversationOpen) DessinerConversation();
-    }
-
-    private void DessinerNotationEdition()
-    {
-        Rect cadre = new Rect(Screen.width - 270f, Screen.height - 178f, 256f, 126f);
-        GUI.Box(cadre, "NOTER L'ÉDITION", boxStyle);
-        GUI.Label(new Rect(cadre.x + 12f, cadre.y + 32f, 232f, 24f),
-            "Votre note :", smallStyle);
-        for (int i = 0; i < 5; i++)
-        {
-            if (GUI.Button(new Rect(cadre.x + 12f + i * 46f, cadre.y + 68f, 38f, 30f),
-                (i + 1).ToString(), buttonStyle))
-            {
-                notationOpen = false;
-                ShowInfo("Note enregistrée : " + (i + 1) + "/5");
-            }
-        }
     }
 
     private void DessinerCorrectionCouleur()

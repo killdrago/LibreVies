@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 71 : portail 7 m et attaque ciblée
-                        ; version 0.5.71
+Derniere mise a jour : 20/09/2026 - MAJ 72 : route droite et portail 8 m
+                        ; version 0.5.72
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -29,6 +29,20 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
+MAJ 72 — ROUTE DROITE, PORTAIL 8 M ET BOUTON EDITION (20/09/2026)
+================================================================================
+
+- La route traverse maintenant le village en ligne droite sur l'axe nord-sud,
+  avec une sortie droite au nord et une sortie droite au sud.
+- Les portails nord et sud ont 8 m de passage libre ; la clôture est interrompue
+  avec la même largeur afin de repartir exactement aux deux poteaux.
+- Le marteau du forgeron reprend maintenant la rotation du bras droit avec la
+  même phase : il avance avec le bras et recule avec lui.
+- Le bouton en bas à droite porte simplement le texte « EDITION » et affiche
+  la version du jeu lorsqu'il est activé.
+- Version de cette MAJ : 0.5.72. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
 MAJ 71 — PORTAIL 7 M, ATTAQUE CIBLEE ET JONCTIONS DES BRAS (20/09/2026)
 ================================================================================
 
@@ -45,8 +59,7 @@ MAJ 71 — PORTAIL 7 M, ATTAQUE CIBLEE ET JONCTIONS DES BRAS (20/09/2026)
 - L'enclume est avancée et décalée vers la Forge pour dégager les jambes ; le
   marteau est resynchronisé avec une amplitude inverse plus nette par rapport
   au bras.
-- Un bouton « NOTER L'ÉDITION » apparaît en bas à droite avec un petit choix
-  de note de 1 à 5.
+- Un bouton « EDITION » apparaît en bas à droite et affiche la version du jeu.
 - Version de cette MAJ : 0.5.71. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
