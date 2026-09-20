@@ -15,7 +15,8 @@ Shader "LibreVies/VerreBleu"
         Tags { "Queue" = "Transparent" "RenderType" = "Transparent" "IgnoreProjector" = "True" }
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
-        Cull Back
+        // Les deux faces restent visibles pour voir l'interieur depuis les deux cotes.
+        Cull Off
         LOD 250
         CGPROGRAM
         #pragma surface surf Standard fullforwardshadows alpha:fade
