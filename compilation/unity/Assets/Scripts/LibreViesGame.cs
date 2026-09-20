@@ -2489,13 +2489,12 @@ public sealed class LibreViesGame : MonoBehaviour
         murs.transform.SetParent(root, false);
         // Un sol interieur donne une vraie profondeur visible par les ouvertures
         // au lieu de laisser le mur oppose remplir la vitre.
-        // La dalle couvre toute l'empreinte du mur et depasse tres
-        // legerement sous celui-ci : elle ne laisse aucun jour visible depuis
-        // le dessus, sur aucun des quatre cotes de la maison.
-        const float recouvrementDalle = 0.02f;
+        // La dalle s'arrete au milieu de l'epaisseur du mur : elle penetre
+        // dans le mur pour supprimer le jour, mais ne depasse jamais a
+        // l'exterieur. Elle reste donc invisible depuis l'exterieur.
         Box(new Vector3(0f, 0.31f, 0f),
-            new Vector3(Mathf.Max(size.x + recouvrementDalle, 1.2f), 0.08f,
-                Mathf.Max(size.z + recouvrementDalle, 1.2f)), "Wood", root, "Sol_Interieur");
+            new Vector3(Mathf.Max(size.x - EpaisseurMurInterieur, 1.2f), 0.08f,
+                Mathf.Max(size.z - EpaisseurMurInterieur, 1.2f)), "Wood", root, "Sol_Interieur");
         // Socle, chaînages d'angle et poutres de rive donnent une silhouette
         // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
         Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
