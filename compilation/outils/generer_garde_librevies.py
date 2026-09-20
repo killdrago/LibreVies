@@ -155,11 +155,11 @@ add_box("Guard_Crest", "GuardGold", (0, 2.47, 0), (.07, .28, .24))
 
 # Hallebarde complète, incluse dans le même maillage importé.
 add_ring_surface("Guard_HalberdShaft", "GuardWood",
-                 [(.42, .20, .08, .035, .035), (.42, 2.72, .08, .035, .035)], 10)
-add_box("Guard_HalberdBlade", "GuardMetal", (.42, 2.78, .08), (.11, .48, .20))
-add_box("Guard_HalberdHook", "GuardMetal", (.28, 2.58, .08), (.28, .10, .08))
+                 [(.59, .20, .05, .035, .035), (.59, 2.72, .05, .035, .035)], 10)
+add_box("Guard_HalberdBlade", "GuardMetal", (.59, 2.78, .05), (.11, .48, .20))
+add_box("Guard_HalberdHook", "GuardMetal", (.45, 2.58, .05), (.28, .10, .08))
 add_ring_surface("Guard_HalberdTip", "GuardMetal",
-                 [(.42, 2.97, .08, .09, .09), (.42, 3.16, .08, .015, .015)], 10)
+                 [(.59, 2.97, .05, .09, .09), (.59, 3.16, .05, .015, .015)], 10)
 
 # Harmonise les normales par groupe. Les anneaux qui descendent (bras,
 # mèches) ne doivent pas être orientés vers l'intérieur, sinon leur face

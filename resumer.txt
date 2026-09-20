@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 67 : marche stable, eau interdite aux monstres et articulations sans trous
-                        ; version 0.5.67
+Derniere mise a jour : 20/09/2026 - MAJ 68 : humanoides detailles et panneaux corrigés
+                        ; version 0.5.68
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -27,6 +27,26 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
   coudes et des genoux afin de fermer les raccords pendant les flexions, sans
   réintroduire les bouchons circulaires qui étaient visibles aux articulations.
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 68 — PERSONNAGES HUMANOÏDES, PORTIQUE DÉCALÉ ET PANNEAUX AGRANDIS (20/09/2026)
+================================================================================
+
+- L'héroïne et les PNJ utilisent maintenant 45 pièces OBJ indépendantes pour
+  obtenir une silhouette adulte plus détaillée : yeux blancs et iris, sourcils,
+  bouche, fermeture, revers, boutons et poches de veste et de jean. Le maillage
+  est plus fin et conserve les pivots d'animation des bras et des jambes.
+- Les PNJ devant les maisons ne sont plus des capsules/cubes : ils chargent le
+  même humanoïde importé et restent animés par pivots.
+- La hallebarde du garde a été recentrée sur la main droite et son pivot tourne
+  au niveau de la main ; elle ne doit plus traverser son épaule.
+- Le portique visuel est déplacé sur le côté de la route. Le passage logique et
+  les collisions restent à l'entrée de la ville, sans décor posé au milieu des
+  pavés.
+- Les pancartes Auberge, Atelier et Entrepot ont été élargies pour que les
+  lettres extrêmes restent dans le bois. La transparence forcée du personnage a
+  été supprimée : les bras et les autres pièces restent opaques.
+- Version de cette MAJ : 0.5.68. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 61 — HÉROÏNE ORIGINALE CC0 ET SHADER DE SECOURS (19/09/2026)

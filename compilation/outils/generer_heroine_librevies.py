@@ -24,8 +24,12 @@ materials = {
     "Sole": (0.12, 0.09, 0.07),
     "Hair_Red": (0.58, 0.055, 0.025),
     "Hair_Red_Light": (0.84, 0.15, 0.045),
+    "EyeWhite": (0.92, 0.92, 0.88),
     "Eyes": (0.025, 0.045, 0.06),
+    "Brow": (0.16, 0.055, 0.035),
     "Mouth": (0.24, 0.035, 0.045),
+    "JacketTrim": (0.12, 0.14, 0.17),
+    "JeansLight": (0.20, 0.30, 0.46),
     "Belt": (0.06, 0.045, 0.035),
 }
 
@@ -73,6 +77,26 @@ def add_ring_surface(name, material, rings, segments=16, phase=0.0, caps=True):
             add_face((bottom, starts[0] + i, starts[0] + (i + 1) % segments), material)
             add_face((top, starts[-1] + (i + 1) % segments, starts[-1] + i), material)
 
+def add_box(name, material, center, size):
+    global active_object
+    active_object = name
+    cx, cy, cz = center
+    sx, sy, sz = (value * 0.5 for value in size)
+    corners = [
+        (cx - sx, cy - sy, cz - sz), (cx + sx, cy - sy, cz - sz),
+        (cx + sx, cy - sy, cz + sz), (cx - sx, cy - sy, cz + sz),
+        (cx - sx, cy + sy, cz - sz), (cx + sx, cy + sy, cz - sz),
+        (cx + sx, cy + sy, cz + sz), (cx - sx, cy + sy, cz + sz),
+    ]
+    first = len(vertices) + 1
+    vertices.extend(corners)
+    for quad in ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4),
+                 (3, 7, 6, 2), (1, 2, 6, 5), (0, 4, 7, 3)):
+        a, b, c, d = (first + i for i in quad)
+        add_face((a, b, c), material)
+        add_face((a, c, d), material)
+
+
 def add_sphere(name, material, center, scale, segments=16, rings=8):
     global active_object
     active_object = name
@@ -109,14 +133,14 @@ add_ring_surface("Boot_R", "Shoes", [(0.18, .11, .075, .14, .25), (0.18, .25, .0
 for side, suffix in ((-1, "L"), (1, "R")):
     add_ring_surface("JeansUpper_" + suffix, "Jeans", [
         (.18 * side, .56, 0, .145, .145), (.18 * side, .92, 0, .15, .15),
-        (.18 * side, 1.12, 0, .19, .17)], 16, caps=False)
+        (.18 * side, 1.12, 0, .19, .17)], 22, caps=False)
     add_ring_surface("JeansLower_" + suffix, "Jeans", [
         (.18 * side, .28, 0, .13, .13), (.18 * side, .50, 0, .135, .135),
-        (.18 * side, .76, 0, .145, .145)], 16, caps=False)
-add_ring_surface("Belt", "Belt", [(0, 1.05, 0, .35, .19), (0, 1.13, 0, .37, .20)], 20)
+        (.18 * side, .76, 0, .145, .145)], 24, caps=False)
+add_ring_surface("Belt", "Belt", [(0, 1.05, 0, .35, .19), (0, 1.13, 0, .37, .20)], 28)
 
 # Veste : volume trapézoïdal avec épaules marquées.
-add_ring_surface("Jacket", "Jacket", [(0, 1.08, 0, .34, .18), (0, 1.30, 0, .36, .19), (0, 1.58, 0, .43, .21), (0, 1.70, 0, .34, .18)], 20, pi / 20)
+add_ring_surface("Jacket", "Jacket", [(0, 1.08, 0, .34, .18), (0, 1.30, 0, .36, .19), (0, 1.58, 0, .43, .21), (0, 1.70, 0, .34, .18)], 28, pi / 28)
 # Col roulé et col ouvert contrasté.
 add_ring_surface("Neck", "SkinLight", [(0, 1.62, 0, .105, .105), (0, 1.78, 0, .11, .11)], 14)
 add_ring_surface("Collar", "JacketLight", [(0, 1.58, .005, .18, .12), (0, 1.70, .005, .15, .10)], 14)
@@ -134,19 +158,42 @@ for side in (-1, 1):
     add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
         (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=False)
     add_sphere("Hand_" + ("L" if side < 0 else "R"), "SkinLight",
-               (.62 * x, 1.05, .05), (.105, .13, .10), 14, 6)
+               (.62 * x, 1.05, .05), (.105, .13, .10), 20, 8)
 
 # Tête, oreilles et yeux : proportions humaines plutôt que tête cartoon.
-add_sphere("Head", "SkinLight", (0, 1.98, .01), (.235, .29, .205), 20, 10)
-add_sphere("Ear_L", "Skin", (-.225, 2.00, .005), (.045, .075, .035), 12, 5)
-add_sphere("Ear_R", "Skin", (.225, 2.00, .005), (.045, .075, .035), 12, 5)
-add_sphere("Eye_L", "Eyes", (-.085, 2.035, .188), (.028, .035, .018), 12, 5)
-add_sphere("Eye_R", "Eyes", (.085, 2.035, .188), (.028, .035, .018), 12, 5)
-add_sphere("Nose", "SkinLight", (0, 1.975, .205), (.035, .055, .045), 12, 5)
+add_sphere("Head", "SkinLight", (0, 1.98, .01), (.235, .29, .205), 32, 16)
+add_sphere("Ear_L", "Skin", (-.225, 2.00, .005), (.045, .075, .035), 16, 7)
+add_sphere("Ear_R", "Skin", (.225, 2.00, .005), (.045, .075, .035), 16, 7)
+add_sphere("Eye_L", "Eyes", (-.085, 2.035, .188), (.028, .035, .018), 16, 7)
+add_sphere("Eye_R", "Eyes", (.085, 2.035, .188), (.028, .035, .018), 16, 7)
+add_sphere("Nose", "SkinLight", (0, 1.975, .205), (.035, .055, .045), 16, 7)
 # Bouche visible sur la face avant du visage. Elle est un petit volume OBJ
 # indépendant, afin de rester opaque avec le shader personnage et de suivre la
 # tête sans recourir à une primitive Unity au runtime.
-add_sphere("Mouth", "Mouth", (0, 1.895, .204), (.055, .018, .014), 16, 5)
+add_sphere("Mouth", "Mouth", (0, 1.895, .204), (.055, .018, .014), 20, 7)
+# Regard et sourcils : de petits volumes superposes donnent un visage plus
+# humain, tout en restant des pieces importees et animables avec la tete.
+for side in (-1, 1):
+    suffix = "L" if side < 0 else "R"
+    add_sphere("EyeWhite_" + suffix, "EyeWhite",
+               (side * .085, 2.035, .183), (.035, .042, .012), 16, 7)
+    add_sphere("Brow_" + suffix, "Brow",
+               (side * .085, 2.095, .194), (.050, .014, .010), 16, 5)
+
+# Details de veste et de jean : fermeture, poches et boutons. Ils suivent le
+# torse fixe comme sur une tenue civile, au lieu d'un simple tube colore.
+add_box("JacketZip", "JacketTrim", (0, 1.43, .216), (.025, .48, .026))
+for side in (-1, 1):
+    suffix = "L" if side < 0 else "R"
+    add_box("JacketLapel_" + suffix, "JacketLight",
+            (side * .145, 1.53, .205), (.085, .34, .030))
+    add_box("JacketPocket_" + suffix, "JacketLight",
+            (side * .205, 1.25, .208), (.22, .115, .030))
+    add_box("JeansPocket_" + suffix, "JeansLight",
+            (side * .235, .88, .145), (.16, .12, .026))
+for y in (1.31, 1.45, 1.59):
+    add_sphere("JacketButton_" + str(y).replace(".", "_"), "JacketTrim",
+               (0, y, .222), (.020, .020, .012), 12, 5)
 
 # Chevelure rousse : calotte et mèches longues, toujours dans ce maillage.
 add_ring_surface("HairCap", "Hair_Red", [(0, 2.07, -.005, .25, .21), (0, 2.18, -.005, .29, .22), (0, 2.29, -.005, .22, .17), (0, 2.36, -.005, .055, .045)], 20)
