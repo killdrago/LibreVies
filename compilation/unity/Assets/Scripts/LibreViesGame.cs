@@ -43,6 +43,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // d'un obstacle, hauteur de la cloture du village (franchissable en
     // sautant par le heros, jamais par les monstres), rayon du heros.
     private const float HauteurCollision = 2f;
+    private const float HauteurPorteConfortable = 2.75f;
     private const float HauteurCloture = 1f;
     private const float RayonJoueur = 0.45f;
     // Saut : 8 m/s avec une gravite de 20 -> 1,60 m de hauteur maximale,
@@ -292,6 +293,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float LargeurPancarte;
         public float HauteurPancarte;
         public float HauteurPorte;
+        public int VersionDimensions;
         public string MateriauMur;
         public string MateriauFenetre;
         public string MateriauPorte;
@@ -1069,8 +1071,10 @@ public sealed class LibreViesGame : MonoBehaviour
                 }
                 if (element != null && element.Maison != null)
                 {
-                    if (coordonnee.HauteurPorte > 0f)
+                    if (coordonnee.VersionDimensions >= 2 && coordonnee.HauteurPorte > 0f)
                         element.Maison.PorteHauteur = coordonnee.HauteurPorte;
+                    else
+                        element.Maison.PorteHauteur = HauteurPorteConfortable;
                     if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
                         AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
@@ -1115,6 +1119,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     LargeurPancarte = 0f,
                     HauteurPancarte = 0f,
                     HauteurPorte = 0f,
+                    VersionDimensions = 0,
                     MateriauMur = null,
                     MateriauFenetre = null,
                     MateriauPorte = null,
@@ -1135,6 +1140,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (element != null && element.Maison != null)
                 {
                     coordonnee.HauteurPorte = element.Maison.PorteHauteur;
+                    coordonnee.VersionDimensions = 2;
                     coordonnee.MateriauMur = element.Maison.MateriauMur;
                     coordonnee.MateriauFenetre = element.Maison.MateriauFenetre;
                     coordonnee.MateriauPorte = element.Maison.MateriauPorte;
@@ -1312,7 +1318,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 : (name == "Water" || name == "Eau_Riviere" || name == "Glass" || name == "GlassBleu"
                     ? 0.90f : 0.32f)));
         if (material.HasProperty("_Alpha") && (name == "Glass" || name == "GlassBleu"))
-            material.SetFloat("_Alpha", 0.42f);
+            material.SetFloat("_Alpha", 0.30f);
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -1411,6 +1417,9 @@ public sealed class LibreViesGame : MonoBehaviour
         sun.intensity = 1.3f;                 // energie du soleil de la reference
         sun.color = new Color(1f, 0.90f, 0.74f);
         sun.shadows = LightShadows.Soft;
+        sun.shadowStrength = 0.82f;
+        sun.shadowBias = 0.045f;
+        sun.shadowNormalBias = 0.32f;
         sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
     }
 
@@ -2086,7 +2095,7 @@ public sealed class LibreViesGame : MonoBehaviour
             bornes.Add(valeur);
         }
 
-        // Mur ferme sur trois cotes et decoupe sur la facade avant. Les
+        // Mur ferme sur ses cotes et decoupe sur les deux facades. Les
         // ouvertures restent de vraies ouvertures du maillage : le verre ne
         // masque donc plus un cube de mur derriere lui.
         public void MurAvecOuvertures(float largeur, float profondeur, float hauteur,
@@ -2103,18 +2112,23 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector3 hautGaucheAvant = new Vector3(-x, hauteur, z);
             Vector3 hautDroitAvant = new Vector3(x, hauteur, z);
             Quad(basGauche, basDroit, hautDroit, hautGauche);
-            Quad(basGaucheAvant, hautGaucheAvant, hautDroitAvant, basDroitAvant);
             Quad(basGauche, basGaucheAvant, hautGaucheAvant, hautGauche);
             Quad(basDroitAvant, basDroit, hautDroit, hautDroitAvant);
             Quad(basGauche, basGaucheAvant, basDroitAvant, basDroit);
             Quad(hautGauche, hautDroit, hautDroitAvant, hautGaucheAvant);
+            FaceAvecOuvertures(largeur, -z, hauteur, centres, tailles, false);
+            FaceAvecOuvertures(largeur, z, hauteur, centres, tailles, true);
+        }
 
-            var bornesX = new List<float> { -x, x };
+        private void FaceAvecOuvertures(float largeur, float z, float hauteur,
+            Vector2[] centres, Vector2[] tailles, bool faceAvant)
+        {
+            var bornesX = new List<float> { -largeur * 0.5f, largeur * 0.5f };
             var bornesY = new List<float> { 0f, hauteur };
             for (int i = 0; i < centres.Length && i < tailles.Length; i++)
             {
-                AjouterBorne(bornesX, Mathf.Clamp(centres[i].x - tailles[i].x * 0.5f, -x, x));
-                AjouterBorne(bornesX, Mathf.Clamp(centres[i].x + tailles[i].x * 0.5f, -x, x));
+                AjouterBorne(bornesX, centres[i].x - tailles[i].x * 0.5f);
+                AjouterBorne(bornesX, centres[i].x + tailles[i].x * 0.5f);
                 AjouterBorne(bornesY, Mathf.Clamp(centres[i].y - tailles[i].y * 0.5f, 0f, hauteur));
                 AjouterBorne(bornesY, Mathf.Clamp(centres[i].y + tailles[i].y * 0.5f, 0f, hauteur));
             }
@@ -2136,10 +2150,12 @@ public sealed class LibreViesGame : MonoBehaviour
                     }
                 }
                 if (ouverture) continue;
-                Quad(new Vector3(bornesX[ix], bornesY[iy], z),
-                    new Vector3(bornesX[ix + 1], bornesY[iy], z),
-                    new Vector3(bornesX[ix + 1], bornesY[iy + 1], z),
-                    new Vector3(bornesX[ix], bornesY[iy + 1], z));
+                Vector3 basGauche = new Vector3(bornesX[ix], bornesY[iy], z);
+                Vector3 basDroit = new Vector3(bornesX[ix + 1], bornesY[iy], z);
+                Vector3 hautDroit = new Vector3(bornesX[ix + 1], bornesY[iy + 1], z);
+                Vector3 hautGauche = new Vector3(bornesX[ix], bornesY[iy + 1], z);
+                if (faceAvant) Quad(basGauche, basDroit, hautDroit, hautGauche);
+                else Quad(basDroit, basGauche, hautGauche, hautDroit);
             }
         }
 
@@ -2335,13 +2351,13 @@ public sealed class LibreViesGame : MonoBehaviour
         murMaillage.MurAvecOuvertures(size.x, size.z, size.y,
             new[]
             {
-                new Vector2(0f, 1.0f),
+                new Vector2(0f, HauteurPorteConfortable * 0.5f),
                 new Vector2(-size.x * 0.27f, 1.8f),
                 new Vector2(size.x * 0.27f, 1.8f)
             },
             new[]
             {
-                new Vector2(1.2f, 2.0f),
+                new Vector2(1.2f, HauteurPorteConfortable),
                 new Vector2(1.0f, 0.75f),
                 new Vector2(1.0f, 0.75f)
             });
@@ -2349,6 +2365,11 @@ public sealed class LibreViesGame : MonoBehaviour
         var murCollider = murs.AddComponent<MeshCollider>();
         murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
         murs.transform.SetParent(root, false);
+        // Un sol interieur donne une vraie profondeur visible par les ouvertures
+        // au lieu de laisser le mur oppose remplir la vitre.
+        Box(new Vector3(0f, 0.31f, 0f),
+            new Vector3(Mathf.Max(size.x - 0.45f, 1.2f), 0.08f,
+                Mathf.Max(size.z - 0.45f, 1.2f)), "Wood", root, "Sol_Interieur");
         // Socle, chaînages d'angle et poutres de rive donnent une silhouette
         // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
         Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
@@ -2391,11 +2412,13 @@ public sealed class LibreViesGame : MonoBehaviour
         batiments.Add(batiment);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
         // est le cote +z. Les panneaux suivent exactement cette facade.
-        Transform porte = Box(new Vector3(0, 1.0f, size.z * 0.51f),
-            new Vector3(1.2f, 2f, 0.12f), "Bois_Clair", root, "Porte").transform;
+        Transform porte = Box(new Vector3(0, HauteurPorteConfortable * 0.5f,
+                size.z * 0.51f),
+            new Vector3(1.2f, HauteurPorteConfortable, 0.12f),
+            "Bois_Clair", root, "Porte").transform;
         batiment.PorteRoot = porte;
         batiment.PorteLargeur = 1.2f;
-        batiment.PorteHauteur = 2.0f;
+        batiment.PorteHauteur = HauteurPorteConfortable;
         for (int side = -1; side <= 1; side += 2)
         {
             Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "GlassBleu", root, "Fenetre");
@@ -3299,6 +3322,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 Position = texte.transform.position,
                 DirectionFacade = parent.TransformDirection(Vector3.forward).normalized
             };
+            AppliquerTaillePancarte(facade);
             AppliquerStylePancarte(facade);
             textesFacades.Add(facade);
         }
@@ -3309,12 +3333,12 @@ public sealed class LibreViesGame : MonoBehaviour
         if (facade == null) return;
         facade.Taille = Mathf.Clamp(facade.Taille <= 0f ? 0.14f : facade.Taille, 0.04f, 1.0f);
         if (facade.Texte != null) facade.Texte.characterSize = facade.Taille;
-        if (facade.Panneau != null && facade.LargeurPanneauInitiale > 0.001f
-            && facade.HauteurPanneauInitiale > 0.001f)
+        if (facade.Panneau != null)
         {
+            float profondeur = Mathf.Max(Mathf.Abs(facade.Panneau.localScale.z), 0.08f);
             facade.Panneau.localScale = new Vector3(
-                facade.LargeurPanneau / facade.LargeurPanneauInitiale,
-                facade.HauteurPanneau / facade.HauteurPanneauInitiale, 1f);
+                Mathf.Max(facade.LargeurPanneau, 1.0f),
+                Mathf.Max(facade.HauteurPanneau, 0.30f), profondeur);
         }
         MettreAJourSoulignement(facade);
     }

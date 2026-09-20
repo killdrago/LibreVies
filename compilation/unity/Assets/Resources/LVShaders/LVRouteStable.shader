@@ -23,7 +23,9 @@ Shader "LibreVies/StablePBR"
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 3.0
+            #pragma multi_compile_fwdbase
             #include "UnityCG.cginc"
+            #include "AutoLight.cginc"
 
             sampler2D _MainTex;
             fixed4 _Color;
@@ -43,6 +45,7 @@ Shader "LibreVies/StablePBR"
                 float4 position : SV_POSITION;
                 float3 worldPosition : TEXCOORD0;
                 float3 worldNormal : TEXCOORD1;
+                SHADOW_COORDS(2)
             };
 
             Varyings vert(AppData input)
@@ -51,6 +54,7 @@ Shader "LibreVies/StablePBR"
                 output.position = UnityObjectToClipPos(input.vertex);
                 output.worldPosition = mul(unity_ObjectToWorld, input.vertex).xyz;
                 output.worldNormal = UnityObjectToWorldNormal(input.normal);
+                TRANSFER_SHADOW(output);
                 return output;
             }
 
@@ -69,20 +73,24 @@ Shader "LibreVies/StablePBR"
             {
                 float3 normal = normalize(input.worldNormal);
                 fixed3 albedo = SampleTriplanar(input.worldPosition, normal).rgb * _Color.rgb;
+                UNITY_LIGHT_ATTENUATION(ombre, input, input.worldPosition);
                 float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz);
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - input.worldPosition);
                 float3 halfDirection = normalize(lightDirection + viewDirection);
                 float diffuse = saturate(dot(normal, lightDirection));
                 float highlight = pow(saturate(dot(normal, halfDirection)), lerp(8.0, 64.0, _Smoothness));
                 fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz * 0.75 + fixed3(0.18, 0.18, 0.18);
-                fixed3 colour = albedo * (ambient + diffuse * 0.72) + highlight * _Metallic * 0.18;
+                fixed3 couleurEclairee = albedo * (ambient + diffuse * 0.72) + highlight * _Metallic * 0.18;
+                fixed3 couleurOmbree = albedo * (ambient * 0.72);
+                fixed3 colour = lerp(couleurOmbree, couleurEclairee, ombre);
                 // Un plancher de lumiere evite le noir complet sur une vieille
-                // carte ou quand Unity ne fournit pas de lumiere directionnelle.
-                colour = max(colour, albedo * 0.22);
+                // carte, mais les ombres restent bien liees au monde.
+                colour = max(colour, albedo * (0.12 + 0.10 * ombre));
                 colour += _EmissionColor.rgb;
                 return fixed4(colour, 1.0);
             }
             ENDCG
         }
     }
+    Fallback "Diffuse"
 }
