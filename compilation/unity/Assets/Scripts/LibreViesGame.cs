@@ -100,6 +100,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private ElementEdition elementEditionSelectionne;
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
+    private readonly Stack<HistoriqueEdition> historiqueEdition = new Stack<HistoriqueEdition>();
     private bool editionMaisonEnDeplacement;
     private Vector3 decalageSourisMaisonEdition;
     private const float HauteurSoulevementMaisonEdition = 1.0f;
@@ -296,6 +297,11 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private string CheminHistoriqueEdition
+    {
+        get { return Path.Combine(Application.persistentDataPath, "librevies_edition_historique.tmp"); }
+    }
+
     private string CheminConfiguration
     {
         get { return Path.Combine(Application.persistentDataPath, "librevies_config.json"); }
@@ -358,6 +364,14 @@ public sealed class LibreViesGame : MonoBehaviour
         public Quaternion RotationAvant;
         public Vector3 EchelleAvant;
         public bool Souleve;
+    }
+
+    private sealed class HistoriqueEdition
+    {
+        public ElementEdition Element;
+        public Vector3 Position;
+        public Quaternion Rotation;
+        public Vector3 Echelle;
     }
 
     private sealed class PnjState
@@ -501,6 +515,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void Awake()
     {
         InitialiserJournalRuntime();
+        SupprimerFichierHistoriqueEdition();
         chrono.Start();
         AfficherVersionDansTitre();
         Journal("journal runtime : " + (cheminJournalRuntime ?? "indisponible"));
@@ -632,9 +647,13 @@ public sealed class LibreViesGame : MonoBehaviour
         // L'annulation est traitee au debut de la frame, avant les retours
         // eventuels du joueur (mort, conversation, nage), afin que Echap
         // fonctionne toujours pendant un deplacement EDITION.
-        if (modeEdition && editionMaisonEnDeplacement
-            && Input.GetKeyDown(KeyCode.Escape))
-            AnnulerDeplacementEdition();
+        if (modeEdition && Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (editionMaisonEnDeplacement)
+                AnnulerDeplacementEdition();
+            else
+                AnnulerDernierDeplacementEdition();
+        }
         if (Time.realtimeSinceStartup >= prochainBattement)
         {
             prochainBattement = Time.realtimeSinceStartup + 60f;
@@ -2082,6 +2101,74 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void EcrireFichierHistoriqueEdition()
+    {
+        try
+        {
+            string dossier = Path.GetDirectoryName(CheminHistoriqueEdition);
+            if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
+            File.WriteAllText(CheminHistoriqueEdition, historiqueEdition.Count.ToString(), Encoding.UTF8);
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : historique edition temporaire impossible : " + erreur.Message);
+        }
+    }
+
+    private void SupprimerFichierHistoriqueEdition()
+    {
+        try
+        {
+            if (File.Exists(CheminHistoriqueEdition)) File.Delete(CheminHistoriqueEdition);
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : suppression historique edition impossible : " + erreur.Message);
+        }
+    }
+
+    private bool EtatEditionModifie(ElementEdition element)
+    {
+        if (element == null || element.Root == null) return false;
+        return (element.Root.position - element.PositionAvant).sqrMagnitude > 0.000001f
+            || Quaternion.Angle(element.Root.rotation, element.RotationAvant) > 0.01f
+            || (element.Root.localScale - element.EchelleAvant).sqrMagnitude > 0.000001f;
+    }
+
+    private void AjouterHistoriqueEdition(ElementEdition element)
+    {
+        if (!EtatEditionModifie(element)) return;
+        historiqueEdition.Push(new HistoriqueEdition
+        {
+            Element = element,
+            Position = element.PositionAvant,
+            Rotation = element.RotationAvant,
+            Echelle = element.EchelleAvant
+        });
+        EcrireFichierHistoriqueEdition();
+    }
+
+    private void AnnulerDernierDeplacementEdition()
+    {
+        while (historiqueEdition.Count > 0)
+        {
+            HistoriqueEdition entree = historiqueEdition.Pop();
+            if (entree.Element == null || entree.Element.Root == null) continue;
+            entree.Element.Root.position = entree.Position;
+            entree.Element.Root.rotation = entree.Rotation;
+            entree.Element.Root.localScale = entree.Echelle;
+            entree.Element.Souleve = false;
+            if (entree.Element.Maison != null)
+                entree.Element.Maison.EditionSoulevee = false;
+            SynchroniserElementEdition(entree.Element);
+            EcrireFichierHistoriqueEdition();
+            ShowInfo("Dernier mouvement annule (" + historiqueEdition.Count
+                + " restant(s))");
+            return;
+        }
+        ShowInfo("Aucun mouvement a annuler");
+    }
+
     private void PoserElementEdition(ElementEdition element)
     {
         if (element == null || element.Root == null) return;
@@ -2157,7 +2244,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private void TerminerDeplacementMaisonEdition()
     {
         if (!editionMaisonEnDeplacement) return;
-        PoserElementEdition(elementEditionSelectionne);
+        ElementEdition element = elementEditionSelectionne;
+        PoserElementEdition(element);
+        AjouterHistoriqueEdition(element);
         editionMaisonEnDeplacement = false;
         elementEditionSelectionne = null;
         ShowInfo("Objet pose a sa nouvelle position");
@@ -4610,8 +4699,11 @@ public sealed class LibreViesGame : MonoBehaviour
         if (modeEdition)
         {
             GUI.color = new Color(0.10f, 0.92f, 1.00f, 1f);
+            string annulation = historiqueEdition.Count > 0
+                ? "ECHAP : ANNULER (" + historiqueEdition.Count + ")"
+                : "ECHAP : ANNULER";
             GUI.Box(new Rect(Screen.width - 292f, Screen.height - 100f, 278f, 48f),
-                "MODE EDITION\nCLIC MAINTENU : DEPLACER | ECHAP : ANNULER", boxStyle);
+                "MODE EDITION\nCLIC MAINTENU : DEPLACER | " + annulation, boxStyle);
             GUI.color = Color.white;
         }
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
@@ -5027,6 +5119,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 PoserElementEdition(elementEditionSelectionne);
             EnregistrerCoordonneesEdition();
         }
+        historiqueEdition.Clear();
+        SupprimerFichierHistoriqueEdition();
     }
 
     private Material screenAdjustMaterial;

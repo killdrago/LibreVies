@@ -37,6 +37,10 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "AnnulerDeplacementEdition" in CS
     assert "PositionAvant" in CS
     assert "Grillage" not in CS
+    assert "Stack<HistoriqueEdition>" in CS
+    assert "AjouterHistoriqueEdition" in CS
+    assert "SupprimerFichierHistoriqueEdition" in CS
+    assert "historiqueEdition.Clear()" in CS
 
 
 def test_requested_objects_are_registered():
