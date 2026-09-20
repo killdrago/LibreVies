@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 73 : objets attaches aux mains
-                        ; version 0.5.73
+Derniere mise a jour : 20/09/2026 - MAJ 74 : points de main precis pour les objets
+                        ; version 0.5.74
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -27,6 +27,18 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
   coudes et des genoux afin de fermer les raccords pendant les flexions, sans
   réintroduire les bouchons circulaires qui étaient visibles aux articulations.
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 74 — POINT DE PAUME PRECIS POUR LE MARTEAU ET LA FEUILLE (20/09/2026)
+================================================================================
+
+- Le point de main des PNJ est maintenant enfant de la transform OBJ Hand_R,
+  avec une position correspondant exactement aux vertices de la paume.
+- Le marteau est enfant de ce point précis : il est réellement dans la main
+  droite du forgeron et suit le coude, le bras et la main.
+- La feuille du maire utilise le même point de paume et suit le mouvement de
+  sa main.
+- Version de cette MAJ : 0.5.74. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 73 — MARTEAU ET FEUILLE ATTACHES AUX MAINS (20/09/2026)

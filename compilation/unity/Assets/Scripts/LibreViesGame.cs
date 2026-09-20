@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.73";
+    private const string VersionJeu = "0.5.74";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -2208,9 +2208,23 @@ public sealed class LibreViesGame : MonoBehaviour
             "SleeveLower_R", "Cuff_R", "Hand_R");
         pnj.CoudeG.SetParent(pnj.BrasG, true);
         pnj.CoudeD.SetParent(pnj.BrasD, true);
+        // Le point de main est calculé dans le même espace que les vertices
+        // de Hand_R. Le transform OBJ de la main a son origine au modèle,
+        // donc ce point tombe exactement sur le centre de la paume et suit le
+        // coude puis le bras, au lieu d'être un point flottant au torse.
+        Transform mainImportee = pnj.CoudeD.Find("Hand_R");
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeD, false);
-        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        if (mainImportee != null)
+        {
+            pnj.Main.SetParent(mainImportee, false);
+            pnj.Main.localPosition = new Vector3(0.62f, 1.05f, 0.05f);
+        }
+        else
+        {
+            pnj.Main.SetParent(pnj.CoudeD, false);
+            pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        }
+        pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
             ? new Color(0.12f, 0.25f, 0.58f)
