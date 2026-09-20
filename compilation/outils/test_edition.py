@@ -73,6 +73,22 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "historiqueEdition.Clear()" in CS
 
 
+def test_requested_material_choices_and_special_shaders():
+    panel = section(CS, "private void DessinerEditionMaison", "private bool TryZoneEcranElementEdition")
+    assert 'new[] { "Wall", "Bois_Clair", "Brique" }' in panel
+    assert 'new[] { "GlassBleu" }' in panel
+    assert 'new[] { "Bois_Clair", "MetalAluminium" }' in panel
+    assert 'new[] { "RoofRed", "Bois_Clair" }' in panel
+    assert "MOQUET" not in panel
+    assert "CLAIR" not in panel
+    assert "TUILE" not in panel
+    assert '"MetalAluminium"' in CS
+    assert '"LVShaders/LVMetalAluminium"' in CS
+    assert '"LVShaders/LVGlassBleu"' in CS
+    assert (ROOT / "compilation/unity/Assets/Resources/LVShaders/LVMetalAluminium.shader").exists()
+    assert (ROOT / "compilation/unity/Assets/Resources/LVShaders/LVGlassBleu.shader").exists()
+
+
 def test_requested_objects_are_registered():
     registry = section(CS, "private bool EstObjetDeplacableEdition", "private void ConstruireObjetsEdition")
     for name in ("Porte", "Fenetre", "Sapin", "Asset_CC0_", "Caisse", "Baril"):

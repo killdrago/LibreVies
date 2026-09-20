@@ -158,6 +158,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private float cameraSensitivity = 3f;
     private Shader cachedShader;
     private Shader routeShader;
+    private Shader metalAluminiumShader;
+    private Shader glassBleuShader;
     private bool routePbrActif;
     private bool firstPerson;
     private bool cameraDragging;
@@ -1073,8 +1075,9 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
         MakeMaterial("Carton", new Color(0.62f, 0.35f, 0.12f));
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
-        MakeMaterial("Brique", new Color(0.58f, 0.18f, 0.10f));
-        MakeMaterial("Moquette", new Color(0.30f, 0.12f, 0.28f));
+        // Brique reprend le shader et la texture pierre/paves du sol de
+        // l'ancien chateau, afin de conserver le meme relief mineral.
+        MakeMaterial("Brique", new Color(0.42f, 0.45f, 0.48f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
@@ -1088,12 +1091,14 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Spider", new Color(0.12f, 0.08f, 0.07f));
         MakeMaterial("Gold", new Color(1f, 0.65f, 0.08f), true);
         MakeMaterial("Water", new Color(0.08f, 0.45f, 0.85f), true);
-        MakeMaterial("Glass", new Color(0.28f, 0.58f, 0.82f), true);
+        MakeMaterial("Glass", new Color(0.12f, 0.48f, 0.88f, 1f), true);
+        MakeMaterial("GlassBleu", new Color(0.12f, 0.48f, 0.88f, 1f), true);
         MakeMaterial("Red", new Color(0.80f, 0.06f, 0.04f), true);
         MakeMaterial("White", Color.white);
         // --- Decor (portage de la reference) ---
         MakeMaterial("Bois_Clair", new Color(0.58f, 0.41f, 0.21f));
         MakeMaterial("Metal", new Color(0.30f, 0.28f, 0.28f));
+        MakeMaterial("MetalAluminium", new Color(0.72f, 0.76f, 0.80f));
         MakeMaterial("Lanterne", new Color(1f, 0.80f, 0.30f), true);
         MakeMaterial("Sapin_Bas", new Color(0.13f, 0.42f, 0.16f));
         MakeMaterial("Sapin_Milieu", new Color(0.16f, 0.50f, 0.19f));
@@ -1108,7 +1113,8 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
         MakeMaterial("Cimier", new Color(0.75f, 0.15f, 0.15f));
         // Textures dediees aux objets qui etaient encore trop plats : feuillage,
-        // pierre, metal, drapeaux et eau partagent toujours StablePBR.
+        // pierre, metal et drapeaux partagent StablePBR ; le verre bleu et
+        // l'aluminium des portes utilisent leurs shaders specialises.
         MakeMaterial("Eau_Riviere", new Color(0.16f, 0.56f, 0.72f), true);
         MakeMaterial("Drapeau", Color.white);
         MakeMaterial("Pierre_Mur", new Color(0.46f, 0.48f, 0.50f));
@@ -1134,11 +1140,11 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
         else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route") chemin = "LVTextures/LV_Stone";
         else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
-        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
-        else if (nom == "Metal" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
+        else if (nom == "Stone" || nom == "Brique" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
         else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
-        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass") chemin = "LVTextures/LV_Water";
+        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
     }
 
@@ -1147,7 +1153,29 @@ public sealed class LibreViesGame : MonoBehaviour
         // Toutes les geometries du monde utilisent StablePBR. Le parametre pbr
         // reste conserve pour identifier Route_PBR dans le journal, sans
         // retirer les autres familles du rendu texture.
-        Shader shader = pbr ? ResoudreShaderRoute() : ResoudreShader();
+        Shader shader;
+        if (name == "MetalAluminium")
+        {
+            if (metalAluminiumShader == null)
+                metalAluminiumShader = ChargerShader("LVShaders/LVMetalAluminium");
+            shader = metalAluminiumShader;
+        }
+        else if (name == "Glass" || name == "GlassBleu")
+        {
+            if (glassBleuShader == null)
+                glassBleuShader = ChargerShader("LVShaders/LVGlassBleu");
+            shader = glassBleuShader;
+        }
+        else
+        {
+            shader = pbr ? ResoudreShaderRoute() : ResoudreShader();
+        }
+        if (shader == null)
+        {
+            Debug.LogWarning("[LV_SHADER] shader specialise indisponible pour " + name
+                + ", retour au shader general");
+            shader = ResoudreShader();
+        }
         if (shader == null)
         {
             Debug.LogError("[LV_SHADER] aucun shader disponible pour " + name);
@@ -1172,8 +1200,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f
                 : (name == "Water" || name == "Eau_Riviere" ? 0.16f
                 : (name == "Leaf" || name.StartsWith("Sapin") || name == "Feuillage" ? 0.22f
-                : (name == "Metal" || name == "Lanterne" ? 0.30f
-                : (name.Contains("Banniere") || name == "Drapeau" ? 0.42f : 0.28f))))));
+                : (name == "Metal" || name == "MetalAluminium" || name == "Lanterne" ? 0.30f
+                : (name == "Glass" || name == "GlassBleu" ? 1.0f
+                : (name.Contains("Banniere") || name == "Drapeau" ? 0.42f : 0.28f)))))));
             material.SetFloat("_Tiling", echelle);
         }
         if (material.HasProperty("_BumpStrength"))
@@ -1183,10 +1212,15 @@ public sealed class LibreViesGame : MonoBehaviour
             material.SetFloat("_BumpStrength", relief);
         }
         if (material.HasProperty("_Metallic"))
-            material.SetFloat("_Metallic", name == "Metal" ? 0.82f : (name == "Gold" ? 0.72f : 0f));
+            material.SetFloat("_Metallic", name == "MetalAluminium" ? 0.95f
+                : (name == "Metal" ? 0.82f : (name == "Gold" ? 0.72f : 0f)));
         if (material.HasProperty("_Smoothness"))
-            material.SetFloat("_Smoothness", name == "Metal" || name == "Gold" ? 0.76f
-                : (name == "Water" || name == "Eau_Riviere" || name == "Glass" ? 0.90f : 0.32f));
+            material.SetFloat("_Smoothness", name == "MetalAluminium" ? 0.90f
+                : (name == "Metal" || name == "Gold" ? 0.76f
+                : (name == "Water" || name == "Eau_Riviere" || name == "Glass" || name == "GlassBleu"
+                    ? 0.90f : 0.32f)));
+        if (material.HasProperty("_Alpha") && (name == "Glass" || name == "GlassBleu"))
+            material.SetFloat("_Alpha", 0.42f);
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -2092,17 +2126,17 @@ public sealed class LibreViesGame : MonoBehaviour
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z,
             LargeurInitiale = size.x, ProfondeurInitiale = size.z,
             Hauteur = size.y, SolY = root.position.y,
-            MateriauMur = "Wall", MateriauFenetre = "Glass",
-            MateriauPorte = "Wood", MateriauToit = materiauToit,
+            MateriauMur = "Wall", MateriauFenetre = "GlassBleu",
+            MateriauPorte = "Bois_Clair", MateriauToit = materiauToit,
             Collision = collisionMaison
         };
         batiments.Add(batiment);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
         // est le cote +z. Les panneaux suivent exactement cette facade.
-        Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Wood", root, "Porte");
+        Box(new Vector3(0, 1.0f, size.z * 0.51f), new Vector3(1.2f, 2f, 0.12f), "Bois_Clair", root, "Porte");
         for (int side = -1; side <= 1; side += 2)
         {
-            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Glass", root, "Fenetre");
+            Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "GlassBleu", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
     }
@@ -2237,6 +2271,17 @@ public sealed class LibreViesGame : MonoBehaviour
     private void AppliquerMateriauMaison(Batiment batiment, string cible, string materiau)
     {
         if (batiment == null || batiment.Root == null || string.IsNullOrEmpty(materiau)) return;
+        // Les anciennes coordonnees peuvent encore contenir des choix retires.
+        // Ils sont convertis vers le rendu actuel au lieu de provoquer un
+        // fallback silencieux vers le premier materiau de la liste.
+        if (cible == "mur" && materiau == "Wood") materiau = "Bois_Clair";
+        if (cible == "mur" && materiau == "Moquette") materiau = "Wall";
+        if (cible == "fenetre" && (materiau == "Glass" || materiau == "Wood" || materiau == "Metal"))
+            materiau = "GlassBleu";
+        if (cible == "porte" && materiau == "Wood") materiau = "Bois_Clair";
+        if (cible == "porte" && (materiau == "Bois_Clair" || materiau == "Metal" || materiau == "Brique"))
+            materiau = materiau == "Metal" ? "MetalAluminium" : "Bois_Clair";
+        if (cible == "toit" && materiau == "Wood") materiau = "Bois_Clair";
         if (cible == "mur") batiment.MateriauMur = materiau;
         else if (cible == "fenetre") batiment.MateriauFenetre = materiau;
         else if (cible == "porte") batiment.MateriauPorte = materiau;
@@ -2326,32 +2371,32 @@ public sealed class LibreViesGame : MonoBehaviour
                     ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], !inverse);
             }
             DessinerChoixMateriaux(batiment, "mur",
-                new[] { "MUR", "BOIS", "BRIQUE", "MOQUET" },
-                new[] { "Wall", "Wood", "Brique", "Moquette" }, cadre.y + 287f);
+                new[] { "MUR", "BOIS", "BRIQUE" },
+                new[] { "Wall", "Bois_Clair", "Brique" }, cadre.y + 287f);
         }
         else if (editionOutilMaison == 2)
         {
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
                 "Les fenetres restent attachees a la maison.", smallStyle);
             DessinerChoixMateriaux(batiment, "fenetre",
-                new[] { "VERRE", "BLEU", "BOIS", "METAL" },
-                new[] { "Glass", "GlassBleu", "Wood", "Metal" }, cadre.y + 220f);
+                new[] { "VERRE BLEU" },
+                new[] { "GlassBleu" }, cadre.y + 220f);
         }
         else if (editionOutilMaison == 3)
         {
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
                 "La porte reste a sa hauteur et sur la maison.", smallStyle);
             DessinerChoixMateriaux(batiment, "porte",
-                new[] { "BOIS", "CLAIR", "METAL", "BRIQUE" },
-                new[] { "Wood", "Bois_Clair", "Metal", "Brique" }, cadre.y + 220f);
+                new[] { "BOIS", "ALUMINIUM" },
+                new[] { "Bois_Clair", "MetalAluminium" }, cadre.y + 220f);
         }
         else
         {
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
                 "Le toit s'adapte automatiquement aux dimensions.", smallStyle);
             DessinerChoixMateriaux(batiment, "toit",
-                new[] { "TUILE", "BLEU", "ROUGE", "BOIS" },
-                new[] { "Roof", "RoofBlue", "RoofRed", "Wood" }, cadre.y + 220f);
+                new[] { "ROUGE", "BOIS" },
+                new[] { "RoofRed", "Bois_Clair" }, cadre.y + 220f);
         }
     }
 
