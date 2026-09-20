@@ -4039,8 +4039,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Renderer rendu = affiche.Root.GetComponent<Renderer>();
             if (rendu == null) continue;
             affiche.Position = affiche.Root.transform.position;
-            if (affiche.Root.parent != null)
-                affiche.DirectionFacade = affiche.Root.parent.TransformDirection(Vector3.forward).normalized;
+            if (affiche.Root.transform.parent != null)
+                affiche.DirectionFacade = affiche.Root.transform.parent.TransformDirection(Vector3.forward).normalized;
             // Une affiche de facade n'existe visuellement que du cote de sa
             // propre facade : le cube opaque de la maison ne laisse plus son
             // envers apparaitre quand on regarde depuis l'arriere.

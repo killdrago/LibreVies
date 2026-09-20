@@ -49,7 +49,7 @@ def test_signs_follow_buildings_and_facade_visibility_is_dynamic():
     assert "texte.transform.SetParent(parent, true)" in CS
     visibility = section(CS, "private void MettreAJourVisibiliteAffiches", "private GameObject CreerTexte3D")
     assert "affiche.Position = affiche.Root.transform.position" in visibility
-    assert "affiche.Root.parent.TransformDirection" in visibility
+    assert "affiche.Root.transform.parent.TransformDirection" in visibility
 
 
 def test_blacksmith_and_mayor_arms_are_locked_without_touching_anvil():
