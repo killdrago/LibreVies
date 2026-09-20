@@ -40,9 +40,11 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "Grillage" not in CS
     assert "MaisonParent" in CS
     assert "HauteurLocale" in CS
-    assert "local.y = Mathf.Clamp(local.y" in CS
+    assert "element.BloqueHauteur ? element.HauteurLocale" in CS
+    assert "Mathf.Clamp(local.y" in CS
     assert "PointSourisSurPlanMaison" in CS
     assert "ProfondeurLocale" in CS
+    assert 'BloqueHauteur = objet.name == "Porte"' in CS
     assert "TryTrouverCoteRedimensionnement" in CS
     assert "ActualiserDimensionsBatiment" in CS
     assert "nouvelleDimension" in CS

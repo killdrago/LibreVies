@@ -374,6 +374,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float SolY;
         public float HauteurLocale;
         public float ProfondeurLocale;
+        public bool BloqueHauteur;
         public float LargeurAvant;
         public float ProfondeurAvant;
         public Obstacle Collision;
@@ -762,6 +763,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 SolY = objet.position.y,
                 HauteurLocale = objet.localPosition.y,
                 ProfondeurLocale = objet.localPosition.z,
+                BloqueHauteur = objet.name == "Porte",
                 Collision = collisionsObjetsEdition.ContainsKey(objet)
                     ? collisionsObjetsEdition[objet] : null
             });
@@ -2572,7 +2574,8 @@ public sealed class LibreViesGame : MonoBehaviour
             float minY = 0.25f;
             float maxY = element.MaisonParent.Hauteur + 1.5f;
             local.x = Mathf.Clamp(local.x, -margeX, margeX);
-            local.y = Mathf.Clamp(local.y, minY, maxY);
+            local.y = element.BloqueHauteur ? element.HauteurLocale
+                : Mathf.Clamp(local.y, minY, maxY);
             local.z = element.ProfondeurLocale;
             element.Root.localPosition = local;
         }
