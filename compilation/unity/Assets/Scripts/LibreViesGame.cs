@@ -132,6 +132,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly Dictionary<string, GameObject> naturePrefabs = new Dictionary<string, GameObject>();
     private int natureInstances;
     private readonly Dictionary<Renderer, Material[]> materiauxOriginaux = new Dictionary<Renderer, Material[]>();
+    private readonly Dictionary<Renderer, bool> renderersMasquesInterieur = new Dictionary<Renderer, bool>();
 
     private Transform player;
     private Transform cameraPivot;
@@ -918,6 +919,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 / Mathf.Max(HauteurPorteConfortable * echelleY, 0.001f);
             batiment.PorteRoot.localScale = echellePorte;
             Vector3 positionPorte = batiment.PorteRoot.localPosition;
+            // Le gond reste au montant gauche et le centre du vantail reste
+            // aligne sur le milieu horizontal du mur.
+            positionPorte.x = -batiment.PorteLargeur * 0.5f;
             positionPorte.y = batiment.PorteHauteur * 0.5f / echelleY;
             batiment.PorteRoot.localPosition = positionPorte;
             ElementEdition elementPorte = TrouverElementEdition(batiment.PorteRoot);
@@ -2116,9 +2120,9 @@ public sealed class LibreViesGame : MonoBehaviour
             bornes.Add(valeur);
         }
 
-        // Mur ferme sur ses cotes et decoupe sur les deux facades. Les
-        // ouvertures restent de vraies ouvertures du maillage : le verre ne
-        // masque donc plus un cube de mur derriere lui.
+        // Mur ferme sur ses cotes, avec ouvertures uniquement sur la facade
+        // avant. Le verre ne masque donc plus un cube de mur derriere lui,
+        // tandis que la face arriere reste une paroi pleine.
         public void MurAvecOuvertures(float largeur, float profondeur, float hauteur,
             Vector2[] centres, Vector2[] tailles)
         {
@@ -2137,7 +2141,9 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(basDroitAvant, basDroit, hautDroit, hautDroitAvant);
             Quad(basGauche, basGaucheAvant, basDroitAvant, basDroit);
             Quad(hautGauche, hautDroit, hautDroitAvant, hautGaucheAvant);
-            FaceAvecOuvertures(largeur, -z, hauteur, centres, tailles, false);
+            // La facade avant porte les vraies ouvertures. Le mur arriere
+            // reste plein : aucune fausse porte/fenetre ni ombre projetee ne
+            // peut apparaitre au fond de la maison.
             FaceAvecOuvertures(largeur, z, hauteur, centres, tailles, true);
         }
 
@@ -5245,6 +5251,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (player == null) return;
         RestaurerTransparences();
+        MettreAJourVisibiliteInterieurMaison(PointDansInterieurMaison(player.position));
         if (firstPerson)
         {
             // En premiere personne, aucun morceau du heros ne doit etre rendu :
@@ -5295,6 +5302,34 @@ public sealed class LibreViesGame : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    private void MettreAJourVisibiliteInterieurMaison(bool interieur)
+    {
+        if (!interieur)
+        {
+            foreach (KeyValuePair<Renderer, bool> entree in renderersMasquesInterieur)
+                if (entree.Key != null) entree.Key.enabled = entree.Value;
+            renderersMasquesInterieur.Clear();
+            return;
+        }
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            Renderer[] rendus = batiment.Root.GetComponentsInChildren<Renderer>(true);
+            for (int j = 0; j < rendus.Length; j++)
+            {
+                Renderer rendu = rendus[j];
+                // En interieur, seule la dalle de sol reste rendue. Les murs,
+                // le toit, la porte, les vitres et les poutres ne bouchent plus
+                // la vue du personnage.
+                if (rendu.transform.name == "Sol_Interieur") continue;
+                if (!renderersMasquesInterieur.ContainsKey(rendu))
+                    renderersMasquesInterieur.Add(rendu, rendu.enabled);
+                rendu.enabled = false;
+            }
+        }
     }
 
     private void MettreAJourVisibiliteAffiches(Vector3 cameraPosition)
