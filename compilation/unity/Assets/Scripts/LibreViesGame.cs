@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.72";
+    private const string VersionJeu = "0.5.73";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -2230,7 +2230,8 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (metier == "Forgeron")
         {
             // Enclume sur pied, avec plateau et pointe : ce n'est plus un
-            // simple cube flottant. Le marteau est parenté au point de la main.
+            // simple cube flottant. Le marteau est parenté directement au
+            // point de la main droite.
             CreerEnclumeForgeron(root);
             pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
             pnj.Marteau.SetParent(pnj.Main, false);
@@ -2242,11 +2243,12 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else if (metier == "Maire")
         {
-            // La feuille est tenue devant le maire et bouge legerement comme
-            // une presentation au public.
+            // La feuille est enfant du point de la main droite : elle suit
+            // exactement le bras et ne peut plus rester suspendue au torse.
             pnj.Feuille = new GameObject("Feuille_Maire").transform;
             pnj.Feuille.SetParent(pnj.Main, false);
             pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, 0.10f);
+            pnj.Feuille.localRotation = Quaternion.identity;
             Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
             Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
@@ -2312,14 +2314,11 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.GenouD != null) pnj.GenouD.localRotation = Quaternion.Euler(Mathf.Max(0f, Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);
             if (pnj.Marteau != null && pnj.Main != null)
             {
-                // Le marteau suit la main. Son angle est volontairement
-                // inverse à celui du bras : quand le bras recule, le marteau
-                // avance vers l'enclume, et inversement.
-                pnj.Marteau.position = pnj.Main.position;
-                // Même phase que le bras droit : sa rotation mondiale est
-                // dérivée du pivot du bras, jamais d'une oscillation séparée.
-                pnj.Marteau.rotation = pnj.BrasD.rotation
-                    * Quaternion.Euler(-18f, 0f, 0f);
+                // Le marteau est enfant du point de la main droite. On ne
+                // recalcule donc pas sa position dans le monde : le parent
+                // entraîne automatiquement position, rotation et animation.
+                pnj.Marteau.localPosition = Vector3.zero;
+                pnj.Marteau.localRotation = Quaternion.Euler(-18f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {

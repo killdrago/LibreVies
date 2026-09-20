@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 72 : route droite et portail 8 m
-                        ; version 0.5.72
+Derniere mise a jour : 20/09/2026 - MAJ 73 : objets attaches aux mains
+                        ; version 0.5.73
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -27,6 +27,17 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
   coudes et des genoux afin de fermer les raccords pendant les flexions, sans
   réintroduire les bouchons circulaires qui étaient visibles aux articulations.
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 73 — MARTEAU ET FEUILLE ATTACHES AUX MAINS (20/09/2026)
+================================================================================
+
+- Le marteau du forgeron est maintenant enfant direct du point de la main
+  droite. Il suit la position et la rotation de la main pendant tout le geste,
+  sans recalcul séparé qui pouvait l'envoyer à contre-mouvement.
+- La feuille du maire est également enfant du point de la main droite et suit
+  le mouvement du bras.
+- Version de cette MAJ : 0.5.73. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 72 — ROUTE DROITE, PORTAIL 8 M ET BOUTON EDITION (20/09/2026)
