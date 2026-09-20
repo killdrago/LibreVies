@@ -378,6 +378,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Hauteur;
         public float SolY;
         public Transform MursRoot;
+        public Transform MursBasRoot;
         public Transform PorteRoot;
         public float PorteLargeur;
         public float PorteHauteur;
@@ -977,6 +978,40 @@ public sealed class LibreViesGame : MonoBehaviour
             collision.sharedMesh = null;
             collision.sharedMesh = nouveau;
         }
+        ActualiserMurBasInterieur(batiment, centres, tailles);
+    }
+
+    private void ActualiserMurBasInterieur(Batiment batiment,
+        List<Vector2> centres, List<Vector2> tailles)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        if (batiment.MursBasRoot == null)
+        {
+            GameObject objet = new GameObject("Murs_Bas_Interieur");
+            batiment.MursBasRoot = objet.transform;
+            batiment.MursBasRoot.SetParent(batiment.Root, false);
+            objet.AddComponent<MeshFilter>();
+            objet.AddComponent<MeshRenderer>();
+        }
+        float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
+        float hauteurBasse = Mathf.Min(batiment.HauteurInitiale, 1f / echelleY);
+        var maillageBas = new Maillage();
+        maillageBas.MurAvecOuvertures(batiment.LargeurInitiale,
+            batiment.ProfondeurInitiale, hauteurBasse,
+            centres.ToArray(), tailles.ToArray());
+        MeshFilter filtreBas = batiment.MursBasRoot.GetComponent<MeshFilter>();
+        MeshRenderer renduBas = batiment.MursBasRoot.GetComponent<MeshRenderer>();
+        filtreBas.sharedMesh = maillageBas.VersMesh("Murs_Bas_Interieur_"
+            + batiment.Root.name);
+        Material materiau = Mat(batiment.MateriauMur);
+        if (materiau == null && batiment.MursRoot != null)
+        {
+            Renderer renduMurs = batiment.MursRoot.GetComponent<Renderer>();
+            if (renduMurs != null) materiau = renduMurs.sharedMaterial;
+        }
+        if (materiau != null) renduBas.sharedMaterial = materiau;
+        // Le mur bas n'est active que pendant la presence a l'interieur.
+        batiment.MursBasRoot.gameObject.SetActive(false);
     }
 
     private void SynchroniserBatiment(Batiment batiment)
@@ -2457,6 +2492,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (renduFenetre != null)
                 renduFenetre.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
+        ActualiserOuverturePorteVisuelle(batiment);
         CreerAfficheMaison(root, size, name);
     }
 
@@ -2657,7 +2693,8 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             string nom = enfants[i].name ?? "";
             bool concerne = cible == "mur"
-                ? (nom == "Murs" || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
+                ? (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                    || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "fenetre" ? nom == "Fenetre"
                 : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
                     : nom.StartsWith("Toit_")));
@@ -5287,7 +5324,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < rendus.Length; i++) rendus[i].enabled = visible;
     }
 
-    private bool PointDansInterieurMaison(Vector3 point)
+    private Batiment TrouverMaisonInterieure(Vector3 point)
     {
         for (int i = 0; i < batiments.Count; i++)
         {
@@ -5299,9 +5336,14 @@ public sealed class LibreViesGame : MonoBehaviour
                 && local.z > -batiment.ProfondeurInitiale * 0.5f
                 && local.z < batiment.ProfondeurInitiale * 0.5f
                 && local.y > -0.05f && local.y < batiment.HauteurInitiale + 0.15f)
-                return true;
+                return batiment;
         }
-        return false;
+        return null;
+    }
+
+    private bool PointDansInterieurMaison(Vector3 point)
+    {
+        return TrouverMaisonInterieure(point) != null;
     }
 
     private void MettreAJourVisibiliteInterieurMaison(bool interieur)
@@ -5311,24 +5353,34 @@ public sealed class LibreViesGame : MonoBehaviour
             foreach (KeyValuePair<Renderer, bool> entree in renderersMasquesInterieur)
                 if (entree.Key != null) entree.Key.enabled = entree.Value;
             renderersMasquesInterieur.Clear();
+            for (int i = 0; i < batiments.Count; i++)
+            {
+                Batiment batiment = batiments[i];
+                if (batiment != null && batiment.MursBasRoot != null)
+                    batiment.MursBasRoot.gameObject.SetActive(false);
+            }
             return;
         }
-        for (int i = 0; i < batiments.Count; i++)
+
+        Batiment maisonInterieure = player == null
+            ? null : TrouverMaisonInterieure(player.position);
+        if (maisonInterieure == null) return;
+        if (maisonInterieure.MursBasRoot != null)
+            maisonInterieure.MursBasRoot.gameObject.SetActive(true);
+        Renderer[] rendus = maisonInterieure.Root.GetComponentsInChildren<Renderer>(true);
+        for (int j = 0; j < rendus.Length; j++)
         {
-            Batiment batiment = batiments[i];
-            if (batiment == null || batiment.Root == null) continue;
-            Renderer[] rendus = batiment.Root.GetComponentsInChildren<Renderer>(true);
-            for (int j = 0; j < rendus.Length; j++)
-            {
-                Renderer rendu = rendus[j];
-                // En interieur, seule la dalle de sol reste rendue. Les murs,
-                // le toit, la porte, les vitres et les poutres ne bouchent plus
-                // la vue du personnage.
-                if (rendu.transform.name == "Sol_Interieur") continue;
-                if (!renderersMasquesInterieur.ContainsKey(rendu))
-                    renderersMasquesInterieur.Add(rendu, rendu.enabled);
-                rendu.enabled = false;
-            }
+            Renderer rendu = rendus[j];
+            // Le mur bas de 1 m remplace le mur complet. La porte reste,
+            // elle, entierement visible pour que le joueur retrouve la sortie.
+            if (maisonInterieure.MursBasRoot != null
+                && rendu.transform.IsChildOf(maisonInterieure.MursBasRoot)) continue;
+            if (maisonInterieure.PorteRoot != null
+                && rendu.transform.IsChildOf(maisonInterieure.PorteRoot)) continue;
+            if (rendu.transform.name == "Sol_Interieur") continue;
+            if (!renderersMasquesInterieur.ContainsKey(rendu))
+                renderersMasquesInterieur.Add(rendu, rendu.enabled);
+            rendu.enabled = false;
         }
     }
 
