@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.77",
-  "notes": "MAJ 77 : aligne le marteau et la feuille dans le prolongement du bras, et permet de soulever puis reposer une maison en cliquant sa cage.",
+  "game_version": "0.5.78",
+  "notes": "MAJ 78 : synchronise les accessoires avec le bras droit, permet de déplacer une maison en maintenant le clic et enregistre les positions dans edition/coordonee chiffré.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},

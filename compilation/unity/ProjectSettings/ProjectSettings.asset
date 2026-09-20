@@ -74,7 +74,7 @@ PlayerSettings:
   gcWBarrierValidation: 0
   apiCompatibilityLevelPerPlatform: {}
   activeInputHandler: 0
-  bundleVersion: 0.5.77
+  bundleVersion: 0.5.78
   metroPackageVersion: 1.0.0.0
   m_ActiveColorSpace: 1
   m_ActiveColorSpaceAndroid: 0

@@ -1,13 +1,26 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 77 : objets dans le prolongement du bras et maisons soulevables
-                        ; version 0.5.77
+Derniere mise a jour : 20/09/2026 - MAJ 78 : bras droit, déplacement des maisons et sauvegarde chiffrée
+                        ; version 0.5.78
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 78 — BRAS DROIT, DEPLACEMENT DES MAISONS ET SAUVEGARDE CHIFFREE (20/09/2026)
+- Le marteau est maintenant calcule depuis la transform Hand_R et le vecteur
+  coude droit -> paume droite ; il ne peut plus suivre le bras gauche.
+- En mode EDITION, appuyer sur une cage souleve la maison de 1 m. Tant que le
+  clic gauche reste enfonce, la maison suit le curseur horizontalement sur X/Z.
+  Relacher le clic la repose a sa nouvelle position.
+- Cliquer a nouveau sur EDITION repose une maison encore soulevee et enregistre
+  toutes les positions des objets racines de la scene.
+- Le fichier est cree dans le dossier edition, a cote de game, sous le nom
+  coordonee. Son contenu est binaire chiffre et n'est pas lisible comme du JSON.
+- Version de cette MAJ : 0.5.78. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
 
 MAJ 77 — OBJETS DANS LE PROLONGEMENT DU BRAS ET MAISONS SOULEVABLES (20/09/2026)
 - Le marteau du forgeron est aligne dynamiquement sur le vecteur coude ->

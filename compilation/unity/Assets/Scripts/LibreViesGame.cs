@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 #if UNITY_STANDALONE_WIN
 using System.Runtime.InteropServices;
 #endif
@@ -16,7 +18,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.77";
+    private const string VersionJeu = "0.5.78";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -95,6 +97,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // par un grillage visible, sans modifier leur position ni leur collision.
     private bool modeEdition;
     private Batiment maisonEditionSelectionnee;
+    private bool editionMaisonEnDeplacement;
+    private Vector3 decalageSourisMaisonEdition;
     private const float HauteurSoulevementMaisonEdition = 1.0f;
     // Portails du village (position du portail) et gardes qui les surveillent.
     private readonly List<Vector2> portails = new List<Vector2>();
@@ -258,6 +262,36 @@ public sealed class LibreViesGame : MonoBehaviour
         public int renaitre = (int)KeyCode.R;
     }
 
+    [Serializable]
+    private sealed class CoordonneeObjetEdition
+    {
+        public string Nom;
+        public Vector3 Position;
+        public Quaternion Rotation;
+        public Vector3 Echelle;
+    }
+
+    [Serializable]
+    private sealed class FichierCoordonneesEdition
+    {
+        public int Version = 1;
+        public List<CoordonneeObjetEdition> Objets = new List<CoordonneeObjetEdition>();
+    }
+
+    private string CheminCoordonneesEdition
+    {
+        get
+        {
+            string dossierJeu = Path.GetDirectoryName(Application.dataPath);
+            string dossierInstallation = dossierJeu == null
+                ? null : Path.GetDirectoryName(dossierJeu);
+            // En build Windows, dataPath vaut .../game/LibreViesGame_Data :
+            // edition est donc .../edition, au meme niveau que game.
+            return Path.Combine(dossierInstallation ?? dossierJeu ?? Application.dataPath,
+                "edition", "coordonee");
+        }
+    }
+
     private string CheminConfiguration
     {
         get { return Path.Combine(Application.persistentDataPath, "librevies_config.json"); }
@@ -307,6 +341,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Hauteur;
         public float SolY;
         public bool EditionSoulevee;
+        public Obstacle Collision;
     }
 
     private sealed class PnjState
@@ -519,6 +554,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Journal("fin   : " + noms[i] + "  (" + objetsCrees + " objets)");
             yield return null;
         }
+        ChargerCoordonneesEdition();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
         Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
@@ -592,6 +628,174 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdateCamera();
         UpdateEffects(dt);
         UpdateHudState(dt);
+    }
+
+    private bool RacineAEnregistrer(Transform objet)
+    {
+        if (objet == null || objet.parent != null || !objet.gameObject.activeInHierarchy)
+            return false;
+        if (objet == transform || objet == player || (gameCamera != null && objet == gameCamera.transform))
+            return false;
+        string nom = objet.name ?? "";
+        if (nom == "Soleil" || nom == "Main Camera" || nom == "EventSystem") return false;
+        return true;
+    }
+
+    private List<Transform> RacinesObjetsEdition()
+    {
+        Transform[] transforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+        var racines = new List<Transform>();
+        for (int i = 0; i < transforms.Length; i++)
+            if (RacineAEnregistrer(transforms[i])) racines.Add(transforms[i]);
+        return racines;
+    }
+
+    private byte[] CleCoordonneesEdition(out byte[] iv)
+    {
+        using (SHA256 sha = SHA256.Create())
+        {
+            byte[] empreinte = sha.ComputeHash(Encoding.UTF8.GetBytes(
+                "LibreVies edition coordonee 0.5 - cle interne du jeu"));
+            iv = new byte[16];
+            Array.Copy(empreinte, 16, iv, 0, 16);
+            return empreinte;
+        }
+    }
+
+    private byte[] ChiffrerCoordonneesEdition(byte[] texte)
+    {
+        byte[] iv;
+        byte[] cle = CleCoordonneesEdition(out iv);
+        using (Aes aes = Aes.Create())
+        {
+            aes.Key = cle;
+            aes.IV = iv;
+            using (ICryptoTransform chiffreur = aes.CreateEncryptor())
+                return chiffreur.TransformFinalBlock(texte, 0, texte.Length);
+        }
+    }
+
+    private byte[] DechiffrerCoordonneesEdition(byte[] donnees)
+    {
+        byte[] iv;
+        byte[] cle = CleCoordonneesEdition(out iv);
+        using (Aes aes = Aes.Create())
+        {
+            aes.Key = cle;
+            aes.IV = iv;
+            using (ICryptoTransform dechiffreur = aes.CreateDecryptor())
+                return dechiffreur.TransformFinalBlock(donnees, 0, donnees.Length);
+        }
+    }
+
+    private void SynchroniserBatiment(Batiment batiment)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        batiment.X = batiment.Root.position.x;
+        batiment.Z = batiment.Root.position.z;
+        if (batiment.Collision != null)
+        {
+            batiment.Collision.X = batiment.X;
+            batiment.Collision.Z = batiment.Z;
+        }
+    }
+
+    private void SynchroniserTousLesBatiments()
+    {
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment != null && !batiment.EditionSoulevee && batiment.Root != null)
+                batiment.SolY = batiment.Root.position.y;
+            SynchroniserBatiment(batiment);
+        }
+    }
+
+    private Transform TrouverRacineCoordonnee(string nom, Vector3 position, HashSet<int> utilisees)
+    {
+        Transform meilleur = null;
+        float meilleureDistance = float.MaxValue;
+        List<Transform> racines = RacinesObjetsEdition();
+        for (int i = 0; i < racines.Count; i++)
+        {
+            Transform racine = racines[i];
+            if (racine.name != nom || utilisees.Contains(racine.GetInstanceID())) continue;
+            float distance = (racine.position - position).sqrMagnitude;
+            if (distance < meilleureDistance)
+            {
+                meilleureDistance = distance;
+                meilleur = racine;
+            }
+        }
+        return meilleur;
+    }
+
+    private void ChargerCoordonneesEdition()
+    {
+        string chemin = CheminCoordonneesEdition;
+        if (!File.Exists(chemin)) return;
+        try
+        {
+            byte[] donnees = DechiffrerCoordonneesEdition(File.ReadAllBytes(chemin));
+            string json = Encoding.UTF8.GetString(donnees);
+            FichierCoordonneesEdition fichier = JsonUtility.FromJson<FichierCoordonneesEdition>(json);
+            if (fichier == null || fichier.Objets == null) return;
+            var utilisees = new HashSet<int>();
+            for (int i = 0; i < fichier.Objets.Count; i++)
+            {
+                CoordonneeObjetEdition coordonnee = fichier.Objets[i];
+                if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
+                Transform objet = TrouverRacineCoordonnee(coordonnee.Nom,
+                    coordonnee.Position, utilisees);
+                if (objet == null) continue;
+                objet.position = coordonnee.Position;
+                objet.rotation = coordonnee.Rotation;
+                objet.localScale = coordonnee.Echelle;
+                utilisees.Add(objet.GetInstanceID());
+            }
+            SynchroniserTousLesBatiments();
+            Journal("coordonnees edition chargees : " + fichier.Objets.Count + " objet(s)");
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : fichier edition ignore (illisible ou non reconnu) : "
+                + erreur.Message);
+        }
+    }
+
+    private void EnregistrerCoordonneesEdition()
+    {
+        try
+        {
+            string dossier = Path.GetDirectoryName(CheminCoordonneesEdition);
+            if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
+            var fichier = new FichierCoordonneesEdition();
+            List<Transform> racines = RacinesObjetsEdition();
+            for (int i = 0; i < racines.Count; i++)
+            {
+                Transform objet = racines[i];
+                fichier.Objets.Add(new CoordonneeObjetEdition
+                {
+                    Nom = objet.name,
+                    Position = objet.position,
+                    Rotation = objet.rotation,
+                    Echelle = objet.localScale
+                });
+            }
+            string json = JsonUtility.ToJson(fichier, false);
+            byte[] chiffre = ChiffrerCoordonneesEdition(Encoding.UTF8.GetBytes(json));
+            string temporaire = CheminCoordonneesEdition + ".tmp";
+            File.WriteAllBytes(temporaire, chiffre);
+            if (File.Exists(CheminCoordonneesEdition)) File.Delete(CheminCoordonneesEdition);
+            File.Move(temporaire, CheminCoordonneesEdition);
+            Journal("coordonnees edition enregistrees : " + fichier.Objets.Count
+                + " objet(s) dans edition/coordonee");
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : enregistrement des coordonnees edition impossible : "
+                + erreur.Message);
+        }
     }
 
     private void CreateMaterials()
@@ -1001,13 +1205,15 @@ public sealed class LibreViesGame : MonoBehaviour
         });
     }
 
-    private void ColBoite(float x, float z, float w, float d, float h = HauteurCollision)
+    private Obstacle ColBoite(float x, float z, float w, float d, float h = HauteurCollision)
     {
-        obstacles.Add(new Obstacle
+        Obstacle obstacle = new Obstacle
         {
             X = x, Z = z, Largeur = w, Profondeur = d,
             Portee = Mathf.Max(w, d) * 0.5f + 1f, Hauteur = h
-        });
+        };
+        obstacles.Add(obstacle);
+        return obstacle;
     }
 
     private bool DansVillage(float x, float z)
@@ -1612,12 +1818,13 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Stone", root, "Cheminee");
         }
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
-        ColBoite(position.x, position.z, size.x + 0.5f, size.z + 0.5f, size.y);
+        Obstacle collisionMaison = ColBoite(position.x, position.z,
+            size.x + 0.5f, size.z + 0.5f, size.y);
         Batiment batiment = new Batiment
         {
             Root = root,
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z,
-            Hauteur = size.y, SolY = root.position.y
+            Hauteur = size.y, SolY = root.position.y, Collision = collisionMaison
         };
         batiments.Add(batiment);
         CreerGrillageMaison(batiment, size);
@@ -1746,41 +1953,94 @@ public sealed class LibreViesGame : MonoBehaviour
         return cible != null;
     }
 
+    private bool PointSourisSurPlanEdition(float hauteur, out Vector3 point)
+    {
+        point = Vector3.zero;
+        if (gameCamera == null) return false;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        if (Mathf.Abs(rayon.direction.y) < 0.0001f) return false;
+        float distance = (hauteur - rayon.origin.y) / rayon.direction.y;
+        if (distance < 0f) return false;
+        point = rayon.GetPoint(distance);
+        return true;
+    }
+
     private void PoserMaisonEdition(Batiment batiment)
     {
         if (batiment == null || batiment.Root == null) return;
-        batiment.Root.position = new Vector3(batiment.Root.position.x, batiment.SolY, batiment.Root.position.z);
+        batiment.Root.position = new Vector3(batiment.Root.position.x,
+            batiment.SolY, batiment.Root.position.z);
         batiment.EditionSoulevee = false;
+        SynchroniserBatiment(batiment);
     }
 
-    private void BasculerMaisonEdition()
+    private void CommencerDeplacementMaisonEdition()
     {
         Batiment cible;
         if (!TryTrouverMaisonEdition(out cible)) return;
-        // Une seule maison est selectionnee a la fois. Cliquer une autre cage
-        // repose la precedente avant de soulever la nouvelle.
         if (maisonEditionSelectionnee != null && maisonEditionSelectionnee != cible)
             PoserMaisonEdition(maisonEditionSelectionnee);
         maisonEditionSelectionnee = cible;
-        if (cible.EditionSoulevee)
+        cible.EditionSoulevee = true;
+        cible.Root.position = new Vector3(cible.Root.position.x,
+            cible.SolY + HauteurSoulevementMaisonEdition, cible.Root.position.z);
+        Vector3 pointSouris;
+        if (PointSourisSurPlanEdition(cible.Root.position.y, out pointSouris))
         {
-            PoserMaisonEdition(cible);
-            maisonEditionSelectionnee = null;
-            ShowInfo("Maison remise au sol");
+            decalageSourisMaisonEdition = cible.Root.position - pointSouris;
+            decalageSourisMaisonEdition.y = 0f;
         }
         else
         {
-            cible.Root.position = new Vector3(cible.Root.position.x,
-                cible.SolY + HauteurSoulevementMaisonEdition, cible.Root.position.z);
-            cible.EditionSoulevee = true;
-            ShowInfo("Maison selectionnee et soulevee");
+            decalageSourisMaisonEdition = Vector3.zero;
         }
+        editionMaisonEnDeplacement = true;
+        SynchroniserBatiment(cible);
+        ShowInfo("Maison soulevee : maintenez le clic et deplacez-la");
+    }
+
+    private void DeplacerMaisonEdition()
+    {
+        if (!editionMaisonEnDeplacement || maisonEditionSelectionnee == null) return;
+        Batiment maison = maisonEditionSelectionnee;
+        Vector3 pointSouris;
+        if (!PointSourisSurPlanEdition(maison.SolY + HauteurSoulevementMaisonEdition,
+            out pointSouris)) return;
+        Vector3 position = pointSouris + decalageSourisMaisonEdition;
+        maison.Root.position = new Vector3(position.x,
+            maison.SolY + HauteurSoulevementMaisonEdition, position.z);
+        SynchroniserBatiment(maison);
+    }
+
+    private void TerminerDeplacementMaisonEdition()
+    {
+        if (!editionMaisonEnDeplacement) return;
+        PoserMaisonEdition(maisonEditionSelectionnee);
+        editionMaisonEnDeplacement = false;
+        maisonEditionSelectionnee = null;
+        ShowInfo("Maison posee a sa nouvelle position");
+    }
+
+    private void GererSourisEdition()
+    {
+        if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0))
+            CommencerDeplacementMaisonEdition();
+        if (editionMaisonEnDeplacement && Input.GetMouseButton(0))
+            DeplacerMaisonEdition();
+        if (editionMaisonEnDeplacement && Input.GetMouseButtonUp(0))
+            TerminerDeplacementMaisonEdition();
     }
 
     private void BasculerModeEdition()
     {
-        if (modeEdition && maisonEditionSelectionnee != null)
-            PoserMaisonEdition(maisonEditionSelectionnee);
+        if (modeEdition)
+        {
+            if (editionMaisonEnDeplacement)
+                TerminerDeplacementMaisonEdition();
+            else if (maisonEditionSelectionnee != null)
+                PoserMaisonEdition(maisonEditionSelectionnee);
+            EnregistrerCoordonneesEdition();
+        }
         modeEdition = !modeEdition;
         if (modeEdition)
             maisonEditionSelectionnee = null;
@@ -1791,9 +2051,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 batiment.Grillage.SetActive(modeEdition);
         }
         if (modeEdition)
-            ShowInfo("MODE EDITION : cliquez une cage pour soulever la maison");
+            ShowInfo("MODE EDITION : maintenez le clic pour deplacer une maison");
         else
-            ShowInfo("MODE NORMAL");
+            ShowInfo("MODE NORMAL : positions enregistrees");
     }
 
     private string LibelleMaison(string nom)
@@ -3465,8 +3725,8 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
 
-        if (modeEdition && Input.GetMouseButtonDown(0))
-            BasculerMaisonEdition();
+        if (modeEdition)
+            GererSourisEdition();
         bool clicGauche = !modeEdition && Input.GetMouseButtonDown(0);
         bool clicNpc = clicGauche && TryOuvrirConversation();
         bool clicMonstre = clicGauche && !clicNpc && TryAttaquerMonstreClique();
@@ -4203,7 +4463,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             GUI.color = new Color(0.10f, 0.92f, 1.00f, 1f);
             GUI.Box(new Rect(Screen.width - 250f, Screen.height - 82f, 228f, 30f),
-                "MODE EDITION — MAISONS", boxStyle);
+                "MODE EDITION — MAINTENEZ LE CLIC", boxStyle);
             GUI.color = Color.white;
         }
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
@@ -4611,6 +4871,14 @@ public sealed class LibreViesGame : MonoBehaviour
     private void OnApplicationQuit()
     {
         SauverConfiguration();
+        if (mondePret)
+        {
+            if (editionMaisonEnDeplacement)
+                TerminerDeplacementMaisonEdition();
+            else if (maisonEditionSelectionnee != null)
+                PoserMaisonEdition(maisonEditionSelectionnee);
+            EnregistrerCoordonneesEdition();
+        }
     }
 
     private Material screenAdjustMaterial;
