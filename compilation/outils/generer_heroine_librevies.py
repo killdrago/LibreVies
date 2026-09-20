@@ -25,6 +25,7 @@ materials = {
     "Hair_Red": (0.58, 0.055, 0.025),
     "Hair_Red_Light": (0.84, 0.15, 0.045),
     "Eyes": (0.025, 0.045, 0.06),
+    "Mouth": (0.24, 0.035, 0.045),
     "Belt": (0.06, 0.045, 0.035),
 }
 
@@ -107,11 +108,11 @@ add_ring_surface("Boot_R", "Shoes", [(0.18, .11, .075, .14, .25), (0.18, .25, .0
 # quand les pivots d'animation font marcher ou courir l'héroïne.
 for side, suffix in ((-1, "L"), (1, "R")):
     add_ring_surface("JeansUpper_" + suffix, "Jeans", [
-        (.18 * side, .66, 0, .135, .135), (.18 * side, .92, 0, .15, .15),
+        (.18 * side, .56, 0, .145, .145), (.18 * side, .92, 0, .15, .15),
         (.18 * side, 1.12, 0, .19, .17)], 16, caps=False)
     add_ring_surface("JeansLower_" + suffix, "Jeans", [
         (.18 * side, .28, 0, .13, .13), (.18 * side, .50, 0, .135, .135),
-        (.18 * side, .66, 0, .135, .135)], 16, caps=False)
+        (.18 * side, .76, 0, .145, .145)], 16, caps=False)
 add_ring_surface("Belt", "Belt", [(0, 1.05, 0, .35, .19), (0, 1.13, 0, .37, .20)], 20)
 
 # Veste : volume trapézoïdal avec épaules marquées.
@@ -125,10 +126,10 @@ add_ring_surface("Collar", "JacketLight", [(0, 1.58, .005, .18, .12), (0, 1.70, 
 for side in (-1, 1):
     x = side
     add_ring_surface("SleeveUpper_" + ("L" if side < 0 else "R"), "JacketLight", [
-        (.40 * x, 1.58, 0, .13, .13), (.44 * x, 1.49, .01, .125, .125),
-        (.48 * x, 1.40, .02, .12, .12)], 14, pi / 14, caps=False)
+        (.40 * x, 1.58, 0, .13, .13), (.45 * x, 1.46, .01, .125, .125),
+        (.53 * x, 1.30, .02, .12, .12)], 14, pi / 14, caps=False)
     add_ring_surface("SleeveLower_" + ("L" if side < 0 else "R"), "JacketLight", [
-        (.48 * x, 1.40, .02, .12, .12), (.54 * x, 1.29, .03, .11, .11),
+        (.43 * x, 1.48, .02, .13, .13), (.54 * x, 1.29, .03, .11, .11),
         (.57 * x, 1.20, .04, .105, .105)], 14, pi / 14, caps=False)
     add_ring_surface("Cuff_" + ("L" if side < 0 else "R"), "Jacket", [
         (.57 * x, 1.18, .04, .11, .11), (.59 * x, 1.12, .045, .105, .105)], 14, caps=False)
@@ -142,6 +143,10 @@ add_sphere("Ear_R", "Skin", (.225, 2.00, .005), (.045, .075, .035), 12, 5)
 add_sphere("Eye_L", "Eyes", (-.085, 2.035, .188), (.028, .035, .018), 12, 5)
 add_sphere("Eye_R", "Eyes", (.085, 2.035, .188), (.028, .035, .018), 12, 5)
 add_sphere("Nose", "SkinLight", (0, 1.975, .205), (.035, .055, .045), 12, 5)
+# Bouche visible sur la face avant du visage. Elle est un petit volume OBJ
+# indépendant, afin de rester opaque avec le shader personnage et de suivre la
+# tête sans recourir à une primitive Unity au runtime.
+add_sphere("Mouth", "Mouth", (0, 1.895, .204), (.055, .018, .014), 16, 5)
 
 # Chevelure rousse : calotte et mèches longues, toujours dans ce maillage.
 add_ring_surface("HairCap", "Hair_Red", [(0, 2.07, -.005, .25, .21), (0, 2.18, -.005, .29, .22), (0, 2.29, -.005, .22, .17), (0, 2.36, -.005, .055, .045)], 20)

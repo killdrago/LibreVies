@@ -100,7 +100,7 @@ CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.1.0"
-GAME_VERSION = "0.5.66"
+GAME_VERSION = "0.5.67"
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
                    "arena/01a0b32c-librevies/jeu")
 
@@ -460,6 +460,16 @@ def noter_etat_jeu(build, exe):
         json.dump(etat, f, indent=2, ensure_ascii=False)
         f.write('\n')
     os.replace(tmp, ETAT_PATH)
+    # Conserver aussi la description de la build dans la configuration locale.
+    # Ainsi find_game() peut valider l'executable au redemarrage, même si le
+    # manifeste distant n'a pas encore été relu par l'interface.
+    try:
+        cfg = load_local_config()
+        cfg['game_build'] = dict(build)
+        cfg['game_version'] = build.get('version', cfg.get('game_version', GAME_VERSION))
+        save_local_config(cfg)
+    except (OSError, TypeError, ValueError):
+        pass
     return etat
 
 

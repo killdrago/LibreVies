@@ -1,13 +1,33 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 19/09/2026 - MAJ 66 : faces externes opaques et raccords des membres corrigés
-                        ; version 0.5.66
+Derniere mise a jour : 20/09/2026 - MAJ 67 : marche stable, eau interdite aux monstres et articulations sans trous
+                        ; version 0.5.67
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09/2026)
+================================================================================
+
+- La petite oscillation verticale de l'héroïne pendant la marche a été retirée :
+  le cycle anime les bras et les jambes sans faire sautiller le modèle.
+- Les anciens arbres procéduraux « boule ronde sur cylindre », vestiges du
+  prototype Godot, ne sont plus créés. Les arbres importés CC0 et les sapins de
+  secours restent disponibles.
+- Le fleuve constitue une zone interdite aux monstres terrestres, avec une marge
+  de sécurité. Une apparition ou une réapparition dans l'eau est repoussée sur
+  la berge ; lorsqu'une trajectoire touche la zone interdite, le monstre choisit
+  un virage tangent pour longer l'eau au lieu de rester bloqué face à la berge.
+- La bouche de l'héroïne est maintenant un OBJ indépendant généré dans
+  Characters/LibreViesHeroineParts/Mouth.obj et chargé avec les autres pièces.
+- Les segments de bras et de jambes se recouvrent volontairement autour des
+  coudes et des genoux afin de fermer les raccords pendant les flexions, sans
+  réintroduire les bouchons circulaires qui étaient visibles aux articulations.
+- Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 61 — HÉROÏNE ORIGINALE CC0 ET SHADER DE SECOURS (19/09/2026)
 ================================================================================

@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.66";
+    private const string VersionJeu = "0.5.67";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -25,6 +25,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float PlayerSpeed = 5f;
     private const float RunSpeed = 11f;
     private const float SwimSpeed = 3.6f;
+    // Les monstres ne nagent pas : une marge de sécurité autour de la nappe
+    // leur laisse le temps de tourner avant que leur corps ne touche l'eau.
+    private const float MargeEauMonstres = 0.85f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
     private const float WaterDepth = 3.20f;
@@ -602,7 +605,6 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Banniere_Bleue", new Color(0.16f, 0.30f, 0.62f));
         MakeMaterial("Banniere_Rouge", new Color(0.55f, 0.16f, 0.16f));
         MakeMaterial("Embleme", new Color(0.95f, 0.85f, 0.35f));
-        MakeMaterial("Arbre_Rond", new Color(0.22f, 0.58f, 0.20f));
         MakeMaterial("Cimier", new Color(0.75f, 0.15f, 0.15f));
         // Textures dediees aux objets qui etaient encore trop plats : feuillage,
         // pierre, metal, drapeaux et eau partagent toujours StablePBR.
@@ -633,7 +635,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
         else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
-        else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Arbre_Rond" || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
+        else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
         else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass") chemin = "LVTextures/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
@@ -668,7 +670,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float echelle = name == "Terrain" || name == "Dirt" || name == "Route_Terre" ? 0.08f
                 : (name.Contains("Roof") ? 0.55f : (name == "Wall" ? 0.34f
                 : (name == "Water" || name == "Eau_Riviere" ? 0.16f
-                : (name == "Leaf" || name.StartsWith("Sapin") || name == "Arbre_Rond" || name == "Feuillage" ? 0.22f
+                : (name == "Leaf" || name.StartsWith("Sapin") || name == "Feuillage" ? 0.22f
                 : (name == "Metal" || name == "Lanterne" ? 0.30f
                 : (name.Contains("Banniere") || name == "Drapeau" ? 0.42f : 0.28f))))));
             material.SetFloat("_Tiling", echelle);
@@ -871,6 +873,81 @@ public sealed class LibreViesGame : MonoBehaviour
         // pont-levis a traiter.
         if (DansVillage(point.x, point.y)) return false;
         return DistancePolyligne(point, RivierePrincipale) <= 5.3f;
+    }
+
+    // Les monstres terrestres n'ont pas de nage : l'eau est une zone interdite
+    // un peu plus large que le ruban visible. La marge permet de choisir une
+    // direction tangentielle avant que la collision ne les bloque sur la berge.
+    private bool ZoneEauInterditeMonstre(Vector2 point)
+    {
+        if (DansVillage(point.x, point.y)) return false;
+        return DistancePolyligne(point, RivierePrincipale) <= 5.3f + MargeEauMonstres;
+    }
+
+    private Vector2 PointRiviereProche(Vector2 point, out Vector2 tangente)
+    {
+        float meilleureDistance = 100000f;
+        Vector2 meilleurPoint = RivierePrincipale[0];
+        tangente = Vector2.right;
+        for (int i = 0; i < RivierePrincipale.Length - 1; i++)
+        {
+            Vector2 a = RivierePrincipale[i];
+            Vector2 b = RivierePrincipale[i + 1];
+            Vector2 ab = b - a;
+            float longueur = Mathf.Max(ab.magnitude, 0.001f);
+            Vector2 direction = ab / longueur;
+            float t = Mathf.Clamp01(Vector2.Dot(point - a, ab) / Mathf.Max(ab.sqrMagnitude, 0.001f));
+            Vector2 projection = a + ab * t;
+            float distance = (point - projection).sqrMagnitude;
+            if (distance < meilleureDistance)
+            {
+                meilleureDistance = distance;
+                meilleurPoint = projection;
+                tangente = direction;
+            }
+        }
+        return meilleurPoint;
+    }
+
+    private Vector2 SortirZoneEauMonstre(Vector2 point)
+    {
+        Vector2 tangente;
+        Vector2 bord = PointRiviereProche(point, out tangente);
+        Vector2 normale = point - bord;
+        if (normale.sqrMagnitude < 0.0001f)
+            normale = new Vector2(-tangente.y, tangente.x);
+        return bord + normale.normalized * (5.3f + MargeEauMonstres + 0.20f);
+    }
+
+    private Vector3 DirectionSansEau(Vector2 position, Vector3 direction)
+    {
+        if (direction.sqrMagnitude < 0.0001f) return direction;
+        direction.y = 0f;
+        direction.Normalize();
+        if (!ZoneEauInterditeMonstre(position + new Vector2(direction.x, direction.z) * 0.9f)
+            && !ZoneEauInterditeMonstre(position + new Vector2(direction.x, direction.z) * 1.7f))
+            return direction;
+
+        // Teste d'abord de petits virages : le monstre longe ainsi la berge
+        // dans le sens le plus proche de sa trajectoire au lieu de rester face
+        // à l'eau. Les grands angles servent de dernier dégagement.
+        float[] angles = { 30f, -30f, 55f, -55f, 80f, -80f, 110f, -110f, 145f, -145f, 180f };
+        Vector3 meilleur = Vector3.zero;
+        float meilleurAlignement = -2f;
+        for (int i = 0; i < angles.Length; i++)
+        {
+            Vector3 candidate = Quaternion.Euler(0f, angles[i], 0f) * direction;
+            Vector2 direction2 = new Vector2(candidate.x, candidate.z);
+            if (ZoneEauInterditeMonstre(position + direction2 * 0.55f)
+                || ZoneEauInterditeMonstre(position + direction2 * 1.25f)) continue;
+            float alignement = Vector3.Dot(direction, candidate);
+            if (alignement > meilleurAlignement)
+            {
+                meilleurAlignement = alignement;
+                meilleur = candidate;
+            }
+        }
+        return meilleur.sqrMagnitude > 0.0001f ? meilleur.normalized : -direction;
     }
 
     // ------------------------------------------------------------------
@@ -1116,7 +1193,6 @@ public sealed class LibreViesGame : MonoBehaviour
         return obj;
     }
 
-    // ------------------------------------------------------------------
     // MAILLAGE PROCEDURAL DE SECOURS
     // L'herbe en touffes et les rochers de la reference sont des maillages
     // faits a la main (MultiMesh cote reference, un seul maillage ici). Les
@@ -2087,15 +2163,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // fleurs, plantes et rochers. Les primitives restent le repli si une
         // installation Unity ne retrouve pas les fichiers Resources.
         CreateImportedNatureDetails();
-        // Quelques arbres ronds aux positions de la reference.
-        foreach (float[] p in new[]
-        {
-            new[] { -14f, 7f }, new[] { 14f, 7f }, new[] { -24f, -8f },
-            new[] { 24f, 8f }, new[] { -30f, 30f }, new[] { 30f, -30f }
-        })
-        {
-            if (EmplacementLibre(p[0], p[1], 1.5f)) CreateRoundTree(p[0], p[1]);
-        }
+        // Les anciens arbres ronds (boule sur cylindre, vestiges de l'ancien
+        // prototype Godot) ne sont plus créés. La végétation visible provient
+        // uniquement des arbres importés CC0 et des sapins procéduraux de secours.
     }
 
     private GameObject NaturePrefab(string asset)
@@ -2190,19 +2260,6 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateCone(root, new Vector3(0f, 3.75f, 0f), 1.05f, 2.1f, "Sapin_Milieu", "Feuillage_Milieu");
         CreateCone(root, new Vector3(0f, 4.80f, 0f), 0.72f, 1.8f, "Sapin_Haut", "Feuillage_Haut");
         ColCercle(x, z, 0.4f * taille, 2.2f);   // tronc
-    }
-
-    // Arbre rond : tronc + deux masses de feuillage facettees.
-    private void CreateRoundTree(float x, float z)
-    {
-        float y = TerrainHeight(x, z);
-        var root = new GameObject("Arbre_Rond").transform;
-        root.position = new Vector3(x, y, z);
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.8f, 0), new Vector3(0.72f, 1.8f, 0.72f), "Wood", root, "Tronc");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.3f, 0), new Vector3(1.2f, 0.3f, 1.2f), "Wood", root, "Souche");
-        Primitive(PrimitiveType.Sphere, new Vector3(0, 4.2f, 0), new Vector3(2.4f, 2.0f, 2.4f), "Arbre_Rond", root, "Feuillage");
-        Primitive(PrimitiveType.Sphere, new Vector3(0.7f, 3.6f, 0.4f), new Vector3(1.4f, 1.2f, 1.4f), "Leaf", root, "Feuillage_Bas");
-        ColCercle(x, z, 0.45f, 2.2f);
     }
 
     private void CreateCone(Transform parent, Vector3 position, float rayon, float hauteur, string materiau, string nom)
@@ -2558,7 +2615,7 @@ public sealed class LibreViesGame : MonoBehaviour
         string[] partiesFixes =
         {
             "Belt", "Jacket", "Neck", "Collar", "Head", "Ear_L", "Ear_R",
-            "Eye_L", "Eye_R", "Nose", "HairCap", "HairBack", "HairLock_L", "HairLock_R"
+            "Eye_L", "Eye_R", "Nose", "Mouth", "HairCap", "HairBack", "HairLock_L", "HairLock_R"
         };
         int piecesChargees = 0;
         for (int i = 0; i < partiesFixes.Length; i++)
@@ -2664,8 +2721,10 @@ public sealed class LibreViesGame : MonoBehaviour
         jambeHeroineDroite.localRotation = Quaternion.Euler(-balancementJambe, 0f, 0f);
         genouHeroineGauche.localRotation = Quaternion.Euler(flexionGenouGauche, 0f, 0f);
         genouHeroineDroit.localRotation = Quaternion.Euler(flexionGenouDroit, 0f, 0f);
-        float rebond = enMouvement ? Mathf.Abs(Mathf.Sin(walkClock * 2f)) * 0.025f : 0f;
-        heroineModel.localPosition = new Vector3(0f, rebond, 0f);
+        // La marche ne doit pas faire sautiller le personnage : ses pieds
+        // restent calés sur le sol et seul le balancement des articulations
+        // anime la foulée.
+        heroineModel.localPosition = Vector3.zero;
     }
 
     private void CreatePlayer()
@@ -2724,6 +2783,13 @@ public sealed class LibreViesGame : MonoBehaviour
         bool spider = type == "araignee";
         bool souris = type == "souris";
         var enemyObject = new GameObject(spider ? "Araignee" : (souris ? "Souris" : "Rat"));
+        Vector2 depart = new Vector2(position.x, position.z);
+        if (ZoneEauInterditeMonstre(depart))
+        {
+            depart = SortirZoneEauMonstre(depart);
+            position.x = depart.x;
+            position.z = depart.y;
+        }
         position.y = TerrainHeight(position.x, position.z);
         enemyObject.transform.position = position;
         EnemyState state = new EnemyState
@@ -3193,6 +3259,7 @@ public sealed class LibreViesGame : MonoBehaviour
                         if (retour.magnitude < 0.001f) retour = new Vector2(1f, 0f);
                         retour = retour.normalized * (VillageRadius + 1f);
                     }
+                    if (ZoneEauInterditeMonstre(retour)) retour = SortirZoneEauMonstre(retour);
                     Vector3 reapparition = new Vector3(retour.x, TerrainHeight(retour.x, retour.y), retour.y);
                     enemy.Root.transform.position = reapparition;
                     enemy.Home = reapparition;
@@ -3233,6 +3300,16 @@ public sealed class LibreViesGame : MonoBehaviour
             // jambes du heros.
             if (distance < 1.5f) deplacement = Vector3.zero;
 
+            // Securite : une bete sortie de sa zone autorisee est remise sur
+            // la berge, puis repart dans une direction terrestre.
+            if (ZoneEauInterditeMonstre(new Vector2(position.x, position.z)))
+            {
+                Vector2 dehors = SortirZoneEauMonstre(new Vector2(position.x, position.z));
+                position.x = dehors.x;
+                position.z = dehors.y;
+                deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
+                enemy.Direction = deplacement;
+            }
             // Securite : une bete egaree dans le village est remise dehors.
             if (DansVillage(position.x, position.z))
             {
@@ -3244,20 +3321,36 @@ public sealed class LibreViesGame : MonoBehaviour
 
             if (deplacement.sqrMagnitude > 0.01f)
             {
+                // Si la prochaine foulée entre dans l'eau, le monstre tourne
+                // immédiatement vers la berge. Il ne reste donc pas planté
+                // face au fleuve à répéter la même collision.
+                deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
+                enemy.Direction = deplacement;
                 Vector3 suivant = position + deplacement * speed * dt;
                 if (DansVillage(suivant.x, suivant.z))
                 {
                     // Village protege : la bete longe la cloture sans entrer.
-                    enemy.WanderTimer = Mathf.Min(enemy.WanderTimer, 0.4f);
+                    enemy.WanderTimer = 0f;
+                    enemy.Direction = Quaternion.Euler(0f, 90f, 0f) * deplacement;
                 }
                 else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
                 {
                     // Les monstres ne traversent rien non plus (murs, arbres).
                     Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps);
-                    position.x = resolu.x; position.z = resolu.y;
-                    Vector3 regard = new Vector3(deplacement.x, 0f, deplacement.z);
-                    if (regard.sqrMagnitude > 0.01f)
-                        enemy.Root.transform.rotation = Quaternion.LookRotation(regard);
+                    if (ZoneEauInterditeMonstre(resolu))
+                    {
+                        // Une collision avec un obstacle ne doit jamais pousser
+                        // une bete dans l'eau : elle garde sa position et
+                        // choisira un autre virage à l'image suivante.
+                        enemy.Direction = DirectionSansEau(new Vector2(position.x, position.z), -deplacement);
+                    }
+                    else
+                    {
+                        position.x = resolu.x; position.z = resolu.y;
+                        Vector3 regard = new Vector3(deplacement.x, 0f, deplacement.z);
+                        if (regard.sqrMagnitude > 0.01f)
+                            enemy.Root.transform.rotation = Quaternion.LookRotation(regard);
+                    }
                 }
             }
 

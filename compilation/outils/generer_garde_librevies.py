@@ -120,9 +120,9 @@ for side, suffix in ((-1, "L"), (1, "R")):
     add_ring_surface("Guard_Boot_" + suffix, "GuardBoots",
                      [(x, .06, .05, .16, .25), (x, .30, .04, .14, .21)], 16, caps=False)
     add_ring_surface("Guard_LegLower_" + suffix, "GuardArmor",
-                     [(x, .30, 0, .13, .13), (x, .66, 0, .145, .145)], 16, caps=False)
+                     [(x, .30, 0, .13, .13), (x, .76, 0, .145, .145)], 16, caps=False)
     add_ring_surface("Guard_LegUpper_" + suffix, "GuardCloth",
-                     [(x, .66, 0, .145, .145), (x, 1.12, 0, .20, .17)], 16, caps=False)
+                     [(x, .56, 0, .145, .145), (x, 1.12, 0, .20, .17)], 16, caps=False)
 
 # Bassin, tunique blindée et épaulières.
 add_ring_surface("Guard_Belt", "GuardLeather",
@@ -137,9 +137,9 @@ add_ring_surface("Guard_ChestPlate", "GuardArmorLight",
 for side, suffix in ((-1, "L"), (1, "R")):
     x = side
     add_ring_surface("Guard_ArmUpper_" + suffix, "GuardArmorLight",
-                     [(.40 * x, 1.58, 0, .13, .13), (.48 * x, 1.40, .01, .115, .115)], 14, caps=False)
+                     [(.40 * x, 1.58, 0, .13, .13), (.53 * x, 1.30, .01, .115, .115)], 14, caps=False)
     add_ring_surface("Guard_ArmLower_" + suffix, "GuardArmor",
-                     [(.48 * x, 1.40, .01, .115, .115), (.57 * x, 1.18, .03, .10, .10)], 14, caps=False)
+                     [(.43 * x, 1.48, .01, .125, .125), (.57 * x, 1.18, .03, .10, .10)], 14, caps=False)
     add_sphere("Guard_Glove_" + suffix, "GuardLeather",
                (.59 * x, 1.10, .04), (.11, .13, .10), 14, 6)
     add_box("Guard_Shoulder_" + suffix, "GuardArmorLight",
