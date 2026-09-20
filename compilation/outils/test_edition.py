@@ -49,6 +49,8 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "ActualiserDimensionsBatiment" in CS
     assert "nouvelleDimension" in CS
     assert "ModifierTailleMur" in CS
+    assert "ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], inverse)" in CS
+    assert "ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], !inverse)" in CS
     assert "CadreEditionMaison" in CS
     assert "editionOutilMaison" in CS
     assert "MODIFIER LES FENETRES" in CS

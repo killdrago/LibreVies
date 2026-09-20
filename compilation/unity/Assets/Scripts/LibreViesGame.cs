@@ -2321,9 +2321,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 bool inverse = cotes[i] == 1 || cotes[i] == 2;
                 GUI.Label(new Rect(cadre.x + 16f, y, 165f, 26f), noms[i], smallStyle);
                 if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 26f), "<", buttonStyle))
-                    ModifierTailleMur(batiment, cotes[i], inverse);
+                    ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], inverse);
                 if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 26f), ">", buttonStyle))
-                    ModifierTailleMur(batiment, cotes[i], !inverse);
+                    ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], !inverse);
             }
             DessinerChoixMateriaux(batiment, "mur",
                 new[] { "MUR", "BOIS", "BRIQUE", "MOQUET" },
