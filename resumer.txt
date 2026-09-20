@@ -1,13 +1,26 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 76 : rotation precedente et grillage des maisons visible
-                        ; version 0.5.76
+Derniere mise a jour : 20/09/2026 - MAJ 77 : objets dans le prolongement du bras et maisons soulevables
+                        ; version 0.5.77
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
 Branche de travail et publiee : arena/01a0b32c-librevies
 ================================================================================
+
+MAJ 77 — OBJETS DANS LE PROLONGEMENT DU BRAS ET MAISONS SOULEVABLES (20/09/2026)
+- Le marteau du forgeron est aligne dynamiquement sur le vecteur coude ->
+  paume : son manche part de la main dans le prolongement du bras.
+- La feuille du maire suit le meme axe ; son bord est tenu par la main et sa
+  grande longueur reste dans le prolongement du bras pendant l'animation.
+- En mode EDITION, un clic dans la cage d'une maison la selectionne et la
+  souleve de 1 m. Un second clic sur la meme cage la repose exactement sur son
+  niveau de sol initial.
+- Une seule maison est soulevee a la fois ; cliquer une autre cage repose la
+  precedente avant de soulever la nouvelle. Quitter EDITION repose la maison.
+- Version de cette MAJ : 0.5.77. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
 
 MAJ 76 — ROTATION PRECEDENTE ET GRILLAGE DES MAISONS VISIBLE (20/09/2026)
 - La rotation precedente du marteau et la profondeur precedente de la feuille

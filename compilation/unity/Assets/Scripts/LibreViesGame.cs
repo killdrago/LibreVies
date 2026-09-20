@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.76";
+    private const string VersionJeu = "0.5.77";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -94,6 +94,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // Premier outil du mode edition : les maisons entieres sont encadrees
     // par un grillage visible, sans modifier leur position ni leur collision.
     private bool modeEdition;
+    private Batiment maisonEditionSelectionnee;
+    private const float HauteurSoulevementMaisonEdition = 1.0f;
     // Portails du village (position du portail) et gardes qui les surveillent.
     private readonly List<Vector2> portails = new List<Vector2>();
     private readonly List<GardeState> gardes = new List<GardeState>();
@@ -302,6 +304,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Z;
         public float Largeur;
         public float Profondeur;
+        public float Hauteur;
+        public float SolY;
+        public bool EditionSoulevee;
     }
 
     private sealed class PnjState
@@ -1611,7 +1616,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Batiment batiment = new Batiment
         {
             Root = root,
-            X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z
+            X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z,
+            Hauteur = size.y, SolY = root.position.y
         };
         batiments.Add(batiment);
         CreerGrillageMaison(batiment, size);
@@ -1680,9 +1686,104 @@ public sealed class LibreViesGame : MonoBehaviour
         grillage.SetActive(modeEdition);
     }
 
+    private bool TryTrouverMaisonEdition(out Batiment cible)
+    {
+        cible = null;
+        if (gameCamera == null) return false;
+        Vector2 souris = Input.mousePosition;
+        float meilleureProfondeur = float.MaxValue;
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null || !batiment.Root.gameObject.activeInHierarchy)
+                continue;
+            float demiX = batiment.Largeur * 0.5f + 0.45f;
+            float demiZ = batiment.Profondeur * 0.5f + 0.45f;
+            float bas = 0.05f;
+            float haut = batiment.Hauteur + 2.72f;
+            Vector3 origine = batiment.Root.position;
+            Vector3[] coinsMaison =
+            {
+                origine + new Vector3(-demiX, bas, -demiZ),
+                origine + new Vector3(-demiX, bas, demiZ),
+                origine + new Vector3(demiX, bas, -demiZ),
+                origine + new Vector3(demiX, bas, demiZ),
+                origine + new Vector3(-demiX, haut, -demiZ),
+                origine + new Vector3(-demiX, haut, demiZ),
+                origine + new Vector3(demiX, haut, -demiZ),
+                origine + new Vector3(demiX, haut, demiZ)
+            };
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minY = float.MaxValue;
+            float maxY = float.MinValue;
+            float profondeur = float.MaxValue;
+            bool visible = true;
+            for (int j = 0; j < coinsMaison.Length; j++)
+            {
+                Vector3 ecran = gameCamera.WorldToScreenPoint(coinsMaison[j]);
+                if (ecran.z <= 0f)
+                {
+                    visible = false;
+                    break;
+                }
+                minX = Mathf.Min(minX, ecran.x);
+                maxX = Mathf.Max(maxX, ecran.x);
+                minY = Mathf.Min(minY, ecran.y);
+                maxY = Mathf.Max(maxY, ecran.y);
+                profondeur = Mathf.Min(profondeur, ecran.z);
+            }
+            if (!visible) continue;
+            // La marge inclut les barres fines de la cage, meme si le clic
+            // tombe juste a cote d'un coin visible.
+            Rect zone = Rect.MinMaxRect(minX - 18f, minY - 18f, maxX + 18f, maxY + 18f);
+            if (zone.Contains(souris) && profondeur < meilleureProfondeur)
+            {
+                meilleureProfondeur = profondeur;
+                cible = batiment;
+            }
+        }
+        return cible != null;
+    }
+
+    private void PoserMaisonEdition(Batiment batiment)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        batiment.Root.position = new Vector3(batiment.Root.position.x, batiment.SolY, batiment.Root.position.z);
+        batiment.EditionSoulevee = false;
+    }
+
+    private void BasculerMaisonEdition()
+    {
+        Batiment cible;
+        if (!TryTrouverMaisonEdition(out cible)) return;
+        // Une seule maison est selectionnee a la fois. Cliquer une autre cage
+        // repose la precedente avant de soulever la nouvelle.
+        if (maisonEditionSelectionnee != null && maisonEditionSelectionnee != cible)
+            PoserMaisonEdition(maisonEditionSelectionnee);
+        maisonEditionSelectionnee = cible;
+        if (cible.EditionSoulevee)
+        {
+            PoserMaisonEdition(cible);
+            maisonEditionSelectionnee = null;
+            ShowInfo("Maison remise au sol");
+        }
+        else
+        {
+            cible.Root.position = new Vector3(cible.Root.position.x,
+                cible.SolY + HauteurSoulevementMaisonEdition, cible.Root.position.z);
+            cible.EditionSoulevee = true;
+            ShowInfo("Maison selectionnee et soulevee");
+        }
+    }
+
     private void BasculerModeEdition()
     {
+        if (modeEdition && maisonEditionSelectionnee != null)
+            PoserMaisonEdition(maisonEditionSelectionnee);
         modeEdition = !modeEdition;
+        if (modeEdition)
+            maisonEditionSelectionnee = null;
         for (int i = 0; i < batiments.Count; i++)
         {
             Batiment batiment = batiments[i];
@@ -1690,7 +1791,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 batiment.Grillage.SetActive(modeEdition);
         }
         if (modeEdition)
-            ShowInfo("MODE EDITION : maisons entieres selectionnees");
+            ShowInfo("MODE EDITION : cliquez une cage pour soulever la maison");
         else
             ShowInfo("MODE NORMAL");
     }
@@ -2343,7 +2444,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // exactement le bras et ne peut plus rester suspendue au torse.
             pnj.Feuille = new GameObject("Feuille_Maire").transform;
             pnj.Feuille.SetParent(pnj.Main, false);
-            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, 0.10f);
+            pnj.Feuille.localPosition = Vector3.zero;
             pnj.Feuille.localRotation = Quaternion.identity;
             Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
             Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
@@ -2364,6 +2465,19 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         ColCercle(position.x, position.z, 0.42f, 2.2f);
         pnjs.Add(pnj);
+    }
+
+    private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
+    {
+        directionLocale = Vector3.down;
+        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
+        if (directionMonde.sqrMagnitude < 0.0001f) return false;
+        // Le vecteur coude -> paume est la direction de sortie du bras. On le
+        // reconvertit dans l'espace local du point de main pour que le marteau
+        // et la feuille restent dans le prolongement, meme pendant l'animation.
+        directionLocale = pnj.Main.InverseTransformDirection(directionMonde.normalized);
+        return directionLocale.sqrMagnitude > 0.0001f;
     }
 
     private void UpdatePnj(float dt)
@@ -2408,18 +2522,26 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.JambeD != null) pnj.JambeD.localRotation = Quaternion.Euler(-Mathf.Sin(pnj.Phase * 0.8f) * 3f, 0f, 0f);
             if (pnj.GenouG != null) pnj.GenouG.localRotation = Quaternion.Euler(Mathf.Max(0f, -Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);
             if (pnj.GenouD != null) pnj.GenouD.localRotation = Quaternion.Euler(Mathf.Max(0f, Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);
-            if (pnj.Marteau != null && pnj.Main != null)
+            Vector3 directionBras;
+            if (TryDirectionProlongementBras(pnj, out directionBras))
             {
-                // Le marteau est enfant du point de la main droite. On ne
-                // recalcule donc pas sa position dans le monde : le parent
-                // entraîne automatiquement position, rotation et animation.
-                pnj.Marteau.localPosition = Vector3.zero;
-                pnj.Marteau.localRotation = Quaternion.Euler(-18f, 0f, 0f);
-            }
-            if (pnj.Feuille != null)
-            {
-                pnj.Feuille.localRotation = Quaternion.Euler(4f + Mathf.Sin(pnj.Phase * 0.8f) * 7f,
-                    Mathf.Sin(pnj.Phase * 0.6f) * 5f, Mathf.Sin(pnj.Phase * 0.9f) * 4f);
+                // Le manche du marteau part de la paume dans la meme direction
+                // que le vecteur coude -> main. Son axe de sortie est -Y.
+                if (pnj.Marteau != null)
+                {
+                    pnj.Marteau.localPosition = Vector3.zero;
+                    pnj.Marteau.localRotation = Quaternion.LookRotation(directionBras, Vector3.up)
+                        * Quaternion.Euler(-90f, 0f, 0f);
+                }
+                // La main tient le bord de la feuille : son grand axe +Y
+                // est aligne avec le prolongement du bras, au lieu de rester
+                // en travers ou de pendre verticalement.
+                if (pnj.Feuille != null)
+                {
+                    pnj.Feuille.localPosition = directionBras * 0.31f;
+                    pnj.Feuille.localRotation = Quaternion.LookRotation(directionBras, Vector3.up)
+                        * Quaternion.Euler(90f, 0f, 0f);
+                }
             }
             if (pnj.Etal != null)
                 pnj.Etal.localRotation = Quaternion.identity;
@@ -3343,6 +3465,8 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
 
+        if (modeEdition && Input.GetMouseButtonDown(0))
+            BasculerMaisonEdition();
         bool clicGauche = !modeEdition && Input.GetMouseButtonDown(0);
         bool clicNpc = clicGauche && TryOuvrirConversation();
         bool clicMonstre = clicGauche && !clicNpc && TryAttaquerMonstreClique();

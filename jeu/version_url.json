@@ -1,7 +1,7 @@
 {
   "launcher_version": "4.1.0",
-  "game_version": "0.5.76",
-  "notes": "MAJ 76 : remet la rotation precedente des accessoires et rend le grillage des maisons visible avec des barres 3D.",
+  "game_version": "0.5.77",
+  "notes": "MAJ 77 : aligne le marteau et la feuille dans le prolongement du bras, et permet de soulever puis reposer une maison en cliquant sa cage.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu",
   "files": {},
