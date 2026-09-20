@@ -1318,7 +1318,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 : (name == "Water" || name == "Eau_Riviere" || name == "Glass" || name == "GlassBleu"
                     ? 0.90f : 0.32f)));
         if (material.HasProperty("_Alpha") && (name == "Glass" || name == "GlassBleu"))
-            material.SetFloat("_Alpha", 0.30f);
+            material.SetFloat("_Alpha", 0.24f);
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -1407,8 +1407,11 @@ public sealed class LibreViesGame : MonoBehaviour
         RenderSettings.fogDensity = 0.0022f;
         RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Skybox;
         RenderSettings.reflectionIntensity = 0.7f;
-        QualitySettings.shadowDistance = 100f;
+        // Projection stable : les ombres restent ancrees dans le monde au lieu
+        // de nager avec la camera lorsque le joueur se deplace.
+        QualitySettings.shadowDistance = 70f;
         QualitySettings.shadowCascades = 4;
+        QualitySettings.shadowProjection = ShadowProjection.StableFit;
         QualitySettings.shadowResolution = ShadowResolution.High;
         CreateSky();
         var sunObject = new GameObject("Soleil");
@@ -3294,9 +3297,12 @@ public sealed class LibreViesGame : MonoBehaviour
         else largeur = 4.20f;
         float tailleTexte = nom == "Auberge" ? 0.15f
             : (nom == "Esthetique" ? 0.11f : 0.14f);
-        GameObject panneau = Box(new Vector3(0f, 2.62f, z),
+        // La pancarte reste au-dessus de la nouvelle porte de 2,75 m et
+        // conserve sa largeur historique, nettement superieure a la porte.
+        float hauteurPancarte = Mathf.Min(taille.y - 0.40f, 3.25f);
+        GameObject panneau = Box(new Vector3(0f, hauteurPancarte, z),
             new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
-        Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
+        Vector3 position = parent.TransformPoint(new Vector3(0f, hauteurPancarte, z + 0.06f));
         string libelle = LibelleMaison(nom);
         Color couleur = new Color(0.16f, 0.09f, 0.04f);
         GameObject texte = CreerTexte3D(libelle, position, couleur, tailleTexte);

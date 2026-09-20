@@ -6,7 +6,7 @@ Shader "LibreVies/VerreBleu"
         _Color ("Teinte bleue", Color) = (0.12,0.48,0.88,1)
         _MainTex ("Revetement", 2D) = "white" {}
         _Tiling ("Echelle du revetement", Float) = 1.0
-        _Alpha ("Transparence", Range(0,1)) = 0.30
+        _Alpha ("Transparence", Range(0,1)) = 0.24
         _Metallic ("Metallic", Range(0,1)) = 0.05
         _Smoothness ("Brillance", Range(0,1)) = 0.90
     }
