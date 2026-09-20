@@ -103,6 +103,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
     private readonly Stack<HistoriqueEdition> historiqueEdition = new Stack<HistoriqueEdition>();
     private bool editionMaisonEnDeplacement;
+    private bool editionRedimensionnement;
+    private int coteRedimensionnement;
+    private Vector3 pointDepartRedimensionnement;
+    private Vector3 decalageLocalMaisonEdition;
     private Vector3 decalageSourisMaisonEdition;
     private const float HauteurSoulevementMaisonEdition = 1.0f;
     // Portails du village (position du portail) et gardes qui les surveillent.
@@ -352,6 +356,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Z;
         public float Largeur;
         public float Profondeur;
+        public float LargeurInitiale;
+        public float ProfondeurInitiale;
         public float Hauteur;
         public float SolY;
         public bool EditionSoulevee;
@@ -367,6 +373,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public string Type;
         public float SolY;
         public float HauteurLocale;
+        public float ProfondeurLocale;
+        public float LargeurAvant;
+        public float ProfondeurAvant;
         public Obstacle Collision;
         public Vector3 PositionAvant;
         public Quaternion RotationAvant;
@@ -380,6 +389,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 Position;
         public Quaternion Rotation;
         public Vector3 Echelle;
+        public float Largeur;
+        public float Profondeur;
     }
 
     private sealed class PnjState
@@ -750,6 +761,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 Type = objet.name,
                 SolY = objet.position.y,
                 HauteurLocale = objet.localPosition.y,
+                ProfondeurLocale = objet.localPosition.z,
                 Collision = collisionsObjetsEdition.ContainsKey(objet)
                     ? collisionsObjetsEdition[objet] : null
             });
@@ -853,6 +865,20 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void ActualiserDimensionsBatiment(Batiment batiment)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        batiment.Largeur = batiment.LargeurInitiale * Mathf.Abs(batiment.Root.localScale.x);
+        batiment.Profondeur = batiment.ProfondeurInitiale * Mathf.Abs(batiment.Root.localScale.z);
+        if (batiment.Collision != null)
+        {
+            batiment.Collision.Largeur = batiment.Largeur + 0.5f;
+            batiment.Collision.Profondeur = batiment.Profondeur + 0.5f;
+            batiment.Collision.Portee = Mathf.Max(batiment.Collision.Largeur,
+                batiment.Collision.Profondeur) * 0.5f + 1f;
+        }
+    }
+
     private void SynchroniserBatiment(Batiment batiment)
     {
         if (batiment == null || batiment.Root == null) return;
@@ -870,6 +896,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < batiments.Count; i++)
         {
             Batiment batiment = batiments[i];
+            ActualiserDimensionsBatiment(batiment);
             if (batiment != null && !batiment.EditionSoulevee && batiment.Root != null)
                 batiment.SolY = batiment.Root.position.y;
             SynchroniserBatiment(batiment);
@@ -2027,6 +2054,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Root = root,
             X = position.x, Z = position.z, Largeur = size.x, Profondeur = size.z,
+            LargeurInitiale = size.x, ProfondeurInitiale = size.z,
             Hauteur = size.y, SolY = root.position.y, Collision = collisionMaison
         };
         batiments.Add(batiment);
@@ -2038,6 +2066,102 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(side * size.x * 0.27f, 1.8f, size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f), "Glass", root, "Fenetre");
         }
         CreerAfficheMaison(root, size, name);
+    }
+
+    private bool TryTrouverCoteRedimensionnement(ElementEdition element, out int cote)
+    {
+        cote = 0;
+        if (element == null || element.Maison == null || gameCamera == null) return false;
+        Batiment batiment = element.Maison;
+        float y = batiment.Hauteur * 0.5f;
+        Vector3[] centres =
+        {
+            batiment.Root.TransformPoint(new Vector3(-batiment.LargeurInitiale * 0.5f, y, 0f)),
+            batiment.Root.TransformPoint(new Vector3(batiment.LargeurInitiale * 0.5f, y, 0f)),
+            batiment.Root.TransformPoint(new Vector3(0f, y, -batiment.ProfondeurInitiale * 0.5f)),
+            batiment.Root.TransformPoint(new Vector3(0f, y, batiment.ProfondeurInitiale * 0.5f))
+        };
+        int[] cotes = { -1, 1, -2, 2 };
+        Vector2 souris = Input.mousePosition;
+        float meilleureDistance = 30f;
+        for (int i = 0; i < centres.Length; i++)
+        {
+            Vector3 ecran = gameCamera.WorldToScreenPoint(centres[i]);
+            if (ecran.z <= 0f) continue;
+            float distance = Vector2.Distance(souris, new Vector2(ecran.x, ecran.y));
+            if (distance < meilleureDistance)
+            {
+                meilleureDistance = distance;
+                cote = cotes[i];
+            }
+        }
+        return cote != 0;
+    }
+
+    private void CapturerEtatAvantEdition(ElementEdition element)
+    {
+        element.PositionAvant = element.Root.position;
+        element.RotationAvant = element.Root.rotation;
+        element.EchelleAvant = element.Root.localScale;
+        if (element.Maison != null)
+        {
+            element.LargeurAvant = element.Maison.Largeur;
+            element.ProfondeurAvant = element.Maison.Profondeur;
+        }
+    }
+
+    private string NomCoteRedimensionnement(int cote)
+    {
+        if (cote == -1) return "cote gauche";
+        if (cote == 1) return "cote droit";
+        if (cote == -2) return "face arriere";
+        return "face avant";
+    }
+
+    private void CommencerRedimensionnementEdition(ElementEdition cible, int cote)
+    {
+        elementEditionSelectionne = cible;
+        elementEditionDernierSelectionne = cible;
+        CapturerEtatAvantEdition(cible);
+        coteRedimensionnement = cote;
+        editionRedimensionnement = true;
+        editionMaisonEnDeplacement = true;
+        Vector3 pointSouris;
+        if (PointSourisSurPlanEdition(cible.Root.position.y, out pointSouris))
+            pointDepartRedimensionnement = pointSouris;
+        else
+            pointDepartRedimensionnement = cible.Root.position;
+        ShowInfo("Redimensionnement : maintenez le clic sur le "
+            + NomCoteRedimensionnement(cote));
+    }
+
+    private void DeplacerRedimensionnementEdition()
+    {
+        if (!editionRedimensionnement || elementEditionSelectionne == null
+            || elementEditionSelectionne.Maison == null) return;
+        ElementEdition element = elementEditionSelectionne;
+        Batiment batiment = element.Maison;
+        Vector3 pointSouris;
+        if (!PointSourisSurPlanEdition(element.PositionAvant.y, out pointSouris)) return;
+        float signe = coteRedimensionnement == -1 || coteRedimensionnement == -2 ? -1f : 1f;
+        bool axeX = coteRedimensionnement == -1 || coteRedimensionnement == 1;
+        float baseDimension = axeX ? element.LargeurAvant : element.ProfondeurAvant;
+        Vector3 axeMonde = (element.RotationAvant
+            * (axeX ? Vector3.right : Vector3.forward)).normalized;
+        float deltaMonde = Vector3.Dot(pointSouris - pointDepartRedimensionnement, axeMonde);
+        float demi = baseDimension * 0.5f + signe * deltaMonde;
+        demi = Mathf.Max(demi, 1.25f);
+        float nouvelleDimension = demi * 2f;
+        Vector3 echelle = element.EchelleAvant;
+        if (axeX) echelle.x = element.EchelleAvant.x * nouvelleDimension / baseDimension;
+        else echelle.z = element.EchelleAvant.z * nouvelleDimension / baseDimension;
+        element.Root.localScale = echelle;
+        float deplacementCentre = signe * (demi - baseDimension * 0.5f);
+        element.Root.position = element.PositionAvant + axeMonde * deplacementCentre;
+        if (axeX) batiment.Largeur = nouvelleDimension;
+        else batiment.Profondeur = nouvelleDimension;
+        ActualiserDimensionsBatiment(batiment);
+        SynchroniserBatiment(batiment);
     }
 
     private bool TryZoneEcranElementEdition(ElementEdition element,
@@ -2128,7 +2252,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 || !zone.Contains(souris)) continue;
             float aire = Mathf.Max(zone.width * zone.height, 0.01f);
             // Les portes/fenetres ont une petite zone : elles gagnent face a
-            // la grande cage de leur maison lorsqu'on clique dessus.
+            // la grande zone de selection de leur maison lorsqu'on clique dessus.
             if (aire < meilleureAire || (Mathf.Abs(aire - meilleureAire) < 0.01f
                 && profondeur < meilleureProfondeur))
             {
@@ -2147,6 +2271,22 @@ public sealed class LibreViesGame : MonoBehaviour
         Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
         if (Mathf.Abs(rayon.direction.y) < 0.0001f) return false;
         float distance = (hauteur - rayon.origin.y) / rayon.direction.y;
+        if (distance < 0f) return false;
+        point = rayon.GetPoint(distance);
+        return true;
+    }
+
+    private bool PointSourisSurPlanMaison(ElementEdition element, out Vector3 point)
+    {
+        point = Vector3.zero;
+        if (element == null || element.MaisonParent == null || gameCamera == null) return false;
+        Vector3 normale = element.MaisonParent.Root.TransformDirection(Vector3.forward).normalized;
+        Vector3 pointPlan = element.MaisonParent.Root.TransformPoint(
+            new Vector3(0f, 0f, element.ProfondeurLocale));
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        float denominateur = Vector3.Dot(normale, rayon.direction);
+        if (Mathf.Abs(denominateur) < 0.0001f) return false;
+        float distance = Vector3.Dot(pointPlan - rayon.origin, normale) / denominateur;
         if (distance < 0f) return false;
         point = rayon.GetPoint(distance);
         return true;
@@ -2213,7 +2353,9 @@ public sealed class LibreViesGame : MonoBehaviour
             Element = element,
             Position = element.PositionAvant,
             Rotation = element.RotationAvant,
-            Echelle = element.EchelleAvant
+            Echelle = element.EchelleAvant,
+            Largeur = element.LargeurAvant,
+            Profondeur = element.ProfondeurAvant
         });
         EcrireFichierHistoriqueEdition();
     }
@@ -2227,9 +2369,19 @@ public sealed class LibreViesGame : MonoBehaviour
             entree.Element.Root.position = entree.Position;
             entree.Element.Root.rotation = entree.Rotation;
             entree.Element.Root.localScale = entree.Echelle;
-            entree.Element.Souleve = false;
+            if (entree.Element.MaisonParent != null)
+            {
+                entree.Element.HauteurLocale = entree.Element.Root.localPosition.y;
+                entree.Element.ProfondeurLocale = entree.Element.Root.localPosition.z;
+            }
             if (entree.Element.Maison != null)
+            {
+                entree.Element.Maison.Largeur = entree.Largeur;
+                entree.Element.Maison.Profondeur = entree.Profondeur;
+                ActualiserDimensionsBatiment(entree.Element.Maison);
                 entree.Element.Maison.EditionSoulevee = false;
+            }
+            entree.Element.Souleve = false;
             SynchroniserElementEdition(entree.Element);
             EcrireFichierHistoriqueEdition();
             ShowInfo("Dernier mouvement annule (" + historiqueEdition.Count
@@ -2246,7 +2398,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (element.MaisonParent != null)
         {
             Vector3 local = element.Root.localPosition;
-            local.y = element.HauteurLocale;
+            local.z = element.ProfondeurLocale;
+            element.HauteurLocale = local.y;
             element.Root.localPosition = local;
         }
         else
@@ -2267,11 +2420,18 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!TryTrouverElementEdition(out cible)) return;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
+        if (cible.Maison != null)
+        {
+            int cote;
+            if (TryTrouverCoteRedimensionnement(cible, out cote))
+            {
+                CommencerRedimensionnementEdition(cible, cote);
+                return;
+            }
+        }
         elementEditionSelectionne = cible;
         elementEditionDernierSelectionne = cible;
-        cible.PositionAvant = cible.Root.position;
-        cible.RotationAvant = cible.Root.rotation;
-        cible.EchelleAvant = cible.Root.localScale;
+        CapturerEtatAvantEdition(cible);
         float sol = SolElementEdition(cible);
         cible.Souleve = true;
         if (cible.Maison != null) cible.Maison.EditionSoulevee = true;
@@ -2279,17 +2439,29 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             cible.Root.position = new Vector3(cible.Root.position.x,
                 sol + HauteurSoulevementMaisonEdition, cible.Root.position.z);
-        }
-        float hauteurPlan = cible.MaisonParent != null ? cible.PositionAvant.y : cible.Root.position.y;
-        Vector3 pointSouris;
-        if (PointSourisSurPlanEdition(hauteurPlan, out pointSouris))
-        {
-            decalageSourisMaisonEdition = cible.Root.position - pointSouris;
-            decalageSourisMaisonEdition.y = 0f;
+            Vector3 pointSouris;
+            if (PointSourisSurPlanEdition(cible.Root.position.y, out pointSouris))
+            {
+                decalageSourisMaisonEdition = cible.Root.position - pointSouris;
+                decalageSourisMaisonEdition.y = 0f;
+            }
+            else
+            {
+                decalageSourisMaisonEdition = Vector3.zero;
+            }
         }
         else
         {
-            decalageSourisMaisonEdition = Vector3.zero;
+            Vector3 pointSouris;
+            if (PointSourisSurPlanMaison(cible, out pointSouris))
+            {
+                Vector3 localSouris = cible.MaisonParent.Root.InverseTransformPoint(pointSouris);
+                decalageLocalMaisonEdition = cible.Root.localPosition - localSouris;
+            }
+            else
+            {
+                decalageLocalMaisonEdition = Vector3.zero;
+            }
         }
         editionMaisonEnDeplacement = true;
         SynchroniserElementEdition(cible);
@@ -2299,6 +2471,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DeplacerMaisonEdition()
     {
         if (!editionMaisonEnDeplacement || elementEditionSelectionne == null) return;
+        if (editionRedimensionnement)
+        {
+            DeplacerRedimensionnementEdition();
+            return;
+        }
         ElementEdition element = elementEditionSelectionne;
         float sol = SolElementEdition(element);
         float hauteurPlan = element.MaisonParent != null
@@ -2308,12 +2485,16 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 position = pointSouris + decalageSourisMaisonEdition;
         if (element.MaisonParent != null)
         {
-            Vector3 local = element.MaisonParent.Root.InverseTransformPoint(position);
-            float margeX = element.MaisonParent.Largeur * 0.5f + 0.55f;
-            float margeZ = element.MaisonParent.Profondeur * 0.5f + 0.55f;
+            Vector3 pointMaison;
+            if (!PointSourisSurPlanMaison(element, out pointMaison)) return;
+            Vector3 local = element.MaisonParent.Root.InverseTransformPoint(pointMaison)
+                + decalageLocalMaisonEdition;
+            float margeX = element.MaisonParent.LargeurInitiale * 0.5f + 0.55f;
+            float minY = 0.25f;
+            float maxY = element.MaisonParent.Hauteur + 1.5f;
             local.x = Mathf.Clamp(local.x, -margeX, margeX);
-            local.z = Mathf.Clamp(local.z, -margeZ, margeZ);
-            local.y = element.HauteurLocale;
+            local.y = Mathf.Clamp(local.y, minY, maxY);
+            local.z = element.ProfondeurLocale;
             element.Root.localPosition = local;
         }
         else
@@ -2331,9 +2512,21 @@ public sealed class LibreViesGame : MonoBehaviour
         element.Root.position = element.PositionAvant;
         element.Root.rotation = element.RotationAvant;
         element.Root.localScale = element.EchelleAvant;
+        if (element.MaisonParent != null)
+        {
+            element.HauteurLocale = element.Root.localPosition.y;
+            element.ProfondeurLocale = element.Root.localPosition.z;
+        }
+        if (element.Maison != null)
+        {
+            element.Maison.Largeur = element.LargeurAvant;
+            element.Maison.Profondeur = element.ProfondeurAvant;
+            ActualiserDimensionsBatiment(element.Maison);
+        }
         element.Souleve = false;
         if (element.Maison != null) element.Maison.EditionSoulevee = false;
         SynchroniserElementEdition(element);
+        editionRedimensionnement = false;
         editionMaisonEnDeplacement = false;
         elementEditionSelectionne = null;
         ShowInfo("Mouvement annule : position precedente restauree");
@@ -2345,6 +2538,7 @@ public sealed class LibreViesGame : MonoBehaviour
         ElementEdition element = elementEditionSelectionne;
         PoserElementEdition(element);
         AjouterHistoriqueEdition(element);
+        editionRedimensionnement = false;
         editionMaisonEnDeplacement = false;
         elementEditionSelectionne = null;
         ShowInfo("Objet pose a sa nouvelle position");
@@ -2556,16 +2750,28 @@ public sealed class LibreViesGame : MonoBehaviour
         string[] noms = { "BLANC", "JAUNE", "ROUGE", "BLEU", "VERT", "BRUN" };
         for (int i = 0; i < couleurs.Length; i++)
         {
+            int colonne = i % 3;
+            int ligne = i / 3;
+            Rect boutonCouleur = new Rect(cadre.x + 88f + colonne * 85f,
+                cadre.y + 101f + ligne * 32f, 80f, 27f);
             GUI.color = couleurs[i];
-            if (GUI.Button(new Rect(cadre.x + 88f + i * 43f, cadre.y + 103f, 40f, 28f),
-                noms[i].Substring(0, 1), buttonStyle))
+            GUI.DrawTexture(boutonCouleur, Texture2D.whiteTexture);
+            float luminosite = couleurs[i].r * 0.299f + couleurs[i].g * 0.587f
+                + couleurs[i].b * 0.114f;
+            GUI.color = luminosite > 0.58f ? Color.black : Color.white;
+            GUI.Label(boutonCouleur, noms[i], new GUIStyle(smallStyle)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            });
+            GUI.color = Color.white;
+            if (GUI.Button(boutonCouleur, GUIContent.none, GUIStyle.none))
             {
                 facade.Couleur = couleurs[i];
                 if (facade.Texte != null) facade.Texte.color = facade.Couleur;
                 MettreAJourSoulignement(facade);
             }
         }
-        GUI.color = Color.white;
         GUI.Label(new Rect(cadre.x + 14f, cadre.y + 145f, cadre.width - 28f, 54f),
             "Les changements sont sauvegardes en quittant EDITION.\n"
                 + "Le texte suit toujours la pancarte et la maison.", smallStyle);

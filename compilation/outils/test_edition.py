@@ -40,7 +40,12 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "Grillage" not in CS
     assert "MaisonParent" in CS
     assert "HauteurLocale" in CS
-    assert "local.y = element.HauteurLocale" in CS
+    assert "local.y = Mathf.Clamp(local.y" in CS
+    assert "PointSourisSurPlanMaison" in CS
+    assert "ProfondeurLocale" in CS
+    assert "TryTrouverCoteRedimensionnement" in CS
+    assert "ActualiserDimensionsBatiment" in CS
+    assert "nouvelleDimension" in CS
     assert "Stack<HistoriqueEdition>" in CS
     assert "AjouterHistoriqueEdition" in CS
     assert "SupprimerFichierHistoriqueEdition" in CS
@@ -77,6 +82,8 @@ def test_sign_text_style_and_persistence_controls_exist():
     assert "LineRenderer" in CS
     assert "TextePancarte" in CS
     assert "CouleurPancarte" in CS
+    for label in ("BLANC", "JAUNE", "ROUGE", "BLEU", "VERT", "BRUN"):
+        assert label in CS
 
 
 def test_encrypted_coordinate_file_and_path_metadata_remain_in_place():
