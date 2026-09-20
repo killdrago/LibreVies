@@ -185,12 +185,14 @@ for side in (-1, 1):
 add_box("JacketZip", "JacketTrim", (0, 1.43, .216), (.025, .48, .026))
 for side in (-1, 1):
     suffix = "L" if side < 0 else "R"
+    # Details très fins : ils doivent lire comme des revers et des poches,
+    # pas comme des plaques rigides collées au torse ou aux genoux.
     add_box("JacketLapel_" + suffix, "JacketLight",
-            (side * .145, 1.53, .205), (.085, .34, .030))
+            (side * .145, 1.53, .205), (.075, .30, .012))
     add_box("JacketPocket_" + suffix, "JacketLight",
-            (side * .205, 1.25, .208), (.22, .115, .030))
+            (side * .205, 1.25, .218), (.18, .085, .010))
     add_box("JeansPocket_" + suffix, "JeansLight",
-            (side * .235, .88, .145), (.16, .12, .026))
+            (side * .235, .88, .149), (.13, .070, .008))
 for y in (1.31, 1.45, 1.59):
     add_sphere("JacketButton_" + str(y).replace(".", "_"), "JacketTrim",
                (0, y, .222), (.020, .020, .012), 12, 5)
@@ -223,7 +225,7 @@ for object_name in dict.fromkeys(face_objects):
 with MTL.open("w", encoding="utf-8") as f:
     f.write("# Matériaux originaux de LibreVies — CC0\n")
     for name, (r, g, b) in materials.items():
-        f.write(f"newmtl {name}\nKd {r:.4f} {g:.4f} {b:.4f}\nKa 0.05 0.05 0.05\nKs 0.18 0.18 0.18\nNs 32.0\nd 1.0\n\n")
+        f.write(f"newmtl {name}\nKd {r:.4f} {g:.4f} {b:.4f}\nKa 0.05 0.05 0.05\nKs 0.18 0.18 0.18\nNs 32.0\nd 1.0\n")
 
 with OBJ.open("w", encoding="utf-8", newline="\n") as f:
     f.write("# LibreViesHeroine — maillage humanoïde original, CC0\n")
@@ -256,7 +258,7 @@ PARTS_MTL = PARTS / "LibreViesHeroineParts.mtl"
 with PARTS_MTL.open("w", encoding="utf-8") as f:
     f.write("# Matériaux originaux de LibreViesHeroine — CC0\n")
     for name, (r, g, b) in materials.items():
-        f.write(f"newmtl {name}\nKd {r:.4f} {g:.4f} {b:.4f}\nKa 0.05 0.05 0.05\nKs 0.18 0.18 0.18\nNs 32.0\nd 1.0\n\n")
+        f.write(f"newmtl {name}\nKd {r:.4f} {g:.4f} {b:.4f}\nKa 0.05 0.05 0.05\nKs 0.18 0.18 0.18\nNs 32.0\nd 1.0\n")
 
 objets = []
 for object_name in face_objects:

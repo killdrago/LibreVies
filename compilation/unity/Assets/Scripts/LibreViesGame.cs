@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.68";
+    private const string VersionJeu = "0.5.69";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -65,10 +65,12 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle loadingTextStyle;
 
     // Trace de la route (memes points que le ruban visible) : sert aux
-    // collisions de la cloture (on passe par les portails) et au pave.
+    // collisions de la cloture (on passe par les portails) et au pave. Les
+    // deux extremites traversent l'enceinte au nord et au sud.
     private static readonly Vector2[] RoutePoints =
     {
-        new Vector2(0, 44), new Vector2(4, 28), new Vector2(-2, 6), new Vector2(1, -8)
+        new Vector2(0, 44), new Vector2(4, 28), new Vector2(-2, 6),
+        new Vector2(1, -8), new Vector2(1, -44)
     };
 
     // Le fleuve traverse le monde du nord-ouest vers le sud-est et reste hors
@@ -158,6 +160,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool inventoryOpen;
     private bool optionsOpen;
     private bool questOpen = true;
+    private bool conversationOpen;
+    private PnjState conversationPnj;
+    private bool conversationFocusRequested;
+    private string conversationInput = "";
+    private readonly List<string> conversationMessages = new List<string>();
     private string infoMessage = "";
     private float infoTimer;
     private float brightness = 0.3f;
@@ -172,6 +179,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle miniCarteTextStyle;
     private GUIStyle miniCarteButtonStyle;
     private GUIStyle barreValeurStyle;
+    private GUIStyle conversationTitleStyle;
+    private GUIStyle conversationTextStyle;
     private Texture2D miniCarteTexture;
     private float miniCarteZoom = 1f;
     private float miniCarteOrientation;
@@ -1529,7 +1538,9 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3, 6), "Forge");
         // La mairie est proche du centre, mais decalee de la route.
         CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
-        CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Maison_Nord");
+        // Cette maison devient le salon d'esthétique : le nom est porté par
+        // sa pancarte et le médecin attend juste devant sa façade.
+        CreateBuilding(new Vector3(-27, 0, 20), new Vector3(5, 3.5f, 5), "Esthetique");
         // Maison_Sud est remise sur le terrain plat du village, loin de la
         // colline du chateau : son socle ne s'enfonce plus dans la pente.
         // La maison devant l'auberge revient a son axe d'origine puis est
@@ -1543,6 +1554,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // a droite de l'entrepot, derriere son etal.
         CreerPnj(new Vector3(-25.3f, 0, 2.5f), "Marchand");
         CreerPnj(new Vector3(-4.8f, 0, 17.5f), "Maire");
+        CreerPnj(new Vector3(-27f, 0, 23.35f), "Medecin");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -1604,6 +1616,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (nom == "Auberge") return "AUBERGE";
         if (nom == "Entrepot") return "ENTREPOT";
         if (nom == "Mairie") return "MAIRIE";
+        if (nom == "Esthetique") return "ESTHÉTIQUE";
         if (nom == "Maison_Nord") return "MAISON";
         if (nom == "Maison_Sud") return "MAISON";
         return "MAISON";
@@ -1618,8 +1631,10 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Entrepot") largeur = 5.00f;
         else if (nom == "Forge") largeur = 4.00f;
         else if (nom == "Mairie") largeur = 4.40f;
+        else if (nom == "Esthetique") largeur = 5.80f;
         else largeur = 4.20f;
-        float tailleTexte = nom == "Auberge" ? 0.15f : 0.14f;
+        float tailleTexte = nom == "Auberge" ? 0.15f
+            : (nom == "Esthetique" ? 0.11f : 0.14f);
         Box(new Vector3(0f, 2.62f, z), new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
         Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
         GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), tailleTexte);
@@ -1774,50 +1789,48 @@ public sealed class LibreViesGame : MonoBehaviour
             float a0 = intervalles[g].x;
             float a1 = intervalles[g].y;
             float am = (a0 + a1) * 0.5f;
-            float mx = Mathf.Cos(am) * VillageRadius;
-            float mz = Mathf.Sin(am) * VillageRadius;
-            Vector2 passage = new Vector2(mx, mz);
-            // Le passage logique reste dans la route pour les collisions et les
-            // gardes, mais le décor du portique est décalé sur le côté de la
-            // route. Ainsi ses piliers et sa pancarte ne reposent plus au milieu
-            // des dalles pavées.
-            Vector2 routeTangent = TangenteRouteProche(passage);
-            Vector2 coteRoute = new Vector2(-routeTangent.y, routeTangent.x).normalized;
-            Vector2 decalagePortique = coteRoute * 4.15f;
-            Vector2 centreVisuel = passage + decalagePortique;
-            foreach (float a in new[] { a0, a1 })
+            Vector2 passage = new Vector2(Mathf.Cos(am) * VillageRadius, Mathf.Sin(am) * VillageRadius);
+            // Le portique est recentré exactement sur la sortie : aucun
+            // décalage latéral ne doit repousser la sortie nord (ou sud) vers
+            // la gauche. Les faces internes des deux poteaux laissent 50 cm.
+            Vector2 tangente = TangenteRouteProche(passage);
+            Vector2 travers = new Vector2(-tangente.y, tangente.x).normalized;
+            const float largeurLibre = 0.50f;
+            const float demiPoteau = 0.15f; // cylindre scale .30 => rayon .15
+            float demiEspacementCentres = largeurLibre * 0.5f + demiPoteau;
+            Vector2 pilierGauche = passage - travers * demiEspacementCentres;
+            Vector2 pilierDroit = passage + travers * demiEspacementCentres;
+            Vector2[] piliers = { pilierGauche, pilierDroit };
+            for (int p = 0; p < piliers.Length; p++)
             {
-                Vector2 pilier = new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius)
-                    + decalagePortique;
-                float gx = pilier.x;
-                float gz = pilier.y;
-                float gy = TerrainHeight(gx, gz);
-                Primitive(PrimitiveType.Cylinder, new Vector3(gx, gy + 2.6f, gz), new Vector3(0.30f, 2.6f, 0.30f), "Wood", null, "Poteau_Portail");
-                Box(new Vector3(gx, gy + 5.26f, gz), new Vector3(0.40f, 0.14f, 0.40f), "Wood", null, "Chapeau_Portail");
+                Vector2 pilier = piliers[p];
+                float gy = TerrainHeight(pilier.x, pilier.y);
+                Primitive(PrimitiveType.Cylinder, new Vector3(pilier.x, gy + 2.6f, pilier.y),
+                    new Vector3(0.30f, 2.6f, 0.30f), "Wood", null, "Poteau_Portail");
+                Box(new Vector3(pilier.x, gy + 5.26f, pilier.y), new Vector3(0.40f, 0.14f, 0.40f),
+                    "Wood", null, "Chapeau_Portail");
             }
-            float my = TerrainHeight(centreVisuel.x, centreVisuel.y);
-            // Memorise la position du passage dans le CHAMP 'portails' :
-            // c'est lui que lisent les gardes (un garde par portail). La boucle
-            // ci-dessus parcourt 'intervalles', donc cet ajout est sans danger.
+            float my = TerrainHeight(passage.x, passage.y);
+            // La largeur extérieure du linteau et de la pancarte inclut les
+            // deux poteaux : ils se rejoignent proprement sans surplomb.
+            float largeurExterieure = largeurLibre + demiPoteau * 4f;
+            float largeurPanneau = largeurExterieure - 0.06f;
             portails.Add(passage);
-            // Longueur du linteau = corde entre les deux poteaux.
-            float longueur = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0)).magnitude * VillageRadius + 0.2f;
-            // L'axe du linteau suit la corde ; le centre, lui, est à côté de
-            // la route et non plus au-dessus du passage.
-            var corde = new Vector2(Mathf.Cos(a1) - Mathf.Cos(a0), Mathf.Sin(a1) - Mathf.Sin(a0));
-            var rotation = Quaternion.LookRotation(new Vector3(corde.x, 0f, corde.y).normalized)
+            Quaternion rotation = Quaternion.LookRotation(new Vector3(travers.x, 0f, travers.y).normalized)
                 * Quaternion.Euler(0f, 90f, 0f);
-            // Le portique est ferme en haut : un panneau plein relie les deux
-            // poteaux, puis un linteau epais termine la couverture.
-            Box(new Vector3(centreVisuel.x, my + 4.78f, centreVisuel.y), new Vector3(longueur, 1.05f, 0.30f), "Wood", null, "Fermeture_Superieure", false, rotation);
-            Box(new Vector3(centreVisuel.x, my + 5.35f, centreVisuel.y), new Vector3(longueur + 0.25f, 0.22f, 0.38f), "Bois_Clair", null, "Linteau", false, rotation);
-            // Panneau en bois portant le nom du village : texte petit et pose
-            // sur sa face, pas en plein milieu du passage.
-            // Plaque centrale opaque et epaisse : elle separe vraiment les
-            // inscriptions interieure et exterieure.
-            Box(new Vector3(centreVisuel.x, my + 4.45f, centreVisuel.y), new Vector3(3.5f, 0.76f, 0.34f), "Bois_Clair", null, "Panneau_Fond", true, rotation);
-            Box(new Vector3(centreVisuel.x, my + 4.45f, centreVisuel.y), new Vector3(3.25f, 0.60f, 0.30f), "Wood", null, "Panneau_Bois", false, rotation);
-            AjouterTextePanneau(new Vector3(centreVisuel.x, my + 4.45f, centreVisuel.y), rotation);
+            Box(new Vector3(passage.x, my + 4.78f, passage.y),
+                new Vector3(largeurExterieure, 1.05f, 0.30f), "Wood", null,
+                "Fermeture_Superieure", false, rotation);
+            Box(new Vector3(passage.x, my + 5.35f, passage.y),
+                new Vector3(largeurExterieure + 0.08f, 0.22f, 0.38f), "Bois_Clair", null,
+                "Linteau", false, rotation);
+            Box(new Vector3(passage.x, my + 4.45f, passage.y),
+                new Vector3(largeurPanneau, 0.76f, 0.34f), "Bois_Clair", null,
+                "Panneau_Fond", true, rotation);
+            Box(new Vector3(passage.x, my + 4.45f, passage.y),
+                new Vector3(largeurPanneau - 0.06f, 0.60f, 0.30f), "Wood", null,
+                "Panneau_Bois", false, rotation);
+            AjouterTextePanneau(new Vector3(passage.x, my + 4.45f, passage.y), rotation);
         }
 
         // La cloture n'est pas enregistree poteau par poteau : elle est geree
@@ -1838,8 +1851,8 @@ public sealed class LibreViesGame : MonoBehaviour
         float hauteur = position.y + 0.14f;
         Vector3 faceExterieure = new Vector3(position.x, hauteur, position.z) + normale * 0.22f;
         Vector3 faceInterieure = new Vector3(position.x, hauteur, position.z) - normale * 0.22f;
-        GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.09f);
-        GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.09f);
+        GameObject exterieur = CreerTexte3D("LIBREVIES", faceExterieure, Color.white, 0.065f);
+        GameObject interieur = CreerTexte3D("LIBREVIES", faceInterieure, Color.white, 0.065f);
         if (exterieur != null)
         {
             exterieur.name = "Texte_Portail_Exterieur";
@@ -1870,7 +1883,11 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 portail = portails[i];
             float distance = portail.magnitude;
             if (distance < 0.001f) continue;
-            Vector2 poste = portail.normalized * (VillageRadius * 0.95f);
+            Vector2 tangente = TangenteRouteProche(portail);
+            Vector2 coteRoute = new Vector2(-tangente.y, tangente.x).normalized;
+            // Le garde reste à l'intérieur de la clôture, mais à 2 m du
+            // centre de la route : le passage et les dalles restent lisibles.
+            Vector2 poste = portail.normalized * (VillageRadius * 0.95f) + coteRoute * 2.0f;
             CreerGarde(poste, portail);
         }
     }
@@ -2152,9 +2169,20 @@ public sealed class LibreViesGame : MonoBehaviour
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
             ? new Color(0.12f, 0.25f, 0.58f)
-            : (metier == "Forgeron" ? new Color(0.24f, 0.27f, 0.31f) : new Color(0.36f, 0.25f, 0.20f)));
+            : (metier == "Forgeron" ? new Color(0.24f, 0.27f, 0.31f)
+            : (metier == "Medecin" ? new Color(0.88f, 0.90f, 0.94f)
+            : new Color(0.36f, 0.25f, 0.20f))));
 
-        if (metier == "Forgeron")
+        if (metier == "Medecin")
+        {
+            // Blouse claire et croix rouge : les accessoires sont des détails
+            // de tenue, le corps reste le vrai maillage humanoïde importé.
+            Box(new Vector3(0f, 1.45f, 0.235f), new Vector3(0.055f, 0.25f, 0.018f),
+                "Red", pnj.Model, "Croix_Medecin_Verticale");
+            Box(new Vector3(0f, 1.45f, 0.235f), new Vector3(0.16f, 0.055f, 0.018f),
+                "Red", pnj.Model, "Croix_Medecin_Horizontale");
+        }
+        else if (metier == "Forgeron")
         {
             // Enclume et marteau : le marteau est un pivot independant anime
             // dans UpdatePnj, pour que le geste soit lisible de loin.
@@ -2208,6 +2236,11 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 balancement = Mathf.Sin(pnj.Phase * 1.4f) * 0.55f;
                 hauteur = 0f;
+            }
+            else if (pnj.Metier == "Medecin")
+            {
+                balancement = Mathf.Sin(pnj.Phase * 0.8f) * 0.045f;
+                hauteur = Mathf.Sin(pnj.Phase * 0.8f) * 0.012f;
             }
             else if (pnj.Metier == "Vendeur")
             {
@@ -3041,6 +3074,9 @@ public sealed class LibreViesGame : MonoBehaviour
             if (ToucheDown(toucheRenaître)) Respawn();
             return;
         }
+        // La saisie de texte ne doit ni faire marcher l'héroïne ni déclencher
+        // une attaque lorsque la fenêtre de conversation est ouverte.
+        if (conversationOpen) return;
         if (attackCooldown > 0) attackCooldown -= dt;
         if (attackAnimation > 0) attackAnimation -= dt;
         // Le joueur ne reçoit qu'un lacet horizontal. Le corps reste donc
@@ -3169,7 +3205,9 @@ public sealed class LibreViesGame : MonoBehaviour
         player.position = new Vector3(Mathf.Clamp(player.position.x, -WorldSize + 2, WorldSize - 2), player.position.y,
             Mathf.Clamp(player.position.z, -WorldSize + 2, WorldSize - 2));
 
-        if (Input.GetMouseButtonDown(0) || ToucheDown(toucheAttaque)) Attack();
+        bool clicGauche = Input.GetMouseButtonDown(0);
+        bool clicNpc = clicGauche && TryOuvrirConversation();
+        if (!conversationOpen && !clicNpc && (clicGauche || ToucheDown(toucheAttaque))) Attack();
         if (ToucheDown(toucheRamasser)) CollectNearby();
         if (ToucheDown(toucheInventaire)) inventoryOpen = !inventoryOpen;
         if (ToucheDown(toucheOptions)) optionsOpen = !optionsOpen;
@@ -3670,6 +3708,106 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    private string NomAffichePnj(PnjState pnj)
+    {
+        if (pnj == null || string.IsNullOrEmpty(pnj.Metier)) return "Habitant";
+        if (pnj.Metier == "Medecin") return "Médecin";
+        if (pnj.Metier == "Forgeron") return "Forgeron";
+        if (pnj.Metier == "Marchand") return "Marchand";
+        if (pnj.Metier == "Maire") return "Maire";
+        return pnj.Metier;
+    }
+
+    private bool TryOuvrirConversation()
+    {
+        if (conversationOpen || gameCamera == null || player == null) return false;
+        Vector2 souris = Input.mousePosition;
+        float meilleur = 64f;
+        PnjState cible = null;
+        for (int i = 0; i < pnjs.Count; i++)
+        {
+            PnjState pnj = pnjs[i];
+            if (pnj == null || pnj.Root == null || !pnj.Root.activeInHierarchy) continue;
+            Vector3 positionMonde = pnj.Root.transform.position + Vector3.up * 1.10f;
+            if (Vector3.Distance(player.position, positionMonde) > 11f) continue;
+            Vector3 positionEcran = gameCamera.WorldToScreenPoint(positionMonde);
+            if (positionEcran.z <= 0f) continue;
+            Vector2 positionGui = new Vector2(positionEcran.x, Screen.height - positionEcran.y);
+            float distance = Vector2.Distance(souris, positionGui);
+            if (distance < meilleur)
+            {
+                meilleur = distance;
+                cible = pnj;
+            }
+        }
+        if (cible == null) return false;
+        conversationPnj = cible;
+        conversationOpen = true;
+        conversationFocusRequested = true;
+        conversationInput = "";
+        conversationMessages.Clear();
+        conversationMessages.Add(NomAffichePnj(cible) + " : Bonjour");
+        return true;
+    }
+
+    private void EnvoyerMessageConversation()
+    {
+        string message = (conversationInput ?? "").Trim();
+        if (message.Length == 0) return;
+        conversationMessages.Add("Vous : " + message);
+        conversationMessages.Add(NomAffichePnj(conversationPnj)
+            + " : Je vous écoute. Que puis-je faire pour vous ?");
+        conversationInput = "";
+    }
+
+    private void FermerConversation()
+    {
+        conversationOpen = false;
+        conversationPnj = null;
+        conversationFocusRequested = false;
+        conversationInput = "";
+        conversationMessages.Clear();
+        GUI.FocusControl("");
+    }
+
+    private void DessinerConversation()
+    {
+        float largeur = Mathf.Min(700f, Screen.width - 40f);
+        float hauteur = Mathf.Min(340f, Screen.height - 80f);
+        Rect cadre = new Rect((Screen.width - largeur) * 0.5f,
+            (Screen.height - hauteur) * 0.5f, largeur, hauteur);
+        GUI.Box(cadre, "", boxStyle);
+        GUI.Label(new Rect(cadre.x + 22f, cadre.y + 16f, largeur - 80f, 30f),
+            "CONVERSATION — " + NomAffichePnj(conversationPnj), conversationTitleStyle);
+        if (GUI.Button(new Rect(cadre.x + largeur - 48f, cadre.y + 14f, 28f, 26f), "X", buttonStyle))
+        {
+            FermerConversation();
+            return;
+        }
+        Rect texte = new Rect(cadre.x + 24f, cadre.y + 58f, largeur - 48f, hauteur - 132f);
+        GUI.Box(texte, "", boxStyle);
+        string contenu = string.Join("\n\n", conversationMessages.ToArray());
+        GUI.Label(new Rect(texte.x + 14f, texte.y + 12f, texte.width - 28f, texte.height - 20f),
+            contenu, conversationTextStyle);
+        GUI.SetNextControlName("ConversationInput");
+        conversationInput = GUI.TextField(new Rect(cadre.x + 24f, cadre.y + hauteur - 58f,
+            largeur - 142f, 32f), conversationInput);
+        if (conversationFocusRequested)
+        {
+            GUI.FocusControl("ConversationInput");
+            conversationFocusRequested = false;
+        }
+        if (GUI.Button(new Rect(cadre.x + largeur - 108f, cadre.y + hauteur - 58f, 84f, 32f),
+            "ENVOYER", buttonStyle))
+            EnvoyerMessageConversation();
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return
+            && GUI.GetNameOfFocusedControl() == "ConversationInput")
+        {
+            EnvoyerMessageConversation();
+            Event.current.Use();
+        }
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -3723,6 +3861,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (optionsOpen) DessinerOptions();
         if (dead) GUI.Box(new Rect(Screen.width / 2 - 180, Screen.height / 2 - 55, 360, 110), "VOUS ÊTES MORT\n\nAppuyez sur " + NomTouche(toucheRenaître) + " pour renaître", boxStyle);
         if (infoTimer > 0) GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 128, 300, 35), infoMessage, titleStyle);
+        if (conversationOpen) DessinerConversation();
     }
 
     private void DessinerCorrectionCouleur()
@@ -4010,6 +4149,16 @@ public sealed class LibreViesGame : MonoBehaviour
         miniCarteButtonStyle.active.textColor = Color.white;
         miniCarteButtonStyle.focused.textColor = Color.white;
         barreValeurStyle = new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+        conversationTitleStyle = new GUIStyle(titleStyle)
+        {
+            fontSize = 18, alignment = TextAnchor.MiddleLeft,
+            normal = { textColor = new Color(1f, 0.78f, 0.10f) }
+        };
+        conversationTextStyle = new GUIStyle(smallStyle)
+        {
+            fontSize = 15, alignment = TextAnchor.UpperLeft, wordWrap = true,
+            normal = { textColor = Color.white }
+        };
         tabStyle = new GUIStyle(buttonStyle) { normal = { textColor = Color.white } };
         tabActifStyle = new GUIStyle(buttonStyle) { fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         loadingTitleStyle = new GUIStyle(GUI.skin.label)

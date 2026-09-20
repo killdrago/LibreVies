@@ -1,8 +1,8 @@
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
-Derniere mise a jour : 20/09/2026 - MAJ 68 : humanoides detailles et panneaux corrigés
-                        ; version 0.5.68
+Derniere mise a jour : 20/09/2026 - MAJ 69 : portails réalignes et conversations PNJ
+                        ; version 0.5.69
                         launcher 4.1.0 / amorce (plus besoin de recompiler
                         le launcher)
 Depot : https://github.com/killdrago/LibreVies
@@ -27,6 +27,25 @@ MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09
   coudes et des genoux afin de fermer les raccords pendant les flexions, sans
   réintroduire les bouchons circulaires qui étaient visibles aux articulations.
 - Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 69 — PORTAILS REALIGNES, MEDECIN ET CONVERSATIONS PNJ (20/09/2026)
+================================================================================
+
+- La route traverse maintenant l'enceinte au nord et au sud. Chaque portail
+  est recentre sur sa sortie, avec 50 cm de passage libre entre les faces
+  internes des poteaux. Le linteau et la pancarte sont dimensionnes sur l'encombrement des poteaux afin
+  de les rejoindre sans décalage latéral.
+- Les gardes restent à leur portail, mais sont décalés de 2 m sur le côté de
+  la route pour ne plus bloquer le passage au milieu des pavés.
+- Une maison du nord est renommée « ESTHÉTIQUE » avec une pancarte agrandie.
+  Un PNJ Médecin en blouse claire et croix rouge est placé devant.
+- Les poches et revers de veste ont été amincis : les plaques trop visibles du
+  torse et des genoux étaient des volumes de détail trop épais, pas une armure.
+- Un clic sur un PNJ proche ouvre une fenêtre de conversation. Elle affiche
+  « Bonjour », conserve l'historique, propose une zone de saisie en bas et un
+  bouton ENVOYER ; la réponse du PNJ est ajoutée à la conversation.
+- Version de cette MAJ : 0.5.69. La compilation Unity Windows et le contrôle
   visuel en jeu restent à effectuer avant de déclarer le rendu validé.
 
 MAJ 68 — PERSONNAGES HUMANOÏDES, PORTIQUE DÉCALÉ ET PANNEAUX AGRANDIS (20/09/2026)
