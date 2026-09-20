@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.75";
+    private const string VersionJeu = "0.5.76";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -94,7 +94,6 @@ public sealed class LibreViesGame : MonoBehaviour
     // Premier outil du mode edition : les maisons entieres sont encadrees
     // par un grillage visible, sans modifier leur position ni leur collision.
     private bool modeEdition;
-    private Material materiauGrillageEdition;
     // Portails du village (position du portail) et gardes qui les surveillent.
     private readonly List<Vector2> portails = new List<Vector2>();
     private readonly List<GardeState> gardes = new List<GardeState>();
@@ -647,29 +646,10 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Route_Terre", new Color(0.46f, 0.30f, 0.16f));
         MakeMaterial("Route_Bord", new Color(0.36f, 0.34f, 0.31f));
         MakeMaterial("Pave_Route", new Color(0.58f, 0.53f, 0.43f));
-        CreerMateriauGrillageEdition();
-    }
-
-    private void CreerMateriauGrillageEdition()
-    {
-        // Le grillage doit rester lisible sur les murs, le toit et le sol.
-        // Unlit est privilegie pour garder une couleur vive quelle que soit
-        // la lumiere ; les replis permettent aux anciennes versions Unity de
-        // conserver le mode edition utilisable.
-        Shader shader = Shader.Find("Unlit/Color");
-        if (shader == null) shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = ResoudreShader();
-        if (shader == null) return;
-        materiauGrillageEdition = new Material(shader) { name = "Grillage_Mode_Edition" };
-        Color couleur = new Color(0.10f, 0.92f, 1.00f, 1f);
-        if (materiauGrillageEdition.HasProperty("_Color"))
-            materiauGrillageEdition.color = couleur;
-        if (materiauGrillageEdition.HasProperty("_EmissionColor"))
-        {
-            materiauGrillageEdition.EnableKeyword("_EMISSION");
-            materiauGrillageEdition.SetColor("_EmissionColor", couleur);
-        }
-        materiauGrillageEdition.renderQueue = 3000;
+        // Le grillage est compose de fines boites et reutilise le meme shader
+        // que le reste du monde : il reste visible meme si LineRenderer ou
+        // Unlit/Color n'est pas disponible dans une ancienne build Unity.
+        MakeMaterial("GrillageEdition", new Color(0.10f, 0.92f, 1.00f), true);
     }
 
     private Texture2D TextureRealiste(string nom)
@@ -1645,26 +1625,17 @@ public sealed class LibreViesGame : MonoBehaviour
         CreerAfficheMaison(root, size, name);
     }
 
-    private void CreerLigneGrillage(Transform parent, Vector3[] points, string nom)
+    private void CreerBarreGrillage(Transform parent, Vector3 position,
+        Vector3 taille, string nom)
     {
-        if (materiauGrillageEdition == null) return;
-        GameObject objet = new GameObject(nom);
-        objet.transform.SetParent(parent, false);
-        LineRenderer ligne = objet.AddComponent<LineRenderer>();
-        ligne.useWorldSpace = false;
-        ligne.positionCount = points.Length;
-        for (int i = 0; i < points.Length; i++) ligne.SetPosition(i, points[i]);
-        ligne.startWidth = 0.055f;
-        ligne.endWidth = 0.055f;
-        ligne.sharedMaterial = materiauGrillageEdition;
-        ligne.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        ligne.receiveShadows = false;
-        ligne.enabled = modeEdition;
+        // Une petite boite est plus fiable qu'un LineRenderer sur les builds
+        // Windows anciennes et reste visible comme une vraie cage 3D.
+        Box(position, taille, "GrillageEdition", parent, nom, false);
     }
 
     private void CreerGrillageMaison(Batiment batiment, Vector3 taille)
     {
-        if (batiment == null || batiment.Root == null || materiauGrillageEdition == null) return;
+        if (batiment == null || batiment.Root == null) return;
         Transform parent = batiment.Root;
         GameObject grillage = new GameObject("Grillage_Maison_Complete");
         grillage.transform.SetParent(parent, false);
@@ -1675,48 +1646,36 @@ public sealed class LibreViesGame : MonoBehaviour
         float demiZ = taille.z * 0.5f + 0.45f;
         float bas = 0.05f;
         float haut = taille.y + 2.72f;
-        float milieu = taille.y + 1.36f;
-        Vector3[] basRectangle =
+        float hauteur = haut - bas;
+        float epaisseur = 0.075f;
+        float milieu = (bas + haut) * 0.5f;
+        float longueurX = demiX * 2f;
+        float longueurZ = demiZ * 2f;
+        float[] niveaux = { bas, milieu, haut };
+        for (int i = 0; i < niveaux.Length; i++)
         {
-            new Vector3(-demiX, bas, -demiZ), new Vector3(-demiX, bas, demiZ),
-            new Vector3(demiX, bas, demiZ), new Vector3(demiX, bas, -demiZ),
-            new Vector3(-demiX, bas, -demiZ)
-        };
-        Vector3[] milieuRectangle =
-        {
-            new Vector3(-demiX, milieu, -demiZ), new Vector3(-demiX, milieu, demiZ),
-            new Vector3(demiX, milieu, demiZ), new Vector3(demiX, milieu, -demiZ),
-            new Vector3(-demiX, milieu, -demiZ)
-        };
-        Vector3[] hautRectangle =
-        {
-            new Vector3(-demiX, haut, -demiZ), new Vector3(-demiX, haut, demiZ),
-            new Vector3(demiX, haut, demiZ), new Vector3(demiX, haut, -demiZ),
-            new Vector3(-demiX, haut, -demiZ)
-        };
-        CreerLigneGrillage(grillage.transform, basRectangle, "Grillage_Bas");
-        CreerLigneGrillage(grillage.transform, milieuRectangle, "Grillage_Milieu");
-        CreerLigneGrillage(grillage.transform, hautRectangle, "Grillage_Haut");
+            float y = niveaux[i];
+            CreerBarreGrillage(grillage.transform, new Vector3(0f, y, -demiZ),
+                new Vector3(longueurX, epaisseur, epaisseur), "Grillage_Face_Avant_H_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(0f, y, demiZ),
+                new Vector3(longueurX, epaisseur, epaisseur), "Grillage_Face_Arriere_H_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(-demiX, y, 0f),
+                new Vector3(epaisseur, epaisseur, longueurZ), "Grillage_Face_Gauche_H_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(demiX, y, 0f),
+                new Vector3(epaisseur, epaisseur, longueurZ), "Grillage_Face_Droite_H_" + i);
+        }
         float[] xs = { -demiX, 0f, demiX };
         float[] zs = { -demiZ, 0f, demiZ };
         for (int i = 0; i < xs.Length; i++)
         {
-            CreerLigneGrillage(grillage.transform, new Vector3[]
-            {
-                new Vector3(xs[i], bas, -demiZ), new Vector3(xs[i], haut, -demiZ)
-            }, "Grillage_Face_Avant_" + i);
-            CreerLigneGrillage(grillage.transform, new Vector3[]
-            {
-                new Vector3(xs[i], bas, demiZ), new Vector3(xs[i], haut, demiZ)
-            }, "Grillage_Face_Arriere_" + i);
-            CreerLigneGrillage(grillage.transform, new Vector3[]
-            {
-                new Vector3(-demiX, bas, zs[i]), new Vector3(-demiX, haut, zs[i])
-            }, "Grillage_Face_Gauche_" + i);
-            CreerLigneGrillage(grillage.transform, new Vector3[]
-            {
-                new Vector3(demiX, bas, zs[i]), new Vector3(demiX, haut, zs[i])
-            }, "Grillage_Face_Droite_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(xs[i], milieu, -demiZ),
+                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Avant_V_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(xs[i], milieu, demiZ),
+                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Arriere_V_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(-demiX, milieu, zs[i]),
+                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Gauche_V_" + i);
+            CreerBarreGrillage(grillage.transform, new Vector3(demiX, milieu, zs[i]),
+                new Vector3(epaisseur, hauteur, epaisseur), "Grillage_Face_Droite_V_" + i);
         }
         grillage.SetActive(modeEdition);
     }
@@ -2384,12 +2343,10 @@ public sealed class LibreViesGame : MonoBehaviour
             // exactement le bras et ne peut plus rester suspendue au torse.
             pnj.Feuille = new GameObject("Feuille_Maire").transform;
             pnj.Feuille.SetParent(pnj.Main, false);
-            // Inversion avant/arriere demandee : la feuille passe du cote
-            // arriere au cote avant de la main, sans quitter son parent anime.
-            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, -0.10f);
+            pnj.Feuille.localPosition = new Vector3(-0.12f, -0.02f, 0.10f);
             pnj.Feuille.localRotation = Quaternion.identity;
             Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
-            Box(new Vector3(0f, 0.18f, 0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
+            Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
         else if (metier == "Vendeur" || metier == "Marchand")
         {
@@ -2457,9 +2414,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 // recalcule donc pas sa position dans le monde : le parent
                 // entraîne automatiquement position, rotation et animation.
                 pnj.Marteau.localPosition = Vector3.zero;
-                // Inversion avant/arriere du marteau : la tete reste dans
-                // la paume mais bascule du mauvais cote vers le cote avant.
-                pnj.Marteau.localRotation = Quaternion.Euler(18f, 0f, 0f);
+                pnj.Marteau.localRotation = Quaternion.Euler(-18f, 0f, 0f);
             }
             if (pnj.Feuille != null)
             {
