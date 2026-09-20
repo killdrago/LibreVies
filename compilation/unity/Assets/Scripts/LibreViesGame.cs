@@ -99,6 +99,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // ouvertures, arbres et autres objets declarés comme deplacables.
     private bool modeEdition;
     private ElementEdition elementEditionSelectionne;
+    private ElementEdition elementEditionDernierSelectionne;
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
     private readonly Stack<HistoriqueEdition> historiqueEdition = new Stack<HistoriqueEdition>();
     private bool editionMaisonEnDeplacement;
@@ -274,6 +275,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 Position;
         public Quaternion Rotation;
         public Vector3 Echelle;
+        public string TextePancarte;
+        public Color CouleurPancarte;
+        public int StylePancarte;
+        public bool SoulignePancarte;
     }
 
     [Serializable]
@@ -357,8 +362,11 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         public Transform Root;
         public Batiment Maison;
+        public Batiment MaisonParent;
+        public FacadeTextState Facade;
         public string Type;
         public float SolY;
+        public float HauteurLocale;
         public Obstacle Collision;
         public Vector3 PositionAvant;
         public Quaternion RotationAvant;
@@ -398,6 +406,13 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class FacadeTextState
     {
         public GameObject Root;
+        public Transform Maison;
+        public Transform Panneau;
+        public TextMesh Texte;
+        public GameObject Soulignement;
+        public string Libelle;
+        public Color Couleur;
+        public bool Souligne;
         public Vector3 Position;
         public Vector3 DirectionFacade;
     }
@@ -707,13 +722,34 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Transform objet = transforms[i];
             if (!EstObjetDeplacableEdition(objet) || dejaAjoutes.Contains(objet)) continue;
+            Batiment maisonParent = null;
+            for (int j = 0; j < batiments.Count; j++)
+            {
+                if (batiments[j] != null && batiments[j].Root == objet.parent)
+                {
+                    maisonParent = batiments[j];
+                    break;
+                }
+            }
+            FacadeTextState facade = null;
+            for (int j = 0; j < textesFacades.Count; j++)
+            {
+                if (textesFacades[j].Panneau == objet)
+                {
+                    facade = textesFacades[j];
+                    break;
+                }
+            }
             // Les enfants d'un PNJ importent deja avec leur PNJ : on ne rend
             // deplacables ici que les accessoires explicitement nommes.
             objetsEdition.Add(new ElementEdition
             {
                 Root = objet,
+                MaisonParent = maisonParent,
+                Facade = facade,
                 Type = objet.name,
                 SolY = objet.position.y,
+                HauteurLocale = objet.localPosition.y,
                 Collision = collisionsObjetsEdition.ContainsKey(objet)
                     ? collisionsObjetsEdition[objet] : null
             });
@@ -745,6 +781,13 @@ public sealed class LibreViesGame : MonoBehaviour
         string nom = objet.name ?? "";
         if (nom == "Soleil" || nom == "Main Camera" || nom == "EventSystem") return false;
         return true;
+    }
+
+    private ElementEdition TrouverElementEdition(Transform objet)
+    {
+        for (int i = 0; i < objetsEdition.Count; i++)
+            if (objetsEdition[i].Root == objet) return objetsEdition[i];
+        return null;
     }
 
     private List<Transform> ObjetsCoordonneesEdition()
@@ -887,6 +930,20 @@ public sealed class LibreViesGame : MonoBehaviour
                 objet.position = coordonnee.Position;
                 objet.rotation = coordonnee.Rotation;
                 objet.localScale = coordonnee.Echelle;
+                ElementEdition element = TrouverElementEdition(objet);
+                if (element != null && element.Facade != null
+                    && coordonnee.TextePancarte != null)
+                {
+                    element.Facade.Libelle = coordonnee.TextePancarte;
+                    element.Facade.Couleur = coordonnee.CouleurPancarte;
+                    if (coordonnee.StylePancarte < (int)FontStyle.Normal
+                        || coordonnee.StylePancarte > (int)FontStyle.BoldAndItalic)
+                        coordonnee.StylePancarte = (int)FontStyle.Normal;
+                    if (element.Facade.Texte != null)
+                        element.Facade.Texte.fontStyle = (FontStyle)coordonnee.StylePancarte;
+                    element.Facade.Souligne = coordonnee.SoulignePancarte;
+                    AppliquerStylePancarte(element.Facade);
+                }
                 utilisees.Add(objet);
             }
             SynchroniserTousLesBatiments();
@@ -910,14 +967,25 @@ public sealed class LibreViesGame : MonoBehaviour
             for (int i = 0; i < objets.Count; i++)
             {
                 Transform objet = objets[i];
-                fichier.Objets.Add(new CoordonneeObjetEdition
+                CoordonneeObjetEdition coordonnee = new CoordonneeObjetEdition
                 {
                     Nom = objet.name,
                     Chemin = CheminObjetEdition(objet),
                     Position = objet.position,
                     Rotation = objet.rotation,
-                    Echelle = objet.localScale
-                });
+                    Echelle = objet.localScale,
+                    TextePancarte = null
+                };
+                ElementEdition element = TrouverElementEdition(objet);
+                if (element != null && element.Facade != null)
+                {
+                    coordonnee.TextePancarte = element.Facade.Libelle ?? "";
+                    coordonnee.CouleurPancarte = element.Facade.Couleur;
+                    coordonnee.StylePancarte = element.Facade.Texte == null
+                        ? (int)FontStyle.Normal : (int)element.Facade.Texte.fontStyle;
+                    coordonnee.SoulignePancarte = element.Facade.Souligne;
+                }
+                fichier.Objets.Add(coordonnee);
             }
             string json = JsonUtility.ToJson(fichier, false);
             byte[] chiffre = ChiffrerCoordonneesEdition(Encoding.UTF8.GetBytes(json));
@@ -2086,8 +2154,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private float SolElementEdition(ElementEdition element)
     {
-        return element != null && element.Maison != null ? element.Maison.SolY
-            : (element == null ? 0f : element.SolY);
+        if (element == null) return 0f;
+        if (element.Maison != null) return element.Maison.SolY;
+        if (element.MaisonParent != null && element.Root != null) return element.Root.position.y;
+        return element.SolY;
     }
 
     private void SynchroniserElementEdition(ElementEdition element)
@@ -2173,7 +2243,16 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (element == null || element.Root == null) return;
         float sol = SolElementEdition(element);
-        element.Root.position = new Vector3(element.Root.position.x, sol, element.Root.position.z);
+        if (element.MaisonParent != null)
+        {
+            Vector3 local = element.Root.localPosition;
+            local.y = element.HauteurLocale;
+            element.Root.localPosition = local;
+        }
+        else
+        {
+            element.Root.position = new Vector3(element.Root.position.x, sol, element.Root.position.z);
+        }
         element.Souleve = false;
         if (element.Maison != null)
         {
@@ -2189,16 +2268,21 @@ public sealed class LibreViesGame : MonoBehaviour
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
         elementEditionSelectionne = cible;
+        elementEditionDernierSelectionne = cible;
         cible.PositionAvant = cible.Root.position;
         cible.RotationAvant = cible.Root.rotation;
         cible.EchelleAvant = cible.Root.localScale;
         float sol = SolElementEdition(cible);
         cible.Souleve = true;
         if (cible.Maison != null) cible.Maison.EditionSoulevee = true;
-        cible.Root.position = new Vector3(cible.Root.position.x,
-            sol + HauteurSoulevementMaisonEdition, cible.Root.position.z);
+        if (cible.MaisonParent == null)
+        {
+            cible.Root.position = new Vector3(cible.Root.position.x,
+                sol + HauteurSoulevementMaisonEdition, cible.Root.position.z);
+        }
+        float hauteurPlan = cible.MaisonParent != null ? cible.PositionAvant.y : cible.Root.position.y;
         Vector3 pointSouris;
-        if (PointSourisSurPlanEdition(cible.Root.position.y, out pointSouris))
+        if (PointSourisSurPlanEdition(hauteurPlan, out pointSouris))
         {
             decalageSourisMaisonEdition = cible.Root.position - pointSouris;
             decalageSourisMaisonEdition.y = 0f;
@@ -2217,12 +2301,26 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!editionMaisonEnDeplacement || elementEditionSelectionne == null) return;
         ElementEdition element = elementEditionSelectionne;
         float sol = SolElementEdition(element);
+        float hauteurPlan = element.MaisonParent != null
+            ? element.PositionAvant.y : sol + HauteurSoulevementMaisonEdition;
         Vector3 pointSouris;
-        if (!PointSourisSurPlanEdition(sol + HauteurSoulevementMaisonEdition,
-            out pointSouris)) return;
+        if (!PointSourisSurPlanEdition(hauteurPlan, out pointSouris)) return;
         Vector3 position = pointSouris + decalageSourisMaisonEdition;
-        element.Root.position = new Vector3(position.x,
-            sol + HauteurSoulevementMaisonEdition, position.z);
+        if (element.MaisonParent != null)
+        {
+            Vector3 local = element.MaisonParent.Root.InverseTransformPoint(position);
+            float margeX = element.MaisonParent.Largeur * 0.5f + 0.55f;
+            float margeZ = element.MaisonParent.Profondeur * 0.5f + 0.55f;
+            local.x = Mathf.Clamp(local.x, -margeX, margeX);
+            local.z = Mathf.Clamp(local.z, -margeZ, margeZ);
+            local.y = element.HauteurLocale;
+            element.Root.localPosition = local;
+        }
+        else
+        {
+            element.Root.position = new Vector3(position.x,
+                sol + HauteurSoulevementMaisonEdition, position.z);
+        }
         SynchroniserElementEdition(element);
     }
 
@@ -2252,9 +2350,22 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo("Objet pose a sa nouvelle position");
     }
 
+    private bool SourisSurInterfaceEdition()
+    {
+        if (!modeEdition) return false;
+        Vector2 souris = new Vector2(Input.mousePosition.x,
+            Screen.height - Input.mousePosition.y);
+        if (elementEditionDernierSelectionne != null
+            && elementEditionDernierSelectionne.Facade != null
+            && new Rect(18f, Screen.height - 278f, 365f, 242f).Contains(souris))
+            return true;
+        return new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f).Contains(souris);
+    }
+
     private void GererSourisEdition()
     {
-        if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0))
+        if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0)
+            && !SourisSurInterfaceEdition())
             CommencerDeplacementMaisonEdition();
         if (editionMaisonEnDeplacement && Input.GetMouseButton(0))
             DeplacerMaisonEdition();
@@ -2274,7 +2385,10 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         modeEdition = !modeEdition;
         if (modeEdition)
+        {
             elementEditionSelectionne = null;
+            elementEditionDernierSelectionne = null;
+        }
         if (modeEdition)
             ShowInfo("MODE EDITION : clic maintenu pour deplacer, ECHAP pour annuler");
         else
@@ -2307,24 +2421,154 @@ public sealed class LibreViesGame : MonoBehaviour
         else largeur = 4.20f;
         float tailleTexte = nom == "Auberge" ? 0.15f
             : (nom == "Esthetique" ? 0.11f : 0.14f);
-        Box(new Vector3(0f, 2.62f, z), new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
+        GameObject panneau = Box(new Vector3(0f, 2.62f, z),
+            new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
         Vector3 position = parent.TransformPoint(new Vector3(0f, 2.62f, z + 0.06f));
-        GameObject texte = CreerTexte3D(LibelleMaison(nom), position, new Color(0.16f, 0.09f, 0.04f), tailleTexte);
+        string libelle = LibelleMaison(nom);
+        Color couleur = new Color(0.16f, 0.09f, 0.04f);
+        GameObject texte = CreerTexte3D(libelle, position, couleur, tailleTexte);
         if (texte != null)
         {
-            // Le TextMesh devait etre retourne pour que le nom soit lisible
-            // depuis la facade sud (+z), pas en miroir.
+            // Le texte suit la pancarte, elle-meme enfant de la maison :
+            // deplacer la profondeur de la pancarte ne le desolidarise plus.
             texte.transform.rotation = parent.rotation * Quaternion.Euler(0f, 180f, 0f);
-            // Le texte doit voyager avec la maison, comme sa pancarte et ses
-            // fenetres, au lieu de rester a son ancienne position mondiale.
-            texte.transform.SetParent(parent, true);
-            textesFacades.Add(new FacadeTextState
+            texte.transform.SetParent(panneau.transform, true);
+            FacadeTextState facade = new FacadeTextState
             {
                 Root = texte,
+                Maison = parent,
+                Panneau = panneau.transform,
+                Texte = texte.GetComponent<TextMesh>(),
+                Libelle = libelle,
+                Couleur = couleur,
                 Position = texte.transform.position,
                 DirectionFacade = parent.TransformDirection(Vector3.forward).normalized
-            });
+            };
+            AppliquerStylePancarte(facade);
+            textesFacades.Add(facade);
         }
+    }
+
+    private void AppliquerStylePancarte(FacadeTextState facade)
+    {
+        if (facade == null || facade.Texte == null) return;
+        facade.Texte.text = facade.Libelle ?? "";
+        facade.Texte.color = facade.Couleur;
+        MettreAJourSoulignement(facade);
+    }
+
+    private void MettreAJourSoulignement(FacadeTextState facade)
+    {
+        if (facade == null || facade.Texte == null) return;
+        if (!facade.Souligne)
+        {
+            if (facade.Soulignement != null) facade.Soulignement.SetActive(false);
+            return;
+        }
+        if (facade.Soulignement == null)
+        {
+            facade.Soulignement = new GameObject("Soulignement_Pancarte");
+            facade.Soulignement.transform.SetParent(facade.Root.transform, false);
+            LineRenderer ligne = facade.Soulignement.AddComponent<LineRenderer>();
+            ligne.useWorldSpace = false;
+            ligne.positionCount = 2;
+            ligne.alignment = LineAlignment.TransformZ;
+            ligne.numCapVertices = 2;
+            Shader shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = ResoudreShader();
+            if (shader != null) ligne.sharedMaterial = new Material(shader);
+        }
+        facade.Soulignement.SetActive(true);
+        LineRenderer rendu = facade.Soulignement.GetComponent<LineRenderer>();
+        Renderer texteRendu = facade.Root.GetComponent<Renderer>();
+        float largeur = texteRendu == null ? 0.8f
+            : texteRendu.bounds.size.x / Mathf.Max(facade.Root.transform.lossyScale.x, 0.001f);
+        float hauteur = -facade.Texte.characterSize * 0.52f;
+        rendu.startWidth = facade.Texte.characterSize * 0.055f;
+        rendu.endWidth = rendu.startWidth;
+        rendu.startColor = facade.Couleur;
+        rendu.endColor = facade.Couleur;
+        rendu.SetPosition(0, new Vector3(-largeur * 0.48f, hauteur, -0.012f));
+        rendu.SetPosition(1, new Vector3(largeur * 0.48f, hauteur, -0.012f));
+    }
+
+    private void DefinirStylePancarte(FacadeTextState facade, bool gras, bool italique)
+    {
+        if (facade == null || facade.Texte == null) return;
+        if (gras && italique) facade.Texte.fontStyle = FontStyle.BoldAndItalic;
+        else if (gras) facade.Texte.fontStyle = FontStyle.Bold;
+        else if (italique) facade.Texte.fontStyle = FontStyle.Italic;
+        else facade.Texte.fontStyle = FontStyle.Normal;
+    }
+
+    private bool PancarteGrasse(FacadeTextState facade)
+    {
+        return facade != null && facade.Texte != null
+            && (facade.Texte.fontStyle == FontStyle.Bold
+                || facade.Texte.fontStyle == FontStyle.BoldAndItalic);
+    }
+
+    private bool PancarteItalique(FacadeTextState facade)
+    {
+        return facade != null && facade.Texte != null
+            && (facade.Texte.fontStyle == FontStyle.Italic
+                || facade.Texte.fontStyle == FontStyle.BoldAndItalic);
+    }
+
+    private void DessinerEditionPancarte()
+    {
+        if (!modeEdition || elementEditionDernierSelectionne == null
+            || elementEditionDernierSelectionne.Facade == null) return;
+        FacadeTextState facade = elementEditionDernierSelectionne.Facade;
+        Rect cadre = new Rect(18f, Screen.height - 278f, 365f, 242f);
+        GUI.Box(cadre, "PANNEAU DE LA MAISON", boxStyle);
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 30f, 90f, 24f), "Texte :", labelStyle);
+        string texte = GUI.TextField(new Rect(cadre.x + 88f, cadre.y + 28f, 258f, 28f),
+            facade.Libelle ?? "");
+        if (texte != facade.Libelle)
+        {
+            facade.Libelle = texte;
+            AppliquerStylePancarte(facade);
+        }
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 66f, 90f, 22f), "Style :", labelStyle);
+        bool gras = PancarteGrasse(facade);
+        bool italique = PancarteItalique(facade);
+        if (GUI.Button(new Rect(cadre.x + 88f, cadre.y + 62f, 80f, 28f),
+            gras ? "GRAS ✓" : "GRAS", buttonStyle))
+            DefinirStylePancarte(facade, !gras, italique);
+        if (GUI.Button(new Rect(cadre.x + 176f, cadre.y + 62f, 92f, 28f),
+            italique ? "ITALIQUE ✓" : "ITALIQUE", buttonStyle))
+            DefinirStylePancarte(facade, gras, !italique);
+        if (GUI.Button(new Rect(cadre.x + 276f, cadre.y + 62f, 72f, 28f),
+            facade.Souligne ? "SOULIGNE ✓" : "SOULIGNE", buttonStyle))
+        {
+            facade.Souligne = !facade.Souligne;
+            MettreAJourSoulignement(facade);
+        }
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 106f, 90f, 22f), "Couleur :", labelStyle);
+        Color[] couleurs =
+        {
+            Color.white, Color.yellow, new Color(0.95f, 0.25f, 0.18f),
+            new Color(0.20f, 0.55f, 1f), new Color(0.25f, 0.85f, 0.30f),
+            new Color(0.16f, 0.09f, 0.04f)
+        };
+        string[] noms = { "BLANC", "JAUNE", "ROUGE", "BLEU", "VERT", "BRUN" };
+        for (int i = 0; i < couleurs.Length; i++)
+        {
+            GUI.color = couleurs[i];
+            if (GUI.Button(new Rect(cadre.x + 88f + i * 43f, cadre.y + 103f, 40f, 28f),
+                noms[i].Substring(0, 1), buttonStyle))
+            {
+                facade.Couleur = couleurs[i];
+                if (facade.Texte != null) facade.Texte.color = facade.Couleur;
+                MettreAJourSoulignement(facade);
+            }
+        }
+        GUI.color = Color.white;
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 145f, cadre.width - 28f, 54f),
+            "Les changements sont sauvegardes en quittant EDITION.\n"
+                + "Le texte suit toujours la pancarte et la maison.", smallStyle);
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
@@ -4062,8 +4306,10 @@ public sealed class LibreViesGame : MonoBehaviour
             Renderer rendu = affiche.Root.GetComponent<Renderer>();
             if (rendu == null) continue;
             affiche.Position = affiche.Root.transform.position;
-            if (affiche.Root.transform.parent != null)
-                affiche.DirectionFacade = affiche.Root.transform.parent.TransformDirection(Vector3.forward).normalized;
+            Transform parentFacade = affiche.Maison != null
+                ? affiche.Maison : affiche.Root.transform.parent;
+            if (parentFacade != null)
+                affiche.DirectionFacade = parentFacade.TransformDirection(Vector3.forward).normalized;
             // Une affiche de facade n'existe visuellement que du cote de sa
             // propre facade : le cube opaque de la maison ne laisse plus son
             // envers apparaitre quand on regarde depuis l'arriere.
@@ -4077,6 +4323,11 @@ public sealed class LibreViesGame : MonoBehaviour
                     visible = false;
             }
             rendu.enabled = visible;
+            if (affiche.Soulignement != null)
+            {
+                LineRenderer ligne = affiche.Soulignement.GetComponent<LineRenderer>();
+                if (ligne != null) ligne.enabled = visible;
+            }
         }
     }
 
@@ -4706,6 +4957,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "MODE EDITION\nCLIC MAINTENU : DEPLACER | " + annulation, boxStyle);
             GUI.color = Color.white;
         }
+        DessinerEditionPancarte();
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "EDITION", buttonStyle))
             BasculerModeEdition();

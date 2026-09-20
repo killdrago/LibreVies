@@ -22,6 +22,7 @@ def test_bat_publishes_before_sync():
     assert "if errorlevel 1" in publisher
     assert "preparer_depot_git" in publisher
     assert "reset --mixed FETCH_HEAD" in BAT
+    assert 'fetch --no-tags origin "%BRANCHE%"' in BAT
     assert "diff --cached --quiet -- jeu\\edition" in publisher or "diff --cached --quiet -- jeu/edition" in publisher
 
 
@@ -37,6 +38,9 @@ def test_edition_keeps_horizontal_drag_and_single_selection():
     assert "AnnulerDeplacementEdition" in CS
     assert "PositionAvant" in CS
     assert "Grillage" not in CS
+    assert "MaisonParent" in CS
+    assert "HauteurLocale" in CS
+    assert "local.y = element.HauteurLocale" in CS
     assert "Stack<HistoriqueEdition>" in CS
     assert "AjouterHistoriqueEdition" in CS
     assert "SupprimerFichierHistoriqueEdition" in CS
@@ -51,10 +55,10 @@ def test_requested_objects_are_registered():
 
 
 def test_signs_follow_buildings_and_facade_visibility_is_dynamic():
-    assert "texte.transform.SetParent(parent, true)" in CS
+    assert "texte.transform.SetParent(panneau.transform, true)" in CS
     visibility = section(CS, "private void MettreAJourVisibiliteAffiches", "private GameObject CreerTexte3D")
     assert "affiche.Position = affiche.Root.transform.position" in visibility
-    assert "affiche.Root.transform.parent.TransformDirection" in visibility
+    assert "parentFacade.TransformDirection" in visibility
 
 
 def test_blacksmith_and_mayor_arms_are_locked_without_touching_anvil():
@@ -63,6 +67,16 @@ def test_blacksmith_and_mayor_arms_are_locked_without_touching_anvil():
     assert "balancement = 0f" in update
     assert "Marteau_Forgeron" not in update
     assert "Enclume_Forgeron" not in update
+
+
+def test_sign_text_style_and_persistence_controls_exist():
+    assert "GUI.TextField" in CS
+    assert "FontStyle.Bold" in CS
+    assert "FontStyle.Italic" in CS
+    assert "Souligne" in CS
+    assert "LineRenderer" in CS
+    assert "TextePancarte" in CS
+    assert "CouleurPancarte" in CS
 
 
 def test_encrypted_coordinate_file_and_path_metadata_remain_in_place():

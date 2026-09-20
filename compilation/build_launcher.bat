@@ -346,6 +346,19 @@ if errorlevel 1 (
         exit /b 1
     )
 )
+rem Le poste peut avoir un ancien commit local d'edition apres un push
+rem refuse. On recale uniquement HEAD et l'index sur GitHub, sans toucher
+rem aux fichiers de travail : coordonee sera donc republiee proprement.
+"%GIT%" -C "%LV_GIT_ROOT%" fetch --no-tags origin "%BRANCHE%"
+if errorlevel 1 (
+    echo ERREUR : impossible de recuperer la branche distante avant publication.
+    exit /b 1
+)
+"%GIT%" -C "%LV_GIT_ROOT%" reset --mixed FETCH_HEAD
+if errorlevel 1 (
+    echo ERREUR : impossible de recaler le depot local sur GitHub.
+    exit /b 1
+)
 "%GIT%" -C "%LV_GIT_ROOT%" config user.name >nul 2>&1
 if errorlevel 1 "%GIT%" -C "%LV_GIT_ROOT%" config user.name "LibreVies Build"
 "%GIT%" -C "%LV_GIT_ROOT%" config user.email >nul 2>&1
