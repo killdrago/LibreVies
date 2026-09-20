@@ -2397,7 +2397,8 @@ public sealed class LibreViesGame : MonoBehaviour
             "Stone", root, "Soubassement");
         // Les anciens chaînages verticaux en bois sont retires : ils
         // produisaient des ombres tres dures sur les façades et alourdissaient
-        // les cotes de la maison.        string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
+        // les cotes de la maison.
+        string materiauToit = name == "Mairie" ? "RoofBlue" : (name == "Forge" ? "RoofRed" : "Roof");
         CreerToitTriangle(root, size, materiauToit, "Toit_" + name);
         Box(new Vector3(0f, size.y - 0.10f, (size.z + 0.72f) * 0.5f),
             new Vector3(size.x + 0.95f, 0.18f, 0.20f), "Wood", root, "Rive_Avant");
