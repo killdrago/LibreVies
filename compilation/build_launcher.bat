@@ -13,6 +13,9 @@ rem  Puis il fabrique, DANS LE DOSSIER jeu\ (tout au meme endroit) :
 rem    jeu\LibreVies.exe     = LE SEUL fichier a donner au joueur
 rem    jeu\game\...          = le jeu exporte, a publier
 rem
+rem  Avant toute synchronisation, les changements locaux de jeu\edition\
+rem  sont publies sur la branche de travail : une coordonnee locale ne peut
+rem  donc jamais etre ecrasee par le telechargement GitHub.
 rem  Avant tout remplacement, l'ancienne version est copiee dans
 rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
 rem  Etape suivante : outils\publier_jeu.bat (met le jeu en ligne)
@@ -250,6 +253,44 @@ exit /b 0
 
 
 rem ==========================================================================
+rem  PUBLICATION DES COORDONNEES D'EDITION
+rem  Cette etape est appelee avant synchroniser_sources.ps1. Elle ne committe
+rem  jamais les autres fichiers locaux et ne fait rien si edition est propre.
+rem ==========================================================================
+:publier_edition
+set "LV_GIT_ROOT=%ROOT%.."
+if not exist "%JEU%\edition" exit /b 0
+git -C "%LV_GIT_ROOT%" rev-parse --is-inside-work-tree >nul 2>&1
+if errorlevel 1 (
+    echo ERREUR : le dossier parent n'est pas un depot Git exploitable.
+    exit /b 1
+)
+git -C "%LV_GIT_ROOT%" add -- jeu/edition
+if errorlevel 1 (
+    echo ERREUR : git add jeu\edition a echoue.
+    exit /b 1
+)
+git -C "%LV_GIT_ROOT%" diff --cached --quiet -- jeu/edition
+if not errorlevel 1 (
+    echo        Edition locale : aucun changement a publier.
+    exit /b 0
+)
+echo        Edition locale : commit des coordonnees...
+git -C "%LV_GIT_ROOT%" commit -m "Edition : met a jour les coordonnees" --only -- jeu/edition
+if errorlevel 1 (
+    echo ERREUR : le commit des changements de jeu\edition a echoue.
+    exit /b 1
+)
+echo        Edition locale : publication vers origin/%BRANCHE%...
+git -C "%LV_GIT_ROOT%" push origin "%BRANCHE%"
+if errorlevel 1 (
+    echo ERREUR : git push origin %BRANCHE% a echoue.
+    exit /b 1
+)
+echo        Edition locale publiee avec succes.
+exit /b 0
+
+rem ==========================================================================
 rem  ETAPE 1 - le projet (sources) : MISE A JOUR depuis GitHub
 rem  Les fichiers sont mis a jour a chaque lancement (le depot est la
 rem  reference). Avant tout remplacement, l'ancienne version est copiee dans
@@ -262,6 +303,16 @@ set "LV_URL=https://github.com/%DEPOT%/archive/refs/heads/%BRANCHE%.zip"
 set "LV_ZIP=%TEMP%\librevies-projet.zip"
 set "LV_DIR=%TEMP%\librevies-projet"
 set "LV_SAUVE=%BUILD%\sauvegarde_locale"
+
+rem --- Publication obligatoire des coordonnees locales ----------------------
+rem Le depot GitHub est mis a jour AVANT toute lecture ou ecriture de source.
+rem Sans changement dans jeu\edition, aucune validation ni aucun commit n'est cree.
+call :publier_edition
+if errorlevel 1 (
+    echo ERREUR : publication des changements de jeu\edition impossible.
+    echo Le build est interrompu pour proteger les coordonnees locales.
+    exit /b 1
+)
 
 rem --- Copie de sauvegarde de ce qui peut etre remplace ---------------------
 rem     (uniquement les sources : le dossier image\ fait 72 Mo et n'est

@@ -90,13 +90,16 @@ public sealed class LibreViesGame : MonoBehaviour
         new Vector2(82, -68), new Vector2(118, -108)
     };
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
+    private readonly Dictionary<Transform, Obstacle> collisionsObjetsEdition =
+        new Dictionary<Transform, Obstacle>();
     // Rectangles des batiments : le decor (arbres, lampadaires, caisses...)
     // ne doit jamais etre pose dans un mur.
     private readonly List<Batiment> batiments = new List<Batiment>();
-    // Premier outil du mode edition : les maisons entieres sont encadrees
-    // par un grillage visible, sans modifier leur position ni leur collision.
+    // Le mode edition encadre les maisons et permet aussi de deplacer les
+    // ouvertures, arbres et autres objets declarés comme deplacables.
     private bool modeEdition;
-    private Batiment maisonEditionSelectionnee;
+    private ElementEdition elementEditionSelectionne;
+    private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
     private bool editionMaisonEnDeplacement;
     private Vector3 decalageSourisMaisonEdition;
     private const float HauteurSoulevementMaisonEdition = 1.0f;
@@ -266,6 +269,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class CoordonneeObjetEdition
     {
         public string Nom;
+        public string Chemin;
         public Vector3 Position;
         public Quaternion Rotation;
         public Vector3 Echelle;
@@ -342,6 +346,16 @@ public sealed class LibreViesGame : MonoBehaviour
         public float SolY;
         public bool EditionSoulevee;
         public Obstacle Collision;
+    }
+
+    private sealed class ElementEdition
+    {
+        public Transform Root;
+        public Batiment Maison;
+        public string Type;
+        public float SolY;
+        public Obstacle Collision;
+        public bool Souleve;
     }
 
     private sealed class PnjState
@@ -554,6 +568,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Journal("fin   : " + noms[i] + "  (" + objetsCrees + " objets)");
             yield return null;
         }
+        ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
@@ -630,6 +645,70 @@ public sealed class LibreViesGame : MonoBehaviour
         UpdateHudState(dt);
     }
 
+    private bool EstObjetDeplacableEdition(Transform objet)
+    {
+        if (objet == null || objet == transform || objet == player) return false;
+        string nom = objet.name ?? "";
+        if (nom == "Porte" || nom == "Fenetre" || nom == "Affiche_Maison") return true;
+        if (nom == "Sapin" || nom == "Fontaine" || nom == "Panneau"
+            || nom == "Lampadaire" || nom == "Banniere" || nom == "Baril"
+            || nom == "Caisse" || nom == "Garde"
+            || nom.StartsWith("Asset_CC0_") || nom.StartsWith("PNJ_")
+            || nom == "Araignee" || nom == "Souris" || nom == "Rat") return true;
+        return false;
+    }
+
+    private void ConstruireObjetsEdition()
+    {
+        objetsEdition.Clear();
+        var dejaAjoutes = new HashSet<Transform>();
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            objetsEdition.Add(new ElementEdition
+            {
+                Root = batiment.Root,
+                Maison = batiment,
+                Type = "Maison",
+                SolY = batiment.SolY
+            });
+            dejaAjoutes.Add(batiment.Root);
+        }
+        Transform[] transforms = FindObjectsByType<Transform>();
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform objet = transforms[i];
+            if (!EstObjetDeplacableEdition(objet) || dejaAjoutes.Contains(objet)) continue;
+            // Les enfants d'un PNJ importent deja avec leur PNJ : on ne rend
+            // deplacables ici que les accessoires explicitement nommes.
+            objetsEdition.Add(new ElementEdition
+            {
+                Root = objet,
+                Type = objet.name,
+                SolY = objet.position.y,
+                Collision = collisionsObjetsEdition.ContainsKey(objet)
+                    ? collisionsObjetsEdition[objet] : null
+            });
+            dejaAjoutes.Add(objet);
+        }
+        Journal("edition : " + objetsEdition.Count + " objet(s) deplacable(s)");
+    }
+
+    private string CheminObjetEdition(Transform objet)
+    {
+        if (objet == null) return "";
+        var morceaux = new List<string>();
+        Transform courant = objet;
+        while (courant != null)
+        {
+            morceaux.Add(courant.name + "[" + courant.GetSiblingIndex() + "]");
+            courant = courant.parent;
+        }
+        morceaux.Reverse();
+        return string.Join("/", morceaux.ToArray());
+    }
+
     private bool RacineAEnregistrer(Transform objet)
     {
         if (objet == null || objet.parent != null || !objet.gameObject.activeInHierarchy)
@@ -641,13 +720,29 @@ public sealed class LibreViesGame : MonoBehaviour
         return true;
     }
 
-    private List<Transform> RacinesObjetsEdition()
+    private List<Transform> ObjetsCoordonneesEdition()
     {
         Transform[] transforms = FindObjectsByType<Transform>();
-        var racines = new List<Transform>();
+        var objets = new List<Transform>();
+        var dejaAjoutes = new HashSet<Transform>();
         for (int i = 0; i < transforms.Length; i++)
-            if (RacineAEnregistrer(transforms[i])) racines.Add(transforms[i]);
-        return racines;
+        {
+            if (RacineAEnregistrer(transforms[i]))
+            {
+                objets.Add(transforms[i]);
+                dejaAjoutes.Add(transforms[i]);
+            }
+        }
+        for (int i = 0; i < objetsEdition.Count; i++)
+        {
+            Transform objet = objetsEdition[i].Root;
+            if (objet != null && !dejaAjoutes.Contains(objet))
+            {
+                objets.Add(objet);
+                dejaAjoutes.Add(objet);
+            }
+        }
+        return objets;
     }
 
     private byte[] CleCoordonneesEdition(out byte[] iv)
@@ -709,22 +804,36 @@ public sealed class LibreViesGame : MonoBehaviour
                 batiment.SolY = batiment.Root.position.y;
             SynchroniserBatiment(batiment);
         }
+        for (int i = 0; i < objetsEdition.Count; i++)
+        {
+            ElementEdition element = objetsEdition[i];
+            if (element.Maison == null && element.Root != null)
+                element.SolY = element.Root.position.y;
+        }
     }
 
-    private Transform TrouverRacineCoordonnee(string nom, Vector3 position, HashSet<Transform> utilisees)
+    private Transform TrouverRacineCoordonnee(string nom, string chemin,
+        Vector3 position, HashSet<Transform> utilisees)
     {
         Transform meilleur = null;
         float meilleureDistance = float.MaxValue;
-        List<Transform> racines = RacinesObjetsEdition();
-        for (int i = 0; i < racines.Count; i++)
+        List<Transform> objets = ObjetsCoordonneesEdition();
+        for (int i = 0; i < objets.Count; i++)
         {
-            Transform racine = racines[i];
-            if (racine.name != nom || utilisees.Contains(racine)) continue;
-            float distance = (racine.position - position).sqrMagnitude;
+            Transform objet = objets[i];
+            if (utilisees.Contains(objet)) continue;
+            if (!string.IsNullOrEmpty(chemin) && CheminObjetEdition(objet) == chemin)
+                return objet;
+        }
+        for (int i = 0; i < objets.Count; i++)
+        {
+            Transform objet = objets[i];
+            if (objet.name != nom || utilisees.Contains(objet)) continue;
+            float distance = (objet.position - position).sqrMagnitude;
             if (distance < meilleureDistance)
             {
                 meilleureDistance = distance;
-                meilleur = racine;
+                meilleur = objet;
             }
         }
         return meilleur;
@@ -746,7 +855,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 CoordonneeObjetEdition coordonnee = fichier.Objets[i];
                 if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
                 Transform objet = TrouverRacineCoordonnee(coordonnee.Nom,
-                    coordonnee.Position, utilisees);
+                    coordonnee.Chemin, coordonnee.Position, utilisees);
                 if (objet == null) continue;
                 objet.position = coordonnee.Position;
                 objet.rotation = coordonnee.Rotation;
@@ -770,13 +879,14 @@ public sealed class LibreViesGame : MonoBehaviour
             string dossier = Path.GetDirectoryName(CheminCoordonneesEdition);
             if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
             var fichier = new FichierCoordonneesEdition();
-            List<Transform> racines = RacinesObjetsEdition();
-            for (int i = 0; i < racines.Count; i++)
+            List<Transform> objets = ObjetsCoordonneesEdition();
+            for (int i = 0; i < objets.Count; i++)
             {
-                Transform objet = racines[i];
+                Transform objet = objets[i];
                 fichier.Objets.Add(new CoordonneeObjetEdition
                 {
                     Nom = objet.name,
+                    Chemin = CheminObjetEdition(objet),
                     Position = objet.position,
                     Rotation = objet.rotation,
                     Echelle = objet.localScale
@@ -1197,12 +1307,14 @@ public sealed class LibreViesGame : MonoBehaviour
     // la cloture, on peut atterrir sur les caisses, et les monstres restent
     // enfermes hors du village.
     // ------------------------------------------------------------------
-    private void ColCercle(float x, float z, float r, float h = HauteurCollision)
+    private Obstacle ColCercle(float x, float z, float r, float h = HauteurCollision)
     {
-        obstacles.Add(new Obstacle
+        Obstacle obstacle = new Obstacle
         {
             Cercle = true, X = x, Z = z, Rayon = r, Portee = r + 1f, Hauteur = h
-        });
+        };
+        obstacles.Add(obstacle);
+        return obstacle;
     }
 
     private Obstacle ColBoite(float x, float z, float w, float d, float h = HauteurCollision)
@@ -1893,23 +2005,23 @@ public sealed class LibreViesGame : MonoBehaviour
         grillage.SetActive(modeEdition);
     }
 
-    private bool TryTrouverMaisonEdition(out Batiment cible)
+    private bool TryZoneEcranElementEdition(ElementEdition element,
+        out Rect zone, out float profondeur)
     {
-        cible = null;
-        if (gameCamera == null) return false;
-        Vector2 souris = Input.mousePosition;
-        float meilleureProfondeur = float.MaxValue;
-        for (int i = 0; i < batiments.Count; i++)
+        zone = new Rect();
+        profondeur = float.MaxValue;
+        if (element == null || element.Root == null || !element.Root.gameObject.activeInHierarchy)
+            return false;
+        Vector3[] points;
+        if (element.Maison != null)
         {
-            Batiment batiment = batiments[i];
-            if (batiment == null || batiment.Root == null || !batiment.Root.gameObject.activeInHierarchy)
-                continue;
+            Batiment batiment = element.Maison;
             float demiX = batiment.Largeur * 0.5f + 0.45f;
             float demiZ = batiment.Profondeur * 0.5f + 0.45f;
             float bas = 0.05f;
             float haut = batiment.Hauteur + 2.72f;
             Vector3 origine = batiment.Root.position;
-            Vector3[] coinsMaison =
+            points = new Vector3[]
             {
                 origine + new Vector3(-demiX, bas, -demiZ),
                 origine + new Vector3(-demiX, bas, demiZ),
@@ -1920,34 +2032,74 @@ public sealed class LibreViesGame : MonoBehaviour
                 origine + new Vector3(demiX, haut, -demiZ),
                 origine + new Vector3(demiX, haut, demiZ)
             };
-            float minX = float.MaxValue;
-            float maxX = float.MinValue;
-            float minY = float.MaxValue;
-            float maxY = float.MinValue;
-            float profondeur = float.MaxValue;
-            bool visible = true;
-            for (int j = 0; j < coinsMaison.Length; j++)
+        }
+        else
+        {
+            Renderer[] rendus = element.Root.GetComponentsInChildren<Renderer>(true);
+            Bounds limites = new Bounds(element.Root.position, Vector3.one * 0.8f);
+            if (rendus.Length > 0)
             {
-                Vector3 ecran = gameCamera.WorldToScreenPoint(coinsMaison[j]);
-                if (ecran.z <= 0f)
-                {
-                    visible = false;
-                    break;
-                }
-                minX = Mathf.Min(minX, ecran.x);
-                maxX = Mathf.Max(maxX, ecran.x);
-                minY = Mathf.Min(minY, ecran.y);
-                maxY = Mathf.Max(maxY, ecran.y);
-                profondeur = Mathf.Min(profondeur, ecran.z);
+                limites = rendus[0].bounds;
+                for (int i = 1; i < rendus.Length; i++) limites.Encapsulate(rendus[i].bounds);
             }
-            if (!visible) continue;
-            // La marge inclut les barres fines de la cage, meme si le clic
-            // tombe juste a cote d'un coin visible.
-            Rect zone = Rect.MinMaxRect(minX - 18f, minY - 18f, maxX + 18f, maxY + 18f);
-            if (zone.Contains(souris) && profondeur < meilleureProfondeur)
+            Vector3 min = limites.min;
+            Vector3 max = limites.max;
+            points = new Vector3[]
             {
+                new Vector3(min.x, min.y, min.z), new Vector3(min.x, min.y, max.z),
+                new Vector3(min.x, max.y, min.z), new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, min.y, min.z), new Vector3(max.x, min.y, max.z),
+                new Vector3(max.x, max.y, min.z), new Vector3(max.x, max.y, max.z)
+            };
+        }
+        float minX = float.MaxValue;
+        float maxX = float.MinValue;
+        float minY = float.MaxValue;
+        float maxY = float.MinValue;
+        bool visible = true;
+        for (int i = 0; i < points.Length; i++)
+        {
+            Vector3 ecran = gameCamera.WorldToScreenPoint(points[i]);
+            if (ecran.z <= 0f)
+            {
+                visible = false;
+                break;
+            }
+            minX = Mathf.Min(minX, ecran.x);
+            maxX = Mathf.Max(maxX, ecran.x);
+            minY = Mathf.Min(minY, ecran.y);
+            maxY = Mathf.Max(maxY, ecran.y);
+            profondeur = Mathf.Min(profondeur, ecran.z);
+        }
+        if (!visible) return false;
+        float marge = element.Maison != null ? 18f : 10f;
+        zone = Rect.MinMaxRect(minX - marge, minY - marge, maxX + marge, maxY + marge);
+        return true;
+    }
+
+    private bool TryTrouverElementEdition(out ElementEdition cible)
+    {
+        cible = null;
+        if (gameCamera == null) return false;
+        Vector2 souris = Input.mousePosition;
+        float meilleureAire = float.MaxValue;
+        float meilleureProfondeur = float.MaxValue;
+        for (int i = 0; i < objetsEdition.Count; i++)
+        {
+            ElementEdition element = objetsEdition[i];
+            Rect zone;
+            float profondeur;
+            if (!TryZoneEcranElementEdition(element, out zone, out profondeur)
+                || !zone.Contains(souris)) continue;
+            float aire = Mathf.Max(zone.width * zone.height, 0.01f);
+            // Les portes/fenetres ont une petite zone : elles gagnent face a
+            // la grande cage de leur maison lorsqu'on clique dessus.
+            if (aire < meilleureAire || (Mathf.Abs(aire - meilleureAire) < 0.01f
+                && profondeur < meilleureProfondeur))
+            {
+                meilleureAire = aire;
                 meilleureProfondeur = profondeur;
-                cible = batiment;
+                cible = element;
             }
         }
         return cible != null;
@@ -1965,25 +2117,48 @@ public sealed class LibreViesGame : MonoBehaviour
         return true;
     }
 
-    private void PoserMaisonEdition(Batiment batiment)
+    private float SolElementEdition(ElementEdition element)
     {
-        if (batiment == null || batiment.Root == null) return;
-        batiment.Root.position = new Vector3(batiment.Root.position.x,
-            batiment.SolY, batiment.Root.position.z);
-        batiment.EditionSoulevee = false;
-        SynchroniserBatiment(batiment);
+        return element != null && element.Maison != null ? element.Maison.SolY
+            : (element == null ? 0f : element.SolY);
+    }
+
+    private void SynchroniserElementEdition(ElementEdition element)
+    {
+        if (element == null || element.Root == null) return;
+        if (element.Maison != null) SynchroniserBatiment(element.Maison);
+        if (element.Collision != null)
+        {
+            element.Collision.X = element.Root.position.x;
+            element.Collision.Z = element.Root.position.z;
+        }
+    }
+
+    private void PoserElementEdition(ElementEdition element)
+    {
+        if (element == null || element.Root == null) return;
+        float sol = SolElementEdition(element);
+        element.Root.position = new Vector3(element.Root.position.x, sol, element.Root.position.z);
+        element.Souleve = false;
+        if (element.Maison != null)
+        {
+            element.Maison.EditionSoulevee = false;
+            SynchroniserBatiment(element.Maison);
+        }
     }
 
     private void CommencerDeplacementMaisonEdition()
     {
-        Batiment cible;
-        if (!TryTrouverMaisonEdition(out cible)) return;
-        if (maisonEditionSelectionnee != null && maisonEditionSelectionnee != cible)
-            PoserMaisonEdition(maisonEditionSelectionnee);
-        maisonEditionSelectionnee = cible;
-        cible.EditionSoulevee = true;
+        ElementEdition cible;
+        if (!TryTrouverElementEdition(out cible)) return;
+        if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
+            PoserElementEdition(elementEditionSelectionne);
+        elementEditionSelectionne = cible;
+        float sol = SolElementEdition(cible);
+        cible.Souleve = true;
+        if (cible.Maison != null) cible.Maison.EditionSoulevee = true;
         cible.Root.position = new Vector3(cible.Root.position.x,
-            cible.SolY + HauteurSoulevementMaisonEdition, cible.Root.position.z);
+            sol + HauteurSoulevementMaisonEdition, cible.Root.position.z);
         Vector3 pointSouris;
         if (PointSourisSurPlanEdition(cible.Root.position.y, out pointSouris))
         {
@@ -1995,30 +2170,31 @@ public sealed class LibreViesGame : MonoBehaviour
             decalageSourisMaisonEdition = Vector3.zero;
         }
         editionMaisonEnDeplacement = true;
-        SynchroniserBatiment(cible);
-        ShowInfo("Maison soulevee : maintenez le clic et deplacez-la");
+        SynchroniserElementEdition(cible);
+        ShowInfo(cible.Type + " souleve : maintenez le clic et deplacez-le");
     }
 
     private void DeplacerMaisonEdition()
     {
-        if (!editionMaisonEnDeplacement || maisonEditionSelectionnee == null) return;
-        Batiment maison = maisonEditionSelectionnee;
+        if (!editionMaisonEnDeplacement || elementEditionSelectionne == null) return;
+        ElementEdition element = elementEditionSelectionne;
+        float sol = SolElementEdition(element);
         Vector3 pointSouris;
-        if (!PointSourisSurPlanEdition(maison.SolY + HauteurSoulevementMaisonEdition,
+        if (!PointSourisSurPlanEdition(sol + HauteurSoulevementMaisonEdition,
             out pointSouris)) return;
         Vector3 position = pointSouris + decalageSourisMaisonEdition;
-        maison.Root.position = new Vector3(position.x,
-            maison.SolY + HauteurSoulevementMaisonEdition, position.z);
-        SynchroniserBatiment(maison);
+        element.Root.position = new Vector3(position.x,
+            sol + HauteurSoulevementMaisonEdition, position.z);
+        SynchroniserElementEdition(element);
     }
 
     private void TerminerDeplacementMaisonEdition()
     {
         if (!editionMaisonEnDeplacement) return;
-        PoserMaisonEdition(maisonEditionSelectionnee);
+        PoserElementEdition(elementEditionSelectionne);
         editionMaisonEnDeplacement = false;
-        maisonEditionSelectionnee = null;
-        ShowInfo("Maison posee a sa nouvelle position");
+        elementEditionSelectionne = null;
+        ShowInfo("Objet pose a sa nouvelle position");
     }
 
     private void GererSourisEdition()
@@ -2037,13 +2213,13 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (editionMaisonEnDeplacement)
                 TerminerDeplacementMaisonEdition();
-            else if (maisonEditionSelectionnee != null)
-                PoserMaisonEdition(maisonEditionSelectionnee);
+            else if (elementEditionSelectionne != null)
+                PoserElementEdition(elementEditionSelectionne);
             EnregistrerCoordonneesEdition();
         }
         modeEdition = !modeEdition;
         if (modeEdition)
-            maisonEditionSelectionnee = null;
+            elementEditionSelectionne = null;
         for (int i = 0; i < batiments.Count; i++)
         {
             Batiment batiment = batiments[i];
@@ -2051,7 +2227,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 batiment.Grillage.SetActive(modeEdition);
         }
         if (modeEdition)
-            ShowInfo("MODE EDITION : maintenez le clic pour deplacer une maison");
+            ShowInfo("MODE EDITION : maintenez le clic pour deplacer un objet");
         else
             ShowInfo("MODE NORMAL : positions enregistrees");
     }
@@ -2090,10 +2266,13 @@ public sealed class LibreViesGame : MonoBehaviour
             // Le TextMesh devait etre retourne pour que le nom soit lisible
             // depuis la facade sud (+z), pas en miroir.
             texte.transform.rotation = parent.rotation * Quaternion.Euler(0f, 180f, 0f);
+            // Le texte doit voyager avec la maison, comme sa pancarte et ses
+            // fenetres, au lieu de rester a son ancienne position mondiale.
+            texte.transform.SetParent(parent, true);
             textesFacades.Add(new FacadeTextState
             {
                 Root = texte,
-                Position = position,
+                Position = texte.transform.position,
                 DirectionFacade = parent.TransformDirection(Vector3.forward).normalized
             });
         }
@@ -2773,6 +2952,10 @@ public sealed class LibreViesGame : MonoBehaviour
                 balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
                 hauteur = 0f;
             }
+            // Le forgeron et le maire gardent les bras fixes : leurs
+            // accessoires restent donc stables dans leurs mains.
+            if (pnj.Metier == "Forgeron" || pnj.Metier == "Maire")
+                balancement = 0f;
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
             if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
@@ -2861,6 +3044,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Les collisions de déplacement du jeu restent mathématiques, mais le
         // modèle possède aussi un collider Unity exploitable par les outils et
         // les futures interactions physiques.
+        Obstacle collisionNature = null;
         if (collision)
         {
             if (asset.StartsWith("CommonTree") || asset.StartsWith("Pine"))
@@ -2869,16 +3053,17 @@ public sealed class LibreViesGame : MonoBehaviour
                 tronc.center = new Vector3(0f, 2.5f, 0f);
                 tronc.radius = 0.65f;
                 tronc.height = 5.2f;
-                ColCercle(x, z, 0.72f * scale, 6.8f * scale);
+                collisionNature = ColCercle(x, z, 0.72f * scale, 6.8f * scale);
             }
             else if (asset.StartsWith("Rock"))
             {
                 BoxCollider rocher = instance.AddComponent<BoxCollider>();
                 rocher.center = new Vector3(0f, 0.75f, 0f);
                 rocher.size = new Vector3(2.2f, 1.6f, 2.2f);
-                ColCercle(x, z, 1.0f * scale, 2.0f * scale);
+                collisionNature = ColCercle(x, z, 1.0f * scale, 2.0f * scale);
             }
         }
+        if (collisionNature != null) collisionsObjetsEdition[instance.transform] = collisionNature;
         return true;
     }
 
@@ -2926,7 +3111,7 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateCone(root, new Vector3(0f, 2.55f, 0f), 1.35f, 2.4f, "Sapin_Bas", "Feuillage_Bas");
         CreateCone(root, new Vector3(0f, 3.75f, 0f), 1.05f, 2.1f, "Sapin_Milieu", "Feuillage_Milieu");
         CreateCone(root, new Vector3(0f, 4.80f, 0f), 0.72f, 1.8f, "Sapin_Haut", "Feuillage_Haut");
-        ColCercle(x, z, 0.4f * taille, 2.2f);   // tronc
+        collisionsObjetsEdition[root] = ColCercle(x, z, 0.4f * taille, 2.2f);   // tronc
     }
 
     private void CreateCone(Transform parent, Vector3 position, float rayon, float hauteur, string materiau, string nom)
@@ -3827,6 +4012,9 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             Renderer rendu = affiche.Root.GetComponent<Renderer>();
             if (rendu == null) continue;
+            affiche.Position = affiche.Root.transform.position;
+            if (affiche.Root.parent != null)
+                affiche.DirectionFacade = affiche.Root.parent.TransformDirection(Vector3.forward).normalized;
             // Une affiche de facade n'existe visuellement que du cote de sa
             // propre facade : le cube opaque de la maison ne laisse plus son
             // envers apparaitre quand on regarde depuis l'arriere.
@@ -4875,8 +5063,8 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (editionMaisonEnDeplacement)
                 TerminerDeplacementMaisonEdition();
-            else if (maisonEditionSelectionnee != null)
-                PoserMaisonEdition(maisonEditionSelectionnee);
+            else if (elementEditionSelectionne != null)
+                PoserElementEdition(elementEditionSelectionne);
             EnregistrerCoordonneesEdition();
         }
     }
