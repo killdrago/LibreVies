@@ -303,7 +303,7 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class FichierCoordonneesEdition
     {
-        public int Version = 1;
+        public int Version = 3;
         public List<CoordonneeObjetEdition> Objets = new List<CoordonneeObjetEdition>();
     }
 
@@ -914,11 +914,14 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
             Vector3 echellePorte = batiment.PorteRoot.localScale;
-            echellePorte.y = batiment.PorteHauteur / echelleY;
+            echellePorte.y = batiment.PorteHauteur
+                / Mathf.Max(HauteurPorteConfortable * echelleY, 0.001f);
             batiment.PorteRoot.localScale = echellePorte;
             Vector3 positionPorte = batiment.PorteRoot.localPosition;
             positionPorte.y = batiment.PorteHauteur * 0.5f / echelleY;
             batiment.PorteRoot.localPosition = positionPorte;
+            ElementEdition elementPorte = TrouverElementEdition(batiment.PorteRoot);
+            if (elementPorte != null) elementPorte.HauteurLocale = positionPorte.y;
         }
         if (batiment.Collision != null)
         {
@@ -940,14 +943,17 @@ public sealed class LibreViesGame : MonoBehaviour
         float profondeur = batiment.ProfondeurInitiale;
         float hauteur = batiment.HauteurInitiale;
         Vector3 positionPorte = batiment.PorteRoot.localPosition;
-        float hauteurPorte = batiment.PorteRoot.localScale.y;
+        float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
+        float hauteurPorte = (batiment.PorteHauteur > 0.001f
+            ? batiment.PorteHauteur : HauteurPorteConfortable) / echelleY;
+        float largeurPorte = batiment.PorteLargeur > 0.001f ? batiment.PorteLargeur : 1.2f;
         var centres = new List<Vector2>
         {
-            new Vector2(positionPorte.x, positionPorte.y)
+            new Vector2(positionPorte.x + largeurPorte * 0.5f, positionPorte.y)
         };
         var tailles = new List<Vector2>
         {
-            new Vector2(Mathf.Abs(batiment.PorteRoot.localScale.x), hauteurPorte)
+            new Vector2(largeurPorte, hauteurPorte)
         };
         Transform[] enfants = batiment.Root.GetComponentsInChildren<Transform>(true);
         for (int i = 0; i < enfants.Length; i++)
@@ -1037,6 +1043,7 @@ public sealed class LibreViesGame : MonoBehaviour
             string json = Encoding.UTF8.GetString(donnees);
             FichierCoordonneesEdition fichier = JsonUtility.FromJson<FichierCoordonneesEdition>(json);
             if (fichier == null || fichier.Objets == null) return;
+            bool migrationPivotPorte = fichier.Version < 3;
             var utilisees = new HashSet<Transform>();
             for (int i = 0; i < fichier.Objets.Count; i++)
             {
@@ -1071,6 +1078,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 }
                 if (element != null && element.Maison != null)
                 {
+                    if (migrationPivotPorte && element.Maison.PorteRoot != null)
+                    {
+                        Vector3 positionPivot = element.Maison.PorteRoot.localPosition;
+                        positionPivot.x = -element.Maison.PorteLargeur * 0.5f;
+                        element.Maison.PorteRoot.localPosition = positionPivot;
+                    }
                     if (coordonnee.VersionDimensions >= 2 && coordonnee.HauteurPorte > 0f)
                         element.Maison.PorteHauteur = coordonnee.HauteurPorte;
                     else
@@ -1701,15 +1714,16 @@ public sealed class LibreViesGame : MonoBehaviour
         float demiProfondeur = batiment.Profondeur * 0.5f;
         float dx = p.x - batiment.Root.position.x;
         float dz = p.y - batiment.Root.position.z;
-        float porteX = batiment.PorteRoot == null
-            ? batiment.Root.position.x : batiment.PorteRoot.position.x;
-        float largeurPorte = batiment.PorteRoot == null
-            ? (batiment.PorteLargeur > 0f ? batiment.PorteLargeur : 1.2f)
-            : Mathf.Abs(batiment.PorteRoot.lossyScale.x);
+        float largeurPorte = batiment.PorteLargeur > 0f ? batiment.PorteLargeur : 1.2f;
+        largeurPorte *= Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.x), 0.001f);
+        Vector3 centrePorte = batiment.PorteRoot == null
+            ? batiment.Root.position + batiment.Root.right * (largeurPorte * 0.5f)
+            : batiment.PorteRoot.position + batiment.Root.right * (largeurPorte * 0.5f);
+        float porteX = centrePorte.x;
         float demiPorte = largeurPorte * 0.5f + rayon;
-        float sommetPorte = batiment.PorteRoot == null
-            ? batiment.Root.position.y + 2f
-            : batiment.PorteRoot.position.y + batiment.PorteRoot.lossyScale.y * 0.5f;
+        float hauteurPorte = batiment.PorteHauteur > 0f
+            ? batiment.PorteHauteur : HauteurPorteConfortable;
+        float sommetPorte = batiment.Root.position.y + hauteurPorte;
         bool hauteurCompatible = pieds + 2.35f <= sommetPorte + 0.04f;
         bool dansLargeurPorte = Mathf.Abs(p.x - porteX) < demiPorte;
         bool passageOuvert = batiment.PorteOuverte && hauteurCompatible && dansLargeurPorte;
@@ -1749,9 +1763,13 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Batiment batiment = batiments[i];
             if (batiment == null || batiment.PorteRoot == null) continue;
+            float largeurPorte = batiment.PorteLargeur > 0f ? batiment.PorteLargeur : 1.2f;
+            largeurPorte *= Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.x), 0.001f);
+            Vector3 centrePorte = batiment.PorteRoot.position
+                + batiment.Root.right * (largeurPorte * 0.5f);
             float distance = Vector2.Distance(
                 new Vector2(player.position.x, player.position.z),
-                new Vector2(batiment.PorteRoot.position.x, batiment.PorteRoot.position.z));
+                new Vector2(centrePorte.x, centrePorte.z));
             float coteZ = player.position.z - batiment.Root.position.z;
             float demiProfondeur = batiment.Profondeur * 0.5f;
             if (!batiment.PorteOuverte && distance < 3.2f)
@@ -2408,14 +2426,19 @@ public sealed class LibreViesGame : MonoBehaviour
         batiments.Add(batiment);
         // Facade et ouvertures orientees vers le sud : dans ce monde, le sud
         // est le cote +z. Les panneaux suivent exactement cette facade.
-        Transform porte = Box(new Vector3(0, HauteurPorteConfortable * 0.5f,
-                size.z * 0.51f),
+        // Pivot place sur le montant gauche : la rotation d'ouverture se fait
+        // sur le cote de la porte, jamais autour de son centre.
+        var pivotPorte = new GameObject("Porte").transform;
+        pivotPorte.SetParent(root, false);
+        pivotPorte.localPosition = new Vector3(-0.60f,
+            HauteurPorteConfortable * 0.5f, size.z * 0.51f);
+        Transform vantailPorte = Box(new Vector3(0.60f, 0f, 0f),
             new Vector3(1.2f, HauteurPorteConfortable, 0.12f),
-            "Bois_Clair", root, "Porte").transform;
-        Renderer renduPorte = porte.GetComponent<Renderer>();
+            "Bois_Clair", pivotPorte, "Porte_Vantail").transform;
+        Renderer renduPorte = vantailPorte.GetComponent<Renderer>();
         if (renduPorte != null)
             renduPorte.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        batiment.PorteRoot = porte;
+        batiment.PorteRoot = pivotPorte;
         batiment.PorteLargeur = 1.2f;
         batiment.PorteHauteur = HauteurPorteConfortable;
         for (int side = -1; side <= 1; side += 2)
@@ -2629,7 +2652,8 @@ public sealed class LibreViesGame : MonoBehaviour
             bool concerne = cible == "mur"
                 ? (nom == "Murs" || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "fenetre" ? nom == "Fenetre"
-                : (cible == "porte" ? nom == "Porte" : nom.StartsWith("Toit_")));
+                : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
+                    : nom.StartsWith("Toit_")));
             if (!concerne) continue;
             Renderer rendu = enfants[i].GetComponent<Renderer>();
             if (rendu != null) rendu.sharedMaterial = materiel;
