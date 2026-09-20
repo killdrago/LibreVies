@@ -996,9 +996,12 @@ public sealed class LibreViesGame : MonoBehaviour
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
         float hauteurBasse = Mathf.Min(batiment.HauteurInitiale, 1f / echelleY);
         var maillageBas = new Maillage();
+        // Aucun plafond horizontal : depuis l'interieur, le centre de la
+        // maison doit rester le sol normal. Seuls les cotes du mur bas de 1 m
+        // sont conserves.
         maillageBas.MurAvecOuvertures(batiment.LargeurInitiale,
             batiment.ProfondeurInitiale, hauteurBasse,
-            centres.ToArray(), tailles.ToArray());
+            centres.ToArray(), tailles.ToArray(), false);
         MeshFilter filtreBas = batiment.MursBasRoot.GetComponent<MeshFilter>();
         MeshRenderer renduBas = batiment.MursBasRoot.GetComponent<MeshRenderer>();
         filtreBas.sharedMesh = maillageBas.VersMesh("Murs_Bas_Interieur_"
@@ -2159,7 +2162,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // avant. Le verre ne masque donc plus un cube de mur derriere lui,
         // tandis que la face arriere reste une paroi pleine.
         public void MurAvecOuvertures(float largeur, float profondeur, float hauteur,
-            Vector2[] centres, Vector2[] tailles)
+            Vector2[] centres, Vector2[] tailles, bool avecDessus = true)
         {
             float x = largeur * 0.5f;
             float z = profondeur * 0.5f;
@@ -2175,7 +2178,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(basGauche, basGaucheAvant, hautGaucheAvant, hautGauche);
             Quad(basDroitAvant, basDroit, hautDroit, hautDroitAvant);
             Quad(basGauche, basGaucheAvant, basDroitAvant, basDroit);
-            Quad(hautGauche, hautDroit, hautDroitAvant, hautGaucheAvant);
+            if (avecDessus)
+                Quad(hautGauche, hautDroit, hautDroitAvant, hautGaucheAvant);
             // La facade avant porte les vraies ouvertures. Le mur arriere
             // reste plein : aucune fausse porte/fenetre ni ombre projetee ne
             // peut apparaitre au fond de la maison.
