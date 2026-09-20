@@ -44,6 +44,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // sautant par le heros, jamais par les monstres), rayon du heros.
     private const float HauteurCollision = 2f;
     private const float HauteurPorteConfortable = 2.75f;
+    // Epaisseur unique des murs bas visibles depuis l'interieur.
+    private const float EpaisseurMurInterieur = 0.18f;
     private const float HauteurCloture = 1f;
     private const float RayonJoueur = 0.45f;
     // Saut : 8 m/s avec une gravite de 20 -> 1,60 m de hauteur maximale,
@@ -2199,8 +2201,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             float x = largeur * 0.5f;
             float z = profondeur * 0.5f;
-            const float epaisseur = 0.18f;
-            float e = Mathf.Min(epaisseur, Mathf.Min(x, z) * 0.45f);
+            float e = Mathf.Min(EpaisseurMurInterieur, Mathf.Min(x, z) * 0.45f);
 
             // Dessus du mur arriere, des deux murs lateraux et des seuls
             // segments pleins de la facade avant. Ces petites bandes ferment
@@ -2488,9 +2489,13 @@ public sealed class LibreViesGame : MonoBehaviour
         murs.transform.SetParent(root, false);
         // Un sol interieur donne une vraie profondeur visible par les ouvertures
         // au lieu de laisser le mur oppose remplir la vitre.
+        // La dalle arrive sous l'epaisseur unique du mur bas et la depasse
+        // tres legerement : aucun jour ne peut apparaitre entre le sol et le
+        // mur quand la camera regarde depuis le dessus.
+        float margeDalle = EpaisseurMurInterieur * 2f - 0.06f;
         Box(new Vector3(0f, 0.31f, 0f),
-            new Vector3(Mathf.Max(size.x - 0.45f, 1.2f), 0.08f,
-                Mathf.Max(size.z - 0.45f, 1.2f)), "Wood", root, "Sol_Interieur");
+            new Vector3(Mathf.Max(size.x - margeDalle, 1.2f), 0.08f,
+                Mathf.Max(size.z - margeDalle, 1.2f)), "Wood", root, "Sol_Interieur");
         // Socle, chaînages d'angle et poutres de rive donnent une silhouette
         // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
         Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
