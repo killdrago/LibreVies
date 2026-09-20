@@ -34,6 +34,7 @@ set "PROJECT=%ROOT%unity"
 set "JEU=%ROOT%..\jeu"
 set "BUILD=%ROOT%build"
 set "PYTHON="
+set "GIT="
 set "UNITY="
 set "LV_ROOT=%ROOT%"
 set "LV_JEU=%JEU%"
@@ -253,59 +254,102 @@ exit /b 0
 
 
 rem ==========================================================================
+rem  DETECTION ET INSTALLATION DE GIT
+rem  Git est necessaire uniquement lorsqu'un fichier local d'edition doit
+rem  etre publie. Winget est tente en premier, puis GitHub fournit l'installateur.
+rem ==========================================================================
+:detecter_git
+set "GIT="
+for /f "delims=" %%G in ('where git 2^>nul') do if not defined GIT set "GIT=%%G"
+if not defined GIT if exist "%ProgramFiles%\Git\cmd\git.exe" set "GIT=%ProgramFiles%\Git\cmd\git.exe"
+if not defined GIT if exist "%ProgramFiles(x86)%\Git\cmd\git.exe" set "GIT=%ProgramFiles(x86)%\Git\cmd\git.exe"
+if not defined GIT if exist "%LOCALAPPDATA%\Programs\Git\cmd\git.exe" set "GIT=%LOCALAPPDATA%\Programs\Git\cmd\git.exe"
+exit /b 0
+
+:installer_git
+where winget >nul 2>&1
+if not errorlevel 1 (
+    echo        Git absent : installation automatique via winget...
+    winget install --exact --id Git.Git --scope user --silent --accept-package-agreements --accept-source-agreements
+    call :detecter_git
+    if defined GIT exit /b 0
+)
+echo        Git absent : telechargement de l'installateur officiel...
+set "LV_GIT_INSTALLER=%TEMP%\librevies-git.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $h=@{'User-Agent'='LibreVies-build'}; $r=Invoke-RestMethod -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' -Headers $h -TimeoutSec 30; $a=$r.assets | Where-Object { $_.name -match '^Git-.*-64-bit\.exe$' } | Select-Object -First 1; if($null -eq $a){throw 'installateur Git x64 introuvable'}; Invoke-WebRequest -Uri $a.browser_download_url -OutFile $env:LV_GIT_INSTALLER -UseBasicParsing -TimeoutSec 120"
+if errorlevel 1 exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:LV_GIT_INSTALLER -ArgumentList '/VERYSILENT','/NORESTART','/CURRENTUSER' -Wait"
+if errorlevel 1 exit /b 1
+if exist "%LV_GIT_INSTALLER%" del /q "%LV_GIT_INSTALLER%"
+call :detecter_git
+if defined GIT exit /b 0
+exit /b 1
+
+:preparer_git
+call :detecter_git
+if defined GIT exit /b 0
+call :installer_git
+if defined GIT exit /b 0
+echo ERREUR : Git est introuvable apres l'installation automatique.
+echo Installe Git for Windows puis relance build_launcher.bat.
+exit /b 1
+
+rem ==========================================================================
 rem  PREPARATION DU DEPOT GIT LOCAL
 rem  Une copie distribuee sans .git est rattachee a la branche GitHub sans
-rem  remplacer ses fichiers locaux. La publication reste limitee a jeu\edition.
+rem  remplacer ses fichiers locaux. La publication reste limitee a jeu\\edition.
 rem ==========================================================================
 :preparer_depot_git
+call :preparer_git
+if errorlevel 1 exit /b 1
 set "LV_GIT_ROOT=%ROOT%.."
 if exist "%LV_GIT_ROOT%\.git" goto :depot_git_existant
 echo        Depot Git absent : initialisation locale sans remplacer les sources...
-git -C "%LV_GIT_ROOT%" init
+"%GIT%" -C "%LV_GIT_ROOT%" init
 if errorlevel 1 (
     echo ERREUR : impossible d'initialiser le depot Git local.
     exit /b 1
 )
-git -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
+"%GIT%" -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
 if errorlevel 1 (
     echo ERREUR : impossible de configurer origin.
     exit /b 1
 )
-git -C "%LV_GIT_ROOT%" fetch --no-tags origin "%BRANCHE%"
+"%GIT%" -C "%LV_GIT_ROOT%" fetch --no-tags origin "%BRANCHE%"
 if errorlevel 1 (
     echo ERREUR : impossible de recuperer la branche GitHub de reference.
     exit /b 1
 )
 rem Le reset --mixed ne touche pas aux fichiers locaux : il ne fait que
 rem preparer l'index avec le commit GitHub avant le commit d'edition.
-git -C "%LV_GIT_ROOT%" reset --mixed FETCH_HEAD
+"%GIT%" -C "%LV_GIT_ROOT%" reset --mixed FETCH_HEAD
 if errorlevel 1 (
     echo ERREUR : impossible de preparer l'index Git local.
     exit /b 1
 )
-git -C "%LV_GIT_ROOT%" branch -M "%BRANCHE%"
+"%GIT%" -C "%LV_GIT_ROOT%" branch -M "%BRANCHE%"
 if errorlevel 1 (
     echo ERREUR : impossible de positionner la branche locale.
     exit /b 1
 )
 :depot_git_existant
-git -C "%LV_GIT_ROOT%" rev-parse --is-inside-work-tree >nul 2>&1
+"%GIT%" -C "%LV_GIT_ROOT%" rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 (
     echo ERREUR : le dossier parent n'est pas un depot Git exploitable.
     exit /b 1
 )
-git -C "%LV_GIT_ROOT%" remote get-url origin >nul 2>&1
+"%GIT%" -C "%LV_GIT_ROOT%" remote get-url origin >nul 2>&1
 if errorlevel 1 (
-    git -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
+    "%GIT%" -C "%LV_GIT_ROOT%" remote add origin "https://github.com/%DEPOT%.git"
     if errorlevel 1 (
         echo ERREUR : impossible de configurer origin.
         exit /b 1
     )
 )
-git -C "%LV_GIT_ROOT%" config user.name >nul 2>&1
-if errorlevel 1 git -C "%LV_GIT_ROOT%" config user.name "LibreVies Build"
-git -C "%LV_GIT_ROOT%" config user.email >nul 2>&1
-if errorlevel 1 git -C "%LV_GIT_ROOT%" config user.email "librevies-build@users.noreply.github.com"
+"%GIT%" -C "%LV_GIT_ROOT%" config user.name >nul 2>&1
+if errorlevel 1 "%GIT%" -C "%LV_GIT_ROOT%" config user.name "LibreVies Build"
+"%GIT%" -C "%LV_GIT_ROOT%" config user.email >nul 2>&1
+if errorlevel 1 "%GIT%" -C "%LV_GIT_ROOT%" config user.email "librevies-build@users.noreply.github.com"
 exit /b 0
 
 rem ==========================================================================
@@ -322,24 +366,24 @@ if not defined LV_EDITION_FICHIER (
 )
 call :preparer_depot_git
 if errorlevel 1 exit /b 1
-git -C "%LV_GIT_ROOT%" add -- jeu/edition
+"%GIT%" -C "%LV_GIT_ROOT%" add -- jeu/edition
 if errorlevel 1 (
     echo ERREUR : git add jeu\edition a echoue.
     exit /b 1
 )
-git -C "%LV_GIT_ROOT%" diff --cached --quiet -- jeu/edition
+"%GIT%" -C "%LV_GIT_ROOT%" diff --cached --quiet -- jeu/edition
 if not errorlevel 1 (
     echo        Edition locale : aucun changement a publier.
     exit /b 0
 )
 echo        Edition locale : commit des coordonnees...
-git -C "%LV_GIT_ROOT%" commit -m "Edition : met a jour les coordonnees" --only -- jeu/edition
+"%GIT%" -C "%LV_GIT_ROOT%" commit -m "Edition : met a jour les coordonnees" --only -- jeu/edition
 if errorlevel 1 (
     echo ERREUR : le commit des changements de jeu\edition a echoue.
     exit /b 1
 )
 echo        Edition locale : publication vers origin/%BRANCHE%...
-git -C "%LV_GIT_ROOT%" push origin "%BRANCHE%"
+"%GIT%" -C "%LV_GIT_ROOT%" push origin "%BRANCHE%"
 if errorlevel 1 (
     echo ERREUR : git push origin %BRANCHE% a echoue.
     exit /b 1

@@ -17,7 +17,7 @@ def test_bat_publishes_before_sync():
     assert "call :publier_edition" in publish
     assert publish.index("call :publier_edition") < publish.index("powershell")
     publisher = section(BAT, ":publier_edition", ":etape_projet")
-    assert "git -C" in publisher and " add -- jeu/edition" in publisher
+    assert '"%GIT%" -C' in publisher and " add -- jeu/edition" in publisher
     assert "commit" in publisher and "push origin" in publisher
     assert "if errorlevel 1" in publisher
     assert "preparer_depot_git" in publisher
