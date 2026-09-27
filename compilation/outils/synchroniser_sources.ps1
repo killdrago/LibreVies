@@ -78,8 +78,7 @@ try {
         Invoke-WebRequest -Uri $raw -OutFile $destination -Headers $headers -UseBasicParsing -TimeoutSec 60
         $verifie = Get-GitBlobSha $destination
         if ($verifie -ne $item.sha) {
-            throw ('hash local incorrect apres telechargement : ' + $item.path
-                + ' (attendu ' + $item.sha + ', obtenu ' + $verifie + ')')
+            throw ("hash local incorrect apres telechargement : {0} (attendu {1}, obtenu {2})" -f $item.path, $item.sha, $verifie)
         }
         $telecharges++
     }
