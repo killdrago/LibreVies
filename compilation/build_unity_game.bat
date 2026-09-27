@@ -1,15 +1,15 @@
 @echo off
 setlocal EnableExtensions
 rem ============================================================
-rem  LibreVies - export du jeu Unity seul (etape de diagnostic)
+rem  LibreVies - export local de diagnostic
 rem
-rem  Le cas normal est de lancer build_launcher.bat, qui exporte le jeu
-rem  ET fabrique le launcher. Ce script-ci ne sert qu'a verifier l'export
-rem  Unity quand quelque chose ne va pas.
+rem  Le cas normal est de lancer build_launcher.bat, qui met a jour les
+rem  sources et fabrique toute la distribution. Ce script-ci sert a refaire
+rem  rapidement les exports Unity deja telecharges : jeu ET createur humain.
 rem
 rem  ATTENTION : ce script ne met PAS les sources a jour (il n'ouvre meme pas
-rem  Internet). Si le jeu exporte ne contient pas les dernieres corrections,
-rem  lancer build_launcher.bat, qui les telecharge depuis GitHub.
+rem  Internet). Si les projets locaux ne contiennent pas les dernieres
+rem  corrections, lancer build_launcher.bat, qui les telecharge depuis GitHub.
 rem ============================================================
 set "ROOT=%~dp0"
 set "JEU=%ROOT%..\jeu"
@@ -110,6 +110,18 @@ echo.
 echo Jeu exporte dans %JEU%\game\
 echo IMPORTANT : Unity a aussi genere UnityPlayer.dll et un dossier *_Data.
 echo Conserve tout le dossier game, pas seulement le .exe.
+echo.
+echo Creation du createur humain autonome dans jeu\personnage\...
+call "%ROOT%build_personnage.bat"
+if errorlevel 1 (
+    echo ERREUR : le jeu est pret, mais le createur n'a pas ete exporte.
+    echo Consultez compilation\build\personnage.log
+    pause
+    exit /b 1
+)
+echo.
+echo Createur exporte dans %JEU%\personnage\
+echo Le dossier contient l'executable et toutes ses dependances Unity.
 echo.
 echo Pour publier cette compilation : outils\publier_jeu.bat
 echo.

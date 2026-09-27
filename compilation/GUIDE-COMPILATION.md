@@ -13,7 +13,8 @@ compilation/               reserve a l'auteur
   unity/                   projet Unity (le jeu)
   personnage/              projet Unity séparé du créateur humain 3D
   build_launcher.bat       fabrique LibreVies.exe + le jeu + le créateur
-  build_unity_game.bat     exporte le jeu seul (diagnostic)
+  build_personnage.bat     exporte uniquement le créateur vers jeu\personnage\
+  build_unity_game.bat     exporte le jeu et le créateur (diagnostic local)
   setup_unity_build_tools.bat / download_unity_hub.ps1
                            installation automatique d'Unity
   image/                   images de travail (bannieres, chapitres, logos)
@@ -51,6 +52,13 @@ Puis il compile et **dépose tout dans `jeu/`** — le dossier du joueur :
 Le créateur de personnages est construit par le même `build_launcher.bat`, mais
 reste séparé du jeu principal. Il contient la base humaine, les morphologies et
 le rig : il ne demande aucune installation au joueur.
+
+Si tu as déjà téléchargé les sources dans `compilation/` mais que le créateur
+manque dans `jeu/`, lance directement `compilation\build_personnage.bat`.
+Il fabrique l'exécutable puis déplace tout son dossier Unity (exe, `*_Data`,
+`UnityPlayer.dll`, etc.) dans `jeu\personnage\`. Le build du jeu principal
+n'est pas nécessaire pour cette étape. `build_unity_game.bat` appelle aussi ce
+script après l'export du jeu.
 
 Il ne touche à rien d'autre dans `jeu/` : `launcher.pyw`, `version_url.json` et
 `LIS-MOI.txt` restent en place. **`compilation/` ne sert qu'à compiler** : tu

@@ -1,7 +1,9 @@
 # LibreVies — créateur de personnages 3D
 
 Ce dossier reçoit la compilation autonome du créateur de personnages lorsque
-`compilation\build_launcher.bat` est exécuté. Le fichier à lancer sera :
+`compilation\build_launcher.bat` est exécuté. Si les projets sont déjà présents
+dans `compilation\`, `compilation\build_personnage.bat` suffit aussi. Le fichier
+à lancer sera :
 
 ```text
 jeu\personnage\LibreViesPersonnage.exe
