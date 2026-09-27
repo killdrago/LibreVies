@@ -143,6 +143,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform brasAttaque;
     private Transform brasHeroineGauche;
     private Transform brasHeroineDroit;
+    private Transform mainHeroine;
+    private Transform marteauHeroine;
     private Transform coudeHeroineGauche;
     private Transform coudeHeroineDroit;
     private Transform jambeHeroineGauche;
@@ -1235,9 +1237,9 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
         MakeMaterial("Carton", new Color(0.62f, 0.35f, 0.12f));
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
-        // Brique reprend le shader et la texture pierre/paves du sol de
-        // l'ancien chateau, afin de conserver le meme relief mineral.
-        MakeMaterial("Brique", new Color(0.42f, 0.45f, 0.48f));
+        // La brique de maison est volontairement gris neutre : aucune teinte
+        // bleue ne doit apparaitre avec le choix BRIQUE dans EDITION.
+        MakeMaterial("Brique", new Color(0.48f, 0.48f, 0.48f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
@@ -1300,7 +1302,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
         else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route") chemin = "LVTextures/LV_Stone";
         else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
-        else if (nom == "Stone" || nom == "Brique" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
         else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
@@ -2835,7 +2837,10 @@ public sealed class LibreViesGame : MonoBehaviour
             for (int i = 0; i < noms.Length; i++)
             {
                 float y = cadre.y + 166f + i * 29f;
-                bool inverse = cotes[i] == 1 || cotes[i] == 2;
+                // Les fleches ont le meme sens pour les quatre faces :
+                // < reduit et > agrandit. Cela corrige l'inversion des faces
+                // avant/arriere sans changer l'axe reel redimensionne.
+                bool inverse = false;
                 GUI.Label(new Rect(cadre.x + 16f, y, 165f, 26f), noms[i], smallStyle);
                 if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 26f), "<", buttonStyle))
                     ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], inverse);
@@ -3477,6 +3482,16 @@ public sealed class LibreViesGame : MonoBehaviour
             facade.Panneau.localScale = new Vector3(
                 Mathf.Max(facade.LargeurPanneau, 1.0f),
                 Mathf.Max(facade.HauteurPanneau, 0.30f), profondeur);
+            // Le texte est enfant de la pancarte pour la suivre, mais sa
+            // taille monde reste independante de l'agrandissement du panneau.
+            if (facade.Root != null)
+            {
+                Vector3 echelleTexte = facade.Root.localScale;
+                facade.Root.localScale = new Vector3(
+                    Mathf.Sign(echelleTexte.x) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.x), 0.001f),
+                    Mathf.Sign(echelleTexte.y) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.y), 0.001f),
+                    Mathf.Sign(echelleTexte.z) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.z), 0.001f));
+            }
         }
         MettreAJourSoulignement(facade);
     }
@@ -3530,7 +3545,9 @@ public sealed class LibreViesGame : MonoBehaviour
         Renderer texteRendu = facade.Root.GetComponent<Renderer>();
         float largeur = texteRendu == null ? 0.8f
             : texteRendu.bounds.size.x / Mathf.Max(facade.Root.transform.lossyScale.x, 0.001f);
-        float hauteur = -facade.Texte.characterSize * 0.52f;
+        // L'option SOULIGNE doit traverser le milieu du texte, pas se placer
+        // sous la pancarte.
+        float hauteur = 0f;
         rendu.startWidth = facade.Texte.characterSize * 0.055f;
         rendu.endWidth = rendu.startWidth;
         rendu.startColor = facade.Couleur;
@@ -3624,8 +3641,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 MettreAJourSoulignement(facade);
             }
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 130f, 24f),
-            "Taille du texte :", labelStyle);
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 180f, 24f),
+            "Taille du texte (nombre) :", labelStyle);
         if (string.IsNullOrEmpty(facade.TailleTexteSaisie))
             facade.TailleTexteSaisie = facade.Taille.ToString("0.00", CultureInfo.InvariantCulture);
         string tailleSaisie = GUI.TextField(new Rect(cadre.x + 145f, cadre.y + 175f, 82f, 28f),
@@ -4874,6 +4891,29 @@ public sealed class LibreViesGame : MonoBehaviour
             "SleeveLower_R", "Cuff_R", "Hand_R");
         coudeHeroineGauche.SetParent(brasHeroineGauche, true);
         coudeHeroineDroit.SetParent(brasHeroineDroit, true);
+        // Le marteau du personnage est attache au point reel de la paume
+        // droite. Il suivra donc le coude et restera dans le prolongement de
+        // la main pendant la marche et l'attaque.
+        Transform mainImportee = coudeHeroineDroit.Find("Hand_R");
+        mainHeroine = new GameObject("Point_Main_Heroine").transform;
+        if (mainImportee != null)
+        {
+            mainHeroine.SetParent(mainImportee, false);
+            mainHeroine.localPosition = new Vector3(0.62f, 1.05f, 0.05f);
+        }
+        else
+        {
+            mainHeroine.SetParent(coudeHeroineDroit, false);
+            mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        }
+        mainHeroine.localRotation = Quaternion.identity;
+        marteauHeroine = new GameObject("Marteau_Heroine").transform;
+        marteauHeroine.SetParent(mainHeroine, false);
+        marteauHeroine.localPosition = Vector3.zero;
+        Box(new Vector3(0f, -0.15f, 0f), new Vector3(0.09f, 0.42f, 0.09f),
+            "Bois_Clair", marteauHeroine, "Manche_Marteau_Heroine");
+        Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
+            "Metal", marteauHeroine, "Tete_Marteau_Heroine");
         jambeHeroineGauche = CreerPivotImporte(heroineModel, dossier,
             new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", "JeansUpper_L");
         jambeHeroineDroite = CreerPivotImporte(heroineModel, dossier,
@@ -4910,6 +4950,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private void JouerAnimationHeroine(string recherche, bool boucle)
     {
         heroineAnimationActuelle = recherche;
+    }
+
+    private void MettreAJourMarteauHeroine()
+    {
+        if (marteauHeroine == null || mainHeroine == null || coudeHeroineDroit == null) return;
+        Vector3 directionMonde = mainHeroine.position - coudeHeroineDroit.position;
+        if (directionMonde.sqrMagnitude < 0.0001f) return;
+        Vector3 directionLocale = mainHeroine.InverseTransformDirection(directionMonde.normalized);
+        marteauHeroine.localPosition = Vector3.zero;
+        // Le manche sort par son axe -Y, dans le prolongement coude -> paume.
+        marteauHeroine.localRotation = Quaternion.LookRotation(directionLocale, Vector3.up)
+            * Quaternion.Euler(-90f, 0f, 0f);
     }
 
     private void AnimerHeroine(bool enMouvement, bool enCourse)
@@ -4964,6 +5016,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // restent calés sur le sol et seul le balancement des articulations
         // anime la foulée.
         heroineModel.localPosition = Vector3.zero;
+        MettreAJourMarteauHeroine();
     }
 
     private void CreatePlayer()
@@ -5197,7 +5250,11 @@ public sealed class LibreViesGame : MonoBehaviour
             // chaque seconde retire exactement 1 PV jusqu'a la sortie.
             regenClock = 0f;
             endurance = Mathf.MoveTowards(endurance, 0f, dt * 11f);
-            if (playerUnderwater && endurance <= 0.01f)
+            // La perte de PV depend de la presence dans l'eau, pas d'une
+            // detection de tete trop haute qui pouvait rester fausse avec le
+            // nouveau modele. Apres epuisement de l'endurance, chaque seconde
+            // dans l'eau retire donc bien 1 PV.
+            if (endurance <= 0.01f)
             {
                 underwaterDamageClock += dt;
                 while (underwaterDamageClock >= 1f && !dead)
@@ -6079,7 +6136,8 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerBarre(new Rect(32, hudY, 230, 14), hp / (float)MaxHp, "PV");
         DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
         DessinerBarre(new Rect(32, hudY + 56f, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
-        GUI.Label(new Rect(32, hudY + 82f, 250, 22), "Or : " + coins + "     Cailloux : " + rocks, smallStyle);
+        // L'or et les cailloux sont consultables dans l'inventaire ; ils ne
+        // sont plus dupliques dans le HUD principal.
         // L'ancienne ligne Energie est retiree : la vie est lue au centre de
         // sa barre et l'endurance reste la barre de course.
         if (questOpen)
