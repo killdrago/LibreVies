@@ -57,7 +57,11 @@ try {
         $local = Get-LocalPath $item.path
         if (!$local) { continue }
         $actuel = Get-GitBlobSha $local
-        if ($actuel -eq $item.sha) { $deja++; continue }
+        # Le script principal est critique pour la compilation Unity. On le
+        # rafraichit toujours, meme si une ancienne copie locale annonce par
+        # erreur le meme hash : cela evite de relancer Unity avec un C# obsolet.
+        $forceScriptUnity = $item.path -eq 'compilation/unity/Assets/Scripts/LibreViesGame.cs'
+        if (!$forceScriptUnity -and $actuel -eq $item.sha) { $deja++; continue }
 
         $segments = $item.path.Split('/') | ForEach-Object { [uri]::EscapeDataString($_) }
         $raw = 'https://raw.githubusercontent.com/' + $env:LV_DEPOT + '/' + $env:LV_BRANCHE + '/' + ($segments -join '/')
@@ -72,6 +76,11 @@ try {
         if (!(Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
         Write-Host ('        telechargement : ' + $item.path)
         Invoke-WebRequest -Uri $raw -OutFile $destination -Headers $headers -UseBasicParsing -TimeoutSec 60
+        $verifie = Get-GitBlobSha $destination
+        if ($verifie -ne $item.sha) {
+            throw ('hash local incorrect apres telechargement : ' + $item.path
+                + ' (attendu ' + $item.sha + ', obtenu ' + $verifie + ')')
+        }
         $telecharges++
     }
     if ($env:LV_SCRIPT_CHANGE -eq 'oui') {
