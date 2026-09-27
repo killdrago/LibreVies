@@ -446,7 +446,18 @@ rem synchronisation est donc lui-meme rafraichi depuis la branche demandee
 rem avant son execution : une ancienne copie locale ne peut plus empecher la
 rem mise a jour du script C#.
 set "LV_SYNC=%ROOT%outils\synchroniser_sources.ps1"
-set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%BRANCHE%/compilation/outils/synchroniser_sources.ps1"
+rem Telecharger l'outil au commit exact deja recupere par Git : l'URL de
+rem branche peut etre servie par le cache raw GitHub pendant une avance de la
+rem branche, ce qui provoque ensuite un hash incoherent.
+set "LV_SYNC_COMMIT="
+for /f "delims=" %%S in ('"%GIT%" -C "%LV_GIT_ROOT%" rev-parse HEAD 2^>nul') do if not defined LV_SYNC_COMMIT set "LV_SYNC_COMMIT=%%S"
+if defined LV_SYNC_COMMIT (
+    set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%LV_SYNC_COMMIT%/compilation/outils/synchroniser_sources.ps1"
+) else (
+    rem Aucun depot Git n'est necessaire si aucune edition n'est a publier.
+    rem Un parametre aleatoire evite alors une ancienne reponse du CDN raw.
+    set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%BRANCHE%/compilation/outils/synchroniser_sources.ps1?v=%RANDOM%"
+)
 set "LV_SYNC_REMOTE=%BUILD%\synchroniser_sources.remote.ps1"
 if not exist "%ROOT%outils" mkdir "%ROOT%outils"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -UseBasicParsing -Headers @{'User-Agent'='LibreVies-build'} -Uri $env:LV_SYNC_URL -OutFile $env:LV_SYNC_REMOTE"

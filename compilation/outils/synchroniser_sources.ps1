@@ -64,7 +64,11 @@ try {
         if (!$forceScriptUnity -and $actuel -eq $item.sha) { $deja++; continue }
 
         $segments = $item.path.Split('/') | ForEach-Object { [uri]::EscapeDataString($_) }
-        $raw = 'https://raw.githubusercontent.com/' + $env:LV_DEPOT + '/' + $env:LV_BRANCHE + '/' + ($segments -join '/')
+        # Utiliser le commit lu par l'API, pas le nom de branche : pendant
+        # une publication d'edition la branche peut avancer entre la lecture
+        # de l'arbre et la requete raw, et le CDN peut alors renvoyer un ancien
+        # contenu. Le commit rend le couple hash/contenu immuable.
+        $raw = 'https://raw.githubusercontent.com/' + $env:LV_DEPOT + '/' + $commitSha + '/' + ($segments -join '/')
         $destination = $local
         # Un .bat ne peut pas s'ecraser alors qu'il execute : il sera applique
         # par l'intermediaire deja present dans build_launcher.bat.
