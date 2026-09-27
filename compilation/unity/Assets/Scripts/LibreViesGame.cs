@@ -4516,7 +4516,8 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             else if (pnj.Metier == "Maire")
             {
-                balancement = Mathf.Sin(pnj.Phase * 0.5f) * 0.20f;
+                // Le maire garde le meme mouvement, legerement accelere.
+                balancement = Mathf.Sin(pnj.Phase * 0.58f) * 0.20f;
                 hauteur = 0f;
             }
             else
@@ -4524,28 +4525,37 @@ public sealed class LibreViesGame : MonoBehaviour
                 balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
                 hauteur = 0f;
             }
-            // Le forgeron et le maire animent maintenant le bras qui tient
-            // leur accessoire : le marteau et la feuille suivent la paume,
-            // sans modifier l'enclume ni l'etal.
-            if (pnj.Metier == "Forgeron" || pnj.Metier == "Maire")
-                balancement *= pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
+            bool accessoireBrasDroit = pnj.Metier == "Forgeron" || pnj.Metier == "Maire";
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
-            bool accessoireBrasGauche = pnj.Metier == "Forgeron" || pnj.Metier == "Maire";
-            Quaternion rotationBrasGauche = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
-            Quaternion rotationCoudeGauche = Quaternion.Euler(Mathf.Max(0f, balancement) * 16f, 0f, 0f);
-            if (pnj.BrasG != null) pnj.BrasG.localRotation = rotationBrasGauche;
-            // L'accessoire reste dans la main droite, mais son bras droit
-            // reprend exactement les rotations du bras gauche pour le maire et
-            // le forgeron. Il ne part plus en opposition de phase.
-            if (pnj.BrasD != null)
-                pnj.BrasD.localRotation = accessoireBrasGauche
-                    ? rotationBrasGauche
-                    : Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
-            if (pnj.CoudeG != null) pnj.CoudeG.localRotation = rotationCoudeGauche;
-            if (pnj.CoudeD != null)
-                pnj.CoudeD.localRotation = accessoireBrasGauche
-                    ? rotationCoudeGauche
-                    : Quaternion.Euler(Mathf.Max(0f, -balancement) * 16f, 0f, 0f);
+            if (accessoireBrasDroit)
+            {
+                // Seul le bras droit porte l'accessoire : le gauche reste
+                // immobile. L'angle est borne avant que le coude ne passe
+                // derriere le corps, au lieu de continuer sa course complete.
+                float amplitude = pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
+                float angleBrasDroit = balancement * amplitude * Mathf.Rad2Deg;
+                float limiteArriere = pnj.Metier == "Forgeron" ? 18f : 16f;
+                float limiteAvant = pnj.Metier == "Forgeron" ? 28f : 24f;
+                angleBrasDroit = Mathf.Clamp(angleBrasDroit, -limiteArriere, limiteAvant);
+                if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
+                if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
+                if (pnj.BrasD != null)
+                    pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                if (pnj.CoudeD != null)
+                    pnj.CoudeD.localRotation = Quaternion.Euler(
+                        Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
+            }
+            else
+            {
+                Quaternion rotationBrasGauche = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
+                Quaternion rotationCoudeGauche = Quaternion.Euler(Mathf.Max(0f, balancement) * 16f, 0f, 0f);
+                if (pnj.BrasG != null) pnj.BrasG.localRotation = rotationBrasGauche;
+                if (pnj.BrasD != null)
+                    pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+                if (pnj.CoudeG != null) pnj.CoudeG.localRotation = rotationCoudeGauche;
+                if (pnj.CoudeD != null)
+                    pnj.CoudeD.localRotation = Quaternion.Euler(Mathf.Max(0f, -balancement) * 16f, 0f, 0f);
+            }
             if (pnj.JambeG != null) pnj.JambeG.localRotation = Quaternion.Euler(Mathf.Sin(pnj.Phase * 0.8f) * 3f, 0f, 0f);
             if (pnj.JambeD != null) pnj.JambeD.localRotation = Quaternion.Euler(-Mathf.Sin(pnj.Phase * 0.8f) * 3f, 0f, 0f);
             if (pnj.GenouG != null) pnj.GenouG.localRotation = Quaternion.Euler(Mathf.Max(0f, -Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);

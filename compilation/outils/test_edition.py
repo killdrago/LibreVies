@@ -106,7 +106,9 @@ def test_signs_follow_buildings_and_facade_visibility_is_dynamic():
 def test_blacksmith_and_mayor_accessories_follow_animated_arms():
     update = section(CS, "private void UpdatePnj", "private void MettreAJourVisibiliteAffiches")
     assert 'pnj.Metier == "Forgeron" || pnj.Metier == "Maire"' in update
-    assert "balancement *=" in update
+    assert "accessoireBrasDroit" in update
+    assert "Mathf.Clamp(angleBrasDroit" in update
+    assert "Quaternion.identity" in update
     assert "TryDirectionProlongementBras" in update
     assert "pnj.Marteau" in update
     assert "pnj.Feuille" in update
