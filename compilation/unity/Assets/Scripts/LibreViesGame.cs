@@ -1328,6 +1328,10 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("GlassBleu", new Color(0.12f, 0.48f, 0.88f, 1f), true);
         MakeMaterial("Red", new Color(0.80f, 0.06f, 0.04f), true);
         MakeMaterial("White", Color.white);
+        MakeMaterial("Nuage", new Color(0.96f, 0.98f, 1f));
+        MakeMaterial("Nuage_Ombre", new Color(0.76f, 0.82f, 0.90f));
+        MakeMaterial("Soleil_Visible", new Color(1f, 0.72f, 0.20f), true);
+        MakeMaterial("Soleil_Halo", new Color(1f, 0.52f, 0.08f), true);
         // --- Decor (portage de la reference) ---
         MakeMaterial("Bois_Clair", new Color(0.58f, 0.41f, 0.21f));
         MakeMaterial("Metal", new Color(0.30f, 0.28f, 0.28f));
@@ -1560,6 +1564,32 @@ public sealed class LibreViesGame : MonoBehaviour
         sun.shadowBias = 0.045f;
         sun.shadowNormalBias = 0.32f;
         sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
+        RenderSettings.sun = sun;
+
+        // La lumiere directionnelle eclaire le monde, mais ne dessine pas
+        // toujours un disque visible selon le pipeline actif. On ajoute donc
+        // une representation lointaine alignee sur cette lumiere : un coeur
+        // chaud et un halo plus grand, tous deux sans collision ni ombre.
+        Vector3 directionSoleil = -sunObject.transform.forward.normalized;
+        Vector3 positionSoleil = directionSoleil * 110f;
+        GameObject halo = Primitive(PrimitiveType.Sphere,
+            positionSoleil + directionSoleil * 1.5f, Vector3.one * 14f,
+            "Soleil_Halo", null, "Soleil_Halo");
+        GameObject disque = Primitive(PrimitiveType.Sphere,
+            positionSoleil - directionSoleil * 1.5f, Vector3.one * 8f,
+            "Soleil_Visible", null, "Soleil_Disque");
+        Renderer haloRenderer = halo.GetComponent<Renderer>();
+        Renderer disqueRenderer = disque.GetComponent<Renderer>();
+        if (haloRenderer != null)
+        {
+            haloRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            haloRenderer.receiveShadows = false;
+        }
+        if (disqueRenderer != null)
+        {
+            disqueRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            disqueRenderer.receiveShadows = false;
+        }
     }
 
     private void CreateSky()
@@ -4406,13 +4436,11 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Sur ce modèle, les groupes OBJ visibles depuis le joueur ont les
-        // côtés nommés en miroir : le bras visible à droite est le pivot G.
-        // L'accessoire doit donc suivre ce pivot, et non le pivot D qui reste
-        // fixe. Son point est directement enfant du coude articulé.
+        // Retour a l'emplacement d'origine de l'accessoire : la main droite
+        // et son coude D, sans modifier les rotations des bras deja reglees.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeG, false);
-        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeD, false);
+        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4476,8 +4504,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
@@ -4974,12 +5002,46 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateClouds()
     {
+        // Chaque nuage est compose de volumes arrondis qui se recouvrent :
+        // les silhouettes sont douces depuis le sol et restent legeres a
+        // deplacer comme un seul groupe. Aucun cube ne sert plus de nuage.
+        Vector3[] boules =
+        {
+            new Vector3(-5.4f, 0.0f, 0.1f),
+            new Vector3(-3.5f, 0.8f, 0.0f),
+            new Vector3(-1.2f, 1.35f, 0.1f),
+            new Vector3(1.2f, 0.95f, -0.1f),
+            new Vector3(3.7f, 0.35f, 0.1f),
+            new Vector3(5.2f, 0.0f, -0.1f),
+            new Vector3(0.0f, 0.15f, 0.5f)
+        };
+        Vector3[] tailles =
+        {
+            new Vector3(4.2f, 2.0f, 2.6f),
+            new Vector3(4.0f, 2.8f, 2.9f),
+            new Vector3(4.8f, 3.6f, 3.2f),
+            new Vector3(4.6f, 3.0f, 3.0f),
+            new Vector3(4.0f, 2.35f, 2.7f),
+            new Vector3(3.4f, 1.8f, 2.4f),
+            new Vector3(6.5f, 1.65f, 3.3f)
+        };
         for (int i = 0; i < 7; i++)
         {
             var cloud = new GameObject("Nuage");
-            cloud.transform.position = new Vector3(-80 + i * 28, 24 + (i % 3) * 4, -30 + i * 13);
-            Box(Vector3.zero, new Vector3(10, 1.4f, 3), "White", cloud.transform, "Nuage_A");
-            Box(new Vector3(3, 0.7f, 0), new Vector3(5, 1.4f, 2.2f), "White", cloud.transform, "Nuage_B");
+            cloud.transform.position = new Vector3(-80 + i * 28,
+                24 + (i % 3) * 4, -30 + i * 13);
+            for (int j = 0; j < boules.Length; j++)
+            {
+                string materiau = j == 0 || j == 5 ? "Nuage_Ombre" : "Nuage";
+                GameObject boule = Primitive(PrimitiveType.Sphere, boules[j], tailles[j],
+                    materiau, cloud.transform, "Nuage_Volume_" + j);
+                Renderer rendu = boule.GetComponent<Renderer>();
+                if (rendu != null)
+                {
+                    rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    rendu.receiveShadows = false;
+                }
+            }
             clouds.Add(cloud);
         }
     }
@@ -5595,7 +5657,9 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             else
             {
-                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, 5f, 70f);
+                // Une orbite legerement sous l'horizon permet de lever le
+                // regard vers le ciel sans passer en premiere personne.
+                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, -25f, 70f);
             }
         }
         if (Input.GetKeyDown(KeyCode.LeftBracket))
