@@ -106,8 +106,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
     private int adminBrasPerso = 3;
-    private int adminBrasMaire = 1;
-    private int adminBrasForgeron = 1;
+    private int adminBrasMaire = 0;
+    private int adminBrasForgeron = 0;
     // 0 = placement G, 1 = placement D ; meme convention pour le pivot.
     private int adminObjetPerso = 1;
     private int adminObjetMaire = 1;
@@ -6576,11 +6576,15 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private int ModeAfficheDepuisInterne(int mode)
     {
+        if (mode == 0) return 1;
+        if (mode == 1) return 0;
         return mode;
     }
 
     private int ModeInterneDepuisAffiche(int mode)
     {
+        if (mode == 0) return 1;
+        if (mode == 1) return 0;
         return mode;
     }
 
