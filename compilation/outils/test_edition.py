@@ -103,22 +103,30 @@ def test_signs_follow_buildings_and_facade_visibility_is_dynamic():
     assert "parentFacade.TransformDirection" in visibility
 
 
-def test_blacksmith_and_mayor_arms_are_locked_without_touching_anvil():
+def test_blacksmith_and_mayor_accessories_follow_animated_arms():
     update = section(CS, "private void UpdatePnj", "private void MettreAJourVisibiliteAffiches")
     assert 'pnj.Metier == "Forgeron" || pnj.Metier == "Maire"' in update
-    assert "balancement = 0f" in update
-    assert "Marteau_Forgeron" not in update
+    assert "balancement *=" in update
+    assert "TryDirectionProlongementBras" in update
+    assert "pnj.Marteau" in update
+    assert "pnj.Feuille" in update
     assert "Enclume_Forgeron" not in update
 
 
 def test_sign_text_style_and_persistence_controls_exist():
+    panel = section(CS, "private void DessinerEditionPancarte", "private void CreerToitTriangle")
     assert "GUI.TextField" in CS
     assert "FontStyle.Bold" in CS
     assert "FontStyle.Italic" in CS
-    assert "Souligne" in CS
-    assert "LineRenderer" in CS
+    assert "Souligne" in CS  # champ conserve pour migrer les anciennes sauvegardes
+    assert "LineRenderer" in CS  # ancien type reconnu sans etre recree
     assert "TextePancarte" in CS
     assert "CouleurPancarte" in CS
+    assert '"SOULIGNE' not in panel
+    assert '"PANNEAU DE LA MAISON"' not in panel
+    assert "Les changements sont sauvegardes" not in panel
+    assert '"TAILLE :"' in panel
+    assert "tailleChampStyle" in panel
     for label in ("BLANC", "JAUNE", "ROUGE", "BLEU", "VERT", "BRUN"):
         assert label in CS
 

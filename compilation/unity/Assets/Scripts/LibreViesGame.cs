@@ -1156,7 +1156,9 @@ public sealed class LibreViesGame : MonoBehaviour
                         coordonnee.StylePancarte = (int)FontStyle.Normal;
                     if (element.Facade.Texte != null)
                         element.Facade.Texte.fontStyle = (FontStyle)coordonnee.StylePancarte;
-                    element.Facade.Souligne = coordonnee.SoulignePancarte;
+                    // Les anciens fichiers peuvent contenir ce champ, mais
+                    // le soulignement a ete retire de l'editeur et du rendu.
+                    element.Facade.Souligne = false;
                     if (coordonnee.TaillePancarte > 0f)
                         element.Facade.Taille = coordonnee.TaillePancarte;
                     if (coordonnee.LargeurPancarte > 0f)
@@ -1235,7 +1237,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.CouleurPancarte = element.Facade.Couleur;
                     coordonnee.StylePancarte = element.Facade.Texte == null
                         ? (int)FontStyle.Normal : (int)element.Facade.Texte.fontStyle;
-                    coordonnee.SoulignePancarte = element.Facade.Souligne;
+                    coordonnee.SoulignePancarte = false;
                     coordonnee.TaillePancarte = element.Facade.Taille;
                     coordonnee.LargeurPancarte = element.Facade.LargeurPanneau;
                     coordonnee.HauteurPancarte = element.Facade.HauteurPanneau;
@@ -1280,7 +1282,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // bleue ne doit apparaitre avec le choix BRIQUE dans EDITION.
         // Brique gris pierre, dans le meme esprit que la route mais plus
         // claire et sans la teinte bleue de l'ancien mur.
-        MakeMaterial("Brique", new Color(0.68f, 0.68f, 0.66f));
+        MakeMaterial("Brique", new Color(0.80f, 0.80f, 0.78f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
@@ -3095,8 +3097,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (!TryZoneEcranElementEdition(element, out zone, out profondeur)
                     || !zone.Contains(souris)) continue;
                 float aire = Mathf.Max(zone.width * zone.height, 0.01f);
-                if (aire < meilleureAire || (Mathf.Abs(aire - meilleureAire) < 0.01f
-                    && profondeur < meilleureProfondeur))
+                // La maison la plus proche de la camera gagne toujours. Avant,
+                // la plus petite zone projetee pouvait choisir une maison
+                // derriere la facade visee.
+                if (profondeur < meilleureProfondeur - 0.01f
+                    || (Mathf.Abs(profondeur - meilleureProfondeur) < 0.01f
+                    && aire < meilleureAire))
                 {
                     meilleureAire = aire;
                     meilleureProfondeur = profondeur;
@@ -3573,43 +3579,15 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void MettreAJourSoulignement(FacadeTextState facade)
     {
-        if (facade == null || facade.Texte == null) return;
-        if (!facade.Souligne)
+        if (facade == null) return;
+        // Le champ est conserve uniquement pour lire les anciennes sauvegardes.
+        // Aucun soulignement ni LineRenderer n'est maintenant cree dans le jeu.
+        facade.Souligne = false;
+        if (facade.Soulignement != null)
         {
-            if (facade.Soulignement != null) facade.Soulignement.SetActive(false);
-            return;
+            Destroy(facade.Soulignement);
+            facade.Soulignement = null;
         }
-        if (facade.Soulignement == null)
-        {
-            facade.Soulignement = new GameObject("Soulignement_Pancarte");
-            facade.Soulignement.transform.SetParent(facade.Root.transform, false);
-            LineRenderer ligne = facade.Soulignement.AddComponent<LineRenderer>();
-            ligne.useWorldSpace = false;
-            ligne.positionCount = 2;
-            ligne.alignment = LineAlignment.TransformZ;
-            ligne.numCapVertices = 2;
-            Shader shader = Shader.Find("Unlit/Color");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            if (shader == null) shader = ResoudreShader();
-            if (shader != null) ligne.sharedMaterial = new Material(shader);
-        }
-        facade.Soulignement.SetActive(true);
-        LineRenderer rendu = facade.Soulignement.GetComponent<LineRenderer>();
-        Renderer texteRendu = facade.Root.GetComponent<Renderer>();
-        float largeur = texteRendu == null ? 0.8f
-            : texteRendu.bounds.size.x / Mathf.Max(facade.Root.transform.lossyScale.x, 0.001f);
-        // L'option SOULIGNE reste sous le texte, sans se retrouver au milieu
-        // des caracteres.
-        // TextMesh est centre sur son point d'origine : -0,52 etait encore
-        // dans la partie basse des glyphes selon la police. Cette marge place
-        // clairement le trait sous toute la hauteur du texte.
-        float hauteur = -facade.Texte.characterSize * 0.88f;
-        rendu.startWidth = facade.Texte.characterSize * 0.055f;
-        rendu.endWidth = rendu.startWidth;
-        rendu.startColor = facade.Couleur;
-        rendu.endColor = facade.Couleur;
-        rendu.SetPosition(0, new Vector3(-largeur * 0.48f, hauteur, -0.012f));
-        rendu.SetPosition(1, new Vector3(largeur * 0.48f, hauteur, -0.012f));
     }
 
     private void DefinirStylePancarte(FacadeTextState facade, bool gras, bool italique)
@@ -3641,7 +3619,7 @@ public sealed class LibreViesGame : MonoBehaviour
             || elementEditionDernierSelectionne.Facade == null) return;
         FacadeTextState facade = elementEditionDernierSelectionne.Facade;
         Rect cadre = new Rect(18f, Screen.height - 405f, 470f, 385f);
-        GUI.Box(cadre, "PANNEAU DE LA MAISON", boxStyle);
+        GUI.Box(cadre, "", boxStyle);
         GUI.Label(new Rect(cadre.x + 14f, cadre.y + 30f, 90f, 24f), "Texte :", labelStyle);
         string texte = GUI.TextField(new Rect(cadre.x + 88f, cadre.y + 28f, 350f, 28f),
             facade.Libelle ?? "");
@@ -3659,12 +3637,6 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(cadre.x + 176f, cadre.y + 62f, 92f, 28f),
             italique ? "ITALIQUE ✓" : "ITALIQUE", buttonStyle))
             DefinirStylePancarte(facade, gras, !italique);
-        if (GUI.Button(new Rect(cadre.x + 276f, cadre.y + 62f, 110f, 28f),
-            facade.Souligne ? "SOULIGNE ✓" : "SOULIGNE", buttonStyle))
-        {
-            facade.Souligne = !facade.Souligne;
-            MettreAJourSoulignement(facade);
-        }
         GUI.Label(new Rect(cadre.x + 14f, cadre.y + 106f, 90f, 22f), "Couleur :", labelStyle);
         Color[] couleurs =
         {
@@ -3697,15 +3669,20 @@ public sealed class LibreViesGame : MonoBehaviour
                 MettreAJourSoulignement(facade);
             }
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 120f, 24f),
-            "TAILLE DU TEXTE :", labelStyle);
-        // L'editeur affiche une taille lisible comme dans Word (1, 2, 10,
-        // 20, 50...). La conversion en characterSize reste interne a Unity.
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 100f, 30f),
+            "TAILLE :", labelStyle);
+        // La valeur saisie reste un entier lisible (1, 2, 10, 20, 50...).
+        // Le champ est plus court, mais sa police est deux fois plus grande.
         if (string.IsNullOrEmpty(facade.TailleTexteSaisie))
             facade.TailleTexteSaisie = Mathf.Clamp(Mathf.RoundToInt(facade.Taille * 100f), 1, 200)
                 .ToString(CultureInfo.InvariantCulture);
-        string tailleSaisie = GUI.TextField(new Rect(cadre.x + 145f, cadre.y + 175f, 82f, 28f),
-            facade.TailleTexteSaisie);
+        GUIStyle tailleChampStyle = new GUIStyle(GUI.skin.textField)
+        {
+            fontSize = Mathf.Max(22, GUI.skin.textField.fontSize * 2),
+            alignment = TextAnchor.MiddleCenter
+        };
+        string tailleSaisie = GUI.TextField(new Rect(cadre.x + 126f, cadre.y + 171f, 54f, 36f),
+            facade.TailleTexteSaisie, tailleChampStyle);
         facade.TailleTexteSaisie = tailleSaisie;
         int tailleEntiere;
         if (int.TryParse(tailleSaisie, NumberStyles.Integer,
@@ -3727,9 +3704,6 @@ public sealed class LibreViesGame : MonoBehaviour
             ModifierTaillePancarte(facade, true, false);
         if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 251f, 54f, 26f), "↑", buttonStyle))
             ModifierTaillePancarte(facade, true, true);
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 292f, cadre.width - 28f, 48f),
-            "Les changements sont sauvegardes en quittant EDITION.\n"
-                + "Le texte et la pancarte restent attaches a la maison.", smallStyle);
         if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 348f, 190f, 28f),
             "RETOUR AU MENU MAISON", buttonStyle))
         {
@@ -4413,10 +4387,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
                 hauteur = 0f;
             }
-            // Le forgeron et le maire gardent les bras fixes : leurs
-            // accessoires restent donc stables dans leurs mains.
+            // Le forgeron et le maire animent maintenant le bras qui tient
+            // leur accessoire : le marteau et la feuille suivent la paume,
+            // sans modifier l'enclume ni l'etal.
             if (pnj.Metier == "Forgeron" || pnj.Metier == "Maire")
-                balancement = 0f;
+                balancement *= pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
             if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
@@ -5621,11 +5596,6 @@ public sealed class LibreViesGame : MonoBehaviour
                     visible = false;
             }
             rendu.enabled = visible;
-            if (affiche.Soulignement != null)
-            {
-                LineRenderer ligne = affiche.Soulignement.GetComponent<LineRenderer>();
-                if (ligne != null) ligne.enabled = visible;
-            }
         }
     }
 
@@ -6194,6 +6164,41 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void DessinerLigneCage(Rect zone, float x, float y, float largeur, float hauteur)
+    {
+        GUI.DrawTexture(new Rect(zone.x + x, zone.y + y, largeur, hauteur), Texture2D.whiteTexture);
+    }
+
+    private void DessinerCagesMaisonsEdition()
+    {
+        if (!modeEdition || gameCamera == null) return;
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            ElementEdition element = TrouverElementEdition(batiment.Root);
+            if (element == null) continue;
+            Rect zoneMonde;
+            float profondeur;
+            if (!TryZoneEcranElementEdition(element, out zoneMonde, out profondeur)) continue;
+            // WorldToScreenPoint a son origine en bas a gauche, GUI en haut a
+            // gauche : cette conversion dessine la zone exacte du clic.
+            Rect zone = new Rect(zoneMonde.x, Screen.height - zoneMonde.yMax,
+                zoneMonde.width, zoneMonde.height);
+            bool selectionnee = elementEditionSelectionne == element
+                || elementEditionDernierSelectionne == element;
+            GUI.color = selectionnee
+                ? new Color(0.10f, 0.95f, 1f, 0.95f)
+                : new Color(1f, 0.80f, 0.18f, 0.72f);
+            const float epaisseur = 2f;
+            DessinerLigneCage(zone, 0f, 0f, zone.width, epaisseur);
+            DessinerLigneCage(zone, 0f, zone.height - epaisseur, zone.width, epaisseur);
+            DessinerLigneCage(zone, 0f, 0f, epaisseur, zone.height);
+            DessinerLigneCage(zone, zone.width - epaisseur, 0f, epaisseur, zone.height);
+        }
+        GUI.color = Color.white;
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -6204,6 +6209,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         DessinerCorrectionCouleur();
+        DessinerCagesMaisonsEdition();
         if (playerUnderwater)
         {
             GUI.color = new Color(0.04f, 0.30f, 0.46f, 0.24f);
