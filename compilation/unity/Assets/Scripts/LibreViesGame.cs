@@ -4436,11 +4436,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Retour a l'emplacement d'origine de l'accessoire : la main droite
-        // et son coude D, sans modifier les rotations des bras deja reglees.
+        // Le bras visible a droite est anime par le pivot G dans ce modele.
+        // Le point est donc solidaire de ce coude : l'accessoire ne peut pas
+        // rester sur l'autre bras ni partir dans le sens oppose.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeD, false);
-        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeG, false);
+        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4504,8 +4505,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
@@ -4593,18 +4594,18 @@ public sealed class LibreViesGame : MonoBehaviour
                 // que le vecteur coude -> main. Son axe de sortie est -Y.
                 if (pnj.Marteau != null)
                 {
+                    // Le marteau est enfant du point de paume : aucune
+                    // correction mondiale ne doit le faire partir en sens
+                    // inverse. Sa position et sa rotation restent collees a
+                    // la main, qui herite deja du mouvement du coude.
                     pnj.Marteau.localPosition = Vector3.zero;
-                    pnj.Marteau.localRotation = Quaternion.LookRotation(directionBras, Vector3.up)
-                        * Quaternion.Euler(-90f, 0f, 0f);
+                    pnj.Marteau.localRotation = Quaternion.identity;
                 }
-                // La main tient le bord de la feuille : son grand axe +Y
-                // est aligne avec le prolongement du bras, au lieu de rester
-                // en travers ou de pendre verticalement.
+                // La feuille reste elle aussi exactement au point de paume.
                 if (pnj.Feuille != null)
                 {
-                    pnj.Feuille.localPosition = directionBras * 0.31f;
-                    pnj.Feuille.localRotation = Quaternion.LookRotation(directionBras, Vector3.up)
-                        * Quaternion.Euler(90f, 0f, 0f);
+                    pnj.Feuille.localPosition = Vector3.zero;
+                    pnj.Feuille.localRotation = Quaternion.identity;
                 }
             }
             if (pnj.Etal != null)
@@ -5203,14 +5204,12 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void MettreAJourMarteauHeroine()
     {
-        if (marteauHeroine == null || mainHeroine == null || coudeHeroineDroit == null) return;
-        Vector3 directionMonde = mainHeroine.position - coudeHeroineDroit.position;
-        if (directionMonde.sqrMagnitude < 0.0001f) return;
-        Vector3 directionLocale = mainHeroine.InverseTransformDirection(directionMonde.normalized);
+        if (marteauHeroine == null || mainHeroine == null) return;
+        // Le marteau est enfant du point de paume et herite donc deja du
+        // coude et du bras droit. Ne jamais recalculer une direction mondiale :
+        // cela pouvait le faire repartir dans le sens oppose au mouvement.
         marteauHeroine.localPosition = Vector3.zero;
-        // Le manche sort par son axe -Y, dans le prolongement coude -> paume.
-        marteauHeroine.localRotation = Quaternion.LookRotation(directionLocale, Vector3.up)
-            * Quaternion.Euler(-90f, 0f, 0f);
+        marteauHeroine.localRotation = Quaternion.identity;
     }
 
     private void AnimerHeroine(bool enMouvement, bool enCourse)
