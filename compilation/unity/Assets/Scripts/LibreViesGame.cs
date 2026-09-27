@@ -5055,11 +5055,17 @@ public sealed class LibreViesGame : MonoBehaviour
         if (attackAnimation > 0f)
         {
             float phase = 1f - attackAnimation / 0.30f;
-            brasHeroineDroit.localRotation = Quaternion.Euler(
+            // Le marteau reste a droite, mais l'animation de frappe est
+            // pilotee par le meme mouvement que le bras gauche ; les deux
+            // bras restent donc synchronises pendant la frappe aussi.
+            Quaternion rotationBrasAttaque = Quaternion.Euler(
                 Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
-            coudeHeroineDroit.localRotation = Quaternion.Euler(Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
-            brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
-            coudeHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+            Quaternion rotationCoudeAttaque = Quaternion.Euler(
+                Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
+            brasHeroineGauche.localRotation = rotationBrasAttaque;
+            brasHeroineDroit.localRotation = rotationBrasAttaque;
+            coudeHeroineGauche.localRotation = rotationCoudeAttaque;
+            coudeHeroineDroit.localRotation = rotationCoudeAttaque;
         }
         else
         {
