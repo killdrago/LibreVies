@@ -103,6 +103,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+    private int adminNpcSelection;
+    // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
+    private int adminBrasPerso = 3;
+    private int adminBrasMaire = 1;
+    private int adminBrasForgeron = 1;
+    // 0 = placement G, 1 = placement D ; meme convention pour le pivot.
+    private int adminObjetPerso = 1;
+    private int adminObjetMaire = 1;
+    private int adminObjetForgeron = 1;
+    private int adminPivotPerso = 1;
+    private int adminPivotMaire = 1;
+    private int adminPivotForgeron = 1;
     private ElementEdition elementEditionSelectionne;
     private ElementEdition elementEditionDernierSelectionne;
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
@@ -4531,14 +4543,54 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
+        if (pnj == null || pnj.Main == null || pnj.Main.parent == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.Main.parent.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
         // et la feuille restent dans le prolongement, meme pendant l'animation.
         directionLocale = pnj.Main.InverseTransformDirection(directionMonde.normalized);
         return directionLocale.sqrMagnitude > 0.0001f;
+    }
+
+    private int ModeBrasAdminPnj(string metier)
+    {
+        return metier == "Maire" ? adminBrasMaire : adminBrasForgeron;
+    }
+
+    private int PlacementObjetAdmin(string metier)
+    {
+        return metier == "Maire" ? adminObjetMaire : adminObjetForgeron;
+    }
+
+    private int PivotObjetAdmin(string metier)
+    {
+        return metier == "Maire" ? adminPivotMaire : adminPivotForgeron;
+    }
+
+    private void ConfigurerObjetPnjAdmin(PnjState pnj)
+    {
+        if (pnj == null || pnj.Main == null
+            || (pnj.Metier != "Maire" && pnj.Metier != "Forgeron")) return;
+        Transform pivot = PivotObjetAdmin(pnj.Metier) == 0 ? pnj.CoudeG : pnj.CoudeD;
+        if (pivot == null) return;
+        pnj.Main.SetParent(pivot, false);
+        pnj.Main.localPosition = PlacementObjetAdmin(pnj.Metier) == 0
+            ? new Vector3(-0.14f, -0.35f, 0.04f)
+            : new Vector3(0.14f, -0.35f, 0.04f);
+        pnj.Main.localRotation = Quaternion.identity;
+    }
+
+    private void ConfigurerObjetHeroineAdmin()
+    {
+        if (mainHeroine == null) return;
+        Transform pivot = adminPivotPerso == 0 ? coudeHeroineGauche : coudeHeroineDroit;
+        if (pivot == null) return;
+        mainHeroine.SetParent(pivot, false);
+        mainHeroine.localPosition = adminObjetPerso == 0
+            ? new Vector3(-0.14f, -0.35f, 0.04f)
+            : new Vector3(0.14f, -0.35f, 0.04f);
+        mainHeroine.localRotation = Quaternion.identity;
     }
 
     private void UpdatePnj(float dt)
@@ -4579,23 +4631,56 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (accessoireBrasDroit)
             {
-                // Le bras droit D porte l'objet et bouge. Le bras gauche G
-                // reste totalement immobile.
+                ConfigurerObjetPnjAdmin(pnj);
+                int modeBras = ModeBrasAdminPnj(pnj.Metier);
                 float amplitude = pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
                 float angleBrasDroit = balancement * amplitude * Mathf.Rad2Deg;
-                // Avec ce rig, l'angle positif part vers l'arriere. Le
-                // forgeron est donc bloque pres du corps a l'arriere, tandis
-                // qu'il dispose d'une course plus grande vers l'avant.
+                // Avec ce rig, l'angle positif part vers l'arriere. Les limites
+                // existantes restent identiques ; seul le choix G/D/stop est
+                // pilote par le panneau ADMIN.
                 float limiteArriere = pnj.Metier == "Forgeron" ? 8f : 16f;
                 float limiteAvant = pnj.Metier == "Forgeron" ? 40f : 24f;
                 angleBrasDroit = Mathf.Clamp(angleBrasDroit, -limiteAvant, limiteArriere);
-                if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
-                if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
-                if (pnj.BrasD != null)
-                    pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
-                if (pnj.CoudeD != null)
-                    pnj.CoudeD.localRotation = Quaternion.Euler(
-                        Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
+                if (modeBras == 2)
+                {
+                    if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
+                    if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
+                    if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.identity;
+                    if (pnj.CoudeD != null) pnj.CoudeD.localRotation = Quaternion.identity;
+                }
+                else if (modeBras == 0)
+                {
+                    if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.identity;
+                    if (pnj.CoudeD != null) pnj.CoudeD.localRotation = Quaternion.identity;
+                    if (pnj.BrasG != null)
+                        pnj.BrasG.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                    if (pnj.CoudeG != null)
+                        pnj.CoudeG.localRotation = Quaternion.Euler(
+                            Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
+                }
+                else if (modeBras == 3)
+                {
+                    if (pnj.BrasG != null)
+                        pnj.BrasG.localRotation = Quaternion.Euler(-angleBrasDroit, 0f, 0f);
+                    if (pnj.CoudeG != null)
+                        pnj.CoudeG.localRotation = Quaternion.Euler(
+                            Mathf.Max(0f, angleBrasDroit) * 0.35f, 0f, 0f);
+                    if (pnj.BrasD != null)
+                        pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                    if (pnj.CoudeD != null)
+                        pnj.CoudeD.localRotation = Quaternion.Euler(
+                            Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
+                }
+                else
+                {
+                    if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
+                    if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
+                    if (pnj.BrasD != null)
+                        pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                    if (pnj.CoudeD != null)
+                        pnj.CoudeD.localRotation = Quaternion.Euler(
+                            Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
+                }
             }
             else
             {
@@ -5260,23 +5345,56 @@ public sealed class LibreViesGame : MonoBehaviour
         float flexionCoudeDroit = enMouvement
             ? (enCourse ? 22f : 14f) * Mathf.Max(0f, -cycle)
             : 0f;
-        if (attackAnimation > 0f)
+        ConfigurerObjetHeroineAdmin();
+        int modeBras = adminBrasPerso;
+        if (attackAnimation > 0f && modeBras != 2)
         {
             float phase = 1f - attackAnimation / 0.30f;
-            // En frappe, seul le bras droit conduit le marteau ; le gauche
-            // reste en retrait au lieu de reproduire le meme geste.
-            brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
-            coudeHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
-            brasHeroineDroit.localRotation = Quaternion.Euler(
-                Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
-            coudeHeroineDroit.localRotation = Quaternion.Euler(
-                Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
+            if (modeBras == 0)
+            {
+                // Reglage diagnostic : frappe avec le bras gauche.
+                brasHeroineGauche.localRotation = Quaternion.Euler(
+                    Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(18f, -8f, phase), 0f);
+                coudeHeroineGauche.localRotation = Quaternion.Euler(
+                    Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
+                brasHeroineDroit.localRotation = Quaternion.identity;
+                coudeHeroineDroit.localRotation = Quaternion.identity;
+            }
+            else
+            {
+                // Par defaut et en alternance, la frappe reste sur le bras D.
+                brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+                coudeHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+                brasHeroineDroit.localRotation = Quaternion.Euler(
+                    Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
+                coudeHeroineDroit.localRotation = Quaternion.Euler(
+                    Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
+            }
+        }
+        else if (modeBras == 2)
+        {
+            brasHeroineGauche.localRotation = Quaternion.identity;
+            coudeHeroineGauche.localRotation = Quaternion.identity;
+            brasHeroineDroit.localRotation = Quaternion.identity;
+            coudeHeroineDroit.localRotation = Quaternion.identity;
+        }
+        else if (modeBras == 0)
+        {
+            brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
+            coudeHeroineGauche.localRotation = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
+            brasHeroineDroit.localRotation = Quaternion.identity;
+            coudeHeroineDroit.localRotation = Quaternion.identity;
+        }
+        else if (modeBras == 1)
+        {
+            brasHeroineGauche.localRotation = Quaternion.identity;
+            coudeHeroineGauche.localRotation = Quaternion.identity;
+            brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
+            coudeHeroineDroit.localRotation = Quaternion.Euler(flexionCoudeDroit, 0f, 0f);
         }
         else
         {
-            // Une marche humaine alterne les deux bras : ils sont decales,
-            // jamais animes ensemble. Le marteau reste dans la main droite et
-            // suit le pivot de ce bras.
+            // Alternance de marche : les deux bras restent inverses.
             brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
             brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
             coudeHeroineGauche.localRotation = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
@@ -6430,10 +6548,191 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    private string NomModeBrasAdmin(int mode)
+    {
+        if (mode == 0) return "Gauche";
+        if (mode == 1) return "Droit";
+        if (mode == 2) return "Stop";
+        return "Alternance";
+    }
+
+    private string NomCoteAdmin(int cote)
+    {
+        return cote == 0 ? "G" : "D";
+    }
+
+    private int LireModeBrasAdminSelection()
+    {
+        if (adminNpcSelection == 0) return adminBrasPerso;
+        if (adminNpcSelection == 1) return adminBrasMaire;
+        return adminBrasForgeron;
+    }
+
+    private void EcrireModeBrasAdminSelection(int valeur)
+    {
+        if (adminNpcSelection == 0) adminBrasPerso = valeur;
+        else if (adminNpcSelection == 1) adminBrasMaire = valeur;
+        else adminBrasForgeron = valeur;
+    }
+
+    private int LireObjetAdminSelection()
+    {
+        if (adminNpcSelection == 0) return adminObjetPerso;
+        if (adminNpcSelection == 1) return adminObjetMaire;
+        return adminObjetForgeron;
+    }
+
+    private void EcrireObjetAdminSelection(int valeur)
+    {
+        if (adminNpcSelection == 0) adminObjetPerso = valeur;
+        else if (adminNpcSelection == 1) adminObjetMaire = valeur;
+        else adminObjetForgeron = valeur;
+    }
+
+    private int LirePivotAdminSelection()
+    {
+        if (adminNpcSelection == 0) return adminPivotPerso;
+        if (adminNpcSelection == 1) return adminPivotMaire;
+        return adminPivotForgeron;
+    }
+
+    private void EcrirePivotAdminSelection(int valeur)
+    {
+        if (adminNpcSelection == 0) adminPivotPerso = valeur;
+        else if (adminNpcSelection == 1) adminPivotMaire = valeur;
+        else adminPivotForgeron = valeur;
+    }
+
+    private bool BoutonChoixAdmin(Rect rect, string libelle, bool actif)
+    {
+        GUI.color = actif ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+        bool clique = GUI.Button(rect, libelle, buttonStyle);
+        GUI.color = Color.white;
+        return clique;
+    }
+
+    private PnjState TrouverPnjAdmin(string metier)
+    {
+        for (int i = 0; i < pnjs.Count; i++)
+            if (pnjs[i] != null && pnjs[i].Metier == metier) return pnjs[i];
+        return null;
+    }
+
+    private string RotationLocaleRapport(Transform articulation)
+    {
+        return articulation == null ? "inconnue" : articulation.localEulerAngles.ToString("F1");
+    }
+
+    private void AjouterLigneRapportNpc(StringBuilder rapport, string nom, int mode,
+        int placement, int pivot, Transform objet, Transform brasG, Transform brasD,
+        Transform coudeG, Transform coudeD)
+    {
+        rapport.AppendLine(nom + " :");
+        rapport.AppendLine("  mouvement_bras = " + NomModeBrasAdmin(mode));
+        rapport.AppendLine("  placement_objet = " + NomCoteAdmin(placement));
+        rapport.AppendLine("  pivot_objet = " + NomCoteAdmin(pivot));
+        rapport.AppendLine("  parent_reel = "
+            + (objet == null || objet.parent == null ? "inconnu" : objet.parent.name));
+        rapport.AppendLine("  position_locale_reelle = "
+            + (objet == null ? "inconnue" : objet.localPosition.ToString("F3")));
+        rapport.AppendLine("  rotation_bras_G = " + RotationLocaleRapport(brasG));
+        rapport.AppendLine("  rotation_bras_D = " + RotationLocaleRapport(brasD));
+        rapport.AppendLine("  rotation_coude_G = " + RotationLocaleRapport(coudeG));
+        rapport.AppendLine("  rotation_coude_D = " + RotationLocaleRapport(coudeD));
+    }
+
+    private void GenererRapportAdminNpc()
+    {
+        var rapport = new System.Text.StringBuilder();
+        rapport.AppendLine("LibreVies - reglages ADMIN NPC");
+        rapport.AppendLine("Date = " + DateTime.Now.ToString("O"));
+        rapport.AppendLine("Regarder les lettres D/G du Forgeron dans le jeu pour le cote visuel.");
+        rapport.AppendLine();
+        AjouterLigneRapportNpc(rapport, "Perso", adminBrasPerso, adminObjetPerso,
+            adminPivotPerso, mainHeroine, brasHeroineGauche, brasHeroineDroit,
+            coudeHeroineGauche, coudeHeroineDroit);
+        PnjState maire = TrouverPnjAdmin("Maire");
+        PnjState forgeron = TrouverPnjAdmin("Forgeron");
+        AjouterLigneRapportNpc(rapport, "Maire", adminBrasMaire, adminObjetMaire,
+            adminPivotMaire, maire == null ? null : maire.Main,
+            maire == null ? null : maire.BrasG, maire == null ? null : maire.BrasD,
+            maire == null ? null : maire.CoudeG, maire == null ? null : maire.CoudeD);
+        AjouterLigneRapportNpc(rapport, "Forgeron", adminBrasForgeron, adminObjetForgeron,
+            adminPivotForgeron, forgeron == null ? null : forgeron.Main,
+            forgeron == null ? null : forgeron.BrasG, forgeron == null ? null : forgeron.BrasD,
+            forgeron == null ? null : forgeron.CoudeG, forgeron == null ? null : forgeron.CoudeD);
+
+        string dossier = Path.GetDirectoryName(Application.dataPath);
+        if (String.IsNullOrEmpty(dossier)) dossier = Application.persistentDataPath;
+        string chemin = Path.Combine(dossier, "admin_npc_reglages.txt");
+        try
+        {
+            File.WriteAllText(chemin, rapport.ToString(), Encoding.UTF8);
+            Debug.Log("[LV_ADMIN] rapport NPC genere : " + chemin);
+            ShowInfo("Rapport NPC genere a cote du jeu");
+        }
+        catch (Exception erreur)
+        {
+            string secours = Path.Combine(Application.persistentDataPath, "admin_npc_reglages.txt");
+            File.WriteAllText(secours, rapport.ToString(), Encoding.UTF8);
+            Debug.LogWarning("[LV_ADMIN] chemin principal indisponible : " + erreur.Message);
+            Debug.Log("[LV_ADMIN] rapport NPC de secours : " + secours);
+            ShowInfo("Rapport NPC genere dans les donnees du jeu");
+        }
+    }
+
+    private void DessinerAdminNpc(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 380f, 26f),
+            "NPC : bras et accessoire", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 45f, 380f, 22f),
+            "Personnage a regler", smallStyle);
+        string[] noms = { "Perso", "Maire", "Forgeron" };
+        for (int i = 0; i < noms.Length; i++)
+        {
+            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 112f,
+                contenu.y + 68f, 104f, 28f), noms[i], adminNpcSelection == i))
+                adminNpcSelection = i;
+        }
+
+        int mode = LireModeBrasAdminSelection();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 108f, 380f, 22f),
+            "Bras a bouger", smallStyle);
+        string[] modes = { "Gauche", "Droit", "Stop", "Alternance" };
+        for (int i = 0; i < modes.Length; i++)
+        {
+            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
+                contenu.y + 132f, 90f, 28f), modes[i], mode == i))
+                EcrireModeBrasAdminSelection(i);
+        }
+
+        int placement = LireObjetAdminSelection();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 174f, 380f, 22f),
+            "Placement objet : " + NomCoteAdmin(placement), smallStyle);
+        if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 198f, 90f, 28f),
+            "G", placement == 0)) EcrireObjetAdminSelection(0);
+        if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 198f, 90f, 28f),
+            "D", placement == 1)) EcrireObjetAdminSelection(1);
+
+        int pivot = LirePivotAdminSelection();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 236f, 380f, 22f),
+            "Pivot objet : " + NomCoteAdmin(pivot), smallStyle);
+        if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 260f, 90f, 28f),
+            "G", pivot == 0)) EcrirePivotAdminSelection(0);
+        if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 260f, 90f, 28f),
+            "D", pivot == 1)) EcrirePivotAdminSelection(1);
+
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 298f, 380f, 36f),
+            "Le choix est applique en jeu et sera inclus dans le fichier TXT.", smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 342f, 260f, 32f),
+            "GENERER admin_npc_reglages.txt", buttonStyle))
+            GenererRapportAdminNpc();
+    }
+
     private void DessinerAdmin()
     {
         Rect fenetre = new Rect(Screen.width * 0.5f - 300f,
-            Screen.height * 0.5f - 190f, 600f, 380f);
+            Screen.height * 0.5f - 230f, 600f, 460f);
         GUI.Box(fenetre, "", boxStyle);
         GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
             "ADMINISTRATION", titleStyle);
@@ -6444,7 +6743,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "Monstre" };
+        string[] onglets = { "Ville", "Joueur", "Monstre", "NPC" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -6479,7 +6778,7 @@ public sealed class LibreViesGame : MonoBehaviour
                         + "Position : " + player.position.ToString("F1"),
                 smallStyle);
         }
-        else
+        else if (adminTab == 2)
         {
             GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
                 "MONSTRE", titleStyle);
@@ -6488,6 +6787,10 @@ public sealed class LibreViesGame : MonoBehaviour
                     + "Rats vaincus : " + ratsKilled + "\n"
                     + "Araignees vaincues : " + spidersKilled,
                 smallStyle);
+        }
+        else
+        {
+            DessinerAdminNpc(contenu);
         }
     }
 
