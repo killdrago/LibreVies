@@ -101,6 +101,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // Le mode edition encadre les maisons et permet aussi de deplacer les
     // ouvertures, arbres et autres objets declarés comme deplacables.
     private bool modeEdition;
+    private bool adminOpen;
+    private int adminTab;
     private ElementEdition elementEditionSelectionne;
     private ElementEdition elementEditionDernierSelectionne;
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
@@ -1568,10 +1570,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
         // La lumiere directionnelle eclaire le monde, mais ne dessine pas
         // toujours un disque visible selon le pipeline actif. On ajoute donc
-        // une representation lointaine alignee sur cette lumiere : un coeur
-        // chaud et un halo plus grand, tous deux sans collision ni ombre.
-        Vector3 directionSoleil = -sunObject.transform.forward.normalized;
-        Vector3 positionSoleil = directionSoleil * 110f;
+        // une representation lointaine placee dans le ciel face a la zone de
+        // depart : un coeur chaud et un halo plus grand, tous deux sans
+        // collision ni ombre. La lumiere directionnelle reste inchangée.
+        Vector3 directionSoleil = new Vector3(-0.18f, 0.48f, 0.86f).normalized;
+        Vector3 positionSoleil = directionSoleil * 120f;
         GameObject halo = Primitive(PrimitiveType.Sphere,
             positionSoleil + directionSoleil * 1.5f, Vector3.one * 14f,
             "Soleil_Halo", null, "Soleil_Halo");
@@ -4436,12 +4439,11 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Le bras visible a droite est anime par le pivot G dans ce modele.
-        // Le point est donc solidaire de ce coude : l'accessoire ne peut pas
-        // rester sur l'autre bras ni partir dans le sens oppose.
+        // Le bras droit visible utilise le pivot D pour cet objet. On ne
+        // change aucune rotation : on change uniquement le cote d'attache.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeG, false);
-        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeD, false);
+        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4505,8 +4507,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
@@ -5146,13 +5148,8 @@ public sealed class LibreViesGame : MonoBehaviour
             "SleeveLower_R", "Cuff_R", "Hand_R");
         coudeHeroineGauche.SetParent(brasHeroineGauche, true);
         coudeHeroineDroit.SetParent(brasHeroineDroit, true);
-        // Le marteau du personnage est attache au point reel de la paume
-        // droite. Il suivra donc le coude et restera dans le prolongement de
-        // la main pendant la marche et l'attaque.
-        // Le point d'accessoire est directement dans le pivot du coude droit.
-        // Le maillage Hand_R est un enfant de ce pivot, mais son origine OBJ
-        // n'est pas une origine de bone : le prendre comme parent faisait
-        // osciller l'objet a un autre endroit que le bras.
+        // Le marteau est place dans le bras droit, sans changer le mouvement
+        // de ce bras ni le sens de l'objet.
         mainHeroine = new GameObject("Point_Main_Heroine").transform;
         mainHeroine.SetParent(coudeHeroineDroit, false);
         mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
@@ -5619,10 +5616,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
         if (modeEdition)
             GererSourisEdition();
-        bool clicGauche = !modeEdition && Input.GetMouseButtonDown(0);
+        bool clicGauche = !modeEdition && !adminOpen && Input.GetMouseButtonDown(0);
         bool clicNpc = clicGauche && TryOuvrirConversation();
         bool clicMonstre = clicGauche && !clicNpc && TryAttaquerMonstreClique();
-        bool attaqueClavier = !modeEdition && toucheAttaque != (int)KeyCode.Mouse0 && ToucheDown(toucheAttaque);
+        bool attaqueClavier = !modeEdition && !adminOpen
+            && toucheAttaque != (int)KeyCode.Mouse0 && ToucheDown(toucheAttaque);
         // Un clic gauche sur le sol ne déclenche plus l'animation d'attaque.
         // Le clic doit viser un monstre ; une touche d'attaque remappée reste
         // disponible séparément.
@@ -5656,9 +5654,9 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             else
             {
-                // Une orbite legerement sous l'horizon permet de lever le
-                // regard vers le ciel sans passer en premiere personne.
-                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, -25f, 70f);
+                // La camera peut descendre jusqu'a la hauteur des jambes
+                // tout en gardant le sol comme limite physique.
+                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, -45f, 70f);
             }
         }
         if (Input.GetKeyDown(KeyCode.LeftBracket))
@@ -5697,7 +5695,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // "caméra sous le sol" : pitch +18° envoyait la caméra vers le bas).
         Vector3 position = target + orbit * (Vector3.back * cameraDistance);
         // Filet de sécurité identique à la référence : jamais sous le terrain.
-        float sol = TerrainHeight(position.x, position.z) + 0.6f;
+        float sol = TerrainHeight(position.x, position.z) + 0.08f;
         if (position.y < sol) position.y = sol;
         gameCamera.transform.position = position;
         gameCamera.transform.LookAt(target);
@@ -6409,6 +6407,67 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    private void DessinerAdmin()
+    {
+        Rect fenetre = new Rect(Screen.width * 0.5f - 300f,
+            Screen.height * 0.5f - 190f, 600f, 380f);
+        GUI.Box(fenetre, "", boxStyle);
+        GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
+            "ADMINISTRATION", titleStyle);
+        if (GUI.Button(new Rect(fenetre.x + fenetre.width - 42f, fenetre.y + 14f, 28f, 28f),
+            "X", buttonStyle))
+        {
+            adminOpen = false;
+            return;
+        }
+
+        string[] onglets = { "Ville", "Joueur", "Monstre" };
+        for (int i = 0; i < onglets.Length; i++)
+        {
+            Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
+                132f, 42f);
+            GUI.color = adminTab == i ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+            if (GUI.Button(onglet, onglets[i], buttonStyle)) adminTab = i;
+            GUI.color = Color.white;
+        }
+
+        Rect contenu = new Rect(fenetre.x + 170f, fenetre.y + 62f,
+            fenetre.width - 190f, fenetre.height - 82f);
+        GUI.Box(contenu, "", boxStyle);
+        if (adminTab == 0)
+        {
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
+                "VILLE", titleStyle);
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 100f),
+                "Maisons : " + batiments.Count + "\n"
+                    + "Portails : " + portails.Count + "\n"
+                    + "Objets editables : " + objetsEdition.Count,
+                smallStyle);
+        }
+        else if (adminTab == 1)
+        {
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
+                "JOUEUR", titleStyle);
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 120f),
+                player == null
+                    ? "Joueur indisponible"
+                    : "Points de vie : " + hp + " / " + MaxHp + "\n"
+                        + "Niveau : " + level + "\n"
+                        + "Position : " + player.position.ToString("F1"),
+                smallStyle);
+        }
+        else
+        {
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
+                "MONSTRE", titleStyle);
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 120f),
+                "Monstres charges : " + enemies.Count + "\n"
+                    + "Rats vaincus : " + ratsKilled + "\n"
+                    + "Araignees vaincues : " + spidersKilled,
+                smallStyle);
+        }
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -6478,9 +6537,20 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         DessinerEditionMaison();
         DessinerEditionPancarte();
+        if (adminOpen) DessinerAdmin();
+        if (GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
+            "ADMIN", buttonStyle))
+        {
+            if (!adminOpen && modeEdition) BasculerModeEdition();
+            adminOpen = !adminOpen;
+            if (adminOpen) ShowInfo("MENU ADMINISTRATION");
+        }
         if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "EDITION", buttonStyle))
+        {
+            adminOpen = false;
             BasculerModeEdition();
+        }
         if (conversationOpen) DessinerConversation();
     }
 
