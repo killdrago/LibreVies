@@ -4406,18 +4406,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        Transform mainImportee = pnj.CoudeD.Find("Hand_R");
+        // Comme pour le joueur, le point de l'accessoire est enfant du coude
+        // droit, pas de l'origine du maillage Hand_R. Il reste ainsi solidaire
+        // du bras qui bouge réellement.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        if (mainImportee != null)
-        {
-            pnj.Main.SetParent(mainImportee, false);
-            pnj.Main.localPosition = new Vector3(0.62f, 1.05f, 0.05f);
-        }
-        else
-        {
-            pnj.Main.SetParent(pnj.CoudeD, false);
-            pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
-        }
+        pnj.Main.SetParent(pnj.CoudeD, false);
+        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -5088,18 +5082,13 @@ public sealed class LibreViesGame : MonoBehaviour
         // Le marteau du personnage est attache au point reel de la paume
         // droite. Il suivra donc le coude et restera dans le prolongement de
         // la main pendant la marche et l'attaque.
-        Transform mainImportee = coudeHeroineDroit.Find("Hand_R");
+        // Le point d'accessoire est directement dans le pivot du coude droit.
+        // Le maillage Hand_R est un enfant de ce pivot, mais son origine OBJ
+        // n'est pas une origine de bone : le prendre comme parent faisait
+        // osciller l'objet a un autre endroit que le bras.
         mainHeroine = new GameObject("Point_Main_Heroine").transform;
-        if (mainImportee != null)
-        {
-            mainHeroine.SetParent(mainImportee, false);
-            mainHeroine.localPosition = new Vector3(0.62f, 1.05f, 0.05f);
-        }
-        else
-        {
-            mainHeroine.SetParent(coudeHeroineDroit, false);
-            mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
-        }
+        mainHeroine.SetParent(coudeHeroineDroit, false);
+        mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
         marteauHeroine = new GameObject("Marteau_Heroine").transform;
         marteauHeroine.SetParent(mainHeroine, false);
@@ -5189,29 +5178,24 @@ public sealed class LibreViesGame : MonoBehaviour
         if (attackAnimation > 0f)
         {
             float phase = 1f - attackAnimation / 0.30f;
-            // Le marteau reste a droite, mais l'animation de frappe est
-            // pilotee par le meme mouvement que le bras gauche ; les deux
-            // bras restent donc synchronises pendant la frappe aussi.
-            Quaternion rotationBrasAttaque = Quaternion.Euler(
+            // En frappe, seul le bras droit conduit le marteau ; le gauche
+            // reste en retrait au lieu de reproduire le meme geste.
+            brasHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+            coudeHeroineGauche.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+            brasHeroineDroit.localRotation = Quaternion.Euler(
                 Mathf.Lerp(-105f, 56f, phase), Mathf.Lerp(-18f, 8f, phase), 0f);
-            Quaternion rotationCoudeAttaque = Quaternion.Euler(
+            coudeHeroineDroit.localRotation = Quaternion.Euler(
                 Mathf.Lerp(-20f, -68f, phase), 0f, 0f);
-            brasHeroineGauche.localRotation = rotationBrasAttaque;
-            brasHeroineDroit.localRotation = rotationBrasAttaque;
-            coudeHeroineGauche.localRotation = rotationCoudeAttaque;
-            coudeHeroineDroit.localRotation = rotationCoudeAttaque;
         }
         else
         {
-            // Le marteau reste du cote droit du joueur, mais son bras porteur
-            // reprend exactement le mouvement du bras gauche demande pour le
-            // personnage : meme balancement, meme flexion du coude.
-            Quaternion rotationBrasGauche = Quaternion.Euler(-balancementBras, 0f, 0f);
-            Quaternion rotationCoudeGauche = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
-            brasHeroineGauche.localRotation = rotationBrasGauche;
-            brasHeroineDroit.localRotation = rotationBrasGauche;
-            coudeHeroineGauche.localRotation = rotationCoudeGauche;
-            coudeHeroineDroit.localRotation = rotationCoudeGauche;
+            // Une marche humaine alterne les deux bras : ils sont decales,
+            // jamais animes ensemble. Le marteau reste dans la main droite et
+            // suit le pivot de ce bras.
+            brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
+            brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
+            coudeHeroineGauche.localRotation = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
+            coudeHeroineDroit.localRotation = Quaternion.Euler(flexionCoudeDroit, 0f, 0f);
         }
         jambeHeroineGauche.localRotation = Quaternion.Euler(balancementJambe, 0f, 0f);
         jambeHeroineDroite.localRotation = Quaternion.Euler(-balancementJambe, 0f, 0f);
