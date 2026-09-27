@@ -4568,14 +4568,25 @@ public sealed class LibreViesGame : MonoBehaviour
         return metier == "Maire" ? adminPivotMaire : adminPivotForgeron;
     }
 
+    // Le rig importe les cotes en miroir par rapport aux lettres affichees dans
+    // le panneau et sur le Forgeron : G affiche doit donc utiliser le pivot D
+    // interne, et inversement. Cette conversion reste centralisee ici pour
+    // que le test ADMIN ne puisse plus inverser placement et pivot.
+    private int CoteInterneDepuisAdmin(int coteAffiche)
+    {
+        return coteAffiche == 0 ? 1 : 0;
+    }
+
     private void ConfigurerObjetPnjAdmin(PnjState pnj)
     {
         if (pnj == null || pnj.Main == null
             || (pnj.Metier != "Maire" && pnj.Metier != "Forgeron")) return;
-        Transform pivot = PivotObjetAdmin(pnj.Metier) == 0 ? pnj.CoudeG : pnj.CoudeD;
+        int pivotInterne = CoteInterneDepuisAdmin(PivotObjetAdmin(pnj.Metier));
+        int placementInterne = CoteInterneDepuisAdmin(PlacementObjetAdmin(pnj.Metier));
+        Transform pivot = pivotInterne == 0 ? pnj.CoudeG : pnj.CoudeD;
         if (pivot == null) return;
         pnj.Main.SetParent(pivot, false);
-        pnj.Main.localPosition = PlacementObjetAdmin(pnj.Metier) == 0
+        pnj.Main.localPosition = placementInterne == 0
             ? new Vector3(-0.14f, -0.35f, 0.04f)
             : new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
@@ -4584,10 +4595,12 @@ public sealed class LibreViesGame : MonoBehaviour
     private void ConfigurerObjetHeroineAdmin()
     {
         if (mainHeroine == null) return;
-        Transform pivot = adminPivotPerso == 0 ? coudeHeroineGauche : coudeHeroineDroit;
+        int pivotInterne = CoteInterneDepuisAdmin(adminPivotPerso);
+        int placementInterne = CoteInterneDepuisAdmin(adminObjetPerso);
+        Transform pivot = pivotInterne == 0 ? coudeHeroineGauche : coudeHeroineDroit;
         if (pivot == null) return;
         mainHeroine.SetParent(pivot, false);
-        mainHeroine.localPosition = adminObjetPerso == 0
+        mainHeroine.localPosition = placementInterne == 0
             ? new Vector3(-0.14f, -0.35f, 0.04f)
             : new Vector3(0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
