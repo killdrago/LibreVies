@@ -1,0 +1,3 @@
+SkinBase.png and HairDark.png are original LibreVies project textures,
+procedurally authored for the standalone character creator. They are included
+with the software and may be redistributed with it.

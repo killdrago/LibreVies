@@ -1,0 +1,71 @@
+# Matériaux originaux de LibreViesGuard — CC0
+newmtl GuardSkin
+Kd 0.7000 0.4300 0.2800
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardArmor
+Kd 0.2000 0.2500 0.3100
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardArmorLight
+Kd 0.4200 0.4800 0.5600
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardCloth
+Kd 0.1600 0.2800 0.5500
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardLeather
+Kd 0.1600 0.0900 0.0550
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardBoots
+Kd 0.0900 0.0700 0.0550
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardMetal
+Kd 0.6200 0.6600 0.7000
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardGold
+Kd 0.9200 0.6700 0.1800
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardWood
+Kd 0.4500 0.2500 0.1000
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+
+newmtl GuardVisor
+Kd 0.0600 0.0800 0.1000
+Ka 0.05 0.05 0.05
+Ks 0.18 0.18 0.18
+Ns 32.0
+d 1.0
+

@@ -1,0 +1,2 @@
+LibreViesHeroineParts est une déclinaison technique du maillage original LibreViesHeroine, sous CC0 1.0.
+Les groupes séparés de ce dossier sont générés à partir du maillage CC0 principal pour permettre l'animation par articulations dans Unity.

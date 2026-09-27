@@ -1,0 +1,5 @@
+MakeHuman Community base mesh and target assets
+Source: https://github.com/makehumancommunity/makehuman
+The graphical assets used here are released under CC0 1.0 Universal according to
+LICENSE.ASSETS.md in this directory. They are bundled into the character creator
+at build time; MakeHuman is not required by the end user.

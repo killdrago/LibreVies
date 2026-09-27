@@ -1,21 +1,51 @@
-# Sorties locales de build (la distribution est publiée comme artefact)
-/release/
-/build/
-/dist/
-*.spec
-/icon.ico
+# ============================================================
+# Rien de ce qui suit ne doit entrer dans git.
+# ============================================================
 
-# Unity génère ces dossiers localement lors de l'ouverture/build
-/unity/Library/
-/unity/Temp/
-/unity/Logs/
-/unity/obj/
-/unity/UserSettings/
-/unity/Builds/
-
-# Fichiers temporaires du launcher / de l'export
-__pycache__/
+# --- Cote joueur : ce que le build et le launcher produisent dans jeu/ ---
+/jeu/LibreVies.exe
+/jeu/game/
+/jeu/jeu.download
+/jeu/jeu.download.part
+/jeu/game.install/
+/jeu/game.ancien/
+/jeu/etat_jeu.json
 *.download
 *.new
 *.tmp
 .librevies-update.cmd
+
+# --- Cote auteur : sorties de compilation (le dossier release n'est plus
+#     utilise : le build ecrit directement dans jeu/) ---
+/compilation/release/
+/compilation/build/
+/compilation/dist/
+/compilation/build_launcher.bat.maj
+/compilation/sauvegarde_locale/
+/compilation/icon.ico
+*.spec
+
+# --- Unity : dossiers recrees a chaque ouverture ---
+/compilation/unity/Library/
+/compilation/unity/Temp/
+/compilation/unity/Logs/
+/compilation/unity/obj/
+/compilation/unity/UserSettings/
+/compilation/unity/Builds/
+/compilation/personnage/Library/
+/compilation/personnage/Temp/
+/compilation/personnage/Logs/
+/compilation/personnage/obj/
+/compilation/personnage/UserSettings/
+/compilation/personnage/Builds/
+
+# --- Executable du createur produit par build_launcher.bat ---
+/jeu/personnage/LibreViesPersonnage.exe
+/jeu/personnage/UnityPlayer.dll
+/jeu/personnage/UnityCrashHandler64.exe
+/jeu/personnage/LibreViesPersonnage_Data/
+/jeu/personnage/MonoBleedingEdge/
+
+# --- Python ---
+__pycache__/
+*.pyc
