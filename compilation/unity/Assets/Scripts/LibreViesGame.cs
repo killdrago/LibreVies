@@ -3486,8 +3486,8 @@ public sealed class LibreViesGame : MonoBehaviour
             // taille monde reste independante de l'agrandissement du panneau.
             if (facade.Root != null)
             {
-                Vector3 echelleTexte = facade.Root.localScale;
-                facade.Root.localScale = new Vector3(
+                Vector3 echelleTexte = facade.Root.transform.localScale;
+                facade.Root.transform.localScale = new Vector3(
                     Mathf.Sign(echelleTexte.x) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.x), 0.001f),
                     Mathf.Sign(echelleTexte.y) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.y), 0.001f),
                     Mathf.Sign(echelleTexte.z) / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.z), 0.001f));
@@ -3545,9 +3545,9 @@ public sealed class LibreViesGame : MonoBehaviour
         Renderer texteRendu = facade.Root.GetComponent<Renderer>();
         float largeur = texteRendu == null ? 0.8f
             : texteRendu.bounds.size.x / Mathf.Max(facade.Root.transform.lossyScale.x, 0.001f);
-        // L'option SOULIGNE doit traverser le milieu du texte, pas se placer
-        // sous la pancarte.
-        float hauteur = 0f;
+        // L'option SOULIGNE reste sous le texte, sans se retrouver au milieu
+        // des caracteres.
+        float hauteur = -facade.Texte.characterSize * 0.52f;
         rendu.startWidth = facade.Texte.characterSize * 0.055f;
         rendu.endWidth = rendu.startWidth;
         rendu.startColor = facade.Couleur;
