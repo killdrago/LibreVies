@@ -23,6 +23,11 @@ public sealed class CharacterCreatorApp : MonoBehaviour
     private bool dragging;
     private Vector2 lastMouse;
 
+    // Version de base demandee : humain nu, sans cheveux, accessoires ni
+    // vetements. Le constructeur de cheveux reste dans le code pour etre
+    // reactive plus tard quand la base homme/femme sera validee.
+    private const bool ShowHair = false;
+
     private static readonly Color Background = new Color(0.035f, 0.047f, 0.08f);
     private static readonly Color Panel = new Color(0.075f, 0.09f, 0.145f);
     private static readonly Color Panel2 = new Color(0.105f, 0.125f, 0.195f);
@@ -42,6 +47,9 @@ public sealed class CharacterCreatorApp : MonoBehaviour
     {
         Application.targetFrameRate = 60;
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        // Le createur est une application fenetree, pas un plein ecran.
+        Screen.SetResolution(1280, 800, FullScreenMode.Windowed);
+        Screen.fullScreenMode = FullScreenMode.Windowed;
         preset = CharacterPreset.Default();
         BuildScene();
         avatar = new HumanAvatar();
@@ -210,14 +218,18 @@ public sealed class CharacterCreatorApp : MonoBehaviour
         Slider("Bouche - volume", ref preset.mouthShape, "fine", "pulpeuse");
         Slider("Oreilles - taille", ref preset.earsShape, "petites", "grandes");
 
-        GUILayout.Label("CHEVEUX", sectionStyle);
-        string[] hairNames = { "Court", "Long", "Carre", "Attache", "Boucle" };
-        for (int i = 0; i < hairNames.Length; i++)
+        // Les coupes seront remises apres validation de la base humaine.
+        if (ShowHair)
         {
-            if (GUILayout.Button(hairNames[i], preset.hairStyle == i ? selectedButtonStyle : buttonStyle, GUILayout.Height(29)))
+            GUILayout.Label("CHEVEUX", sectionStyle);
+            string[] hairNames = { "Court", "Long", "Carre", "Attache", "Boucle" };
+            for (int i = 0; i < hairNames.Length; i++)
             {
-                preset.hairStyle = i;
-                Rebuild("Coupe : " + hairNames[i]);
+                if (GUILayout.Button(hairNames[i], preset.hairStyle == i ? selectedButtonStyle : buttonStyle, GUILayout.Height(29)))
+                {
+                    preset.hairStyle = i;
+                    Rebuild("Coupe : " + hairNames[i]);
+                }
             }
         }
 
@@ -290,8 +302,8 @@ public sealed class CharacterCreatorApp : MonoBehaviour
         preset.noseShape = UnityEngine.Random.Range(-0.7f, 0.75f);
         preset.mouthShape = UnityEngine.Random.Range(-0.7f, 0.75f);
         preset.earsShape = UnityEngine.Random.Range(-0.65f, 0.7f);
-        preset.hairStyle = UnityEngine.Random.Range(0, 5);
-        Rebuild("Nouvelle combinaison aleatoire");
+        preset.hairStyle = -1;
+        Rebuild("Nouvelle base humaine aleatoire");
     }
 
     private void Rebuild(string message)
@@ -366,7 +378,7 @@ public sealed class CharacterCreatorApp : MonoBehaviour
                 noseShape = 0f,
                 mouthShape = 0f,
                 earsShape = 0f,
-                hairStyle = 2
+                hairStyle = -1
             };
         }
     }
@@ -497,7 +509,8 @@ public sealed class CharacterCreatorApp : MonoBehaviour
             renderer.sharedMaterials = new[] { skin, eyes, teeth };
             renderer.updateWhenOffscreen = true;
             ApplySkinWeights(mesh, renderer);
-            hair = HairBuilder.Create(preset.hairStyle, root.transform, FindBone("head"), hairMaterial);
+            if (ShowHair)
+                hair = HairBuilder.Create(preset.hairStyle, root.transform, FindBone("head"), hairMaterial);
             root.transform.localRotation = Quaternion.Euler(0f, 180f + yaw, 0f);
         }
 
@@ -700,7 +713,15 @@ public sealed class CharacterCreatorApp : MonoBehaviour
                     {
                         int current = VertexIndex(p[i], positions.Count);
                         if (first >= 0 && previous >= 0 && current >= 0)
-                            data.triangles.Add(new ObjTriangle(first, previous, current, MaterialIndex(group)));
+                        {
+                            int material = MaterialIndex(group);
+                            // MakeHuman exports helper geometry (hair, skirt,
+                            // tights, eyelashes and joints) in the same OBJ.
+                            // It is not the naked human base and was the
+                            // source of the oversized hat seen in the preview.
+                            if (material >= 0)
+                                data.triangles.Add(new ObjTriangle(first, previous, current, material));
+                        }
                         previous = current;
                     }
                 }
@@ -747,9 +768,13 @@ public sealed class CharacterCreatorApp : MonoBehaviour
         private static int MaterialIndex(string group)
         {
             string lower = group.ToLowerInvariant();
+            // The OBJ also contains MakeHuman helper meshes. They are useful
+            // while authoring the model but are not part of the naked base:
+            // helper-hair was rendered as the oversized hat, while helper-
+            // skirt/tights looked like unwanted clothing.
+            if (lower.StartsWith("helper-") || lower.StartsWith("joint-")) return -1;
             if (lower.Contains("eye") || lower.Contains("eyelash")) return 1;
             if (lower.Contains("teeth") || lower.Contains("tongue")) return 2;
-            if (lower.StartsWith("joint-")) return 0;
             return 0;
         }
 

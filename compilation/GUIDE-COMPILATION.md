@@ -61,8 +61,12 @@ n'est pas nécessaire pour cette étape. `build_unity_game.bat` appelle aussi ce
 script après l'export du jeu.
 
 Il ne touche à rien d'autre dans `jeu/` : `launcher.pyw`, `version_url.json` et
-`LIS-MOI.txt` restent en place. **`compilation/` ne sert qu'à compiler** : tu
-peux l'oublier une fois le build terminé.
+`LIS-MOI.txt` restent en place. **`compilation/` ne sert qu'à compiler** : après
+avoir vérifié que `jeu\personnage\LibreViesPersonnage.exe` démarre, tu peux
+supprimer localement `compilation\personnage\` pour récupérer de la place.
+Ne supprime jamais `jeu\personnage\` : ce dossier contient le logiciel livré.
+Si tu veux reconstruire plus tard après avoir supprimé les sources, relance
+`build_launcher.bat` ; il téléchargera de nouveau le projet du créateur.
 
 Deux garanties importantes :
 
