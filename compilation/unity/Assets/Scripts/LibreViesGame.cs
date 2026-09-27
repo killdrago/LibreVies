@@ -179,6 +179,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private float playerProtection;
     private float invincibility;
     private float speedBoost;
+    // Apres epuisement, maintenir SHIFT ne doit pas relancer la course des
+    // que l'endurance remonte d'une fraction : le joueur doit relacher puis
+    // rappuyer, comme dans un jeu de course classique.
+    private bool courseBloqueeEndurance;
     private int hp = MaxHp;
     private int coins;
     private int rocks;
@@ -932,6 +936,7 @@ public sealed class LibreViesGame : MonoBehaviour
             ElementEdition elementPorte = TrouverElementEdition(batiment.PorteRoot);
             if (elementPorte != null) elementPorte.HauteurLocale = positionPorte.y;
         }
+        CollerOuverturesEtPancarteAuMur(batiment);
         if (batiment.Collision != null)
         {
             batiment.Collision.Largeur = batiment.Largeur + 0.5f;
@@ -939,6 +944,39 @@ public sealed class LibreViesGame : MonoBehaviour
             batiment.Collision.Hauteur = batiment.Hauteur;
             batiment.Collision.Portee = Mathf.Max(batiment.Collision.Largeur,
                 batiment.Collision.Profondeur) * 0.5f + 1f;
+        }
+    }
+
+    private void CollerOuverturesEtPancarteAuMur(Batiment batiment)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        // La facade active est a +Z. Les centres des objets sont avances de la
+        // moitie de leur epaisseur : ils touchent le mur sans flotter devant.
+        float face = batiment.ProfondeurInitiale * 0.5f;
+        if (batiment.PorteRoot != null)
+        {
+            Vector3 position = batiment.PorteRoot.localPosition;
+            position.z = face + 0.061f; // vantail : profondeur 0,12 m
+            batiment.PorteRoot.localPosition = position;
+        }
+        Transform[] enfants = batiment.Root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < enfants.Length; i++)
+        {
+            Transform enfant = enfants[i];
+            if (enfant.name == "Fenetre")
+            {
+                Vector3 position = enfant.localPosition;
+                position.z = face + 0.051f; // vitre : profondeur 0,10 m
+                enfant.localPosition = position;
+            }
+        }
+        Transform panneau = batiment.Root.Find("Affiche_Maison");
+        if (panneau != null)
+        {
+            Vector3 position = panneau.localPosition;
+            float demiEpaisseur = Mathf.Abs(panneau.localScale.z) * 0.5f;
+            position.z = face + demiEpaisseur + 0.002f;
+            panneau.localPosition = position;
         }
     }
 
@@ -1029,6 +1067,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void SynchroniserBatiment(Batiment batiment)
     {
         if (batiment == null || batiment.Root == null) return;
+        CollerOuverturesEtPancarteAuMur(batiment);
         batiment.X = batiment.Root.position.x;
         batiment.Z = batiment.Root.position.z;
         if (batiment.Collision != null)
@@ -1239,7 +1278,9 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
         // La brique de maison est volontairement gris neutre : aucune teinte
         // bleue ne doit apparaitre avec le choix BRIQUE dans EDITION.
-        MakeMaterial("Brique", new Color(0.48f, 0.48f, 0.48f));
+        // Brique gris pierre, dans le meme esprit que la route mais plus
+        // claire et sans la teinte bleue de l'ancien mur.
+        MakeMaterial("Brique", new Color(0.68f, 0.68f, 0.66f));
         MakeMaterial("Roof", new Color(0.42f, 0.12f, 0.09f));
         MakeMaterial("RoofBlue", new Color(0.16f, 0.30f, 0.58f));
         MakeMaterial("RoofRed", new Color(0.55f, 0.13f, 0.10f));
@@ -1300,7 +1341,8 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
         else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route"
+            || nom == "Brique") chemin = "LVTextures/LV_Stone";
         else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
         else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
@@ -2538,7 +2580,7 @@ public sealed class LibreViesGame : MonoBehaviour
         var pivotPorte = new GameObject("Porte").transform;
         pivotPorte.SetParent(root, false);
         pivotPorte.localPosition = new Vector3(-0.60f,
-            HauteurPorteConfortable * 0.5f, size.z * 0.51f);
+            HauteurPorteConfortable * 0.5f, size.z * 0.5f + 0.061f);
         Transform vantailPorte = Box(new Vector3(0.60f, 0f, 0f),
             new Vector3(1.2f, HauteurPorteConfortable, 0.12f),
             "Bois_Clair", pivotPorte, "Porte_Vantail").transform;
@@ -2551,7 +2593,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int side = -1; side <= 1; side += 2)
         {
             GameObject fenetre = Box(new Vector3(side * size.x * 0.27f, 1.8f,
-                size.z * 0.515f), new Vector3(1.0f, 0.75f, 0.10f),
+                size.z * 0.5f + 0.051f), new Vector3(1.0f, 0.75f, 0.10f),
                 "GlassBleu", root, "Fenetre");
             Renderer renduFenetre = fenetre.GetComponent<Renderer>();
             if (renduFenetre != null)
@@ -2559,6 +2601,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         ActualiserOuverturePorteVisuelle(batiment);
         CreerAfficheMaison(root, size, name);
+        CollerOuverturesEtPancarteAuMur(batiment);
     }
 
     private bool TryTrouverCoteRedimensionnement(ElementEdition element, out int cote)
@@ -2837,21 +2880,22 @@ public sealed class LibreViesGame : MonoBehaviour
             for (int i = 0; i < noms.Length; i++)
             {
                 float y = cadre.y + 166f + i * 29f;
-                // Les fleches ont le meme sens pour les quatre faces :
-                // < reduit et > agrandit. Cela corrige l'inversion des faces
-                // avant/arriere sans changer l'axe reel redimensionne.
+                // Les faces avant et arriere n'ont plus de fleches dont le
+                // sens depend de la camera : moins reduit, plus agrandit.
+                // Le redimensionnement garde ainsi le bon cote fixe, y compris
+                // pour la face arriere.
                 bool inverse = false;
                 GUI.Label(new Rect(cadre.x + 16f, y, 165f, 26f), noms[i], smallStyle);
-                if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 26f), "<", buttonStyle))
+                if (GUI.Button(new Rect(cadre.x + 242f, y, 54f, 26f), "-", buttonStyle))
                     ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], inverse);
-                if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 26f), ">", buttonStyle))
+                if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 26f), "+", buttonStyle))
                     ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], !inverse);
             }
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 282f, 165f, 26f),
-                "HAUTEUR DES MURS", smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 282f, 54f, 26f), "<", buttonStyle))
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 282f, 165f, 36f),
+                "HAUTEUR\nDES MURS", smallStyle);
+            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 282f, 54f, 26f), "↓", buttonStyle))
                 ModifierHauteurMur(elementEditionDernierSelectionne, false);
-            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 282f, 54f, 26f), ">", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 282f, 54f, 26f), "↑", buttonStyle))
                 ModifierHauteurMur(elementEditionDernierSelectionne, true);
             DessinerChoixMateriaux(batiment, "mur",
                 new[] { "MUR", "BOIS", "BRIQUE" },
@@ -2870,11 +2914,11 @@ public sealed class LibreViesGame : MonoBehaviour
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
                 "Maintenez le clic sur la porte pour la deplacer.\n"
                     + "Elle s'ouvre devant vous si elle est assez haute.", smallStyle);
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 218f, 165f, 26f),
-                "HAUTEUR DE LA PORTE", smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 218f, 54f, 26f), "<", buttonStyle))
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 218f, 165f, 36f),
+                "HAUTEUR\nDE LA PORTE", smallStyle);
+            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 218f, 54f, 26f), "↓", buttonStyle))
                 ModifierHauteurPorte(batiment, false);
-            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 218f, 54f, 26f), ">", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 218f, 54f, 26f), "↑", buttonStyle))
                 ModifierHauteurPorte(batiment, true);
             DessinerChoixMateriaux(batiment, "porte",
                 new[] { "BOIS", "ALUMINIUM" },
@@ -3104,8 +3148,13 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (element == null || element.Root == null) return;
         if (element.Maison != null) SynchroniserBatiment(element.Maison);
-        if (element.MaisonParent != null && (element.Type == "Fenetre" || element.Type == "Porte"))
-            ActualiserOuverturePorteVisuelle(element.MaisonParent);
+        if (element.MaisonParent != null)
+        {
+            CollerOuverturesEtPancarteAuMur(element.MaisonParent);
+            if (element.Type == "Fenetre" || element.Type == "Porte")
+                ActualiserOuverturePorteVisuelle(element.MaisonParent);
+            SynchroniserBatiment(element.MaisonParent);
+        }
         if (element.Collision != null)
         {
             element.Collision.X = element.Root.position.x;
@@ -3222,6 +3271,8 @@ public sealed class LibreViesGame : MonoBehaviour
             element.Maison.EditionSoulevee = false;
             SynchroniserBatiment(element.Maison);
         }
+        if (element.MaisonParent != null)
+            SynchroniserElementEdition(element);
     }
 
     private void CommencerDeplacementMaisonEdition()
@@ -3423,7 +3474,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerAfficheMaison(Transform parent, Vector3 taille, string nom)
     {
-        float z = taille.z * 0.525f;
+        // Panneau centre sur la surface du mur (+Z), avec juste son epaisseur
+        // dehors : il ne flotte plus et ne s'enfonce pas dans la facade.
+        float z = taille.z * 0.5f + 0.041f;
         float largeur;
         if (nom == "Auberge") largeur = 5.20f;
         else if (nom == "Atelier") largeur = 4.80f;
@@ -3474,7 +3527,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void AppliquerTaillePancarte(FacadeTextState facade)
     {
         if (facade == null) return;
-        facade.Taille = Mathf.Clamp(facade.Taille <= 0f ? 0.14f : facade.Taille, 0.04f, 1.0f);
+        facade.Taille = Mathf.Clamp(facade.Taille <= 0f ? 0.14f : facade.Taille, 0.01f, 2.0f);
         if (facade.Texte != null) facade.Texte.characterSize = facade.Taille;
         if (facade.Panneau != null)
         {
@@ -3547,7 +3600,10 @@ public sealed class LibreViesGame : MonoBehaviour
             : texteRendu.bounds.size.x / Mathf.Max(facade.Root.transform.lossyScale.x, 0.001f);
         // L'option SOULIGNE reste sous le texte, sans se retrouver au milieu
         // des caracteres.
-        float hauteur = -facade.Texte.characterSize * 0.52f;
+        // TextMesh est centre sur son point d'origine : -0,52 etait encore
+        // dans la partie basse des glyphes selon la police. Cette marge place
+        // clairement le trait sous toute la hauteur du texte.
+        float hauteur = -facade.Texte.characterSize * 0.88f;
         rendu.startWidth = facade.Texte.characterSize * 0.055f;
         rendu.endWidth = rendu.startWidth;
         rendu.startColor = facade.Couleur;
@@ -3641,31 +3697,35 @@ public sealed class LibreViesGame : MonoBehaviour
                 MettreAJourSoulignement(facade);
             }
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 180f, 24f),
-            "Taille du texte (nombre) :", labelStyle);
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 120f, 24f),
+            "TAILLE DU TEXTE :", labelStyle);
+        // L'editeur affiche une taille lisible comme dans Word (1, 2, 10,
+        // 20, 50...). La conversion en characterSize reste interne a Unity.
         if (string.IsNullOrEmpty(facade.TailleTexteSaisie))
-            facade.TailleTexteSaisie = facade.Taille.ToString("0.00", CultureInfo.InvariantCulture);
+            facade.TailleTexteSaisie = Mathf.Clamp(Mathf.RoundToInt(facade.Taille * 100f), 1, 200)
+                .ToString(CultureInfo.InvariantCulture);
         string tailleSaisie = GUI.TextField(new Rect(cadre.x + 145f, cadre.y + 175f, 82f, 28f),
             facade.TailleTexteSaisie);
         facade.TailleTexteSaisie = tailleSaisie;
-        float taille;
-        if (float.TryParse(tailleSaisie.Replace(',', '.'), NumberStyles.Float,
-            CultureInfo.InvariantCulture, out taille))
+        int tailleEntiere;
+        if (int.TryParse(tailleSaisie, NumberStyles.Integer,
+            CultureInfo.InvariantCulture, out tailleEntiere))
         {
-            facade.Taille = Mathf.Clamp(taille, 0.04f, 1.0f);
+            tailleEntiere = Mathf.Clamp(tailleEntiere, 1, 200);
+            facade.Taille = tailleEntiere / 100f;
             AppliquerTaillePancarte(facade);
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 218f, 190f, 24f),
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 218f, 190f, 34f),
             "LARGEUR PANCARTE", labelStyle);
-        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 216f, 54f, 26f), "<", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 216f, 54f, 26f), "-", buttonStyle))
             ModifierTaillePancarte(facade, false, false);
-        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 216f, 54f, 26f), ">", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 216f, 54f, 26f), "+", buttonStyle))
             ModifierTaillePancarte(facade, false, true);
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 253f, 190f, 24f),
-            "HAUTEUR PANCARTE", labelStyle);
-        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 251f, 54f, 26f), "<", buttonStyle))
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 253f, 190f, 36f),
+            "HAUTEUR\nPANCARTE", labelStyle);
+        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 251f, 54f, 26f), "↓", buttonStyle))
             ModifierTaillePancarte(facade, true, false);
-        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 251f, 54f, 26f), ">", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 251f, 54f, 26f), "↑", buttonStyle))
             ModifierTaillePancarte(facade, true, true);
         GUI.Label(new Rect(cadre.x + 14f, cadre.y + 292f, cadre.width - 28f, 48f),
             "Les changements sont sauvegardes en quittant EDITION.\n"
@@ -5003,10 +5063,15 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else
         {
-            brasHeroineGauche.localRotation = Quaternion.Euler(-balancementBras, 0f, 0f);
-            brasHeroineDroit.localRotation = Quaternion.Euler(balancementBras, 0f, 0f);
-            coudeHeroineGauche.localRotation = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
-            coudeHeroineDroit.localRotation = Quaternion.Euler(flexionCoudeDroit, 0f, 0f);
+            // Le marteau reste du cote droit du joueur, mais son bras porteur
+            // reprend exactement le mouvement du bras gauche demande pour le
+            // personnage : meme balancement, meme flexion du coude.
+            Quaternion rotationBrasGauche = Quaternion.Euler(-balancementBras, 0f, 0f);
+            Quaternion rotationCoudeGauche = Quaternion.Euler(flexionCoudeGauche, 0f, 0f);
+            brasHeroineGauche.localRotation = rotationBrasGauche;
+            brasHeroineDroit.localRotation = rotationBrasGauche;
+            coudeHeroineGauche.localRotation = rotationCoudeGauche;
+            coudeHeroineDroit.localRotation = rotationCoudeGauche;
         }
         jambeHeroineGauche.localRotation = Quaternion.Euler(balancementJambe, 0f, 0f);
         jambeHeroineDroite.localRotation = Quaternion.Euler(-balancementJambe, 0f, 0f);
@@ -5284,12 +5349,24 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 forward = gameCamera.transform.forward; forward.y = 0; forward.Normalize();
         Vector3 right = gameCamera.transform.right; right.y = 0; right.Normalize();
         Vector3 direction = forward * input.z + right * input.x;
-        bool courseDemandee = Touche(toucheCourir) && direction.sqrMagnitude > 0.01f;
-        bool courseActive = courseDemandee && endurance > 0.5f && !playerInWater;
+        bool toucheCourse = Touche(toucheCourir);
+        bool courseDemandee = toucheCourse && direction.sqrMagnitude > 0.01f;
+        if (!toucheCourse) courseBloqueeEndurance = false;
+        if (toucheCourse && endurance <= 0.01f) courseBloqueeEndurance = true;
+        bool courseActive = courseDemandee && !courseBloqueeEndurance
+            && endurance > 0.5f && !playerInWater;
+        // Une fois l'endurance vide, on repasse bien a PlayerSpeed meme si la
+        // touche de course reste enfoncee. Elle ne se recharge qu'apres avoir
+        // relache la touche, ce qui empeche l'alternance course/marche a
+        // chaque frame qui donnait l'impression que la vitesse ne baissait pas.
         float speed = playerInWater ? SwimSpeed : (courseActive ? RunSpeed : PlayerSpeed);
         if (!playerInWater)
-            endurance = Mathf.MoveTowards(endurance, courseActive ? 0f : 100f,
-                dt * (courseActive ? 22f : 16f));
+        {
+            if (courseActive)
+                endurance = Mathf.MoveTowards(endurance, 0f, dt * 22f);
+            else if (!toucheCourse)
+                endurance = Mathf.MoveTowards(endurance, 100f, dt * 16f);
+        }
         if (speedBoost > 0) speed += playerInWater ? 0.8f : 3f;
         if (direction.sqrMagnitude > 0.01f)
         {
@@ -6131,7 +6208,9 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // Les barres restent le premier encadre en haut a gauche. La fenetre
         // de quete vient juste SOUS ce cadre, avec une croix pour la fermer.
-        GUI.Box(new Rect(20, 18, 270, 124), "", boxStyle);
+        // Or et cailloux restent dans l'inventaire : le cadre HUD ne garde
+        // que PV, endurance et experience, avec une hauteur reduite.
+        GUI.Box(new Rect(20, 18, 270, 108), "", boxStyle);
         float hudY = 29f;
         DessinerBarre(new Rect(32, hudY, 230, 14), hp / (float)MaxHp, "PV");
         DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
