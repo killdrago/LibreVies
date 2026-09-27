@@ -4406,12 +4406,13 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Comme pour le joueur, le point de l'accessoire est enfant du coude
-        // droit, pas de l'origine du maillage Hand_R. Il reste ainsi solidaire
-        // du bras qui bouge réellement.
+        // Sur ce modèle, les groupes OBJ visibles depuis le joueur ont les
+        // côtés nommés en miroir : le bras visible à droite est le pivot G.
+        // L'accessoire doit donc suivre ce pivot, et non le pivot D qui reste
+        // fixe. Son point est directement enfant du coude articulé.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeD, false);
-        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeG, false);
+        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4475,8 +4476,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
@@ -4523,20 +4524,23 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (accessoireBrasDroit)
             {
-                // Seul le bras droit porte l'accessoire : le gauche reste
-                // immobile. L'angle est borne avant que le coude ne passe
-                // derriere le corps, au lieu de continuer sa course complete.
+                // Le bras visible a droite porte l'accessoire : dans ces OBJ,
+                // il correspond au pivot G. Le pivot D visible a gauche reste
+                // strictement fixe.
                 float amplitude = pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
                 float angleBrasDroit = balancement * amplitude * Mathf.Rad2Deg;
-                float limiteArriere = pnj.Metier == "Forgeron" ? 18f : 16f;
-                float limiteAvant = pnj.Metier == "Forgeron" ? 28f : 24f;
-                angleBrasDroit = Mathf.Clamp(angleBrasDroit, -limiteArriere, limiteAvant);
-                if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
-                if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
-                if (pnj.BrasD != null)
-                    pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
-                if (pnj.CoudeD != null)
-                    pnj.CoudeD.localRotation = Quaternion.Euler(
+                // Avec ce rig, l'angle positif part vers l'arriere. Le
+                // forgeron est donc bloque pres du corps a l'arriere, tandis
+                // qu'il dispose d'une course plus grande vers l'avant.
+                float limiteArriere = pnj.Metier == "Forgeron" ? 8f : 16f;
+                float limiteAvant = pnj.Metier == "Forgeron" ? 40f : 24f;
+                angleBrasDroit = Mathf.Clamp(angleBrasDroit, -limiteAvant, limiteArriere);
+                if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.identity;
+                if (pnj.CoudeD != null) pnj.CoudeD.localRotation = Quaternion.identity;
+                if (pnj.BrasG != null)
+                    pnj.BrasG.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                if (pnj.CoudeG != null)
+                    pnj.CoudeG.localRotation = Quaternion.Euler(
                         Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
             }
             else
