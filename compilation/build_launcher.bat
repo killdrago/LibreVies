@@ -250,6 +250,7 @@ echo   TERMINE
 echo ==========================================================================
 echo   A donner au joueur : %JEU%\LibreVies.exe
 echo   A publier (le jeu) : %JEU%\game\
+echo   Createur humain   : %PERSONNAGE%\LibreViesPersonnage.exe
 echo.
 echo   Le joueur ne peut jouer qu'apres la publication de cette compilation.
 echo.
