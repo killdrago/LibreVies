@@ -4439,11 +4439,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Le bras droit visible utilise le pivot D pour cet objet. On ne
-        // change aucune rotation : on change uniquement le cote d'attache.
+        // Vu de face, le bras gauche du personnage correspond au pivot G.
+        // C'est le pivot deja anime : seul le point d'attache de l'objet est
+        // aligne dessus, sans changer le mouvement du bras.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeD, false);
-        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeG, false);
+        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4474,6 +4475,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Bois_Clair", pnj.Marteau, "Manche_Marteau");
             Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
                 "Metal", pnj.Marteau, "Tete_Marteau");
+            AjouterEtiquettesBrasForgeron(pnj);
         }
         else if (metier == "Maire")
         {
@@ -4504,11 +4506,34 @@ public sealed class LibreViesGame : MonoBehaviour
         pnjs.Add(pnj);
     }
 
+    private void AjouterEtiquettesBrasForgeron(PnjState pnj)
+    {
+        if (pnj == null) return;
+        // Ces lettres servent uniquement a identifier les deux cotes du
+        // personnage vu de face. Elles ne changent aucune rotation d'armature.
+        GameObject etiquetteD = CreerTexte3D("D", Vector3.zero, Color.yellow, 0.28f);
+        GameObject etiquetteG = CreerTexte3D("G", Vector3.zero, Color.cyan, 0.28f);
+        if (etiquetteD != null && pnj.BrasD != null)
+        {
+            etiquetteD.name = "Etiquette_Bras_Droit";
+            etiquetteD.transform.SetParent(pnj.BrasD, false);
+            etiquetteD.transform.localPosition = new Vector3(0.34f, 0.02f, -0.08f);
+            etiquetteD.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        }
+        if (etiquetteG != null && pnj.BrasG != null)
+        {
+            etiquetteG.name = "Etiquette_Bras_Gauche";
+            etiquetteG.transform.SetParent(pnj.BrasG, false);
+            etiquetteG.transform.localPosition = new Vector3(-0.34f, 0.02f, -0.08f);
+            etiquetteG.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        }
+    }
+
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
