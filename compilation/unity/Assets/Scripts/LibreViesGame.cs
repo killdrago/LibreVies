@@ -140,6 +140,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private Font policeDefaut;
     private bool policeCherchee;
     private readonly List<EnemyState> enemies = new List<EnemyState>();
+    private int nombreMonstresAdmin = 18;
+    private string nombreMonstresAdminTexte = "18";
     private readonly List<PickupState> pickups = new List<PickupState>();
     private readonly List<GameObject> clouds = new List<GameObject>();
     private readonly List<Material> materials = new List<Material>();
@@ -4473,31 +4475,18 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(0f, 1.45f, 0.235f), new Vector3(0.16f, 0.055f, 0.018f),
                 "Red", pnj.Model, "Croix_Medecin_Horizontale");
         }
-        else if (metier == "Forgeron")
+        else if (metier == "Forgeron" || metier == "Maire")
         {
-            // Enclume sur pied, avec plateau et pointe : ce n'est plus un
-            // simple cube flottant. Le marteau est parenté directement au
-            // point de la main droite.
-            CreerEnclumeForgeron(root);
-            pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
+            // Les bras du Forgeron et du Maire restent fixes. Le marteau est
+            // parenté directement au point de la main droite.
+            if (metier == "Forgeron") CreerEnclumeForgeron(root);
+            pnj.Marteau = new GameObject("Marteau_" + metier).transform;
             pnj.Marteau.SetParent(pnj.Main, false);
             pnj.Marteau.localPosition = Vector3.zero;
             Box(new Vector3(0f, -0.15f, 0f), new Vector3(0.09f, 0.42f, 0.09f),
                 "Bois_Clair", pnj.Marteau, "Manche_Marteau");
             Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
                 "Metal", pnj.Marteau, "Tete_Marteau");
-            AjouterEtiquettesBrasForgeron(pnj);
-        }
-        else if (metier == "Maire")
-        {
-            // La feuille est enfant du point de la main droite : elle suit
-            // exactement le bras et ne peut plus rester suspendue au torse.
-            pnj.Feuille = new GameObject("Feuille_Maire").transform;
-            pnj.Feuille.SetParent(pnj.Main, false);
-            pnj.Feuille.localPosition = Vector3.zero;
-            pnj.Feuille.localRotation = Quaternion.identity;
-            Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
-            Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f), "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
         else if (metier == "Vendeur" || metier == "Marchand")
         {
@@ -4515,33 +4504,6 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         ColCercle(position.x, position.z, 0.42f, 2.2f);
         pnjs.Add(pnj);
-    }
-
-    private void AjouterEtiquettesBrasForgeron(PnjState pnj)
-    {
-        if (pnj == null) return;
-        // Ces lettres servent uniquement a identifier les deux cotes du
-        // personnage vu de face. Elles ne changent aucune rotation d'armature.
-        GameObject etiquetteD = CreerTexte3D("D", Vector3.zero, Color.yellow, 0.28f);
-        GameObject etiquetteG = CreerTexte3D("G", Vector3.zero, Color.cyan, 0.28f);
-        // Les lettres doivent etre posees sur l'avant-bras visible, pas a
-        // l'exterieur du pivot du haut : sinon elles peuvent bouger seules et
-        // donner l'impression que le mauvais bras est anime. Le coude herite
-        // deja de la rotation du bras et reste colle au maillage de l'avant-bras.
-        if (etiquetteD != null && pnj.CoudeD != null)
-        {
-            etiquetteD.name = "Etiquette_Bras_Droit";
-            etiquetteD.transform.SetParent(pnj.CoudeD, false);
-            etiquetteD.transform.localPosition = new Vector3(0.03f, -0.10f, -0.16f);
-            etiquetteD.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        }
-        if (etiquetteG != null && pnj.CoudeG != null)
-        {
-            etiquetteG.name = "Etiquette_Bras_Gauche";
-            etiquetteG.transform.SetParent(pnj.CoudeG, false);
-            etiquetteG.transform.localPosition = new Vector3(-0.03f, -0.10f, -0.16f);
-            etiquetteG.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        }
     }
 
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
@@ -4585,14 +4547,12 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (pnj == null || pnj.Main == null
             || (pnj.Metier != "Maire" && pnj.Metier != "Forgeron")) return;
-        int pivotInterne = CoteInterneDepuisAdmin(PivotObjetAdmin(pnj.Metier));
-        int placementInterne = PlacementObjetAdmin(pnj.Metier);
-        Transform pivot = pivotInterne == 0 ? pnj.CoudeG : pnj.CoudeD;
+        // Le panneau NPC est retire : les deux PNJ gardent leur marteau
+        // directement dans la main droite visible.
+        Transform pivot = pnj.CoudeD;
         if (pivot == null) return;
         pnj.Main.SetParent(pivot, false);
-        pnj.Main.localPosition = placementInterne == 0
-            ? new Vector3(-0.14f, -0.35f, 0.04f)
-            : new Vector3(0.14f, -0.35f, 0.04f);
+        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
     }
 
@@ -4649,7 +4609,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (accessoireBrasDroit)
             {
                 ConfigurerObjetPnjAdmin(pnj);
-                int modeBras = ModeBrasAdminPnj(pnj.Metier);
+                int modeBras = 2; // Forgeron et Maire : deux bras fixes
                 float amplitude = pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
                 float angleBrasDroit = balancement * amplitude * Mathf.Rad2Deg;
                 // Avec ce rig, l'angle positif part vers l'arriere. Les limites
@@ -5279,13 +5239,8 @@ public sealed class LibreViesGame : MonoBehaviour
         mainHeroine.SetParent(coudeHeroineDroit, false);
         mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
-        marteauHeroine = new GameObject("Marteau_Heroine").transform;
-        marteauHeroine.SetParent(mainHeroine, false);
-        marteauHeroine.localPosition = Vector3.zero;
-        Box(new Vector3(0f, -0.15f, 0f), new Vector3(0.09f, 0.42f, 0.09f),
-            "Bois_Clair", marteauHeroine, "Manche_Marteau_Heroine");
-        Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
-            "Metal", marteauHeroine, "Tete_Marteau_Heroine");
+        // Le personnage joueur n'a plus de marteau visuel pour le moment.
+        marteauHeroine = null;
         jambeHeroineGauche = CreerPivotImporte(heroineModel, dossier,
             new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", "JeansUpper_L");
         jambeHeroineDroite = CreerPivotImporte(heroineModel, dossier,
@@ -5451,32 +5406,44 @@ public sealed class LibreViesGame : MonoBehaviour
         joueurCollider.radius = 0.48f;
     }
 
+    private void ReconfigurerMonstresAdmin()
+    {
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyState ennemi = enemies[i];
+            if (ennemi == null) continue;
+            if (ennemi.Corps != null) obstacles.Remove(ennemi.Corps);
+            if (ennemi.Root != null) Destroy(ennemi.Root);
+        }
+        enemies.Clear();
+        CreateEnemies();
+        ShowInfo("Nombre de monstres applique : " + nombreMonstresAdmin);
+    }
+
     private void CreateEnemies()
     {
-        // 6 zones de 3 betes, exactement comme la reference : souris (25 PV),
-        // rats (50 PV), araignees (75 PV). Une bete qui naitrait dans le
-        // village protege est repoussee juste dehors.
+        // La quantite est reglable dans ADMIN > Monstre. La repartition
+        // alterne souris, rats et araignees sur les six zones existantes.
         string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
         float[] centresX = { 55f, -55f, 70f, -70f, 35f, -45f };
         float[] centresZ = { 45f, -40f, -55f, 55f, 80f, -82f };
-        for (int zone = 0; zone < types.Length; zone++)
+        for (int index = 0; index < nombreMonstresAdmin; index++)
         {
-            for (int i = 0; i < 3; i++)
+            int zone = index % types.Length;
+            float x = centresX[zone] + UnityEngine.Random.Range(-8f, 8f);
+            float z = centresZ[zone] + UnityEngine.Random.Range(-8f, 8f);
+            if (DansVillage(x, z))
             {
-                float x = centresX[zone] + UnityEngine.Random.Range(-8f, 8f);
-                float z = centresZ[zone] + UnityEngine.Random.Range(-8f, 8f);
-                if (DansVillage(x, z))
-                {
-                    Vector2 pousse = new Vector2(x, z);
-                    if (pousse.magnitude < 0.001f) pousse = new Vector2(1f, 0f);
-                    pousse = pousse.normalized * (VillageRadius + 7f);
-                    x = pousse.x;
-                    z = pousse.y;
-                }
-                CreateEnemy(new Vector3(x, 0f, z), types[zone]);
+                Vector2 pousse = new Vector2(x, z);
+                if (pousse.magnitude < 0.001f) pousse = new Vector2(1f, 0f);
+                pousse = pousse.normalized * (VillageRadius + 7f);
+                x = pousse.x;
+                z = pousse.y;
             }
+            CreateEnemy(new Vector3(x, 0f, z), types[zone]);
         }
-        Debug.Log("[LV] monstres créés : " + enemies.Count + " (6 zones de 3, quantité conservée)");
+        Debug.Log("[LV] monstres créés : " + enemies.Count
+            + " (quantite ADMIN = " + nombreMonstresAdmin + ")");
     }
 
     private void CreateEnemy(Vector3 position, string type)
@@ -6762,6 +6729,44 @@ public sealed class LibreViesGame : MonoBehaviour
             GenererRapportAdminNpc();
     }
 
+    private void DessinerAdminMonstres(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
+            "MONSTRES", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 410f, 44f),
+            "Nombre de monstres charges : " + enemies.Count + "\n"
+                + "Souris, rats et araignees sont repartis dans les zones.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 132f, 230f, 24f),
+            "Nouvelle quantite (0 a 120)", smallStyle);
+        nombreMonstresAdminTexte = GUI.TextField(
+            new Rect(contenu.x + 250f, contenu.y + 128f, 82f, 30f),
+            nombreMonstresAdminTexte, 4, buttonStyle);
+        if (GUI.Button(new Rect(contenu.x + 342f, contenu.y + 128f, 110f, 30f),
+            "APPLIQUER", buttonStyle))
+        {
+            int valeur;
+            if (int.TryParse(nombreMonstresAdminTexte, NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out valeur))
+            {
+                valeur = Mathf.Clamp(valeur, 0, 120);
+                nombreMonstresAdminTexte = valeur.ToString(CultureInfo.InvariantCulture);
+                if (valeur != nombreMonstresAdmin)
+                {
+                    nombreMonstresAdmin = valeur;
+                    ReconfigurerMonstresAdmin();
+                }
+            }
+            else
+            {
+                nombreMonstresAdminTexte = nombreMonstresAdmin.ToString(CultureInfo.InvariantCulture);
+                ShowInfo("Quantite de monstres invalide");
+            }
+        }
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 184f, 470f, 60f),
+            "La modification recree les monstres immediatement.\n"
+                + "La valeur par defaut reste 18.", smallStyle);
+    }
+
     private void DessinerAdmin()
     {
         Rect fenetre = new Rect(Screen.width * 0.5f - 300f,
@@ -6776,7 +6781,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "Monstre", "NPC" };
+        string[] onglets = { "Ville", "Joueur", "Monstre" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -6813,17 +6818,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else if (adminTab == 2)
         {
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
-                "MONSTRE", titleStyle);
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 120f),
-                "Monstres charges : " + enemies.Count + "\n"
-                    + "Rats vaincus : " + ratsKilled + "\n"
-                    + "Araignees vaincues : " + spidersKilled,
-                smallStyle);
-        }
-        else
-        {
-            DessinerAdminNpc(contenu);
+            DessinerAdminMonstres(contenu);
         }
     }
 

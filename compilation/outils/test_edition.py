@@ -107,12 +107,25 @@ def test_blacksmith_and_mayor_accessories_follow_animated_arms():
     update = section(CS, "private void UpdatePnj", "private void MettreAJourVisibiliteAffiches")
     assert 'pnj.Metier == "Forgeron" || pnj.Metier == "Maire"' in update
     assert "accessoireBrasDroit" in update
+    assert "int modeBras = 2" in update
     assert "Mathf.Clamp(angleBrasDroit" in update
     assert "Quaternion.identity" in update
     assert "TryDirectionProlongementBras" in update
     assert "pnj.Marteau" in update
     assert "pnj.Feuille" in update
+    assert 'new GameObject("Marteau_" + metier)' in CS
+    assert "AjouterEtiquettesBrasForgeron" not in CS
+    assert "Marteau_Heroine" not in CS
     assert "Enclume_Forgeron" not in update
+
+
+def test_admin_monster_quantity_and_removed_npc_tab():
+    admin = section(CS, "private void DessinerAdmin()", "private void OnGUI")
+    assert 'string[] onglets = { "Ville", "Joueur", "Monstre" };' in admin
+    assert "DessinerAdminMonstres" in admin
+    assert "nombreMonstresAdmin" in CS
+    assert "GUI.TextField" in CS
+    assert "ReconfigurerMonstresAdmin" in CS
 
 
 def test_sign_text_style_and_persistence_controls_exist():
