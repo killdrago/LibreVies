@@ -6803,10 +6803,15 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(135, 112, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
         if (menuResolutions)
         {
-            int debut = Mathf.Max(0, resolutionIndex - 3);
-            for (int i = debut; i < Mathf.Min(resolutions.Length, debut + 6); i++)
+            // Deux colonnes rendent toutes les resolutions accessibles en un
+            // seul ouvert de menu, notamment 1440x900, 1600x900 et 1680x1050.
+            const int lignesParColonne = 8;
+            for (int i = 0; i < resolutions.Length; i++)
             {
-                if (GUI.Button(new Rect(135, 142 + (i - debut) * 27, 220, 25), resolutions[i].x + " x " + resolutions[i].y, buttonStyle))
+                int colonne = i / lignesParColonne;
+                int ligne = i % lignesParColonne;
+                Rect choix = new Rect(colonne * 210f, 142f + ligne * 27f, 200f, 25f);
+                if (GUI.Button(choix, resolutions[i].x + " x " + resolutions[i].y, buttonStyle))
                 {
                     resolutionIndex = i;
                     menuResolutions = false;
