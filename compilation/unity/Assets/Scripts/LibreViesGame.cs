@@ -115,15 +115,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminPivotPerso = 1;
     private int adminPivotMaire = 1;
     private int adminPivotForgeron = 1;
-    // Apparence : 0 = femme, 1 = homme. Chaque personnage garde ses cinq
-    // choix independants : tete, bras, corps, jambes et coupe de cheveux.
-    private int adminApparenceCible;
-    private int adminSexePerso;
-    private int adminTetePerso;
-    private int adminBrasApparencePerso;
-    private int adminCorpsPerso;
-    private int adminJambesPerso;
-    private int adminCheveuxPerso;
     private ElementEdition elementEditionSelectionne;
     private ElementEdition elementEditionDernierSelectionne;
     private readonly List<ElementEdition> objetsEdition = new List<ElementEdition>();
@@ -480,12 +471,6 @@ public sealed class LibreViesGame : MonoBehaviour
         public Transform Etal;
         public float Phase;
         public string Metier;
-        public int Sexe;
-        public int TypeTete;
-        public int TypeBras;
-        public int TypeCorps;
-        public int TypeJambes;
-        public int TypeCheveux;
     }
 
     private sealed class FacadeTextState
@@ -4416,17 +4401,7 @@ public sealed class LibreViesGame : MonoBehaviour
         float y = TerrainHeight(position.x, position.z);
         var root = new GameObject("PNJ_" + metier).transform;
         root.position = new Vector3(position.x, y, position.z);
-        var pnj = new PnjState
-        {
-            Root = root.gameObject,
-            Metier = metier,
-            Sexe = (metier == "Maire" || metier == "Forgeron" || metier == "Marchand") ? 1 : 0,
-            TypeTete = 0,
-            TypeBras = 0,
-            TypeCorps = 0,
-            TypeJambes = 0,
-            TypeCheveux = 0
-        };
+        var pnj = new PnjState { Root = root.gameObject, Metier = metier };
 
         // Les habitants utilisent le même humanoïde OBJ indépendant que
         // l'héroïne : plus de capsule, cube ou tête carrée issue du prototype
@@ -4538,7 +4513,6 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(-0.02f, 0.67f, 0.02f), new Vector3(0.48f, 0.34f, 0.46f),
                 "Bois_Clair", pnj.Etal, "Carton_Haut");
         }
-        AppliquerApparencePnj(pnj);
         ColCercle(position.x, position.z, 0.42f, 2.2f);
         pnjs.Add(pnj);
     }
@@ -4568,246 +4542,6 @@ public sealed class LibreViesGame : MonoBehaviour
             etiquetteG.transform.localPosition = new Vector3(-0.03f, -0.10f, -0.16f);
             etiquetteG.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         }
-    }
-
-    private int TypeApparenceValide(int valeur)
-    {
-        return Mathf.Clamp(valeur, 0, 4);
-    }
-
-    private Transform TrouverPartieApparence(Transform racine, string nom)
-    {
-        if (racine == null) return null;
-        Transform[] enfants = racine.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < enfants.Length; i++)
-            if (enfants[i] != null && enfants[i].name == nom) return enfants[i];
-        return null;
-    }
-
-    private void EchellePartieApparence(Transform racine, string nom, Vector3 echelle)
-    {
-        Transform partie = TrouverPartieApparence(racine, nom);
-        if (partie != null) partie.localScale = echelle;
-    }
-
-    private void PositionPartieApparence(Transform racine, string nom, Vector3 position)
-    {
-        Transform partie = TrouverPartieApparence(racine, nom);
-        if (partie != null) partie.localPosition = position;
-    }
-
-    private void CouleurApparence(Transform racine, int sexe, int cheveux)
-    {
-        if (racine == null) return;
-        Color peau = sexe == 1
-            ? new Color(0.62f, 0.39f, 0.27f)
-            : new Color(0.88f, 0.57f, 0.39f);
-        Color[] couleursCheveux =
-        {
-            sexe == 1 ? new Color(0.10f, 0.065f, 0.04f) : new Color(0.58f, 0.055f, 0.025f),
-            new Color(0.20f, 0.08f, 0.035f),
-            new Color(0.78f, 0.46f, 0.12f),
-            new Color(0.035f, 0.025f, 0.02f),
-            new Color(0.18f, 0.23f, 0.34f)
-        };
-        Color couleurCheveux = couleursCheveux[TypeApparenceValide(cheveux)];
-        Renderer[] renderers = racine.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            Material[] materiaux = renderers[i].materials;
-            bool modifie = false;
-            for (int j = 0; j < materiaux.Length; j++)
-            {
-                if (materiaux[j] == null) continue;
-                string nom = materiaux[j].name;
-                if (nom.IndexOf("Skin", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    materiaux[j].color = peau;
-                    modifie = true;
-                }
-                else if (nom.IndexOf("Hair", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    materiaux[j].color = couleurCheveux;
-                    modifie = true;
-                }
-            }
-            if (modifie) renderers[i].materials = materiaux;
-        }
-    }
-
-    private void AppliquerApparencePersonnage(Transform modele,
-        Transform brasG, Transform brasD, Transform coudeG, Transform coudeD,
-        Transform jambeG, Transform jambeD, Transform genouG, Transform genouD,
-        float echelleBase, int sexe, int tete, int bras, int corps,
-        int jambes, int cheveux)
-    {
-        if (modele == null) return;
-        sexe = Mathf.Clamp(sexe, 0, 1);
-        tete = TypeApparenceValide(tete);
-        bras = TypeApparenceValide(bras);
-        corps = TypeApparenceValide(corps);
-        jambes = TypeApparenceValide(jambes);
-        cheveux = TypeApparenceValide(cheveux);
-        modele.localScale = Vector3.one * echelleBase;
-
-        float[] taillesTete = { 0.90f, 0.96f, 1.00f, 1.06f, 1.12f };
-        float tailleTete = taillesTete[tete] * (sexe == 1 ? 1.03f : 0.98f);
-        string[] partiesTete =
-        {
-            "Head", "Ear_L", "Ear_R", "EyeWhite_L", "EyeWhite_R", "Eye_L",
-            "Eye_R", "Brow_L", "Brow_R", "Nose", "Mouth"
-        };
-        for (int i = 0; i < partiesTete.Length; i++)
-            EchellePartieApparence(modele, partiesTete[i], Vector3.one * tailleTete);
-
-        float[] largeursBras = { 0.86f, 0.94f, 1.00f, 1.08f, 1.16f };
-        float[] longueursBras = { 0.88f, 0.95f, 1.00f, 1.07f, 1.15f };
-        float largeurBras = largeursBras[bras] * (sexe == 1 ? 1.08f : 0.96f);
-        Vector3 echelleBras = new Vector3(largeurBras, longueursBras[bras], largeurBras);
-        Vector3 echelleCoude = new Vector3(largeurBras, longueursBras[bras], largeurBras);
-        if (brasG != null) brasG.localScale = echelleBras;
-        if (brasD != null) brasD.localScale = echelleBras;
-        if (coudeG != null) coudeG.localScale = echelleCoude;
-        if (coudeD != null) coudeD.localScale = echelleCoude;
-
-        float[] largeursCorps = { 0.88f, 0.95f, 1.00f, 1.08f, 1.16f };
-        float[] profondeursCorps = { 0.92f, 0.97f, 1.00f, 1.07f, 1.14f };
-        float largeurCorps = largeursCorps[corps] * (sexe == 1 ? 1.08f : 0.96f);
-        Vector3 echelleCorps = new Vector3(largeurCorps, 1f, profondeursCorps[corps]);
-        EchellePartieApparence(modele, "Jacket", echelleCorps);
-        EchellePartieApparence(modele, "Belt", echelleCorps);
-        EchellePartieApparence(modele, "Collar", echelleCorps);
-
-        float[] largeursJambes = { 0.88f, 0.95f, 1.00f, 1.07f, 1.15f };
-        float[] longueursJambes = { 0.90f, 0.96f, 1.00f, 1.07f, 1.14f };
-        Vector3 echelleJambes = new Vector3(largeursJambes[jambes], longueursJambes[jambes], largeursJambes[jambes]);
-        if (jambeG != null) jambeG.localScale = echelleJambes;
-        if (jambeD != null) jambeD.localScale = echelleJambes;
-        if (genouG != null) genouG.localScale = echelleJambes;
-        if (genouD != null) genouD.localScale = echelleJambes;
-
-        string[] cheveuxParties = { "HairCap", "HairBack", "HairLock_L", "HairLock_R" };
-        for (int i = 0; i < cheveuxParties.Length; i++)
-        {
-            EchellePartieApparence(modele, cheveuxParties[i], Vector3.one);
-            PositionPartieApparence(modele, cheveuxParties[i], Vector3.zero);
-        }
-        if (cheveux == 1)
-        {
-            EchellePartieApparence(modele, "HairBack", new Vector3(1f, 0.72f, 1f));
-            EchellePartieApparence(modele, "HairLock_L", new Vector3(1f, 0.60f, 1f));
-            EchellePartieApparence(modele, "HairLock_R", new Vector3(1f, 0.60f, 1f));
-            PositionPartieApparence(modele, "HairBack", new Vector3(0f, 0.45f, 0f));
-            PositionPartieApparence(modele, "HairLock_L", new Vector3(0f, 0.65f, 0f));
-            PositionPartieApparence(modele, "HairLock_R", new Vector3(0f, 0.65f, 0f));
-        }
-        else if (cheveux == 2)
-        {
-            EchellePartieApparence(modele, "HairBack", new Vector3(1f, 1.20f, 1f));
-            EchellePartieApparence(modele, "HairLock_L", new Vector3(1f, 1.25f, 1f));
-            EchellePartieApparence(modele, "HairLock_R", new Vector3(1f, 1.25f, 1f));
-            PositionPartieApparence(modele, "HairBack", new Vector3(0f, -0.35f, 0f));
-            PositionPartieApparence(modele, "HairLock_L", new Vector3(0f, -0.40f, 0f));
-            PositionPartieApparence(modele, "HairLock_R", new Vector3(0f, -0.40f, 0f));
-        }
-        else if (cheveux == 3)
-        {
-            EchellePartieApparence(modele, "HairCap", new Vector3(1.12f, 1.10f, 1.12f));
-            EchellePartieApparence(modele, "HairBack", new Vector3(1.10f, 1.08f, 1.10f));
-            PositionPartieApparence(modele, "HairCap", new Vector3(0f, -0.20f, 0f));
-            PositionPartieApparence(modele, "HairBack", new Vector3(0f, -0.15f, 0f));
-        }
-        else if (cheveux == 4)
-        {
-            EchellePartieApparence(modele, "HairBack", new Vector3(1.05f, 0.90f, 1f));
-            EchellePartieApparence(modele, "HairLock_L", new Vector3(1f, 1.35f, 1f));
-            EchellePartieApparence(modele, "HairLock_R", new Vector3(1f, 0.55f, 1f));
-            PositionPartieApparence(modele, "HairBack", new Vector3(0f, 0.15f, 0f));
-            PositionPartieApparence(modele, "HairLock_L", new Vector3(0f, -0.40f, 0f));
-            PositionPartieApparence(modele, "HairLock_R", new Vector3(0f, 0.55f, 0f));
-        }
-        CouleurApparence(modele, sexe, cheveux);
-    }
-
-    private void AppliquerApparencePnj(PnjState pnj)
-    {
-        if (pnj == null) return;
-        AppliquerApparencePersonnage(pnj.Model, pnj.BrasG, pnj.BrasD,
-            pnj.CoudeG, pnj.CoudeD, pnj.JambeG, pnj.JambeD,
-            pnj.GenouG, pnj.GenouD, 1.02f, pnj.Sexe, pnj.TypeTete,
-            pnj.TypeBras, pnj.TypeCorps, pnj.TypeJambes, pnj.TypeCheveux);
-    }
-
-    private void AppliquerApparenceHeroine()
-    {
-        AppliquerApparencePersonnage(heroineModel, brasHeroineGauche,
-            brasHeroineDroit, coudeHeroineGauche, coudeHeroineDroit,
-            jambeHeroineGauche, jambeHeroineDroite, genouHeroineGauche,
-            genouHeroineDroit, 1f, adminSexePerso, adminTetePerso,
-            adminBrasApparencePerso, adminCorpsPerso, adminJambesPerso,
-            adminCheveuxPerso);
-    }
-
-    private PnjState ApparenceCibleAdmin()
-    {
-        if (adminApparenceCible == 1) return TrouverPnjAdmin("Maire");
-        if (adminApparenceCible == 2) return TrouverPnjAdmin("Forgeron");
-        if (adminApparenceCible == 3) return TrouverPnjAdmin("Medecin");
-        if (adminApparenceCible == 4) return TrouverPnjAdmin("Marchand");
-        return null;
-    }
-
-    private string NomCibleApparence(int cible)
-    {
-        string[] noms = { "Perso", "Maire", "Forgeron", "Medecin", "Marchand" };
-        return noms[Mathf.Clamp(cible, 0, noms.Length - 1)];
-    }
-
-    private void LireApparenceAdmin(out int sexe, out int tete, out int bras,
-        out int corps, out int jambes, out int cheveux)
-    {
-        if (adminApparenceCible == 0)
-        {
-            sexe = adminSexePerso;
-            tete = adminTetePerso;
-            bras = adminBrasApparencePerso;
-            corps = adminCorpsPerso;
-            jambes = adminJambesPerso;
-            cheveux = adminCheveuxPerso;
-            return;
-        }
-        PnjState pnj = ApparenceCibleAdmin();
-        sexe = pnj == null ? 0 : pnj.Sexe;
-        tete = pnj == null ? 0 : pnj.TypeTete;
-        bras = pnj == null ? 0 : pnj.TypeBras;
-        corps = pnj == null ? 0 : pnj.TypeCorps;
-        jambes = pnj == null ? 0 : pnj.TypeJambes;
-        cheveux = pnj == null ? 0 : pnj.TypeCheveux;
-    }
-
-    private void EcrireApparenceAdmin(int sexe, int tete, int bras,
-        int corps, int jambes, int cheveux)
-    {
-        if (adminApparenceCible == 0)
-        {
-            adminSexePerso = sexe;
-            adminTetePerso = tete;
-            adminBrasApparencePerso = bras;
-            adminCorpsPerso = corps;
-            adminJambesPerso = jambes;
-            adminCheveuxPerso = cheveux;
-            AppliquerApparenceHeroine();
-            return;
-        }
-        PnjState pnj = ApparenceCibleAdmin();
-        if (pnj == null) return;
-        pnj.Sexe = sexe;
-        pnj.TypeTete = tete;
-        pnj.TypeBras = bras;
-        pnj.TypeCorps = corps;
-        pnj.TypeJambes = jambes;
-        pnj.TypeCheveux = cheveux;
-        AppliquerApparencePnj(pnj);
     }
 
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
@@ -5571,7 +5305,6 @@ public sealed class LibreViesGame : MonoBehaviour
             && coudeHeroineGauche.childCount > 0 && coudeHeroineDroit.childCount > 0
             && jambeHeroineGauche.childCount > 0 && jambeHeroineDroite.childCount > 0
             && genouHeroineGauche.childCount > 0 && genouHeroineDroit.childCount > 0;
-        AppliquerApparenceHeroine();
         ConfigurerAnimationsHeroine(model);
         Debug.Log("[LV] héroïne CC0 assemblée avec " + piecesChargees
             + " OBJ fixes ; animation par OBJ séparés=" + heroineRigPret);
@@ -7029,89 +6762,10 @@ public sealed class LibreViesGame : MonoBehaviour
             GenererRapportAdminNpc();
     }
 
-    private string NomSexeApparence(int sexe)
-    {
-        return sexe == 1 ? "Homme" : "Femme";
-    }
-
-    private void DessinerAdminApparence(Rect contenu)
-    {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 480f, 28f),
-            "APPARENCE DU PERSONNAGE", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 38f, 480f, 24f),
-            "Corps de base, sans objet ni accessoire", smallStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 66f, 480f, 22f),
-            "Personnage a modifier : " + NomCibleApparence(adminApparenceCible), smallStyle);
-        string[] cibles = { "Perso", "Maire", "Forgeron", "Medecin", "Marchand" };
-        for (int i = 0; i < cibles.Length; i++)
-        {
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 90f, 88f, 28f), cibles[i], adminApparenceCible == i))
-                adminApparenceCible = i;
-        }
-
-        int sexe;
-        int tete;
-        int bras;
-        int corps;
-        int jambes;
-        int cheveux;
-        LireApparenceAdmin(out sexe, out tete, out bras, out corps, out jambes, out cheveux);
-        bool modifie = false;
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 132f, 470f, 22f),
-            "Sexe : " + NomSexeApparence(sexe), smallStyle);
-        if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 156f, 130f, 28f),
-            "Femme", sexe == 0)) { sexe = 0; modifie = true; }
-        if (BoutonChoixAdmin(new Rect(contenu.x + 154f, contenu.y + 156f, 130f, 28f),
-            "Homme", sexe == 1)) { sexe = 1; modifie = true; }
-
-        string[] choix = { "1", "2", "3", "4", "5" };
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 198f, 470f, 22f),
-            "Tete : type " + (tete + 1), smallStyle);
-        for (int i = 0; i < choix.Length; i++)
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 222f, 88f, 28f), choix[i], tete == i))
-            { tete = i; modifie = true; }
-
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 264f, 470f, 22f),
-            "Bras : type " + (bras + 1), smallStyle);
-        for (int i = 0; i < choix.Length; i++)
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 288f, 88f, 28f), choix[i], bras == i))
-            { bras = i; modifie = true; }
-
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 330f, 470f, 22f),
-            "Corps : type " + (corps + 1), smallStyle);
-        for (int i = 0; i < choix.Length; i++)
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 354f, 88f, 28f), choix[i], corps == i))
-            { corps = i; modifie = true; }
-
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 396f, 470f, 22f),
-            "Jambes : type " + (jambes + 1), smallStyle);
-        for (int i = 0; i < choix.Length; i++)
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 420f, 88f, 28f), choix[i], jambes == i))
-            { jambes = i; modifie = true; }
-
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 462f, 470f, 22f),
-            "Coupe de cheveux : type " + (cheveux + 1), smallStyle);
-        for (int i = 0; i < choix.Length; i++)
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 486f, 88f, 28f), choix[i], cheveux == i))
-            { cheveux = i; modifie = true; }
-
-        if (modifie)
-            EcrireApparenceAdmin(sexe, tete, bras, corps, jambes, cheveux);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 528f, 490f, 38f),
-            "Les cinq types changent les proportions du maillage de base.\n"
-                + "Les objets et accessoires seront ajoutes plus tard.", smallStyle);
-    }
-
     private void DessinerAdmin()
     {
-        Rect fenetre = new Rect(Screen.width * 0.5f - 360f,
-            Screen.height * 0.5f - 320f, 720f, 640f);
+        Rect fenetre = new Rect(Screen.width * 0.5f - 300f,
+            Screen.height * 0.5f - 230f, 600f, 460f);
         GUI.Box(fenetre, "", boxStyle);
         GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
             "ADMINISTRATION", titleStyle);
@@ -7122,7 +6776,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "Monstre", "NPC", "Apparence" };
+        string[] onglets = { "Ville", "Joueur", "Monstre", "NPC" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -7167,13 +6821,9 @@ public sealed class LibreViesGame : MonoBehaviour
                     + "Araignees vaincues : " + spidersKilled,
                 smallStyle);
         }
-        else if (adminTab == 3)
-        {
-            DessinerAdminNpc(contenu);
-        }
         else
         {
-            DessinerAdminApparence(contenu);
+            DessinerAdminNpc(contenu);
         }
     }
 
