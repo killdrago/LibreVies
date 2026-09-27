@@ -8,6 +8,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 #endif
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Jeu LibreVies autonome pour Unity.
@@ -103,6 +104,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+    private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
     private int adminBrasPerso = 3;
@@ -1311,6 +1313,29 @@ public sealed class LibreViesGame : MonoBehaviour
             Debug.LogWarning("LibreVies : enregistrement des coordonnees edition impossible : "
                 + erreur.Message);
         }
+    }
+
+    private void RazEditionVille()
+    {
+        try
+        {
+            if (File.Exists(CheminCoordonneesEdition))
+                File.Delete(CheminCoordonneesEdition);
+            string temporaire = CheminCoordonneesEdition + ".tmp";
+            if (File.Exists(temporaire)) File.Delete(temporaire);
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : RAZ ville impossible : " + erreur.Message);
+        }
+        historiqueEdition.Clear();
+        elementEditionSelectionne = null;
+        elementEditionDernierSelectionne = null;
+        editionMaisonEnDeplacement = false;
+        editionRedimensionnement = false;
+        // Le rechargement reconstruit les maisons puis ne trouve plus de
+        // coordonnees sauvegardees : toutes les modifications sont annulees.
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     private void CreateMaterials()
@@ -4475,18 +4500,30 @@ public sealed class LibreViesGame : MonoBehaviour
             Box(new Vector3(0f, 1.45f, 0.235f), new Vector3(0.16f, 0.055f, 0.018f),
                 "Red", pnj.Model, "Croix_Medecin_Horizontale");
         }
-        else if (metier == "Forgeron" || metier == "Maire")
+        else if (metier == "Forgeron")
         {
-            // Les bras du Forgeron et du Maire restent fixes. Le marteau est
-            // parenté directement au point de la main droite.
-            if (metier == "Forgeron") CreerEnclumeForgeron(root);
-            pnj.Marteau = new GameObject("Marteau_" + metier).transform;
+            // Le bras du Forgeron reste fixe et le marteau est dans la main
+            // droite. L'enclume reste son decor de metier.
+            CreerEnclumeForgeron(root);
+            pnj.Marteau = new GameObject("Marteau_Forgeron").transform;
             pnj.Marteau.SetParent(pnj.Main, false);
             pnj.Marteau.localPosition = Vector3.zero;
             Box(new Vector3(0f, -0.15f, 0f), new Vector3(0.09f, 0.42f, 0.09f),
                 "Bois_Clair", pnj.Marteau, "Manche_Marteau");
             Box(new Vector3(0f, -0.39f, 0f), new Vector3(0.40f, 0.20f, 0.18f),
                 "Metal", pnj.Marteau, "Tete_Marteau");
+        }
+        else if (metier == "Maire")
+        {
+            // Le bras du Maire reste fixe et la feuille est dans la main
+            // droite, comme avant la modification du marteau commun.
+            pnj.Feuille = new GameObject("Feuille_Maire").transform;
+            pnj.Feuille.SetParent(pnj.Main, false);
+            pnj.Feuille.localPosition = Vector3.zero;
+            pnj.Feuille.localRotation = Quaternion.identity;
+            Box(Vector3.zero, new Vector3(0.48f, 0.62f, 0.035f), "White", pnj.Feuille, "Feuille");
+            Box(new Vector3(0f, 0.18f, -0.025f), new Vector3(0.30f, 0.025f, 0.012f),
+                "Dirt", pnj.Feuille, "Ligne_Feuille");
         }
         else if (metier == "Vendeur" || metier == "Marchand")
         {
@@ -5422,28 +5459,44 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateEnemies()
     {
-        // La quantite est reglable dans ADMIN > Monstre. La repartition
-        // alterne souris, rats et araignees sur les six zones existantes.
-        string[] types = { "souris", "souris", "rat", "rat", "araignee", "araignee" };
-        float[] centresX = { 55f, -55f, 70f, -70f, 35f, -45f };
-        float[] centresZ = { 45f, -40f, -55f, 55f, 80f, -82f };
+        // La quantite est reglable dans ADMIN > Monstre. Les positions sont
+        // tirees sur toute la carte, jamais dans le village ni dans la riviere.
+        // Un ecart minimal evite de former des tas lorsque la quantite augmente.
+        string[] types = { "souris", "rat", "araignee" };
         for (int index = 0; index < nombreMonstresAdmin; index++)
         {
-            int zone = index % types.Length;
-            float x = centresX[zone] + UnityEngine.Random.Range(-8f, 8f);
-            float z = centresZ[zone] + UnityEngine.Random.Range(-8f, 8f);
-            if (DansVillage(x, z))
+            Vector3 position = Vector3.zero;
+            bool positionValide = false;
+            for (int essai = 0; essai < 160 && !positionValide; essai++)
             {
-                Vector2 pousse = new Vector2(x, z);
-                if (pousse.magnitude < 0.001f) pousse = new Vector2(1f, 0f);
-                pousse = pousse.normalized * (VillageRadius + 7f);
-                x = pousse.x;
-                z = pousse.y;
+                float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+                float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+                Vector2 candidate = new Vector2(x, z);
+                positionValide = !DansVillage(x, z)
+                    && !ZoneEauInterditeMonstre(candidate);
+                if (positionValide)
+                {
+                    for (int precedent = 0; precedent < enemies.Count; precedent++)
+                    {
+                        EnemyState autre = enemies[precedent];
+                        if (autre == null || autre.Root == null) continue;
+                        Vector3 delta = autre.Root.transform.position - new Vector3(x, 0f, z);
+                        delta.y = 0f;
+                        if (delta.sqrMagnitude < 25f)
+                        {
+                            positionValide = false;
+                            break;
+                        }
+                    }
+                }
+                if (positionValide)
+                    position = new Vector3(x, 0f, z);
             }
-            CreateEnemy(new Vector3(x, 0f, z), types[zone]);
+            if (!positionValide) continue;
+            CreateEnemy(position, types[index % types.Length]);
         }
         Debug.Log("[LV] monstres créés : " + enemies.Count
-            + " (quantite ADMIN = " + nombreMonstresAdmin + ")");
+            + " (quantite ADMIN = " + nombreMonstresAdmin + ", positions aleatoires)");
     }
 
     private void CreateEnemy(Vector3 position, string type)
@@ -6803,6 +6856,23 @@ public sealed class LibreViesGame : MonoBehaviour
                     + "Portails : " + portails.Count + "\n"
                     + "Objets editables : " + objetsEdition.Count,
                 smallStyle);
+            if (!razVilleConfirmation)
+            {
+                if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 184f, 240f, 32f),
+                    "RAZ VILLE", buttonStyle))
+                    razVilleConfirmation = true;
+            }
+            else
+            {
+                GUI.Label(new Rect(contenu.x + 18f, contenu.y + 178f, 450f, 24f),
+                    "Confirmer : annuler toutes les modifications ?", smallStyle);
+                if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 208f, 120f, 32f),
+                    "CONFIRMER", buttonStyle))
+                    RazEditionVille();
+                if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 208f, 120f, 32f),
+                    "ANNULER", buttonStyle))
+                    razVilleConfirmation = false;
+            }
         }
         else if (adminTab == 1)
         {

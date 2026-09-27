@@ -113,7 +113,9 @@ def test_blacksmith_and_mayor_accessories_follow_animated_arms():
     assert "TryDirectionProlongementBras" in update
     assert "pnj.Marteau" in update
     assert "pnj.Feuille" in update
-    assert 'new GameObject("Marteau_" + metier)' in CS
+    assert 'new GameObject("Marteau_Forgeron")' in CS
+    assert 'new GameObject("Feuille_Maire")' in CS
+    assert 'new GameObject("Marteau_Maire")' not in CS
     assert "AjouterEtiquettesBrasForgeron" not in CS
     assert "Marteau_Heroine" not in CS
     assert "Enclume_Forgeron" not in update
@@ -126,6 +128,19 @@ def test_admin_monster_quantity_and_removed_npc_tab():
     assert "nombreMonstresAdmin" in CS
     assert "GUI.TextField" in CS
     assert "ReconfigurerMonstresAdmin" in CS
+    create = section(CS, "private void CreateEnemies()", "private void CreateEnemy")
+    assert "Random.Range(-WorldSize + 6f" in create
+    assert "DansVillage(x, z)" in create
+    assert "ZoneEauInterditeMonstre" in create
+
+
+def test_admin_city_reset_restores_saved_coordinates():
+    assert "private void RazEditionVille()" in CS
+    assert "File.Delete(CheminCoordonneesEdition)" in CS
+    assert "SceneManager.LoadScene" in CS
+    admin = section(CS, "if (adminTab == 0)", "else if (adminTab == 1)")
+    assert "RAZ VILLE" in admin
+    assert "CONFIRMER" in admin
 
 
 def test_sign_text_style_and_persistence_controls_exist():
