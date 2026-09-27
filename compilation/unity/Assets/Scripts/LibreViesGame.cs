@@ -106,8 +106,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
     private int adminBrasPerso = 3;
-    private int adminBrasMaire = 1;
-    private int adminBrasForgeron = 1;
+    private int adminBrasMaire = 0;
+    private int adminBrasForgeron = 0;
     // 0 = placement G, 1 = placement D ; meme convention pour le pivot.
     private int adminObjetPerso = 1;
     private int adminObjetMaire = 1;
@@ -6574,18 +6574,33 @@ public sealed class LibreViesGame : MonoBehaviour
         return cote == 0 ? "G" : "D";
     }
 
+    private int ModeAfficheDepuisInterne(int mode)
+    {
+        if (mode == 0) return 1;
+        if (mode == 1) return 0;
+        return mode;
+    }
+
+    private int ModeInterneDepuisAffiche(int mode)
+    {
+        if (mode == 0) return 1;
+        if (mode == 1) return 0;
+        return mode;
+    }
+
     private int LireModeBrasAdminSelection()
     {
-        if (adminNpcSelection == 0) return adminBrasPerso;
-        if (adminNpcSelection == 1) return adminBrasMaire;
-        return adminBrasForgeron;
+        int mode = adminNpcSelection == 0 ? adminBrasPerso
+            : (adminNpcSelection == 1 ? adminBrasMaire : adminBrasForgeron);
+        return ModeAfficheDepuisInterne(mode);
     }
 
     private void EcrireModeBrasAdminSelection(int valeur)
     {
-        if (adminNpcSelection == 0) adminBrasPerso = valeur;
-        else if (adminNpcSelection == 1) adminBrasMaire = valeur;
-        else adminBrasForgeron = valeur;
+        int mode = ModeInterneDepuisAffiche(valeur);
+        if (adminNpcSelection == 0) adminBrasPerso = mode;
+        else if (adminNpcSelection == 1) adminBrasMaire = mode;
+        else adminBrasForgeron = mode;
     }
 
     private int LireObjetAdminSelection()
@@ -6641,9 +6656,10 @@ public sealed class LibreViesGame : MonoBehaviour
         Transform coudeG, Transform coudeD)
     {
         rapport.AppendLine(nom + " :");
-        rapport.AppendLine("  mouvement_bras = " + NomModeBrasAdmin(mode));
-        rapport.AppendLine("  placement_objet = " + NomCoteAdmin(placement));
-        rapport.AppendLine("  pivot_objet = " + NomCoteAdmin(pivot));
+        rapport.AppendLine("  mouvement_bras = "
+            + NomModeBrasAdmin(ModeAfficheDepuisInterne(mode)));
+        rapport.AppendLine("  placement_objet = " + NomCoteAdmin(pivot));
+        rapport.AppendLine("  pivot_objet = " + NomCoteAdmin(placement));
         rapport.AppendLine("  parent_reel = "
             + (objet == null || objet.parent == null ? "inconnu" : objet.parent.name));
         rapport.AppendLine("  position_locale_reelle = "
@@ -6719,21 +6735,25 @@ public sealed class LibreViesGame : MonoBehaviour
                 EcrireModeBrasAdminSelection(i);
         }
 
-        int placement = LireObjetAdminSelection();
+        // Le controle Pivot objet etait celui qui changeait le cote visuel
+        // du personnage : il est donc expose sous le nom Placement de l'objet.
+        int placement = LirePivotAdminSelection();
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 174f, 380f, 22f),
-            "Placement objet : " + NomCoteAdmin(placement), smallStyle);
+            "Placement de l'objet : " + NomCoteAdmin(placement), smallStyle);
         if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 198f, 90f, 28f),
-            "G", placement == 0)) EcrireObjetAdminSelection(0);
+            "G", placement == 0)) EcrirePivotAdminSelection(0);
         if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 198f, 90f, 28f),
-            "D", placement == 1)) EcrireObjetAdminSelection(1);
+            "D", placement == 1)) EcrirePivotAdminSelection(1);
 
-        int pivot = LirePivotAdminSelection();
+        // L'ancien controle Placement objet regle le point local dans le
+        // pivot : il est maintenant expose sous le nom Pivot objet.
+        int pivot = LireObjetAdminSelection();
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 236f, 380f, 22f),
             "Pivot objet : " + NomCoteAdmin(pivot), smallStyle);
         if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 260f, 90f, 28f),
-            "G", pivot == 0)) EcrirePivotAdminSelection(0);
+            "G", pivot == 0)) EcrireObjetAdminSelection(0);
         if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 260f, 90f, 28f),
-            "D", pivot == 1)) EcrirePivotAdminSelection(1);
+            "D", pivot == 1)) EcrireObjetAdminSelection(1);
 
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 298f, 380f, 36f),
             "Le choix est applique en jeu et sera inclus dans le fichier TXT.", smallStyle);
