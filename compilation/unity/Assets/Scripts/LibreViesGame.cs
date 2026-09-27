@@ -5148,11 +5148,12 @@ public sealed class LibreViesGame : MonoBehaviour
             "SleeveLower_R", "Cuff_R", "Hand_R");
         coudeHeroineGauche.SetParent(brasHeroineGauche, true);
         coudeHeroineDroit.SetParent(brasHeroineDroit, true);
-        // Le marteau est place dans le bras droit, sans changer le mouvement
-        // de ce bras ni le sens de l'objet.
+        // Le marteau est place dans le bras droit visible. Seule l'attache
+        // change de cote : le mouvement et le sens de l'objet restent ceux
+        // deja definis.
         mainHeroine = new GameObject("Point_Main_Heroine").transform;
-        mainHeroine.SetParent(coudeHeroineDroit, false);
-        mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
+        mainHeroine.SetParent(coudeHeroineGauche, false);
+        mainHeroine.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
         marteauHeroine = new GameObject("Marteau_Heroine").transform;
         marteauHeroine.SetParent(mainHeroine, false);
