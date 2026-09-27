@@ -302,6 +302,10 @@ public sealed class LibreViesGame : MonoBehaviour
         public float LargeurPancarte;
         public float HauteurPancarte;
         public float HauteurPorte;
+        public float LuminositePancarte;
+        public float LuminositeMur;
+        public float LuminositePorte;
+        public float LuminositeToit;
         public int VersionDimensions;
         public string MateriauMur;
         public string MateriauFenetre;
@@ -312,7 +316,7 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class FichierCoordonneesEdition
     {
-        public int Version = 3;
+        public int Version = 4;
         public List<CoordonneeObjetEdition> Objets = new List<CoordonneeObjetEdition>();
     }
 
@@ -396,6 +400,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public string MateriauFenetre;
         public string MateriauPorte;
         public string MateriauToit;
+        public float LuminositeMur = 1f;
+        public float LuminositePorte = 1f;
+        public float LuminositeToit = 1f;
         public bool EditionSoulevee;
         public Obstacle Collision;
     }
@@ -464,6 +471,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public bool Souligne;
         public float Taille;
         public string TailleTexteSaisie;
+        public float Luminosite = 1f;
         public float LargeurPanneau;
         public float HauteurPanneau;
         public float LargeurPanneauInitiale;
@@ -1165,8 +1173,11 @@ public sealed class LibreViesGame : MonoBehaviour
                         element.Facade.LargeurPanneau = coordonnee.LargeurPancarte;
                     if (coordonnee.HauteurPancarte > 0f)
                         element.Facade.HauteurPanneau = coordonnee.HauteurPancarte;
+                    if (coordonnee.LuminositePancarte > 0f)
+                        element.Facade.Luminosite = Mathf.Clamp(coordonnee.LuminositePancarte, 0.2f, 2f);
                     AppliquerTaillePancarte(element.Facade);
                     AppliquerStylePancarte(element.Facade);
+                    AppliquerLuminositePancarte(element.Facade);
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -1180,6 +1191,12 @@ public sealed class LibreViesGame : MonoBehaviour
                         element.Maison.PorteHauteur = coordonnee.HauteurPorte;
                     else
                         element.Maison.PorteHauteur = HauteurPorteConfortable;
+                    if (coordonnee.LuminositeMur > 0f)
+                        element.Maison.LuminositeMur = Mathf.Clamp(coordonnee.LuminositeMur, 0.2f, 2f);
+                    if (coordonnee.LuminositePorte > 0f)
+                        element.Maison.LuminositePorte = Mathf.Clamp(coordonnee.LuminositePorte, 0.2f, 2f);
+                    if (coordonnee.LuminositeToit > 0f)
+                        element.Maison.LuminositeToit = Mathf.Clamp(coordonnee.LuminositeToit, 0.2f, 2f);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
                         AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
@@ -1188,6 +1205,9 @@ public sealed class LibreViesGame : MonoBehaviour
                         AppliquerMateriauMaison(element.Maison, "porte", coordonnee.MateriauPorte);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauToit))
                         AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
+                    AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
+                    AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
+                    AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
                 }
                 utilisees.Add(objet);
             }
@@ -1224,6 +1244,10 @@ public sealed class LibreViesGame : MonoBehaviour
                     LargeurPancarte = 0f,
                     HauteurPancarte = 0f,
                     HauteurPorte = 0f,
+                    LuminositePancarte = 0f,
+                    LuminositeMur = 0f,
+                    LuminositePorte = 0f,
+                    LuminositeToit = 0f,
                     VersionDimensions = 0,
                     MateriauMur = null,
                     MateriauFenetre = null,
@@ -1241,6 +1265,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.TaillePancarte = element.Facade.Taille;
                     coordonnee.LargeurPancarte = element.Facade.LargeurPanneau;
                     coordonnee.HauteurPancarte = element.Facade.HauteurPanneau;
+                    coordonnee.LuminositePancarte = element.Facade.Luminosite;
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -1250,6 +1275,9 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.MateriauFenetre = element.Maison.MateriauFenetre;
                     coordonnee.MateriauPorte = element.Maison.MateriauPorte;
                     coordonnee.MateriauToit = element.Maison.MateriauToit;
+                    coordonnee.LuminositeMur = element.Maison.LuminositeMur;
+                    coordonnee.LuminositePorte = element.Maison.LuminositePorte;
+                    coordonnee.LuminositeToit = element.Maison.LuminositeToit;
                 }
                 fichier.Objets.Add(coordonnee);
             }
@@ -2812,6 +2840,66 @@ public sealed class LibreViesGame : MonoBehaviour
             Renderer rendu = enfants[i].GetComponent<Renderer>();
             if (rendu != null) rendu.sharedMaterial = materiel;
         }
+        if (cible == "mur") AppliquerLuminositeMaison(batiment, "mur", batiment.LuminositeMur);
+        else if (cible == "porte") AppliquerLuminositeMaison(batiment, "porte", batiment.LuminositePorte);
+        else if (cible == "toit") AppliquerLuminositeMaison(batiment, "toit", batiment.LuminositeToit);
+    }
+
+    private float LireLuminositeMaison(Batiment batiment, string cible)
+    {
+        if (batiment == null) return 1f;
+        if (cible == "mur") return batiment.LuminositeMur;
+        if (cible == "porte") return batiment.LuminositePorte;
+        return batiment.LuminositeToit;
+    }
+
+    private void EcrireLuminositeMaison(Batiment batiment, string cible, float valeur)
+    {
+        if (batiment == null) return;
+        valeur = Mathf.Clamp(valeur, 0.2f, 2f);
+        if (cible == "mur") batiment.LuminositeMur = valeur;
+        else if (cible == "porte") batiment.LuminositePorte = valeur;
+        else batiment.LuminositeToit = valeur;
+    }
+
+    private void AppliquerLuminositeMaison(Batiment batiment, string cible, float valeur)
+    {
+        if (batiment == null || batiment.Root == null) return;
+        EcrireLuminositeMaison(batiment, cible, valeur);
+        string materiau = cible == "mur" ? batiment.MateriauMur
+            : (cible == "porte" ? batiment.MateriauPorte : batiment.MateriauToit);
+        Material source = Mat(materiau);
+        if (source == null) return;
+        Transform[] enfants = batiment.Root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < enfants.Length; i++)
+        {
+            string nom = enfants[i].name ?? "";
+            bool concerne = cible == "mur"
+                ? (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                    || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
+                : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
+                    : nom.StartsWith("Toit_"));
+            if (!concerne) continue;
+            Renderer rendu = enfants[i].GetComponent<Renderer>();
+            if (rendu == null || !source.HasProperty("_Color")) continue;
+            Material instance = rendu.material;
+            if (!instance.HasProperty("_Color")) continue;
+            Color couleur = source.color;
+            couleur.r = Mathf.Clamp01(couleur.r * valeur);
+            couleur.g = Mathf.Clamp01(couleur.g * valeur);
+            couleur.b = Mathf.Clamp01(couleur.b * valeur);
+            instance.color = couleur;
+        }
+    }
+
+    private void DessinerSliderLuminositeMaison(Batiment batiment, string cible, float y)
+    {
+        float valeur = LireLuminositeMaison(batiment, cible);
+        GUI.Label(new Rect(34f, y, 135f, 24f),
+            "LUMINOSITE : " + Mathf.RoundToInt(valeur * 100f) + "%", smallStyle);
+        float nouvelle = GUI.HorizontalSlider(new Rect(174f, y + 7f, 180f, 20f), valeur, 0.2f, 2f);
+        if (Mathf.Abs(nouvelle - valeur) > 0.001f)
+            AppliquerLuminositeMaison(batiment, cible, nouvelle);
     }
 
     private void DessinerChoixMateriaux(Batiment batiment, string cible,
@@ -2848,7 +2936,7 @@ public sealed class LibreViesGame : MonoBehaviour
             || elementEditionDernierSelectionne.Facade != null) return;
         Rect cadre = CadreEditionMaison();
         Batiment batiment = elementEditionDernierSelectionne.Maison;
-        GUI.Box(cadre, "MAISON SELECTIONNEE", boxStyle);
+        GUI.Box(cadre, "", boxStyle);
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
             "Choisissez une action : une seule action a la fois.", smallStyle);
         if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 56f, 190f, 30f),
@@ -2902,6 +2990,7 @@ public sealed class LibreViesGame : MonoBehaviour
             DessinerChoixMateriaux(batiment, "mur",
                 new[] { "MUR", "BOIS", "BRIQUE" },
                 new[] { "Wall", "Bois_Clair", "Brique" }, cadre.y + 320f);
+            DessinerSliderLuminositeMaison(batiment, "mur", cadre.y + 350f);
         }
         else if (editionOutilMaison == 2)
         {
@@ -2925,6 +3014,7 @@ public sealed class LibreViesGame : MonoBehaviour
             DessinerChoixMateriaux(batiment, "porte",
                 new[] { "BOIS", "ALUMINIUM" },
                 new[] { "Bois_Clair", "MetalAluminium" }, cadre.y + 258f);
+            DessinerSliderLuminositeMaison(batiment, "porte", cadre.y + 293f);
         }
         else if (editionOutilMaison == 4)
         {
@@ -2933,6 +3023,7 @@ public sealed class LibreViesGame : MonoBehaviour
             DessinerChoixMateriaux(batiment, "toit",
                 new[] { "ROUGE", "BOIS" },
                 new[] { "RoofRed", "Bois_Clair" }, cadre.y + 220f);
+            DessinerSliderLuminositeMaison(batiment, "toit", cadre.y + 255f);
         }
     }
 
@@ -3569,11 +3660,56 @@ public sealed class LibreViesGame : MonoBehaviour
             + (agrandir ? "augmentee de 0,5 m" : "reduite de 0,5 m"));
     }
 
+    private void AppliquerLuminositePancarte(FacadeTextState facade)
+    {
+        if (facade == null) return;
+        facade.Luminosite = Mathf.Clamp(facade.Luminosite, 0.2f, 2f);
+        if (facade.Panneau != null)
+        {
+            Renderer panneau = facade.Panneau.GetComponent<Renderer>();
+            Material source = Mat("Bois_Clair");
+            if (panneau != null && source != null && source.HasProperty("_Color"))
+            {
+                Material instance = panneau.material;
+                if (instance.HasProperty("_Color"))
+                {
+                    Color couleur = source.color;
+                    couleur.r = Mathf.Clamp01(couleur.r * facade.Luminosite);
+                    couleur.g = Mathf.Clamp01(couleur.g * facade.Luminosite);
+                    couleur.b = Mathf.Clamp01(couleur.b * facade.Luminosite);
+                    instance.color = couleur;
+                }
+            }
+        }
+        if (facade.Texte != null)
+        {
+            Color couleurTexte = facade.Couleur;
+            couleurTexte.r = Mathf.Clamp01(couleurTexte.r * facade.Luminosite);
+            couleurTexte.g = Mathf.Clamp01(couleurTexte.g * facade.Luminosite);
+            couleurTexte.b = Mathf.Clamp01(couleurTexte.b * facade.Luminosite);
+            facade.Texte.color = couleurTexte;
+        }
+    }
+
+    private void DessinerSliderLuminositePancarte(FacadeTextState facade, float y)
+    {
+        if (facade == null) return;
+        float valeur = Mathf.Clamp(facade.Luminosite, 0.2f, 2f);
+        GUI.Label(new Rect(32f, y, 125f, 24f),
+            "LUMINOSITE : " + Mathf.RoundToInt(valeur * 100f) + "%", smallStyle);
+        float nouvelle = GUI.HorizontalSlider(new Rect(163f, y + 7f, 180f, 20f), valeur, 0.2f, 2f);
+        if (Mathf.Abs(nouvelle - valeur) > 0.001f)
+        {
+            facade.Luminosite = nouvelle;
+            AppliquerLuminositePancarte(facade);
+        }
+    }
+
     private void AppliquerStylePancarte(FacadeTextState facade)
     {
         if (facade == null || facade.Texte == null) return;
         facade.Texte.text = facade.Libelle ?? "";
-        facade.Texte.color = facade.Couleur;
+        AppliquerLuminositePancarte(facade);
         MettreAJourSoulignement(facade);
     }
 
@@ -3665,15 +3801,16 @@ public sealed class LibreViesGame : MonoBehaviour
             if (GUI.Button(boutonCouleur, GUIContent.none, GUIStyle.none))
             {
                 facade.Couleur = couleurs[i];
-                if (facade.Texte != null) facade.Texte.color = facade.Couleur;
+                AppliquerLuminositePancarte(facade);
                 MettreAJourSoulignement(facade);
             }
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 178f, 100f, 30f),
+        DessinerSliderLuminositePancarte(facade, cadre.y + 165f);
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 201f, 100f, 30f),
             "TAILLE :", labelStyle);
-        // La valeur saisie reste un entier lisible (1, 2, 10, 20, 50...).
-        // Le champ est plus court, mais sa police est deux fois plus grande.
-        if (string.IsNullOrEmpty(facade.TailleTexteSaisie))
+        // Le test null, et non vide, permet d'effacer completement le champ
+        // avant de saisir le prochain entier.
+        if (facade.TailleTexteSaisie == null)
             facade.TailleTexteSaisie = Mathf.Clamp(Mathf.RoundToInt(facade.Taille * 100f), 1, 200)
                 .ToString(CultureInfo.InvariantCulture);
         GUIStyle tailleChampStyle = new GUIStyle(GUI.skin.textField)
@@ -3681,7 +3818,7 @@ public sealed class LibreViesGame : MonoBehaviour
             fontSize = Mathf.Max(22, GUI.skin.textField.fontSize * 2),
             alignment = TextAnchor.MiddleCenter
         };
-        string tailleSaisie = GUI.TextField(new Rect(cadre.x + 126f, cadre.y + 171f, 54f, 36f),
+        string tailleSaisie = GUI.TextField(new Rect(cadre.x + 126f, cadre.y + 194f, 54f, 36f),
             facade.TailleTexteSaisie, tailleChampStyle);
         facade.TailleTexteSaisie = tailleSaisie;
         int tailleEntiere;
@@ -3692,17 +3829,17 @@ public sealed class LibreViesGame : MonoBehaviour
             facade.Taille = tailleEntiere / 100f;
             AppliquerTaillePancarte(facade);
         }
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 218f, 190f, 34f),
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 240f, 190f, 28f),
             "LARGEUR PANCARTE", labelStyle);
-        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 216f, 54f, 26f), "-", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 238f, 54f, 26f), "-", buttonStyle))
             ModifierTaillePancarte(facade, false, false);
-        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 216f, 54f, 26f), "+", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 238f, 54f, 26f), "+", buttonStyle))
             ModifierTaillePancarte(facade, false, true);
-        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 253f, 190f, 36f),
-            "HAUTEUR\nPANCARTE", labelStyle);
-        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 251f, 54f, 26f), "↓", buttonStyle))
+        GUI.Label(new Rect(cadre.x + 14f, cadre.y + 275f, 190f, 28f),
+            "HAUTEUR PANCARTE", labelStyle);
+        if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 273f, 54f, 26f), "↓", buttonStyle))
             ModifierTaillePancarte(facade, true, false);
-        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 251f, 54f, 26f), "↑", buttonStyle))
+        if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 273f, 54f, 26f), "↑", buttonStyle))
             ModifierTaillePancarte(facade, true, true);
         if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 348f, 190f, 28f),
             "RETOUR AU MENU MAISON", buttonStyle))
@@ -4393,10 +4530,22 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Metier == "Forgeron" || pnj.Metier == "Maire")
                 balancement *= pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
-            if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
-            if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
-            if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.Euler(Mathf.Max(0f, balancement) * 16f, 0f, 0f);
-            if (pnj.CoudeD != null) pnj.CoudeD.localRotation = Quaternion.Euler(Mathf.Max(0f, -balancement) * 16f, 0f, 0f);
+            bool accessoireBrasGauche = pnj.Metier == "Forgeron" || pnj.Metier == "Maire";
+            Quaternion rotationBrasGauche = Quaternion.Euler(balancement * Mathf.Rad2Deg, 0f, 0f);
+            Quaternion rotationCoudeGauche = Quaternion.Euler(Mathf.Max(0f, balancement) * 16f, 0f, 0f);
+            if (pnj.BrasG != null) pnj.BrasG.localRotation = rotationBrasGauche;
+            // L'accessoire reste dans la main droite, mais son bras droit
+            // reprend exactement les rotations du bras gauche pour le maire et
+            // le forgeron. Il ne part plus en opposition de phase.
+            if (pnj.BrasD != null)
+                pnj.BrasD.localRotation = accessoireBrasGauche
+                    ? rotationBrasGauche
+                    : Quaternion.Euler(-balancement * Mathf.Rad2Deg, 0f, 0f);
+            if (pnj.CoudeG != null) pnj.CoudeG.localRotation = rotationCoudeGauche;
+            if (pnj.CoudeD != null)
+                pnj.CoudeD.localRotation = accessoireBrasGauche
+                    ? rotationCoudeGauche
+                    : Quaternion.Euler(Mathf.Max(0f, -balancement) * 16f, 0f, 0f);
             if (pnj.JambeG != null) pnj.JambeG.localRotation = Quaternion.Euler(Mathf.Sin(pnj.Phase * 0.8f) * 3f, 0f, 0f);
             if (pnj.JambeD != null) pnj.JambeD.localRotation = Quaternion.Euler(-Mathf.Sin(pnj.Phase * 0.8f) * 3f, 0f, 0f);
             if (pnj.GenouG != null) pnj.GenouG.localRotation = Quaternion.Euler(Mathf.Max(0f, -Mathf.Sin(pnj.Phase * 0.8f)) * 6f, 0f, 0f);
