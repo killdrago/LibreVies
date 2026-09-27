@@ -4439,12 +4439,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // de Hand_R. Le transform OBJ de la main a son origine au modèle,
         // donc ce point tombe exactement sur le centre de la paume et suit le
         // coude puis le bras, au lieu d'être un point flottant au torse.
-        // Vu de face, le bras gauche du personnage correspond au pivot G.
-        // C'est le pivot deja anime : seul le point d'attache de l'objet est
-        // aligne dessus, sans changer le mouvement du bras.
+        // Vu de face, le bras droit du personnage correspond au pivot D.
+        // L'objet est attache a ce meme bras anime, sans decalage ni mouvement
+        // autonome.
         pnj.Main = new GameObject("Point_Main_PNJ").transform;
-        pnj.Main.SetParent(pnj.CoudeG, false);
-        pnj.Main.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
+        pnj.Main.SetParent(pnj.CoudeD, false);
+        pnj.Main.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         pnj.Main.localRotation = Quaternion.identity;
         AppliquerShaderPersonnage(pnj.Model);
         TeinterPnj(pnj.Model, metier == "Maire"
@@ -4532,8 +4532,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool TryDirectionProlongementBras(PnjState pnj, out Vector3 directionLocale)
     {
         directionLocale = Vector3.down;
-        if (pnj == null || pnj.Main == null || pnj.CoudeG == null) return false;
-        Vector3 directionMonde = pnj.Main.position - pnj.CoudeG.position;
+        if (pnj == null || pnj.Main == null || pnj.CoudeD == null) return false;
+        Vector3 directionMonde = pnj.Main.position - pnj.CoudeD.position;
         if (directionMonde.sqrMagnitude < 0.0001f) return false;
         // Le vecteur coude -> paume est la direction de sortie du bras. On le
         // reconvertit dans l'espace local du point de main pour que le marteau
@@ -4580,9 +4580,8 @@ public sealed class LibreViesGame : MonoBehaviour
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);
             if (accessoireBrasDroit)
             {
-                // Le bras visible a droite porte l'accessoire : dans ces OBJ,
-                // il correspond au pivot G. Le pivot D visible a gauche reste
-                // strictement fixe.
+                // Vu de face, seul le bras droit porte l'accessoire et bouge.
+                // Le bras gauche reste totalement immobile.
                 float amplitude = pnj.Metier == "Forgeron" ? 1.35f : 0.85f;
                 float angleBrasDroit = balancement * amplitude * Mathf.Rad2Deg;
                 // Avec ce rig, l'angle positif part vers l'arriere. Le
@@ -4591,12 +4590,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 float limiteArriere = pnj.Metier == "Forgeron" ? 8f : 16f;
                 float limiteAvant = pnj.Metier == "Forgeron" ? 40f : 24f;
                 angleBrasDroit = Mathf.Clamp(angleBrasDroit, -limiteAvant, limiteArriere);
-                if (pnj.BrasD != null) pnj.BrasD.localRotation = Quaternion.identity;
-                if (pnj.CoudeD != null) pnj.CoudeD.localRotation = Quaternion.identity;
-                if (pnj.BrasG != null)
-                    pnj.BrasG.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
-                if (pnj.CoudeG != null)
-                    pnj.CoudeG.localRotation = Quaternion.Euler(
+                if (pnj.BrasG != null) pnj.BrasG.localRotation = Quaternion.identity;
+                if (pnj.CoudeG != null) pnj.CoudeG.localRotation = Quaternion.identity;
+                if (pnj.BrasD != null)
+                    pnj.BrasD.localRotation = Quaternion.Euler(angleBrasDroit, 0f, 0f);
+                if (pnj.CoudeD != null)
+                    pnj.CoudeD.localRotation = Quaternion.Euler(
                         Mathf.Max(0f, -angleBrasDroit) * 0.35f, 0f, 0f);
             }
             else
@@ -5173,12 +5172,11 @@ public sealed class LibreViesGame : MonoBehaviour
             "SleeveLower_R", "Cuff_R", "Hand_R");
         coudeHeroineGauche.SetParent(brasHeroineGauche, true);
         coudeHeroineDroit.SetParent(brasHeroineDroit, true);
-        // Le marteau est place dans le bras droit visible. Seule l'attache
-        // change de cote : le mouvement et le sens de l'objet restent ceux
-        // deja definis.
+        // Le marteau est dans la main droite et suit le pivot du bras droit.
+        // Le mouvement alterne du bras gauche reste gere par AnimerHeroine.
         mainHeroine = new GameObject("Point_Main_Heroine").transform;
-        mainHeroine.SetParent(coudeHeroineGauche, false);
-        mainHeroine.localPosition = new Vector3(-0.14f, -0.35f, 0.04f);
+        mainHeroine.SetParent(coudeHeroineDroit, false);
+        mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
         marteauHeroine = new GameObject("Marteau_Heroine").transform;
         marteauHeroine.SetParent(mainHeroine, false);
