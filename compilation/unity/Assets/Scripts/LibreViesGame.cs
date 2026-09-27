@@ -4524,18 +4524,22 @@ public sealed class LibreViesGame : MonoBehaviour
         // personnage vu de face. Elles ne changent aucune rotation d'armature.
         GameObject etiquetteD = CreerTexte3D("D", Vector3.zero, Color.yellow, 0.28f);
         GameObject etiquetteG = CreerTexte3D("G", Vector3.zero, Color.cyan, 0.28f);
-        if (etiquetteD != null && pnj.BrasD != null)
+        // Les lettres doivent etre posees sur l'avant-bras visible, pas a
+        // l'exterieur du pivot du haut : sinon elles peuvent bouger seules et
+        // donner l'impression que le mauvais bras est anime. Le coude herite
+        // deja de la rotation du bras et reste colle au maillage de l'avant-bras.
+        if (etiquetteD != null && pnj.CoudeD != null)
         {
             etiquetteD.name = "Etiquette_Bras_Droit";
-            etiquetteD.transform.SetParent(pnj.BrasD, false);
-            etiquetteD.transform.localPosition = new Vector3(0.34f, 0.02f, -0.08f);
+            etiquetteD.transform.SetParent(pnj.CoudeD, false);
+            etiquetteD.transform.localPosition = new Vector3(0.03f, -0.10f, -0.16f);
             etiquetteD.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         }
-        if (etiquetteG != null && pnj.BrasG != null)
+        if (etiquetteG != null && pnj.CoudeG != null)
         {
             etiquetteG.name = "Etiquette_Bras_Gauche";
-            etiquetteG.transform.SetParent(pnj.BrasG, false);
-            etiquetteG.transform.localPosition = new Vector3(-0.34f, 0.02f, -0.08f);
+            etiquetteG.transform.SetParent(pnj.CoudeG, false);
+            etiquetteG.transform.localPosition = new Vector3(-0.03f, -0.10f, -0.16f);
             etiquetteG.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         }
     }
