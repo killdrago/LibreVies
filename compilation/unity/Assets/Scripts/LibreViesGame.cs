@@ -4568,10 +4568,10 @@ public sealed class LibreViesGame : MonoBehaviour
         return metier == "Maire" ? adminPivotMaire : adminPivotForgeron;
     }
 
-    // Le rig importe les cotes en miroir par rapport aux lettres affichees dans
-    // le panneau et sur le Forgeron : G affiche doit donc utiliser le pivot D
-    // interne, et inversement. Cette conversion reste centralisee ici pour
-    // que le test ADMIN ne puisse plus inverser placement et pivot.
+    // Le rig importe les pivots en miroir par rapport aux lettres affichees
+    // dans le panneau et sur le Forgeron : le pivot G affiche utilise donc le
+    // pivot D interne, et inversement. Le placement local, lui, conserve son
+    // cote affiche directement.
     private int CoteInterneDepuisAdmin(int coteAffiche)
     {
         return coteAffiche == 0 ? 1 : 0;
@@ -4582,7 +4582,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (pnj == null || pnj.Main == null
             || (pnj.Metier != "Maire" && pnj.Metier != "Forgeron")) return;
         int pivotInterne = CoteInterneDepuisAdmin(PivotObjetAdmin(pnj.Metier));
-        int placementInterne = CoteInterneDepuisAdmin(PlacementObjetAdmin(pnj.Metier));
+        int placementInterne = PlacementObjetAdmin(pnj.Metier);
         Transform pivot = pivotInterne == 0 ? pnj.CoudeG : pnj.CoudeD;
         if (pivot == null) return;
         pnj.Main.SetParent(pivot, false);
@@ -4596,7 +4596,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (mainHeroine == null) return;
         int pivotInterne = CoteInterneDepuisAdmin(adminPivotPerso);
-        int placementInterne = CoteInterneDepuisAdmin(adminObjetPerso);
+        int placementInterne = adminObjetPerso;
         Transform pivot = pivotInterne == 0 ? coudeHeroineGauche : coudeHeroineDroit;
         if (pivot == null) return;
         mainHeroine.SetParent(pivot, false);
