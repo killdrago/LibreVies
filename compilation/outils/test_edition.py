@@ -115,6 +115,23 @@ def test_blacksmith_and_mayor_accessories_follow_animated_arms():
     assert "Enclume_Forgeron" not in update
 
 
+def test_admin_character_appearance_editor_exists():
+    assert "APPARENCE DU PERSONNAGE" in CS
+    assert "DessinerAdminApparence" in CS
+    assert "AppliquerApparencePersonnage" in CS
+    assert "NomSexeApparence" in CS
+    assert '"Femme"' in CS and '"Homme"' in CS
+    assert '"Tete : type "' in CS
+    assert '"Bras : type "' in CS
+    assert '"Corps : type "' in CS
+    assert '"Jambes : type "' in CS
+    assert '"Coupe de cheveux : type "' in CS
+    assert 'string[] choix = { "1", "2", "3", "4", "5" };' in CS
+    for field in ("TypeTete", "TypeBras", "TypeCorps", "TypeJambes", "TypeCheveux"):
+        assert field in CS
+    assert "objets et accessoires seront ajoutes plus tard." in CS
+
+
 def test_sign_text_style_and_persistence_controls_exist():
     panel = section(CS, "private void DessinerEditionPancarte", "private void CreerToitTriangle")
     assert "GUI.TextField" in CS
