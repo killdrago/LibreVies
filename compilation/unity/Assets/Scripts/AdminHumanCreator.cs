@@ -195,6 +195,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             underwearMaterial = NewMaterial(new Color(0.12f, 0.18f, 0.42f), 0f, 0.28f);
             Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (texture != null) skin.mainTexture = texture;
+            Texture2D clothTexture = Resources.Load<Texture2D>("LVTextures/LV_Cloth");
+            if (clothTexture != null)
+            {
+                underwearMaterial.mainTexture = clothTexture;
+                underwearMaterial.mainTextureScale = new Vector2(1.8f, 1.8f);
+            }
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -305,7 +311,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             skin.color = SkinColor(values.skinTone);
-            renderer.sharedMaterial = skin;
+            renderer.sharedMaterials = new[] { skin, underwearMaterial };
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
             root.transform.localRotation = facePreviewCamera
@@ -314,8 +320,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             underwearMaterial.color = values.female
                 ? new Color(0.07f, 0.10f, 0.16f)
                 : new Color(0.05f, 0.07f, 0.11f);
-            ClothingBuilder.Create(values.female, values.chestShape, values.hipShape, values.belly,
-                root.transform, underwearMaterial, bones, boneIndexes);
+            // Les sous-vetements ne sont plus des objets poses devant le corps.
+            // Les faces correspondantes du maillage humain utilisent directement
+            // le materiau textile ci-dessus dans le second sous-maillage.
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -537,240 +544,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    private static class ClothingBuilder
-    {
-        private static Transform[] skinBones;
-        private static Dictionary<string, int> skinBoneIndexes;
-
-        public static void Create(bool female, float chestShape, float hipShape, float belly,
-            Transform parent, Material material, Transform[] bones, Dictionary<string, int> boneIndexes)
-        {
-            skinBones = bones;
-            skinBoneIndexes = boneIndexes;
-            float hipScale = Mathf.Clamp(1f + hipShape * 0.22f, 0.82f, 1.22f);
-            float bellyScale = Mathf.Clamp(1f + belly * 0.12f, 0.92f, 1.10f);
-            if (female)
-            {
-                float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
-                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.54f, 1.58f,
-                    0.16f, 0.20f, material);
-                CreateCup("Bonnet gauche", parent, -0.09f * cupScale, 1.61f,
-                    0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
-                CreateCup("Bonnet droit", parent, 0.09f * cupScale, 1.61f,
-                    0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
-                CreateStrap("Bretelle gauche", parent, -0.09f, -0.16f, 1.63f, 1.88f, 0.215f, material);
-                CreateStrap("Bretelle droite", parent, 0.09f, 0.16f, 1.63f, 1.88f, 0.215f, material);
-                CreateBriefs("Culotte", parent, 1.00f, 1.25f,
-                    0.18f * hipScale, 0.13f * bellyScale, material);
-            }
-            else
-            {
-                CreateBriefs("Calecon", parent, 0.98f, 1.26f,
-                    0.20f * hipScale, 0.14f * bellyScale, material);
-            }
-        }
-
-        private static void CreateBriefs(string name, Transform parent, float bottom, float top,
-            float width, float depth, Material material)
-        {
-            float front = depth + 0.03f;
-            float back = -depth - 0.02f;
-            CreateBriefPanel(name + " avant", parent, bottom, top, width, front, material);
-            CreateBriefPanel(name + " arriere", parent, bottom, top, width, back, material);
-            CreateBriefSide(name + " cote gauche", parent, bottom, top, -width, -width * 0.55f,
-                front, back, material);
-            CreateBriefSide(name + " cote droit", parent, bottom, top, width, width * 0.55f,
-                front, back, material);
-            CreateBand(name + " ceinture", parent, top - 0.06f, top, width, depth + 0.02f, material);
-        }
-
-        private static GameObject CreateFrontPanel(string name, Transform parent, float bottom,
-            float top, float width, float front, Material material)
-        {
-            Vector3[] vertices =
-            {
-                new Vector3(-width, bottom, front), new Vector3(width, bottom, front),
-                new Vector3(width, top, front), new Vector3(-width, top, front)
-            };
-            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.vertices = vertices;
-            mesh.triangles = indices;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine01");
-        }
-
-        private static GameObject CreateBriefSide(string name, Transform parent, float bottom, float top,
-            float topX, float bottomX, float front, float back, Material material)
-        {
-            Vector3[] vertices =
-            {
-                new Vector3(topX, top, front), new Vector3(topX, top, back),
-                new Vector3(bottomX, bottom, back), new Vector3(bottomX, bottom, front)
-            };
-            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.vertices = vertices;
-            mesh.triangles = indices;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine01");
-        }
-
-        private static GameObject CreateBriefPanel(string name, Transform parent, float bottom, float top,
-            float width, float depth, Material material)
-        {
-            float bas = width * 0.55f;
-            Vector3[] vertices =
-            {
-                new Vector3(-width, top, depth), new Vector3(width, top, depth),
-                new Vector3(bas, bottom, depth), new Vector3(-bas, bottom, depth)
-            };
-            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.vertices = vertices;
-            mesh.triangles = indices;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine01");
-        }
-
-        private static GameObject CreateStrap(string name, Transform parent, float bottomX, float topX,
-            float bottomY, float topY, float z, Material material)
-        {
-            const float halfWidth = 0.018f;
-            Vector3[] vertices =
-            {
-                new Vector3(bottomX - halfWidth, bottomY, z),
-                new Vector3(bottomX + halfWidth, bottomY, z),
-                new Vector3(topX + halfWidth, topY, z),
-                new Vector3(topX - halfWidth, topY, z)
-            };
-            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.vertices = vertices;
-            mesh.triangles = indices;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine01");
-        }
-
-        private static GameObject CreateCup(string name, Transform parent, float centerX,
-            float centerY, float radiusX, float radiusY, float radiusZ, float surfaceZ,
-            Material material)
-        {
-            const int segments = 24;
-            const int rings = 5;
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            for (int ring = 0; ring < rings; ring++)
-            {
-                float t = ring / (float)(rings - 1);
-                float angle = t * Mathf.PI * 0.5f;
-                float ringRadius = Mathf.Sin(angle);
-                float dome = Mathf.Cos(angle) * radiusZ;
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    float around = segment * Mathf.PI * 2f / segments;
-                    vertices.Add(new Vector3(
-                        centerX + Mathf.Cos(around) * radiusX * ringRadius,
-                        centerY + Mathf.Sin(around) * radiusY * ringRadius,
-                        surfaceZ + dome));
-                }
-            }
-            for (int ring = 0; ring < rings - 1; ring++)
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    int a = ring * segments + segment;
-                    int b = ring * segments + (segment + 1) % segments;
-                    int c = (ring + 1) * segments + (segment + 1) % segments;
-                    int d = (ring + 1) * segments + segment;
-                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
-                }
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine02");
-        }
-
-        private static GameObject CreateBand(string name, Transform parent, float bottom, float top,
-            float width, float depth, Material material)
-        {
-            const int segments = 24;
-            const int rings = 3;
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            for (int ring = 0; ring < rings; ring++)
-            {
-                float t = ring / (float)(rings - 1);
-                float y = Mathf.Lerp(bottom, top, t);
-                float ringWidth = width * (ring == 1 ? 1.03f : 0.96f);
-                float ringDepth = depth * (ring == 1 ? 1.03f : 0.96f);
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    float angle = segment * Mathf.PI * 2f / segments;
-                    vertices.Add(new Vector3(Mathf.Cos(angle) * ringWidth, y,
-                        Mathf.Sin(angle) * ringDepth));
-                }
-            }
-            for (int ring = 0; ring < rings - 1; ring++)
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    int a = ring * segments + segment;
-                    int b = ring * segments + (segment + 1) % segments;
-                    int c = (ring + 1) * segments + (segment + 1) % segments;
-                    int d = (ring + 1) * segments + segment;
-                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
-                }
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return CreateMeshObject(name, parent, mesh, material, "spine01");
-        }
-
-        private static GameObject CreateMeshObject(string name, Transform parent, Mesh mesh,
-            Material material, string boneName)
-        {
-            GameObject garment = new GameObject(name);
-            garment.transform.SetParent(parent, false);
-            if (skinBones == null || skinBoneIndexes == null || skinBones.Length == 0)
-            {
-                garment.AddComponent<MeshFilter>().sharedMesh = mesh;
-                garment.AddComponent<MeshRenderer>().sharedMaterial = material;
-                return garment;
-            }
-
-            SkinnedMeshRenderer renderer = garment.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterial = material;
-            renderer.bones = skinBones;
-            int boneIndex = skinBoneIndexes.ContainsKey(boneName)
-                ? skinBoneIndexes[boneName]
-                : skinBoneIndexes.ContainsKey("root") ? skinBoneIndexes["root"] : 0;
-            renderer.rootBone = skinBones[skinBoneIndexes.ContainsKey("root")
-                ? skinBoneIndexes["root"] : 0];
-            BoneWeight[] weights = new BoneWeight[mesh.vertexCount];
-            for (int i = 0; i < weights.Length; i++)
-            {
-                weights[i].boneIndex0 = boneIndex;
-                weights[i].weight0 = 1f;
-            }
-            mesh.boneWeights = weights;
-            Matrix4x4[] bindposes = new Matrix4x4[skinBones.Length];
-            for (int i = 0; i < skinBones.Length; i++)
-                bindposes[i] = skinBones[i].worldToLocalMatrix * garment.transform.localToWorldMatrix;
-            mesh.bindposes = bindposes;
-            renderer.updateWhenOffscreen = true;
-            return garment;
-        }
-    }
+    // Les sous-vetements sont maintenant un sous-maillage du corps :
+    // aucune geometrie flottante n est creee devant le personnage.
 
     private static class HairBuilder
     {
@@ -990,16 +765,20 @@ public sealed class AdminHumanCreator : MonoBehaviour
             };
             mesh.vertices = vertices;
             mesh.uv = uv;
-            List<int> indices = new List<int>();
+            List<int> skinIndices = new List<int>();
+            List<int> underwearIndices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
                 Vector3 centre = (vertices[triangle.a] + vertices[triangle.b] + vertices[triangle.c]) / 3f;
-                if (UnderwearCovers(centre, female)) continue;
-                indices.Add(triangle.a);
-                indices.Add(triangle.b);
-                indices.Add(triangle.c);
+                List<int> destination = UnderwearCovers(centre, female)
+                    ? underwearIndices : skinIndices;
+                destination.Add(triangle.a);
+                destination.Add(triangle.b);
+                destination.Add(triangle.c);
             }
-            mesh.SetTriangles(indices, 0);
+            mesh.subMeshCount = 2;
+            mesh.SetTriangles(skinIndices, 0);
+            mesh.SetTriangles(underwearIndices, 1);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
@@ -1009,16 +788,30 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             float side = Mathf.Abs(point.x);
             float frontBack = Mathf.Abs(point.z);
-            // La poitrine sous le soutien-gorge est retiree du rendu de peau.
-            // La marge suit le tissu afin d'eviter une bande de peau autour
-            // des bonnets lorsque le torse est regenere.
-            bool braZone = female && point.y >= 1.51f && point.y <= 1.70f
-                && side <= 0.18f && frontBack >= 0.08f;
-            // Meme principe pour le bassin : les faces avant et arriere sont
-            // laissees au vetement et non superposees par un corps nu.
-            bool briefZone = point.y >= 0.94f && point.y <= 1.30f
-                && side <= 0.24f && frontBack >= 0.06f;
-            return braZone || briefZone;
+            bool braZone = false;
+            if (female && frontBack >= 0.07f)
+            {
+                // Deux zones ovales remplacent la peau par le tissu du
+                // soutien-gorge, au lieu de poser deux objets par-dessus.
+                float leftCup = Mathf.Pow((point.x + 0.09f) / 0.115f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.085f, 2f);
+                float rightCup = Mathf.Pow((point.x - 0.09f) / 0.115f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.085f, 2f);
+                bool cups = point.z > 0.07f && (leftCup <= 1f || rightCup <= 1f);
+                bool underBand = point.y >= 1.54f && point.y <= 1.60f && side <= 0.20f;
+                bool leftStrap = point.y >= 1.61f && point.y <= 1.90f
+                    && Mathf.Abs(point.x - Mathf.Lerp(-0.09f, -0.16f,
+                        Mathf.InverseLerp(1.61f, 1.90f, point.y))) <= 0.025f;
+                bool rightStrap = point.y >= 1.61f && point.y <= 1.90f
+                    && Mathf.Abs(point.x - Mathf.Lerp(0.09f, 0.16f,
+                        Mathf.InverseLerp(1.61f, 1.90f, point.y))) <= 0.025f;
+                braZone = cups || underBand || leftStrap || rightStrap;
+            }
+            // La culotte et le calecon remplacent la peau du bassin, devant
+            // comme derriere, avec une forme ajustee a la largeur des hanches.
+            if (point.y < 0.94f || point.y > 1.30f || frontBack < 0.04f) return braZone;
+            float width = Mathf.Lerp(0.13f, 0.23f, Mathf.InverseLerp(0.94f, 1.30f, point.y));
+            return braZone || side <= width;
         }
         private static int VertexIndex(string token, int count) { int index; if (!int.TryParse(token.Split('/')[0], out index)) return -1; return index < 0 ? count + index : index - 1; }
         private static float F(string value) { return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture); }
