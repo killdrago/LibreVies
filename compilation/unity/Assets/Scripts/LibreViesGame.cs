@@ -295,7 +295,7 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class Configuration
     {
-        public int version = 1;
+        public int version = 2;
         public float brightness = 0.50f;
         public float contrast = 1f;
         public float cameraSensitivity = 3f;
@@ -7101,11 +7101,13 @@ public sealed class LibreViesGame : MonoBehaviour
         if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !adminHumanCreator.female))
         {
             adminHumanCreator.female = false;
+            adminHumanCreator.hairStyle = 0;
             adminHumanCreator.BuildPreview();
         }
         if (BoutonChoixAdmin(new Rect(gauche + 100f, contenu.y + 68f, 92f, 28f), "Femme", adminHumanCreator.female))
         {
             adminHumanCreator.female = true;
+            adminHumanCreator.hairStyle = 0;
             adminHumanCreator.BuildPreview();
         }
 
@@ -7151,37 +7153,57 @@ public sealed class LibreViesGame : MonoBehaviour
         nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 310f, 238f, 24f), "Oreilles", adminHumanCreator.earsShape);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.earsShape) > 0.001f) { adminHumanCreator.earsShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
+        GUI.Label(new Rect(gauche, contenu.y + 350f, 238f, 22f),
+            adminHumanCreator.female ? "Coiffures femme" : "Coiffures homme", smallStyle);
+        string[] coiffures = adminHumanCreator.female
+            ? new[] { "Carre", "Longs", "Court", "Attache", "Boucles" }
+            : new[] { "Brosse", "Court", "Punk", "Mi-long", "Long" };
+        for (int i = 0; i < coiffures.Length; i++)
+        {
+            Rect coupe = new Rect(gauche + (i % 2) * 122f,
+                contenu.y + 378f + (i / 2) * 30f, 116f, 26f);
+            if (BoutonChoixAdmin(coupe, coiffures[i], adminHumanCreator.hairStyle == i))
+            {
+                adminHumanCreator.hairStyle = i;
+                adminHumanCreator.BuildPreview();
+            }
+        }
+
         GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "Corps et proportions", smallStyle);
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Ventre", adminHumanCreator.belly);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Poitrine", adminHumanCreator.chestShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f) { adminHumanCreator.chestShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches", adminHumanCreator.hipShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f) { adminHumanCreator.hipShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 135f, 238f, 24f), "Ventre", adminHumanCreator.belly);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.belly) > 0.001f) { adminHumanCreator.belly = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Bras largeur", adminHumanCreator.armThickness);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 165f, 238f, 24f), "Bras largeur", adminHumanCreator.armThickness);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armThickness) > 0.001f) { adminHumanCreator.armThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 135f, 238f, 24f), "Bras longueur", adminHumanCreator.armLength);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 195f, 238f, 24f), "Bras longueur", adminHumanCreator.armLength);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armLength) > 0.001f) { adminHumanCreator.armLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 165f, 238f, 24f), "Jambes largeur", adminHumanCreator.legThickness);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 225f, 238f, 24f), "Jambes largeur", adminHumanCreator.legThickness);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legThickness) > 0.001f) { adminHumanCreator.legThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 195f, 238f, 24f), "Jambes longueur", adminHumanCreator.legLength);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 255f, 238f, 24f), "Hauteur jambe", adminHumanCreator.legLength);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legLength) > 0.001f) { adminHumanCreator.legLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 225f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
-        GUI.Label(new Rect(droite, contenu.y + 274f, 250f, 44f),
+        GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 44f),
             "Le vrai maillage humain est\naffiche ici en temps reel.", smallStyle);
-        if (GUI.Button(new Rect(droite, contenu.y + 325f, 112f, 34f), "ALEATOIRE", buttonStyle))
+        if (GUI.Button(new Rect(droite, contenu.y + 382f, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
             ShowInfo("Personnage humain aleatoire genere");
         }
-        if (GUI.Button(new Rect(droite + 122f, contenu.y + 325f, 112f, 34f), "REINITIALISER", buttonStyle))
+        if (GUI.Button(new Rect(droite + 122f, contenu.y + 382f, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
             ShowInfo("Reglages humains reinitialises");
         }
-        if (GUI.Button(new Rect(droite, contenu.y + 370f, 234f, 36f),
+        if (GUI.Button(new Rect(droite, contenu.y + 430f, 234f, 36f),
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
-        GUI.Label(new Rect(droite, contenu.y + 420f, 250f, 44f),
-            "Cheveux, vetements et accessoires seront ajoutes\ndans une prochaine etape.", smallStyle);
+        GUI.Label(new Rect(droite, contenu.y + 478f, 250f, 44f),
+            "Sous-vetements et coiffure sont crees\navec le personnage par defaut.", smallStyle);
     }
 
     private void DessinerAdmin()
@@ -7693,7 +7715,18 @@ public sealed class LibreViesGame : MonoBehaviour
             if (File.Exists(CheminConfiguration))
             {
                 Configuration config = JsonUtility.FromJson<Configuration>(File.ReadAllText(CheminConfiguration));
-                if (config != null) return config;
+                if (config != null)
+                {
+                    // Les anciennes versions pouvaient conserver la luminosite
+                    // a 100 %. La nouvelle reference demarre a 50 %, tout en
+                    // laissant encore la plage 50-100 % dans les options.
+                    if (config.version < 2)
+                    {
+                        config.version = 2;
+                        config.brightness = 0.50f;
+                    }
+                    return config;
+                }
             }
         }
         catch (Exception erreur) { Debug.LogWarning("LibreVies : configuration illisible : " + erreur.Message); }

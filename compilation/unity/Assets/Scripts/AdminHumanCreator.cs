@@ -12,6 +12,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public bool female = true;
     public int skinTone;
     public float belly;
+    public float chestShape;
+    public float hipShape;
     public float armThickness;
     public float armLength;
     public float legThickness;
@@ -22,6 +24,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public float noseShape;
     public float mouthShape;
     public float earsShape;
+    public int hairStyle;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -139,6 +142,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
         female = UnityEngine.Random.value > 0.5f;
         skinTone = UnityEngine.Random.Range(0, 7);
         belly = UnityEngine.Random.Range(-0.65f, 0.75f);
+        chestShape = UnityEngine.Random.Range(-0.65f, 0.75f);
+        hipShape = UnityEngine.Random.Range(-0.65f, 0.75f);
+        hairStyle = UnityEngine.Random.Range(0, 5);
         armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
         armLength = UnityEngine.Random.Range(-0.65f, 0.7f);
         legThickness = UnityEngine.Random.Range(-0.65f, 0.7f);
@@ -156,8 +162,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
     {
         female = true;
         skinTone = 0;
-        belly = armThickness = armLength = legThickness = legLength = feetSize = 0f;
+        belly = chestShape = hipShape = armThickness = armLength = legThickness = legLength = feetSize = 0f;
         headShape = eyesShape = noseShape = mouthShape = earsShape = 0f;
+        hairStyle = 0;
         BuildPreview();
     }
 
@@ -173,14 +180,23 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
+        private Material hairMaterial;
+        private Material underwearMaterial;
+        private GameObject hair;
+        private int hairStyle;
+        private bool hairFemale;
 
         public HumanPreview(Transform parent)
         {
             this.parent = parent;
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
+            hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
+            underwearMaterial = NewMaterial(new Color(0.12f, 0.18f, 0.42f), 0f, 0.28f);
             Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (texture != null) skin.mainTexture = texture;
+            Texture2D hairTexture = Resources.Load<Texture2D>(Root + "HairDark");
+            if (hairTexture != null) hairMaterial.mainTexture = hairTexture;
             LoadTargets();
         }
 
@@ -246,6 +262,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
+            ScaleRegion(deformed, values.chestShape, 2.9f, 5.6f, 2.45f, 0.16f, 0.20f);
+            ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "l-lowerarm-scale-horiz-incr", "l-lowerarm-scale-horiz-decr", 0.5f);
@@ -290,6 +308,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
+            underwearMaterial.color = values.female
+                ? new Color(0.48f, 0.08f, 0.16f)
+                : new Color(0.10f, 0.16f, 0.42f);
+            ClothingBuilder.Create(values.female, root.transform, underwearMaterial);
+            hairStyle = values.hairStyle;
+            hairFemale = values.female;
+            hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
+                FindBone("head"), hairMaterial);
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
@@ -306,8 +332,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
             // Z rapproche les bras et les jambes du tronc ; X conserve le
             // balancement avant-arriere de la marche et de la course.
-            SetBoneRotation("pelvis.L", 0f, -16f);
-            SetBoneRotation("pelvis.R", 0f, 16f);
+            SetBoneRotation("pelvis.L", 0f, -32f);
+            SetBoneRotation("pelvis.R", 0f, 32f);
             SetBoneRotation("upperleg01.L", legSwing, 28f);
             SetBoneRotation("upperleg01.R", -legSwing, -28f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
@@ -316,6 +342,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             SetBoneRotation("upperarm01.R", armSwing, 30f);
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
             SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
+            HairBuilder.Animate(hair, hairStyle, hairFemale, moving, running, clock);
+        }
+
+        private Transform FindBone(string name)
+        {
+            if (boneIndexes != null && boneIndexes.ContainsKey(name))
+                return bones[boneIndexes[name]];
+            return root.transform;
         }
 
         private void SetBoneRotation(string name, float x, float z)
@@ -448,6 +482,25 @@ public sealed class AdminHumanCreator : MonoBehaviour
         { foreach (KeyValuePair<int, Vector3> item in target) if (item.Key >= 0 && item.Key < vertices.Length) vertices[item.Key] += item.Value * amount; }
         private void Signed(Vector3[] vertices, float amount, string positive, string negative, float strength)
         { Add(vertices, Target(amount >= 0f ? positive : negative), Mathf.Abs(amount) * strength); }
+
+        private static void ScaleRegion(Vector3[] vertices, float amount, float bottom, float top,
+            float halfWidth, float widthFactor, float depthFactor)
+        {
+            if (Mathf.Abs(amount) < 0.001f) return;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 v = vertices[i];
+                if (v.y < bottom || v.y > top || Mathf.Abs(v.x) > halfWidth) continue;
+                float centre = (bottom + top) * 0.5f;
+                float radius = (top - bottom) * 0.5f;
+                float vertical = 1f - Mathf.Clamp01(Mathf.Abs(v.y - centre) / radius);
+                float side = 1f - Mathf.Clamp01(Mathf.Abs(v.x) / halfWidth);
+                float weight = vertical * side;
+                vertices[i].x *= 1f + amount * widthFactor * weight;
+                vertices[i].z *= 1f + amount * depthFactor * weight;
+            }
+        }
+
         private static List<int> ParseIndexes(string value)
         { List<int> result = new List<int>(); foreach (string part in value.Split(',')) { int n; if (int.TryParse(part, out n)) result.Add(n); } return result; }
         private static Material NewMaterial(Color color, float metallic, float smoothness)
@@ -455,6 +508,136 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
+    }
+
+    private static class ClothingBuilder
+    {
+        public static void Create(bool female, Transform parent, Material material)
+        {
+            if (female)
+            {
+                CreateBand("Soutien-gorge", parent, 1.53f, 1.72f, 0.38f, 0.22f, material);
+                CreateBand("Culotte", parent, 1.02f, 1.22f, 0.34f, 0.19f, material);
+            }
+            else
+            {
+                CreateBand("Calecon", parent, 0.98f, 1.29f, 0.37f, 0.20f, material);
+            }
+        }
+
+        private static GameObject CreateBand(string name, Transform parent, float bottom, float top,
+            float width, float depth, Material material)
+        {
+            const int segments = 24;
+            const int rings = 3;
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            for (int ring = 0; ring < rings; ring++)
+            {
+                float t = ring / (float)(rings - 1);
+                float y = Mathf.Lerp(bottom, top, t);
+                float ringWidth = width * (ring == 1 ? 1.03f : 0.96f);
+                float ringDepth = depth * (ring == 1 ? 1.03f : 0.96f);
+                for (int segment = 0; segment < segments; segment++)
+                {
+                    float angle = segment * Mathf.PI * 2f / segments;
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * ringWidth, y,
+                        Mathf.Sin(angle) * ringDepth));
+                }
+            }
+            for (int ring = 0; ring < rings - 1; ring++)
+                for (int segment = 0; segment < segments; segment++)
+                {
+                    int a = ring * segments + segment;
+                    int b = ring * segments + (segment + 1) % segments;
+                    int c = (ring + 1) * segments + (segment + 1) % segments;
+                    int d = (ring + 1) * segments + segment;
+                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
+                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                }
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject garment = new GameObject(name);
+            garment.transform.SetParent(parent, false);
+            MeshFilter filter = garment.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+            MeshRenderer renderer = garment.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            return garment;
+        }
+    }
+
+    private static class HairBuilder
+    {
+        public static GameObject Create(int style, bool female, Transform parent, Transform head,
+            Material material)
+        {
+            GameObject objectHair = new GameObject("Cheveux - coupe " + style);
+            objectHair.transform.SetParent(head == null ? parent : head, false);
+            float width = female ? 0.37f : 0.35f;
+            float depth = 0.34f;
+            float length;
+            if (female)
+                length = style == 1 ? 0.95f : (style == 3 ? 0.62f : (style == 4 ? 0.78f : (style == 0 ? 0.45f : 0.28f)));
+            else
+                length = style == 2 ? 0.48f : (style == 3 ? 0.62f : (style == 4 ? 0.78f : (style == 0 ? 0.20f : 0.34f)));
+            bool curly = female && style == 4;
+            bool punk = !female && style == 2;
+            const int rows = 8;
+            const int columns = 40;
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            for (int row = 0; row < rows; row++)
+            {
+                float t = row / (float)(rows - 1);
+                float y = 0.08f + t * length;
+                float radius = Mathf.Lerp(width, width * (punk ? 0.32f : 0.62f), t);
+                for (int col = 0; col < columns; col++)
+                {
+                    float angle = col * Mathf.PI * 2f / columns;
+                    float wave = curly ? Mathf.Sin(angle * 5f + t * 4f) * 0.025f : 0f;
+                    float spikes = punk && t > 0.45f ? Mathf.Sin(angle * 7f) * 0.045f * t : 0f;
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * (radius + wave + spikes), y,
+                        Mathf.Sin(angle) * ((radius + wave) * depth / width)));
+                }
+            }
+            for (int row = 0; row < rows - 1; row++)
+                for (int col = 0; col < columns; col++)
+                {
+                    int a = row * columns + col;
+                    int b = row * columns + (col + 1) % columns;
+                    int c = (row + 1) * columns + (col + 1) % columns;
+                    int d = (row + 1) * columns + col;
+                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
+                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                }
+            Mesh mesh = new Mesh { name = "Cheveux - mesh" };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            MeshFilter filter = objectHair.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+            MeshRenderer renderer = objectHair.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            return objectHair;
+        }
+
+        public static void Animate(GameObject hair, int style, bool female, bool moving,
+            bool running, float clock)
+        {
+            if (hair == null) return;
+            bool longHair = female ? style == 1 || style == 3 || style == 4
+                : style == 3 || style == 4;
+            float amplitude = longHair ? (running ? 5f : 3f) : 1.2f;
+            float phase = Time.time * (running ? 2.2f : 1.7f);
+            float wave = Mathf.Sin(phase + clock * 0.15f) * amplitude
+                * (moving ? 1f : (longHair ? 0.28f : 0.08f));
+            hair.transform.localRotation = Quaternion.Euler(wave * 0.45f, wave * 0.25f, wave);
+        }
     }
 
     private sealed class ObjData
