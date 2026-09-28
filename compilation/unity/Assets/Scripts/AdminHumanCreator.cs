@@ -185,7 +185,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Material hairMaterial;
         private Texture2D skinTexture;
         private Texture2D clothTexture;
-        private Texture2D paintedSkinTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -195,10 +194,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
             this.parent = parent;
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
+            Shader characterShader = Shader.Find("LibreVies/PersonnageOpaque");
+            if (characterShader != null) skin.shader = characterShader;
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             clothTexture = Resources.Load<Texture2D>("LVTextures/LV_Cloth");
             if (skinTexture != null) skin.mainTexture = skinTexture;
+            if (clothTexture != null && skin.HasProperty("_ClothTex"))
+            {
+                skin.SetTexture("_ClothTex", clothTexture);
+                skin.SetTextureScale("_ClothTex", new Vector2(3f, 3f));
+            }
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -298,10 +304,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            if (paintedSkinTexture != null) UnityEngine.Object.Destroy(paintedSkinTexture);
-            paintedSkinTexture = obj.PaintUnderwearTexture(vertices, values.female,
-                skinTexture, clothTexture);
-            skin.mainTexture = paintedSkinTexture != null ? paintedSkinTexture : skinTexture;
+            if (skin.HasProperty("_UnderwearFemale"))
+                skin.SetFloat("_UnderwearFemale", values.female ? 1f : 0f);
             Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
@@ -749,132 +753,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             foreach (string line in text.text.Split('\n')) if (line.TrimStart().StartsWith("f ")) { string[] p = line.Trim().Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries); foreach (string token in p) { string[] bits = token.Split('/'); int vi = VertexIndex(token, data.vertices.Length), ti; if (vi >= 0 && bits.Length > 1 && int.TryParse(bits[1], out ti)) { ti = ti < 0 ? uvs.Count + ti : ti - 1; if (ti >= 0 && ti < uvs.Count && uvForVertex[vi] == 0) { data.uv[vi] = uvs[ti]; uvForVertex[vi] = ti + 1; } } } }
             return data;
         }
-        public Texture2D PaintUnderwearTexture(Vector3[] vertices, bool female,
-            Texture2D skinSource, Texture2D clothSource)
-        {
-            // Un import texture non lisible ne doit jamais faire disparaitre
-            // tout le preview : on garde alors la peau normale.
-            if (skinSource == null || !skinSource.isReadable) return null;
-            if (clothSource != null && !clothSource.isReadable) clothSource = null;
-            const int size = 256;
-            Texture2D painted = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
-            Color[] pixels = new Color[size * size];
-            Color[] sourcePixels = skinSource.GetPixels();
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float u = (x + 0.5f) / size;
-                    float v = (y + 0.5f) / size;
-                    int sourceX = Mathf.Clamp(Mathf.RoundToInt(u * (skinSource.width - 1)), 0,
-                        skinSource.width - 1);
-                    int sourceY = Mathf.Clamp(Mathf.RoundToInt(v * (skinSource.height - 1)), 0,
-                        skinSource.height - 1);
-                    pixels[y * size + x] = sourcePixels[sourceY * skinSource.width + sourceX];
-                }
-
-            Color clothTint = female
-                ? new Color(0.18f, 0.24f, 0.48f, 1f)
-                : new Color(0.12f, 0.16f, 0.30f, 1f);
-            foreach (ObjTriangle triangle in triangles)
-            {
-                Vector2 a = uv[triangle.a];
-                Vector2 b = uv[triangle.b];
-                Vector2 c = uv[triangle.c];
-                if (Mathf.Abs(a.x - b.x) > 0.5f || Mathf.Abs(a.x - c.x) > 0.5f
-                    || Mathf.Abs(b.x - c.x) > 0.5f) continue;
-                PaintTriangle(pixels, size, vertices[triangle.a], vertices[triangle.b],
-                    vertices[triangle.c], a, b, c, female, clothSource, clothTint);
-            }
-            painted.SetPixels(pixels);
-            painted.Apply(false, false);
-            painted.wrapMode = TextureWrapMode.Repeat;
-            painted.filterMode = FilterMode.Point;
-            return painted;
-        }
-
-        private static void PaintTriangle(Color[] pixels, int size, Vector3 p0, Vector3 p1,
-            Vector3 p2, Vector2 uv0, Vector2 uv1, Vector2 uv2, bool female,
-            Texture2D clothSource, Color clothTint)
-        {
-            float minU = Mathf.Min(uv0.x, Mathf.Min(uv1.x, uv2.x));
-            float maxU = Mathf.Max(uv0.x, Mathf.Max(uv1.x, uv2.x));
-            float minV = Mathf.Min(uv0.y, Mathf.Min(uv1.y, uv2.y));
-            float maxV = Mathf.Max(uv0.y, Mathf.Max(uv1.y, uv2.y));
-            int left = Mathf.Clamp(Mathf.FloorToInt(minU * size), 0, size - 1);
-            int right = Mathf.Clamp(Mathf.CeilToInt(maxU * size), 0, size - 1);
-            int bottom = Mathf.Clamp(Mathf.FloorToInt(minV * size), 0, size - 1);
-            int top = Mathf.Clamp(Mathf.CeilToInt(maxV * size), 0, size - 1);
-            float denominator = (uv1.y - uv2.y) * (uv0.x - uv2.x)
-                + (uv2.x - uv1.x) * (uv0.y - uv2.y);
-            if (Mathf.Abs(denominator) < 0.000001f) return;
-            for (int y = bottom; y <= top; y++)
-                for (int x = left; x <= right; x++)
-                {
-                    Vector2 point = new Vector2((x + 0.5f) / size, (y + 0.5f) / size);
-                    float w0 = ((uv1.y - uv2.y) * (point.x - uv2.x)
-                        + (uv2.x - uv1.x) * (point.y - uv2.y)) / denominator;
-                    float w1 = ((uv2.y - uv0.y) * (point.x - uv2.x)
-                        + (uv0.x - uv2.x) * (point.y - uv2.y)) / denominator;
-                    float w2 = 1f - w0 - w1;
-                    if (w0 < 0f || w1 < 0f || w2 < 0f) continue;
-                    Vector3 bodyPoint = p0 * w0 + p1 * w1 + p2 * w2;
-                    float coverage = UnderwearMask(bodyPoint, female);
-                    if (coverage <= 0.01f) continue;
-                    Color cloth = clothSource == null ? clothTint
-                        : clothSource.GetPixelBilinear(Mathf.Repeat(point.x * 3f, 1f),
-                            Mathf.Repeat(point.y * 3f, 1f));
-                    cloth *= clothTint;
-                    int index = y * size + x;
-                    pixels[index] = Color.Lerp(pixels[index], cloth, coverage);
-                }
-        }
-
-        private static float UnderwearMask(Vector3 point, bool female)
-        {
-            float side = Mathf.Abs(point.x);
-            float frontBack = Mathf.Abs(point.z);
-            float mask = 0f;
-            if (female && frontBack >= 0.045f)
-            {
-                float leftCup = Mathf.Pow((point.x + 0.09f) / 0.14f, 2f)
-                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
-                float rightCup = Mathf.Pow((point.x - 0.09f) / 0.14f, 2f)
-                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
-                float cupMask = 1f - Mathf.SmoothStep(0.78f, 1.08f,
-                    Mathf.Min(leftCup, rightCup));
-                float band = BandMask(point.y, 1.46f, 1.55f)
-                    * (1f - Mathf.SmoothStep(0.19f, 0.25f, side));
-                float t = Mathf.InverseLerp(1.61f, 1.90f, point.y);
-                float leftStrap = 1f - Mathf.SmoothStep(0.018f, 0.040f,
-                    Mathf.Abs(point.x - Mathf.Lerp(-0.09f, -0.16f, t)));
-                float rightStrap = 1f - Mathf.SmoothStep(0.018f, 0.040f,
-                    Mathf.Abs(point.x - Mathf.Lerp(0.09f, 0.16f, t)));
-                if (point.y < 1.61f || point.y > 1.90f)
-                {
-                    leftStrap = 0f;
-                    rightStrap = 0f;
-                }
-                mask = Mathf.Max(cupMask, band, leftStrap, rightStrap);
-            }
-            if (point.y >= 0.94f && point.y <= 1.30f)
-            {
-                float width = Mathf.Lerp(0.15f, 0.27f,
-                    Mathf.InverseLerp(0.94f, 1.30f, point.y));
-                float sides = 1f - Mathf.SmoothStep(width - 0.025f, width + 0.025f, side);
-                float lower = Mathf.SmoothStep(0.94f, 0.99f, point.y);
-                float upper = 1f - Mathf.SmoothStep(1.27f, 1.30f, point.y);
-                mask = Mathf.Max(mask, sides * Mathf.Min(lower, upper));
-            }
-            return Mathf.Clamp01(mask);
-        }
-
-        private static float BandMask(float value, float bottom, float top)
-        {
-            float lower = Mathf.SmoothStep(bottom - 0.025f, bottom + 0.025f, value);
-            float upper = 1f - Mathf.SmoothStep(top - 0.025f, top + 0.025f, value);
-            return lower * upper;
-        }
-
         public Mesh CreateMesh(Vector3[] vertices)
         {
             Mesh mesh = new Mesh
