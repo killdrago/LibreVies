@@ -104,6 +104,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+    // Apercu MakeHuman de l'ADMIN : le composant garde les reglages et
+    // pourra etre reutilise plus tard pour creer le personnage joueur.
+    private AdminHumanCreator adminHumanCreator;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
@@ -656,14 +659,14 @@ public sealed class LibreViesGame : MonoBehaviour
             "materiaux", "environnement", "terrain", "route", "village",
             "riviere", "cloture et portails", "arbres", "herbe", "rochers",
             "decor (barils, caisses)", "lampadaires", "nuages", "heros",
-            "monstres", "gardes", "objets a ramasser"
+            "apercu humain MakeHuman", "monstres", "gardes", "objets a ramasser"
         };
         System.Action[] travaux =
         {
             CreateMaterials, CreateEnvironment, CreateTerrain, CreateRoad, CreateTown,
             CreateWaterways, CreateFence, CreateTreesAndProps, CreateGrassTufts, CreateRocks,
-            CreateProps, CreateLampposts, CreateClouds, CreatePlayer, CreateEnemies,
-            CreateGuards, CreatePickups
+            CreateProps, CreateLampposts, CreateClouds, CreatePlayer, CreateHumanAdminPreview,
+            CreateEnemies, CreateGuards, CreatePickups
         };
         for (int i = 0; i < noms.Length; i++)
         {
@@ -5420,6 +5423,20 @@ public sealed class LibreViesGame : MonoBehaviour
         MettreAJourMarteauHeroine();
     }
 
+    private void CreateHumanAdminPreview()
+    {
+        if (player == null) return;
+        GameObject creatorObject = new GameObject("ADMIN - Createur humain MakeHuman");
+        // Le mannequin reste dans le monde, juste a cote du joueur, pour que
+        // chaque modification de l'ADMIN soit jugeable avec la camera du jeu.
+        creatorObject.transform.position = new Vector3(
+            player.position.x + 3.4f,
+            TerrainHeight(player.position.x + 3.4f, player.position.z) + 0.04f,
+            player.position.z + 0.4f);
+        adminHumanCreator = creatorObject.AddComponent<AdminHumanCreator>();
+        adminHumanCreator.ResetPreview();
+    }
+
     private void CreatePlayer()
     {
         player = new GameObject("Joueur").transform;
@@ -6820,10 +6837,108 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
+    private float SliderHumain(Rect rect, string nom, float valeur)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, -1f, 1f);
+        GUI.Label(new Rect(rect.x + rect.width - 30f, rect.y, 30f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
+    private void DessinerAdminPersonnage(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 500f, 28f),
+            "CREATEUR HUMAIN MAKEHUMAN", titleStyle);
+        if (adminHumanCreator == null)
+        {
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 54f, 480f, 70f),
+                "Apercu MakeHuman indisponible : les ressources CC0 n'ont pas ete chargees.", smallStyle);
+            return;
+        }
+
+        float gauche = contenu.x + 18f;
+        float droite = contenu.x + 250f;
+        GUI.Label(new Rect(gauche, contenu.y + 45f, 230f, 22f), "Sexe", smallStyle);
+        if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !adminHumanCreator.female))
+        {
+            adminHumanCreator.female = false;
+            adminHumanCreator.BuildPreview();
+        }
+        if (BoutonChoixAdmin(new Rect(gauche + 100f, contenu.y + 68f, 92f, 28f), "Femme", adminHumanCreator.female))
+        {
+            adminHumanCreator.female = true;
+            adminHumanCreator.BuildPreview();
+        }
+
+        GUI.Label(new Rect(gauche, contenu.y + 104f, 240f, 22f), "Teinte de peau", smallStyle);
+        Color[] teintes =
+        {
+            new Color(0.78f, 0.49f, 0.37f), new Color(0.62f, 0.32f, 0.21f),
+            new Color(0.40f, 0.19f, 0.12f), new Color(0.25f, 0.10f, 0.06f)
+        };
+        for (int i = 0; i < teintes.Length; i++)
+        {
+            GUI.color = teintes[i];
+            bool clic = GUI.Button(new Rect(gauche + i * 48f, contenu.y + 130f, 40f, 25f), "");
+            GUI.color = i == adminHumanCreator.skinTone ? Color.yellow : Color.white;
+            GUI.Box(new Rect(gauche + i * 48f, contenu.y + 130f, 40f, 25f), "");
+            GUI.color = Color.white;
+            if (clic)
+            {
+                adminHumanCreator.skinTone = i;
+                adminHumanCreator.BuildPreview();
+            }
+        }
+
+        GUI.Label(new Rect(gauche, contenu.y + 166f, 230f, 22f), "Visage", smallStyle);
+        float nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 190f, 238f, 24f), "Tete", adminHumanCreator.headShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.headShape) > 0.001f) { adminHumanCreator.headShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 220f, 238f, 24f), "Yeux", adminHumanCreator.eyesShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.eyesShape) > 0.001f) { adminHumanCreator.eyesShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 250f, 238f, 24f), "Nez", adminHumanCreator.noseShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.noseShape) > 0.001f) { adminHumanCreator.noseShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 280f, 238f, 24f), "Bouche", adminHumanCreator.mouthShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.mouthShape) > 0.001f) { adminHumanCreator.mouthShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(gauche, contenu.y + 310f, 238f, 24f), "Oreilles", adminHumanCreator.earsShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.earsShape) > 0.001f) { adminHumanCreator.earsShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+
+        GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "Corps et proportions", smallStyle);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Ventre", adminHumanCreator.belly);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.belly) > 0.001f) { adminHumanCreator.belly = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Bras largeur", adminHumanCreator.armThickness);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armThickness) > 0.001f) { adminHumanCreator.armThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 135f, 238f, 24f), "Bras longueur", adminHumanCreator.armLength);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armLength) > 0.001f) { adminHumanCreator.armLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 165f, 238f, 24f), "Jambes largeur", adminHumanCreator.legThickness);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legThickness) > 0.001f) { adminHumanCreator.legThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 195f, 238f, 24f), "Jambes longueur", adminHumanCreator.legLength);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legLength) > 0.001f) { adminHumanCreator.legLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 225f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
+
+        GUI.Label(new Rect(droite, contenu.y + 274f, 250f, 44f),
+            "Le vrai maillage humain MakeHuman est\naffiche pres du joueur en temps reel.", smallStyle);
+        if (GUI.Button(new Rect(droite, contenu.y + 325f, 112f, 34f), "ALEATOIRE", buttonStyle))
+        {
+            adminHumanCreator.Randomize();
+            ShowInfo("Personnage MakeHuman aleatoire genere");
+        }
+        if (GUI.Button(new Rect(droite + 122f, contenu.y + 325f, 112f, 34f), "REINITIALISER", buttonStyle))
+        {
+            adminHumanCreator.ResetPreview();
+            ShowInfo("Reglages MakeHuman reinitialises");
+        }
+        GUI.Label(new Rect(droite, contenu.y + 370f, 250f, 44f),
+            "Cheveux, vetements et accessoires seront ajoutes\ndans une prochaine etape.", smallStyle);
+    }
+
     private void DessinerAdmin()
     {
-        Rect fenetre = new Rect(Screen.width * 0.5f - 300f,
-            Screen.height * 0.5f - 230f, 600f, 460f);
+        Rect fenetre = new Rect(Screen.width * 0.5f - 350f,
+            Screen.height * 0.5f - 260f, 700f, 520f);
         GUI.Box(fenetre, "", boxStyle);
         GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
             "ADMINISTRATION", titleStyle);
@@ -6834,7 +6949,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "Monstre" };
+        string[] onglets = { "Ville", "Joueur", "Monstre", "Personnage" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -6889,6 +7004,10 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (adminTab == 2)
         {
             DessinerAdminMonstres(contenu);
+        }
+        else if (adminTab == 3)
+        {
+            DessinerAdminPersonnage(contenu);
         }
     }
 
