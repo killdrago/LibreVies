@@ -49,7 +49,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private void EnsurePreviewCamera()
     {
         if (previewCamera != null) return;
-        previewTexture = new RenderTexture(360, 480, 24, RenderTextureFormat.ARGB32);
+        previewTexture = new RenderTexture(480, 640, 24, RenderTextureFormat.ARGB32);
         previewTexture.name = "ADMIN_HumanPreview_RenderTexture";
         previewTexture.Create();
         GameObject cameraObject = new GameObject("ADMIN - Camera apercu humain");
@@ -68,7 +68,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
     {
         if (previewCamera == null) return;
         Vector3 cible = transform.position + Vector3.up * 1.08f;
-        previewCamera.transform.position = transform.position + new Vector3(0f, 1.10f, -3.60f);
+        // Le recul laisse toujours entrer les pieds et le sommet de la tete
+        // dans le cadre, meme lorsque les proportions sont modifiees.
+        previewCamera.transform.position = transform.position + new Vector3(0f, 1.10f, -5.00f);
         previewCamera.transform.LookAt(cible);
     }
 

@@ -108,11 +108,13 @@ public sealed class LibreViesGame : MonoBehaviour
     // pourra etre reutilise plus tard pour creer le personnage joueur.
     private AdminHumanCreator adminHumanCreator;
     private int adminNpcListeSelection;
-    private int adminObjetListeSelection;
     private int adminJoueurSelection;
     private bool adminJoueurMenuOuvert;
-    private Vector2 adminObjetScroll;
+    private int adminObjetOutil;
+    private Vector2 adminObjetCurseur;
+    private Vector2 adminNpcScroll;
     private string adminEditionContexte = "Nouveau personnage";
+    private bool adminHumainValide;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
@@ -463,6 +465,13 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Largeur;
         public float Profondeur;
         public float HauteurPorte;
+    }
+
+    private sealed class AdminNpcEntry
+    {
+        public string Nom;
+        public PnjState Pnj;
+        public GardeState Garde;
     }
 
     private sealed class PnjState
@@ -6756,66 +6765,84 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private List<PnjState> ObtenirPnjsAdminTries()
+    private List<AdminNpcEntry> ObtenirNpcsAdminTries()
     {
-        List<PnjState> result = new List<PnjState>();
+        List<AdminNpcEntry> result = new List<AdminNpcEntry>();
         for (int i = 0; i < pnjs.Count; i++)
-            if (pnjs[i] != null && pnjs[i].Root != null) result.Add(pnjs[i]);
-        result.Sort((a, b) => string.Compare(NomAffichePnj(a), NomAffichePnj(b),
+        {
+            if (pnjs[i] != null && pnjs[i].Root != null)
+                result.Add(new AdminNpcEntry { Nom = NomAffichePnj(pnjs[i]), Pnj = pnjs[i] });
+        }
+        for (int i = 0; i < gardes.Count; i++)
+        {
+            if (gardes[i] != null && gardes[i].Root != null)
+                result.Add(new AdminNpcEntry { Nom = "Garde " + (i + 1).ToString("00"), Garde = gardes[i] });
+        }
+        result.Sort((a, b) => string.Compare(a.Nom, b.Nom,
             StringComparison.CurrentCultureIgnoreCase));
         return result;
     }
 
     private void DessinerAdminNpc(Rect contenu)
     {
-        List<PnjState> liste = ObtenirPnjsAdminTries();
+        List<AdminNpcEntry> liste = ObtenirNpcsAdminTries();
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
             "NPC EN PLACE", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 520f, 22f),
-            "Selectionnez un NPC pour afficher ses caracteristiques et son edition humaine.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 620f, 22f),
+            "Cliquez sur un NPC ou un garde, puis ouvrez son edition humaine.", smallStyle);
 
-        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 190f, 350f);
-        GUI.Box(listeRect, "NPC", boxStyle);
+        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 260f, 430f);
+        GUI.Box(listeRect, "NPC et gardes", boxStyle);
+        Rect vue = new Rect(listeRect.x + 8f, listeRect.y + 28f, listeRect.width - 16f, listeRect.height - 36f);
+        float hauteur = Mathf.Max(vue.height, liste.Count * 32f);
+        adminNpcScroll = GUI.BeginScrollView(vue, adminNpcScroll,
+            new Rect(0f, 0f, vue.width - 18f, hauteur));
         for (int i = 0; i < liste.Count; i++)
         {
-            string libelle = NomAffichePnj(liste[i]);
-            if (BoutonChoixAdmin(new Rect(listeRect.x + 10f, listeRect.y + 28f + i * 34f,
-                170f, 28f), libelle, adminNpcListeSelection == i))
+            AdminNpcEntry entree = liste[i];
+            if (BoutonChoixAdmin(new Rect(0f, i * 32f, vue.width - 28f, 28f),
+                entree.Nom, adminNpcListeSelection == i))
             {
                 adminNpcListeSelection = i;
-                adminEditionContexte = "NPC : " + libelle;
-                adminTab = 5;
+                adminEditionContexte = "NPC : " + entree.Nom;
             }
         }
-        GUI.Label(new Rect(listeRect.x + 10f, listeRect.y + 28f + liste.Count * 34f,
-            170f, 42f), "Gardes en place : " + gardes.Count, smallStyle);
+        GUI.EndScrollView();
 
         if (liste.Count == 0)
         {
-            GUI.Label(new Rect(contenu.x + 230f, contenu.y + 90f, 420f, 80f),
-                "Aucun NPC n'est encore charge.", smallStyle);
+            GUI.Label(new Rect(contenu.x + 320f, contenu.y + 90f, 420f, 80f),
+                "Aucun NPC ou garde n'est encore charge.", smallStyle);
             return;
         }
         adminNpcListeSelection = Mathf.Clamp(adminNpcListeSelection, 0, liste.Count - 1);
-        PnjState selection = liste[adminNpcListeSelection];
-        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 84f, 400f, 30f),
-            NomAffichePnj(selection), titleStyle);
-        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 122f, 420f, 100f),
-            "Metier : " + NomAffichePnj(selection) + "\n"
-                + "Position : " + selection.Root.transform.position.ToString("F1") + "\n"
+        AdminNpcEntry selection = liste[adminNpcListeSelection];
+        string metier = selection.Pnj != null ? NomAffichePnj(selection.Pnj) : "Garde";
+        Vector3 position = selection.Pnj != null
+            ? selection.Pnj.Root.transform.position
+            : selection.Garde.Root.transform.position;
+        string accessoire = selection.Pnj != null
+            ? (selection.Pnj.Marteau != null ? "marteau"
+                : (selection.Pnj.Feuille != null ? "feuille" : "aucun"))
+            : "hallebarde";
+        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 84f, 440f, 30f),
+            selection.Nom, titleStyle);
+        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 122f, 480f, 110f),
+            "Type : " + metier + "\n"
+                + "Position : " + position.ToString("F1") + "\n"
                 + "Personnage 3D : maillage humain en place\n"
-                + "Accessoire : " + (selection.Marteau != null ? "marteau"
-                    : (selection.Feuille != null ? "feuille" : "aucun")), smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 230f, contenu.y + 240f, 260f, 36f),
+                + "Accessoire : " + accessoire, smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 320f, contenu.y + 252f, 290f, 36f),
             "OUVRIR L'EDITION HUMAINE", buttonStyle))
         {
-            adminEditionContexte = "NPC : " + NomAffichePnj(selection);
+            adminEditionContexte = "NPC : " + selection.Nom;
             adminTab = 5;
-            ShowInfo("Edition du " + NomAffichePnj(selection));
+            ShowInfo("Edition de " + selection.Nom);
         }
-        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 292f, 380f, 70f),
+        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 306f, 430f, 70f),
             "Les regles de gameplay restent conservees :\n"
-                + "bras fixes du Maire et du Forgeron, feuille et marteau reserves.", smallStyle);
+                + "bras fixes du Maire et du Forgeron, feuille, marteau\n"
+                + "et hallebarde reserves a leurs personnages.", smallStyle);
     }
 
     private void DessinerAdminMonstres(Rect contenu)
@@ -6856,59 +6883,56 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
-    private List<ElementEdition> ObtenirObjetsAdminTries()
-    {
-        List<ElementEdition> result = new List<ElementEdition>();
-        for (int i = 0; i < objetsEdition.Count; i++)
-            if (objetsEdition[i] != null && objetsEdition[i].Root != null) result.Add(objetsEdition[i]);
-        result.Sort((a, b) => string.Compare(a.Type, b.Type,
-            StringComparison.CurrentCultureIgnoreCase));
-        return result;
-    }
-
     private void DessinerAdminObjets(Rect contenu)
     {
-        List<ElementEdition> liste = ObtenirObjetsAdminTries();
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
-            "OBJETS EDITABLES", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 620f, 22f),
-            "Selectionnez un objet pour l'afficher dans le mode edition du monde.", smallStyle);
-        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 300f, 390f);
-        GUI.Box(listeRect, "Objets en place : " + liste.Count, boxStyle);
-        Rect vue = new Rect(listeRect.x + 8f, listeRect.y + 28f, listeRect.width - 16f, listeRect.height - 36f);
-        float hauteur = Mathf.Max(vue.height, liste.Count * 31f);
-        adminObjetScroll = GUI.BeginScrollView(vue, adminObjetScroll,
-            new Rect(0f, 0f, vue.width - 18f, hauteur));
-        for (int i = 0; i < liste.Count; i++)
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 650f, 28f),
+            "ATELIER D'OBJETS", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 700f, 22f),
+            "Zone de construction sur quadrillage : choisissez un outil puis cliquez sur la grille.", smallStyle);
+
+        Rect grille = new Rect(contenu.x + 18f, contenu.y + 76f, 680f, 510f);
+        GUI.color = new Color(0.055f, 0.075f, 0.11f, 1f);
+        GUI.DrawTexture(grille, Texture2D.whiteTexture);
+        GUI.color = new Color(0.20f, 0.34f, 0.46f, 0.75f);
+        const float pas = 32f;
+        for (float x = grille.x; x <= grille.xMax; x += pas)
+            GUI.DrawTexture(new Rect(x, grille.y, 1f, grille.height), Texture2D.whiteTexture);
+        for (float y = grille.y; y <= grille.yMax; y += pas)
+            GUI.DrawTexture(new Rect(grille.x, y, grille.width, 1f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 0
+            && grille.Contains(Event.current.mousePosition))
         {
-            ElementEdition element = liste[i];
-            string libelle = element.Type + "  " + element.Root.position.ToString("F1");
-            if (BoutonChoixAdmin(new Rect(0f, i * 31f, vue.width - 28f, 27f),
-                libelle, adminObjetListeSelection == i))
-                adminObjetListeSelection = i;
+            Vector2 local = Event.current.mousePosition - new Vector2(grille.x, grille.y);
+            adminObjetCurseur = new Vector2(
+                Mathf.Floor(local.x / pas) * pas + pas * 0.5f,
+                Mathf.Floor(local.y / pas) * pas + pas * 0.5f);
+            ShowInfo("Emplacement de creation selectionne sur la grille");
+            Event.current.Use();
         }
-        GUI.EndScrollView();
-        if (liste.Count == 0) return;
-        adminObjetListeSelection = Mathf.Clamp(adminObjetListeSelection, 0, liste.Count - 1);
-        ElementEdition selection = liste[adminObjetListeSelection];
-        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 86f, 330f, 30f),
-            selection.Type, titleStyle);
-        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 128f, 330f, 80f),
-            "Position : " + selection.Root.position.ToString("F2") + "\n"
-                + "Rotation : " + selection.Root.eulerAngles.ToString("F1") + "\n"
-                + "Echelle : " + selection.Root.localScale.ToString("F2"), smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 350f, contenu.y + 238f, 240f, 36f),
-            "OUVRIR LE MODE EDITION", buttonStyle))
+        GUI.color = new Color(0.94f, 0.69f, 0.19f, 0.85f);
+        GUI.DrawTexture(new Rect(grille.x + adminObjetCurseur.x - 12f,
+            grille.y + adminObjetCurseur.y - 12f, 24f, 24f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        GUI.Label(new Rect(contenu.x + 730f, contenu.y + 78f, 220f, 26f),
+            "OUTILS", titleStyle);
+        string[] outils = { "Bloc", "Mur", "Porte", "Fenetre", "Arbre", "Lampe", "Decor" };
+        for (int i = 0; i < outils.Length; i++)
         {
-            elementEditionDernierSelectionne = selection;
-            elementEditionSelectionne = null;
-            editionOutilMaison = 0;
-            modeEdition = true;
-            adminOpen = false;
-            ShowInfo(selection.Type + " selectionne : mode edition actif");
+            if (BoutonChoixAdmin(new Rect(contenu.x + 730f, contenu.y + 116f + i * 38f,
+                210f, 32f), outils[i], adminObjetOutil == i))
+                adminObjetOutil = i;
         }
-        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 294f, 330f, 80f),
-            "Le clic maintenu deplace l'objet.\nECHAP annule le dernier deplacement.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 730f, contenu.y + 410f, 220f, 48f),
+            "Outil actif : " + outils[adminObjetOutil] + "\nCliquez une cellule pour la positionner.", smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 730f, contenu.y + 482f, 210f, 34f),
+            "REINITIALISER LA GRILLE", buttonStyle))
+        {
+            adminObjetCurseur = new Vector2(0f, 0f);
+            ShowInfo("Grille d'objet reinitialisee");
+        }
     }
 
     private void DessinerAdminJoueur(Rect contenu)
@@ -6953,6 +6977,14 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "multijoueurs sans changer l'interface ADMIN.", smallStyle);
     }
 
+    private void ValiderEditionHumaine()
+    {
+        if (adminHumanCreator == null) return;
+        adminHumanCreator.BuildPreview();
+        adminHumainValide = true;
+        ShowInfo("Profil humain applique : " + adminEditionContexte);
+    }
+
     private float SliderHumain(Rect rect, string nom, float valeur)
     {
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
@@ -6975,7 +7007,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        Rect previewRect = new Rect(contenu.x + 18f, contenu.y + 48f, 190f, 300f);
+        Rect previewRect = new Rect(contenu.x + 18f, contenu.y + 48f, 360f, 560f);
         GUI.Box(previewRect, "", boxStyle);
         if (adminHumanCreator.PreviewReady && adminHumanCreator.PreviewTexture != null)
             GUI.DrawTexture(previewRect, adminHumanCreator.PreviewTexture, ScaleMode.ScaleToFit, false);
@@ -6983,8 +7015,8 @@ public sealed class LibreViesGame : MonoBehaviour
             GUI.Label(new Rect(previewRect.x + 12f, previewRect.y + 120f, 166f, 50f),
                 "Apercu en preparation...", smallStyle);
 
-        float gauche = contenu.x + 225f;
-        float droite = contenu.x + 465f;
+        float gauche = contenu.x + 400f;
+        float droite = contenu.x + 660f;
         GUI.Label(new Rect(gauche, contenu.y + 45f, 230f, 22f), "Sexe", smallStyle);
         if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !adminHumanCreator.female))
         {
@@ -7007,11 +7039,18 @@ public sealed class LibreViesGame : MonoBehaviour
         };
         for (int i = 0; i < teintes.Length; i++)
         {
-            float x = gauche + i * 30f;
+            Rect carre = new Rect(gauche + i * 30f, contenu.y + 130f, 26f, 25f);
+            // Le bouton est traite avant le dessin : on peint ensuite un
+            // carre blanc teinte, afin que sa couleur corresponde exactement
+            // a celle utilisee par le materiau de l'aperçu.
+            bool clic = GUI.Button(carre, "", GUIStyle.none);
             GUI.color = teintes[i];
-            bool clic = GUI.Button(new Rect(x, contenu.y + 130f, 26f, 25f), "");
-            GUI.color = i == adminHumanCreator.skinTone ? Color.yellow : Color.white;
-            GUI.Box(new Rect(x, contenu.y + 130f, 26f, 25f), "");
+            GUI.DrawTexture(carre, Texture2D.whiteTexture);
+            GUI.color = i == adminHumanCreator.skinTone ? Color.yellow : Color.black;
+            GUI.DrawTexture(new Rect(carre.x, carre.y, carre.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(carre.x, carre.yMax - 2f, carre.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(carre.x, carre.y, 2f, carre.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(carre.xMax - 2f, carre.y, 2f, carre.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
             if (clic)
             {
@@ -7058,14 +7097,17 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumanCreator.ResetPreview();
             ShowInfo("Reglages humains reinitialises");
         }
-        GUI.Label(new Rect(droite, contenu.y + 370f, 250f, 44f),
+        if (GUI.Button(new Rect(droite, contenu.y + 370f, 234f, 36f),
+            adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
+            ValiderEditionHumaine();
+        GUI.Label(new Rect(droite, contenu.y + 420f, 250f, 44f),
             "Cheveux, vetements et accessoires seront ajoutes\ndans une prochaine etape.", smallStyle);
     }
 
     private void DessinerAdmin()
     {
-        Rect fenetre = new Rect(Screen.width * 0.5f - 490f,
-            Screen.height * 0.5f - 325f, 980f, 650f);
+        Rect fenetre = new Rect(Screen.width * 0.5f - 590f,
+            Screen.height * 0.5f - 360f, 1180f, 720f);
         GUI.Box(fenetre, "", boxStyle);
         GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
             "ADMINISTRATION", titleStyle);
