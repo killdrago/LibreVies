@@ -113,8 +113,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminObjetOutil;
     private Vector2 adminObjetCurseur;
     private Vector2 adminNpcScroll;
-    private string adminEditionContexte = "Nouveau personnage";
+    private string adminEditionContexte = "Joueur : Joueur principal";
     private bool adminHumainValide;
+    private bool adminHumainJoueurActif;
+    private bool adminPreviewSourisActive;
+    private Vector2 adminPreviewDerniereSouris;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
@@ -6981,8 +6984,25 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (adminHumanCreator == null) return;
         adminHumanCreator.BuildPreview();
+        if (adminEditionContexte.StartsWith("Joueur :", StringComparison.Ordinal)
+            && heroBody != null)
+        {
+            bool applique = adminHumanCreator.ApplyTo(heroBody);
+            if (applique)
+            {
+                // Le vrai maillage humain rigge remplace le modele visuel
+                // precedent. Les controles du joueur restent sur heroBody.
+                if (heroineModel != null) heroineModel.gameObject.SetActive(false);
+                adminHumainJoueurActif = true;
+                adminHumainValide = true;
+                ShowInfo("Profil humain applique au personnage joueur");
+                return;
+            }
+            ShowInfo("Application impossible : maillage humain indisponible");
+            return;
+        }
         adminHumainValide = true;
-        ShowInfo("Profil humain applique : " + adminEditionContexte);
+        ShowInfo("Profil humain valide dans l'apercu. Ouvrez Joueur pour l'appliquer au personnage.");
     }
 
     private float SliderHumain(Rect rect, string nom, float valeur)
@@ -6994,6 +7014,57 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(rect.x + rect.width - 30f, rect.y, 30f, 22f),
             Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
         return nouveau;
+    }
+
+    private void GererCameraPreview(Rect previewRect)
+    {
+        if (adminHumanCreator == null) return;
+        Event evenement = Event.current;
+        Rect commandes = new Rect(previewRect.x + 8f, previewRect.yMax - 42f, 238f, 34f);
+        bool dansPreview = previewRect.Contains(evenement.mousePosition);
+        bool dansCommandes = commandes.Contains(evenement.mousePosition);
+        if (evenement.type == EventType.MouseDown && evenement.button == 0
+            && dansPreview && !dansCommandes)
+        {
+            adminPreviewSourisActive = true;
+            adminPreviewDerniereSouris = evenement.mousePosition;
+            GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
+            evenement.Use();
+        }
+        else if (adminPreviewSourisActive && evenement.type == EventType.MouseDrag
+            && evenement.button == 0)
+        {
+            Vector2 delta = evenement.mousePosition - adminPreviewDerniereSouris;
+            adminPreviewDerniereSouris = evenement.mousePosition;
+            adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
+            evenement.Use();
+        }
+        else if (adminPreviewSourisActive && evenement.type == EventType.MouseUp
+            && evenement.button == 0)
+        {
+            adminPreviewSourisActive = false;
+            GUIUtility.hotControl = 0;
+            evenement.Use();
+        }
+        else if (evenement.type == EventType.Scroll && dansPreview && !dansCommandes)
+        {
+            adminHumanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
+            evenement.Use();
+        }
+    }
+
+    private void DessinerCommandesCameraPreview(Rect previewRect)
+    {
+        Rect commandes = new Rect(previewRect.x + 8f, previewRect.yMax - 42f, 238f, 34f);
+        GUI.Box(commandes, "", boxStyle);
+        if (GUI.Button(new Rect(commandes.x + 4f, commandes.y + 3f, 32f, 28f), "-", buttonStyle))
+            adminHumanCreator.ZoomPreview(0.45f);
+        if (GUI.Button(new Rect(commandes.x + 40f, commandes.y + 3f, 32f, 28f), "+", buttonStyle))
+            adminHumanCreator.ZoomPreview(-0.45f);
+        if (GUI.Button(new Rect(commandes.x + 78f, commandes.y + 3f, 96f, 28f), "CAMERA", buttonStyle))
+            adminHumanCreator.ResetPreviewCamera();
+        GUI.Label(new Rect(commandes.x + 178f, commandes.y + 5f, 55f, 22f),
+            adminHumanCreator.PreviewDistance.ToString("0.0"), smallStyle);
     }
 
     private void DessinerAdminPersonnage(Rect contenu)
@@ -7014,6 +7085,10 @@ public sealed class LibreViesGame : MonoBehaviour
         else
             GUI.Label(new Rect(previewRect.x + 12f, previewRect.y + 120f, 166f, 50f),
                 "Apercu en preparation...", smallStyle);
+        GererCameraPreview(previewRect);
+        GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
+            "Glisser : pivoter / voir dessus-dessous", smallStyle);
+        DessinerCommandesCameraPreview(previewRect);
 
         float gauche = contenu.x + 400f;
         float droite = contenu.x + 660f;

@@ -26,6 +26,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private HumanPreview preview;
     private Camera previewCamera;
     private RenderTexture previewTexture;
+    private HumanPreview appliedHuman;
+    private float previewDistance = 5.00f;
+    private float previewYaw;
+    private float previewPitch;
+
+    public float PreviewDistance
+    {
+        get { return previewDistance; }
+    }
 
     public RenderTexture PreviewTexture
     {
@@ -44,6 +53,39 @@ public sealed class AdminHumanCreator : MonoBehaviour
         preview.Build(this);
         preview.SetPresentationLayer(PreviewLayer);
         PositionPreviewCamera();
+    }
+
+    public void OrbitPreview(float yawDelta, float pitchDelta)
+    {
+        previewYaw = Mathf.Repeat(previewYaw + yawDelta + 180f, 360f) - 180f;
+        previewPitch = Mathf.Clamp(previewPitch + pitchDelta, -75f, 75f);
+        PositionPreviewCamera();
+    }
+
+    public void ZoomPreview(float amount)
+    {
+        previewDistance = Mathf.Clamp(previewDistance + amount, 2.25f, 9.00f);
+        PositionPreviewCamera();
+    }
+
+    public void ResetPreviewCamera()
+    {
+        previewDistance = 5.00f;
+        previewYaw = 0f;
+        previewPitch = 0f;
+        PositionPreviewCamera();
+    }
+
+    // Applique le meme maillage humain rigge et les memes morphs au personnage
+    // reel. Le panneau n'est plus seulement une image de demonstration.
+    public bool ApplyTo(Transform target)
+    {
+        if (target == null) return false;
+        if (appliedHuman != null) appliedHuman.DestroyRoot();
+        appliedHuman = new HumanPreview(target);
+        appliedHuman.Build(this);
+        appliedHuman.SetPresentationLayer(target.gameObject.layer);
+        return appliedHuman.IsBuilt;
     }
 
     private void EnsurePreviewCamera()
@@ -70,12 +112,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
         Vector3 cible = transform.position + Vector3.up * 1.08f;
         // Le recul laisse toujours entrer les pieds et le sommet de la tete
         // dans le cadre, meme lorsque les proportions sont modifiees.
-        previewCamera.transform.position = transform.position + new Vector3(0f, 1.10f, -5.00f);
+        Quaternion orbite = Quaternion.Euler(previewPitch, previewYaw, 0f);
+        Vector3 direction = orbite * Vector3.back;
+        previewCamera.transform.position = cible + direction * previewDistance;
         previewCamera.transform.LookAt(cible);
     }
 
     private void OnDestroy()
     {
+        if (appliedHuman != null) appliedHuman.DestroyRoot();
         if (previewCamera != null) UnityEngine.Object.Destroy(previewCamera.gameObject);
         if (previewTexture != null)
         {
@@ -132,6 +177,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (texture != null) skin.mainTexture = texture;
             LoadTargets();
+        }
+
+        public bool IsBuilt
+        {
+            get { return root != null; }
+        }
+
+        public void DestroyRoot()
+        {
+            if (root != null) UnityEngine.Object.Destroy(root);
+            root = null;
         }
 
         private void LoadTargets()
