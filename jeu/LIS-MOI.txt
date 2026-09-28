@@ -7,7 +7,7 @@ LibreVies — comment jouer
    reprendra où il s'est arrêté.
 3. Quand la barre affiche « Prêt ! », clique sur JOUER.
 
-Rien d'autre à installer : pas de Unity, pas de Python, pas de compte.
+Rien d'autre à installer : pas d'Unreal Engine, pas de Python, pas de compte.
 Une connexion Internet est nécessaire pour le téléchargement et pour les
 mises à jour suivantes. Hors ligne, un jeu déjà installé se lance quand même.
 

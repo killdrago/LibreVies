@@ -13,7 +13,7 @@ qui l'execute. C'est donc ici que se trouve le code, et ce fichier se met a
 jour tout seul par son hash (voir version_url.json) : le launcher n'a plus
 jamais besoin d'etre reconstruit.
 
-Le dossier compilation/ (projet Unity, scripts, images de travail) ne part
+Le dossier compilation/ (projet Unreal, scripts, images de travail) ne part
 JAMAIS chez le joueur.
 """
 import tkinter as tk
@@ -80,11 +80,11 @@ def export_banner(path="banniere_v1.png"):
 # EMPLACEMENTS ET REGLAGES
 #
 # Ce fichier est LA seule chose que le joueur recoit. Il ne
-# lui faut ni Python, ni Unity, ni un installeur : au premier
+# lui faut ni Python, ni Unreal Engine, ni un installeur : au premier
 # lancement il telecharge le jeu complet (une seule archive
 # publiee dans la release GitHub) puis il le lance.
 #
-# Le dossier compilation/ (projet Unity, scripts de build,
+# Le dossier compilation/ (projet Unreal, scripts de build,
 # images de travail) n'est JAMAIS telecharge par le joueur.
 # ============================================================
 if getattr(sys, 'frozen', False):
@@ -108,8 +108,8 @@ DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
 NOM_DOSSIER_TMP = "game.install"
 NOM_DOSSIER_ANCIEN = "game.ancien"
-# Le jeu est une compilation Unity : son executable s'appelle LibreViesGame.exe.
-NOMS_EXE_JEU = ("LibreViesGame.exe",)
+# Le jeu est une compilation Unreal : son executable s'appelle LibreViesGame.exe.
+NOMS_EXE_JEU = ("LibreVies.exe", "LibreViesGame.exe")
 
 BG = "#1a1a2e"; BG2 = "#222244"; CARD = "#2a2a50"
 ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
@@ -119,11 +119,11 @@ NEWS = [
     {"date": "18/09/2026", "t": "Launcher 4.1.0 — mise a jour sans rien recompiler",
      "d": "LibreVies.exe n'est plus qu'une petite amorce : tout le launcher est dans launcher.pyw. Des que ce fichier change, son hash change dans version_url.json : le launcher le telecharge et redemarre tout seul. Plus jamais besoin de reconstruire le launcher."},
     {"date": "18/09/2026", "t": "Launcher 4.1.0 — bouton RAPPORT (plantages)",
-     "d": "Le jeu est lance avec son journal dans jeu\\game\\logs\\LibreVies.log. Le bouton RAPPORT ouvre le dossier des journaux et celui des rapports de plantage Unity : un plantage devient un fichier a envoyer, plus une devinette."},
+     "d": "Le jeu est lance avec son journal dans jeu\\game\\logs\\LibreVies.log. Le bouton RAPPORT ouvre le dossier des journaux et celui des rapports de plantage du jeu Unreal : un plantage devient un fichier a envoyer, plus une devinette."},
     {"date": "18/09/2026", "t": "Launcher 4.0.0 — le jeu complet se telecharge tout seul",
-     "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unity publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
-    {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
-     "d": "Le jeu Unity exporte contient deja son runtime : le joueur ne telecharge pas Unity. Le launcher verifie les MAJ, les telecharge, puis lance directement LibreViesGame.exe. Le launcher peut aussi se mettre a jour et redemarrer seul."},
+     "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unreal publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
+    {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unreal autonome",
+     "d": "Le package Unreal contient deja son runtime : le joueur ne telecharge pas Unreal Engine. Le launcher verifie les MAJ, les telecharge, puis lance directement le package. Le launcher peut aussi se mettre a jour et redemarrer seul."},
     {"date": "14/09/2026", "t": "Launcher 2.8.0 — retour aux hashs md5",
      "d": "Le systeme a numeros (2.7.0) est abandonne : retour au hash md5 par fichier, qui detecte et REPARE aussi les fichiers corrompus. Regle imperative inchangee : tout changement de fichier = nouveau hash dans version_url.json ; tout nouveau fichier = nouvelle ligne avec son hash ; toute suppression = ligne retiree."},
     {"date": "14/09/2026", "t": "Launcher 2.6.0 — images integrees",
@@ -144,7 +144,7 @@ NEWS = [
 # ============================================================
 
 TEXT_EXTS = ('.pyw', '.py', '.bat', '.json', '.cfg', '.txt', '.md',
-             '.html', '.css', '.js', '.csv', '.cs', '.meta', '.unity')
+             '.html', '.css', '.js', '.csv', '.cs', '.meta')
 
 USER_AGENT = 'LibreVies/%s' % LAUNCHER_VERSION
 
@@ -515,7 +515,7 @@ def _trouver_exe_jeu(dossier, profondeur=2):
 def build_a_installer(build):
     """Le jeu doit-il etre (re)telecharge ? Renvoie (bool, raison lisible)."""
     if not isinstance(build, dict) or not build.get('url') or not build.get('hash'):
-        return False, 'aucune compilation Unity publiee pour le moment'
+        return False, 'aucune compilation Unreal publiee pour le moment'
     etat = lire_etat_jeu()
     if etat.get('hash') != build.get('hash'):
         return True, 'nouvelle compilation disponible'
@@ -1178,7 +1178,7 @@ class App(tk.Tk):
                 dossiers.append(dossier)
         profil = os.environ.get('USERPROFILE') or os.path.expanduser('~')
         if profil:
-            # Emplacement standard d'Unity pour companyName/productName.
+            # Emplacement local des journaux du jeu.
             dossiers.append(os.path.join(profil, 'AppData', 'LocalLow',
                                          'LibreVies', 'LibreVies'))
         temp = os.environ.get('TEMP') or os.environ.get('TMP')

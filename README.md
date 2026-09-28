@@ -1,37 +1,52 @@
 # LibreVies
 
-Deux dossiers, deux rôles bien séparés :
+LibreVies utilise maintenant **Unreal Engine 5.6**. Le createur de personnages
+et l'atelier d'objets sont dans le meme projet afin que le personnage puisse
+etre reutilise plus tard directement au debut d'une nouvelle partie.
 
-| Dossier | Pour qui | Contenu |
-|---|---|---|
-| **`jeu/`** | le joueur | **tout ce qui concerne le joueur, dans un seul dossier** : launcher du jeu, `game/`, et `personnage/` (créateur humain 3D autonome). |
-| **`compilation/`** | l'auteur seul | projet Unity du jeu, projet Unity séparé du créateur humain, scripts de build Windows, images de travail et outils de publication. Il **compile** et dépose le résultat dans `jeu/`. **Jamais téléchargé par le joueur.** |
+## Organisation
 
-## Le parcours du joueur
+```text
+compilation/
+  unreal/                 projet Unreal, sources C++, assets et licences
+  build_launcher.bat      compile et place la distribution dans jeu/game/
+  INSTALLATION-UNREAL.md  installation de l'auteur
+  GUIDE-COMPILATION.md    fabrication et distribution
 
-1. Il reçoit **un seul fichier** : `LibreVies.exe`.
-2. Il double-clique : le launcher vérifie `jeu/version_url.json`, télécharge
-   l'archive du jeu publiée (avec reprise si la connexion coupe), contrôle son
-   md5 et l'installe.
-3. Il clique sur **JOUER**.
+jeu/
+  game/                   distribution Windows a donner au joueur
+  launcher.pyw            launcher optionnel de mise a jour
+  edition/                donnees d'edition du monde
+```
 
-Aucun Unity, aucun Python, aucun compte, aucune installation chez le joueur.
-Un jeu déjà installé se lance même hors ligne.
+Le projet de l ancien moteur a ete retire du depot a la demande du createur.
+Une sauvegarde locale du projet precedent doit etre conservee en dehors du
+repo si elle est encore necessaire.
 
-## Publier une mise à jour (côté auteur)
+## Fonctions Unreal de la premiere migration
 
-1. `compilation\build_launcher.bat` — **un seul double-clic, tout est
-   automatique** : il télécharge ce qui manque (le projet depuis GitHub,
-   Python, PyInstaller, Unity) sans jamais écraser tes fichiers, puis il
-   compile et dépose le résultat **dans `jeu/`** : `jeu\LibreVies.exe`
-   (le launcher), `jeu\game\` (le jeu exporté) et
-   `jeu\personnage\LibreViesPersonnage.exe` (le créateur humain autonome).
-2. `compilation\outils\publier_jeu.bat` — met `jeu\game` en ligne
-   (release GitHub) et met à jour `jeu/version_url.json`.
-3. `git push` — les joueurs reçoivent la mise à jour au prochain lancement.
+- base humaine MakeHuman Community CC0, homme ou femme ;
+- morphologie independante du ventre, des bras, des jambes, des pieds et du
+  visage ;
+- bouton Aleatoire et sauvegarde JSON du preset ;
+- base nue sans cheveux, accessoires ni vetements pour valider le mesh ;
+- atelier de prototypes d'arbre, chaise, brique, arme et vetement ;
+- source des meshes et des cibles morphologiques embarquee dans le projet ;
+- structure prevue pour reutiliser le generateur dans le jeu au debut de la
+  partie.
 
-La **première** publication est obligatoire : avant elle, le launcher affiche
-« aucune compilation Unity publiee » et le bouton JOUER reste grisé. Le jeu est
-une compilation Unity (`LibreViesGame.exe`) : aucun autre moteur n'est utilisé.
+Les prototypes d'objets sont une base technique. Ils seront remplaces
+progressivement par des meshes artistiques, des materiaux et des vetements
+rigges sans changer le principe de l'atelier.
 
-Détails, commandes et dépannage : [`compilation/GUIDE-COMPILATION.md`](compilation/GUIDE-COMPILATION.md)
+## Demarrage rapide auteur
+
+1. Installer Epic Games Launcher, Unreal Engine 5.6 et les outils Visual Studio
+   indiques dans `compilation/INSTALLATION-UNREAL.md`.
+2. Ouvrir `compilation/unreal/LibreVies.uproject`.
+3. Laisser Unreal compiler le module C++.
+4. Cliquer sur **Play** : le createur MakeHuman et l'atelier s'ouvrent.
+5. Pour fabriquer la version joueur, lancer `compilation/build_launcher.bat`.
+
+Le joueur final ne recoit ni Unreal Engine, ni Epic Games Launcher, ni Visual
+Studio : il recoit uniquement `jeu/game/`.
