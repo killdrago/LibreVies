@@ -311,7 +311,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             underwearMaterial.color = values.female
                 ? new Color(0.07f, 0.10f, 0.16f)
                 : new Color(0.05f, 0.07f, 0.11f);
-            ClothingBuilder.Create(values.female, values.chestShape, root.transform, underwearMaterial);
+            ClothingBuilder.Create(values.female, values.chestShape, values.hipShape, values.belly,
+                root.transform, underwearMaterial, bones, boneIndexes);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -535,24 +536,34 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     private static class ClothingBuilder
     {
-        public static void Create(bool female, float chestShape, Transform parent, Material material)
+        private static Transform[] skinBones;
+        private static Dictionary<string, int> skinBoneIndexes;
+
+        public static void Create(bool female, float chestShape, float hipShape, float belly,
+            Transform parent, Material material, Transform[] bones, Dictionary<string, int> boneIndexes)
         {
+            skinBones = bones;
+            skinBoneIndexes = boneIndexes;
+            float hipScale = Mathf.Clamp(1f + hipShape * 0.22f, 0.82f, 1.22f);
+            float bellyScale = Mathf.Clamp(1f + belly * 0.12f, 0.92f, 1.10f);
             if (female)
             {
                 float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
-                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.42f, 1.46f,
+                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.54f, 1.58f,
                     0.16f, 0.20f, material);
-                CreateCup("Bonnet gauche", parent, -0.09f * cupScale, 1.49f,
+                CreateCup("Bonnet gauche", parent, -0.09f * cupScale, 1.61f,
                     0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
-                CreateCup("Bonnet droit", parent, 0.09f * cupScale, 1.49f,
+                CreateCup("Bonnet droit", parent, 0.09f * cupScale, 1.61f,
                     0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
-                CreateStrap("Bretelle gauche", parent, -0.09f, -0.16f, 1.51f, 1.86f, 0.215f, material);
-                CreateStrap("Bretelle droite", parent, 0.09f, 0.16f, 1.51f, 1.86f, 0.215f, material);
-                CreateBriefs("Culotte", parent, 1.00f, 1.25f, 0.18f, 0.13f, material);
+                CreateStrap("Bretelle gauche", parent, -0.09f, -0.16f, 1.63f, 1.88f, 0.215f, material);
+                CreateStrap("Bretelle droite", parent, 0.09f, 0.16f, 1.63f, 1.88f, 0.215f, material);
+                CreateBriefs("Culotte", parent, 1.00f, 1.25f,
+                    0.18f * hipScale, 0.13f * bellyScale, material);
             }
             else
             {
-                CreateBriefs("Calecon", parent, 0.98f, 1.26f, 0.20f, 0.14f, material);
+                CreateBriefs("Calecon", parent, 0.98f, 1.26f,
+                    0.20f * hipScale, 0.14f * bellyScale, material);
             }
         }
 
@@ -584,11 +595,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.triangles = indices;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject panel = new GameObject(name);
-            panel.transform.SetParent(parent, false);
-            panel.AddComponent<MeshFilter>().sharedMesh = mesh;
-            panel.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return panel;
+            return CreateMeshObject(name, parent, mesh, material, "spine01");
         }
 
         private static GameObject CreateBriefSide(string name, Transform parent, float bottom, float top,
@@ -605,11 +612,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.triangles = indices;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject side = new GameObject(name);
-            side.transform.SetParent(parent, false);
-            side.AddComponent<MeshFilter>().sharedMesh = mesh;
-            side.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return side;
+            return CreateMeshObject(name, parent, mesh, material, "spine01");
         }
 
         private static GameObject CreateBriefPanel(string name, Transform parent, float bottom, float top,
@@ -627,11 +630,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.triangles = indices;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject panel = new GameObject(name);
-            panel.transform.SetParent(parent, false);
-            panel.AddComponent<MeshFilter>().sharedMesh = mesh;
-            panel.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return panel;
+            return CreateMeshObject(name, parent, mesh, material, "spine01");
         }
 
         private static GameObject CreateStrap(string name, Transform parent, float bottomX, float topX,
@@ -651,11 +650,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.triangles = indices;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject strap = new GameObject(name);
-            strap.transform.SetParent(parent, false);
-            strap.AddComponent<MeshFilter>().sharedMesh = mesh;
-            strap.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return strap;
+            return CreateMeshObject(name, parent, mesh, material, "spine01");
         }
 
         private static GameObject CreateCup(string name, Transform parent, float centerX,
@@ -696,11 +691,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject cup = new GameObject(name);
-            cup.transform.SetParent(parent, false);
-            cup.AddComponent<MeshFilter>().sharedMesh = mesh;
-            cup.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return cup;
+            return CreateMeshObject(name, parent, mesh, material, "spine02");
         }
 
         private static GameObject CreateBand(string name, Transform parent, float bottom, float top,
@@ -738,12 +729,42 @@ public sealed class AdminHumanCreator : MonoBehaviour
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
+            return CreateMeshObject(name, parent, mesh, material, "spine01");
+        }
+
+        private static GameObject CreateMeshObject(string name, Transform parent, Mesh mesh,
+            Material material, string boneName)
+        {
             GameObject garment = new GameObject(name);
             garment.transform.SetParent(parent, false);
-            MeshFilter filter = garment.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
-            MeshRenderer renderer = garment.AddComponent<MeshRenderer>();
+            if (skinBones == null || skinBoneIndexes == null || skinBones.Length == 0)
+            {
+                garment.AddComponent<MeshFilter>().sharedMesh = mesh;
+                garment.AddComponent<MeshRenderer>().sharedMaterial = material;
+                return garment;
+            }
+
+            SkinnedMeshRenderer renderer = garment.AddComponent<SkinnedMeshRenderer>();
+            renderer.sharedMesh = mesh;
             renderer.sharedMaterial = material;
+            renderer.bones = skinBones;
+            int boneIndex = skinBoneIndexes.ContainsKey(boneName)
+                ? skinBoneIndexes[boneName]
+                : skinBoneIndexes.ContainsKey("root") ? skinBoneIndexes["root"] : 0;
+            renderer.rootBone = skinBones[skinBoneIndexes.ContainsKey("root")
+                ? skinBoneIndexes["root"] : 0];
+            BoneWeight[] weights = new BoneWeight[mesh.vertexCount];
+            for (int i = 0; i < weights.Length; i++)
+            {
+                weights[i].boneIndex0 = boneIndex;
+                weights[i].weight0 = 1f;
+            }
+            mesh.boneWeights = weights;
+            Matrix4x4[] bindposes = new Matrix4x4[skinBones.Length];
+            for (int i = 0; i < skinBones.Length; i++)
+                bindposes[i] = skinBones[i].worldToLocalMatrix * garment.transform.localToWorldMatrix;
+            mesh.bindposes = bindposes;
+            renderer.updateWhenOffscreen = true;
             return garment;
         }
     }
