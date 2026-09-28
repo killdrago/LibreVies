@@ -23,11 +23,11 @@ Shader "Hidden/LibreVies/ReglagesEcran"
             {
                 fixed4 couleur = tex2D(_MainTex, i.uv);
                 fixed3 image = (couleur.rgb - 0.5) * _Contrast + 0.5;
-                // 0 = noir absolu, 0.5 = image neutre, 1 = blanc absolu.
-                float versNoir = saturate((0.5 - _Brightness) * 2.0);
-                float versBlanc = saturate((_Brightness - 0.5) * 2.0);
-                image = lerp(image, fixed3(0, 0, 0), versNoir);
-                image = lerp(image, fixed3(1, 1, 1), versBlanc);
+                // 0.5 = image neutre. Les deux moities assombrissent ou
+                // eclaircissent progressivement sans forcer l'ecran au noir
+                // ou au blanc : le joueur regle autour de cette reference.
+                float variation = (_Brightness - 0.5) * 0.9;
+                image *= 1.0 + variation;
                 couleur.rgb = saturate(image);
                 return couleur;
             }
