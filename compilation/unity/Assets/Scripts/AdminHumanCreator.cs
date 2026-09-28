@@ -294,7 +294,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Mesh mesh = obj.CreateMesh(vertices);
+            // Les zones couvertes par les sous-vetements ne rendent plus la
+            // peau du corps : le tissu n'est pas pose sur une image, il
+            // remplace reellement la surface visible a cet endroit.
+            Mesh mesh = obj.CreateMesh(vertices, values.female);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -978,8 +981,45 @@ public sealed class AdminHumanCreator : MonoBehaviour
             foreach (string line in text.text.Split('\n')) if (line.TrimStart().StartsWith("f ")) { string[] p = line.Trim().Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries); foreach (string token in p) { string[] bits = token.Split('/'); int vi = VertexIndex(token, data.vertices.Length), ti; if (vi >= 0 && bits.Length > 1 && int.TryParse(bits[1], out ti)) { ti = ti < 0 ? uvs.Count + ti : ti - 1; if (ti >= 0 && ti < uvs.Count && uvForVertex[vi] == 0) { data.uv[vi] = uvs[ti]; uvForVertex[vi] = ti + 1; } } } }
             return data;
         }
-        public Mesh CreateMesh(Vector3[] vertices)
-        { Mesh mesh = new Mesh { name = "Humain - preview", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; mesh.vertices = vertices; mesh.uv = uv; List<int> indices = new List<int>(); foreach (ObjTriangle t in triangles) { indices.Add(t.a); indices.Add(t.b); indices.Add(t.c); } mesh.SetTriangles(indices, 0); mesh.RecalculateNormals(); mesh.RecalculateBounds(); return mesh; }
+        public Mesh CreateMesh(Vector3[] vertices, bool female)
+        {
+            Mesh mesh = new Mesh
+            {
+                name = "Humain - preview",
+                indexFormat = UnityEngine.Rendering.IndexFormat.UInt32
+            };
+            mesh.vertices = vertices;
+            mesh.uv = uv;
+            List<int> indices = new List<int>();
+            foreach (ObjTriangle triangle in triangles)
+            {
+                Vector3 centre = (vertices[triangle.a] + vertices[triangle.b] + vertices[triangle.c]) / 3f;
+                if (UnderwearCovers(centre, female)) continue;
+                indices.Add(triangle.a);
+                indices.Add(triangle.b);
+                indices.Add(triangle.c);
+            }
+            mesh.SetTriangles(indices, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        private static bool UnderwearCovers(Vector3 point, bool female)
+        {
+            float side = Mathf.Abs(point.x);
+            float frontBack = Mathf.Abs(point.z);
+            // La poitrine sous le soutien-gorge est retiree du rendu de peau.
+            // La marge suit le tissu afin d'eviter une bande de peau autour
+            // des bonnets lorsque le torse est regenere.
+            bool braZone = female && point.y >= 1.51f && point.y <= 1.70f
+                && side <= 0.18f && frontBack >= 0.08f;
+            // Meme principe pour le bassin : les faces avant et arriere sont
+            // laissees au vetement et non superposees par un corps nu.
+            bool briefZone = point.y >= 0.94f && point.y <= 1.30f
+                && side <= 0.24f && frontBack >= 0.06f;
+            return braZone || briefZone;
+        }
         private static int VertexIndex(string token, int count) { int index; if (!int.TryParse(token.Split('/')[0], out index)) return -1; return index < 0 ? count + index : index - 1; }
         private static float F(string value) { return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture); }
         private struct ObjTriangle { public int a, b, c; public ObjTriangle(int a, int b, int c) { this.a = a; this.b = b; this.c = c; } }
