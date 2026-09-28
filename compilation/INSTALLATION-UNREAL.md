@@ -17,11 +17,21 @@ premiere ouverture, utiliser 5.6.
 
 ## 2. Installer la compilation C++ Windows
 
-Installer **Visual Studio Community 2022** avec la charge de travail :
+Pour le projet actuel en Unreal Engine 5.6, installer **Visual Studio Community 2022**
+en parallele de Visual Studio 2026. La documentation Epic indique que Visual
+Studio 2026 n'est pas supporte avec Unreal Engine 5.6 ; notre projet est donc
+fixe sur VS 2022 pour cette migration.
 
-- Developpement Desktop en C++ ;
+Dans Visual Studio 2022, cocher les deux charges de travail :
+
+- **Developpement Desktop en C++** ;
+- **Developpement de jeux avec C++**.
+
+Dans les details, verifier :
+
 - MSVC v143 ;
 - Windows 10 ou Windows 11 SDK ;
+- Visual Studio Tools for Unreal Engine, s'il est propose ;
 - outils CMake pour Windows (facultatif mais utile).
 
 Unreal utilise Visual Studio pour compiler le module `LibreVies` et les futures
