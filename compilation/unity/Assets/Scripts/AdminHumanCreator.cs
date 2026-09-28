@@ -290,6 +290,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
+            // Le fichier MakeHuman est fourni en pose de travail, jambes et
+            // bras ouverts. On le remet debout avant la premiere image.
+            Animate(false, false, 0f);
         }
 
         public void Animate(bool moving, bool running, float clock)
@@ -301,20 +304,24 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float kneeAmplitude = running ? 48f : 36f;
             float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
-            SetBoneRotation("upperleg01.L", legSwing);
-            SetBoneRotation("upperleg01.R", -legSwing);
-            SetBoneRotation("lowerleg01.L", leftKnee);
-            SetBoneRotation("lowerleg01.R", rightKnee);
-            SetBoneRotation("upperarm01.L", -armSwing);
-            SetBoneRotation("upperarm01.R", armSwing);
-            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f);
-            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f);
+            // Z rapproche les bras et les jambes du tronc ; X conserve le
+            // balancement avant-arriere de la marche et de la course.
+            SetBoneRotation("pelvis.L", 0f, -16f);
+            SetBoneRotation("pelvis.R", 0f, 16f);
+            SetBoneRotation("upperleg01.L", legSwing, 28f);
+            SetBoneRotation("upperleg01.R", -legSwing, -28f);
+            SetBoneRotation("lowerleg01.L", leftKnee, 0f);
+            SetBoneRotation("lowerleg01.R", rightKnee, 0f);
+            SetBoneRotation("upperarm01.L", -armSwing, -30f);
+            SetBoneRotation("upperarm01.R", armSwing, 30f);
+            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
         }
 
-        private void SetBoneRotation(string name, float x)
+        private void SetBoneRotation(string name, float x, float z)
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
-            bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, 0f);
+            bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, z);
         }
 
         private static Color SkinColor(int tone)
