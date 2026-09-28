@@ -83,9 +83,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
         if (target == null) return false;
         if (appliedHuman != null) appliedHuman.DestroyRoot();
         appliedHuman = new HumanPreview(target);
-        appliedHuman.Build(this);
+        appliedHuman.Build(this, false);
         appliedHuman.SetPresentationLayer(target.gameObject.layer);
         return appliedHuman.IsBuilt;
+    }
+
+    public void AnimateAppliedHuman(bool moving, bool running, float clock)
+    {
+        if (appliedHuman != null) appliedHuman.Animate(moving, running, clock);
     }
 
     private void EnsurePreviewCamera()
@@ -227,6 +232,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         public void Build(AdminHumanCreator values)
         {
+            Build(values, true);
+        }
+
+        public void Build(AdminHumanCreator values, bool facePreviewCamera)
+        {
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
             root = new GameObject("ADMIN - apercu humain");
@@ -277,7 +287,34 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
-            root.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            root.transform.localRotation = facePreviewCamera
+                ? Quaternion.Euler(0f, 180f, 0f)
+                : Quaternion.identity;
+        }
+
+        public void Animate(bool moving, bool running, float clock)
+        {
+            if (!IsBuilt || bones == null || boneIndexes == null) return;
+            float cycle = moving ? Mathf.Sin(clock) : 0f;
+            float legSwing = (running ? 38f : 30f) * cycle;
+            float armSwing = (running ? 32f : 24f) * cycle;
+            float kneeAmplitude = running ? 48f : 36f;
+            float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
+            float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
+            SetBoneRotation("upperleg01.L", legSwing);
+            SetBoneRotation("upperleg01.R", -legSwing);
+            SetBoneRotation("lowerleg01.L", leftKnee);
+            SetBoneRotation("lowerleg01.R", rightKnee);
+            SetBoneRotation("upperarm01.L", -armSwing);
+            SetBoneRotation("upperarm01.R", armSwing);
+            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f);
+            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f);
+        }
+
+        private void SetBoneRotation(string name, float x)
+        {
+            if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
+            bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, 0f);
         }
 
         private static Color SkinColor(int tone)

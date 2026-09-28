@@ -5349,7 +5349,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void AnimerHeroine(bool enMouvement, bool enCourse)
     {
-        if (adminHumainJoueurActif) return;
+        if (adminHumainJoueurActif && adminHumanCreator != null)
+        {
+            adminHumanCreator.AnimateAppliedHuman(enMouvement, enCourse, walkClock);
+            return;
+        }
         if (heroineModel == null) return;
         // Ne jamais incliner le personnage : la rotation de joueur ne contient
         // que le lacet horizontal, et l'animation ne touche qu'aux pivots.
