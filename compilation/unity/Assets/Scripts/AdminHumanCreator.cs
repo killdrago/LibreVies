@@ -309,8 +309,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
             underwearMaterial.color = values.female
-                ? new Color(0.48f, 0.08f, 0.16f)
-                : new Color(0.10f, 0.16f, 0.42f);
+                ? new Color(0.07f, 0.10f, 0.16f)
+                : new Color(0.05f, 0.07f, 0.11f);
             ClothingBuilder.Create(values.female, values.chestShape, root.transform, underwearMaterial);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
@@ -536,13 +536,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (female)
             {
                 float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
-                CreateBand("Soutien-gorge bande fine", parent, 1.56f, 1.60f, 0.24f, 0.19f, material);
+                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.56f, 1.60f,
+                    0.20f, material);
                 CreateCup("Bonnet gauche", parent, -0.11f * cupScale, 1.62f,
-                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
+                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, 0.205f, material);
                 CreateCup("Bonnet droit", parent, 0.11f * cupScale, 1.62f,
-                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
-                CreateStrap("Bretelle gauche", parent, -0.11f, -0.20f, 1.65f, 1.86f, 0.31f, material);
-                CreateStrap("Bretelle droite", parent, 0.11f, 0.20f, 1.65f, 1.86f, 0.31f, material);
+                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, 0.205f, material);
+                CreateStrap("Bretelle gauche", parent, -0.11f, -0.20f, 1.65f, 1.86f, 0.215f, material);
+                CreateStrap("Bretelle droite", parent, 0.11f, 0.20f, 1.65f, 1.86f, 0.215f, material);
                 CreateBriefs("Culotte", parent, 0.91f, 1.28f, 0.28f, 0.17f, material);
             }
             else
@@ -554,15 +555,36 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static void CreateBriefs(string name, Transform parent, float bottom, float top,
             float width, float depth, Material material)
         {
-            float front = depth + 0.18f;
-            float back = -depth - 0.06f;
+            float front = depth + 0.03f;
+            float back = -depth - 0.02f;
             CreateBriefPanel(name + " avant", parent, bottom, top, width, front, material);
             CreateBriefPanel(name + " arriere", parent, bottom, top, width, back, material);
             CreateBriefSide(name + " cote gauche", parent, bottom, top, -width, -width * 0.55f,
                 front, back, material);
             CreateBriefSide(name + " cote droit", parent, bottom, top, width, width * 0.55f,
                 front, back, material);
-            CreateBand(name + " ceinture", parent, top - 0.06f, top, width, depth + 0.08f, material);
+            CreateBand(name + " ceinture", parent, top - 0.06f, top, width, depth + 0.02f, material);
+        }
+
+        private static GameObject CreateFrontPanel(string name, Transform parent, float bottom,
+            float top, float front, Material material)
+        {
+            Vector3[] vertices =
+            {
+                new Vector3(-0.20f, bottom, front), new Vector3(0.20f, bottom, front),
+                new Vector3(0.20f, top, front), new Vector3(-0.20f, top, front)
+            };
+            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.vertices = vertices;
+            mesh.triangles = indices;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject panel = new GameObject(name);
+            panel.transform.SetParent(parent, false);
+            panel.AddComponent<MeshFilter>().sharedMesh = mesh;
+            panel.AddComponent<MeshRenderer>().sharedMaterial = material;
+            return panel;
         }
 
         private static GameObject CreateBriefSide(string name, Transform parent, float bottom, float top,
@@ -633,36 +655,38 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
 
         private static GameObject CreateCup(string name, Transform parent, float centerX,
-            float centerY, float radiusX, float radiusY, float radiusZ, Material material)
+            float centerY, float radiusX, float radiusY, float radiusZ, float surfaceZ,
+            Material material)
         {
-            const int segments = 16;
+            const int segments = 24;
+            const int rings = 5;
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
-            vertices.Add(new Vector3(centerX, centerY, 0.30f + radiusZ));
-            for (int ring = 1; ring <= 2; ring++)
+            for (int ring = 0; ring < rings; ring++)
             {
-                float scale = ring == 1 ? 0.58f : 1f;
-                float dome = ring == 1 ? radiusZ * 0.45f : 0f;
+                float t = ring / (float)(rings - 1);
+                float angle = t * Mathf.PI * 0.5f;
+                float ringRadius = Mathf.Sin(angle);
+                float dome = Mathf.Cos(angle) * radiusZ;
                 for (int segment = 0; segment < segments; segment++)
                 {
-                    float angle = segment * Mathf.PI * 2f / segments;
+                    float around = segment * Mathf.PI * 2f / segments;
                     vertices.Add(new Vector3(
-                        centerX + Mathf.Cos(angle) * radiusX * scale,
-                        centerY + Mathf.Sin(angle) * radiusY * scale,
-                        0.30f + dome));
+                        centerX + Mathf.Cos(around) * radiusX * ringRadius,
+                        centerY + Mathf.Sin(around) * radiusY * ringRadius,
+                        surfaceZ + dome));
                 }
             }
-            for (int segment = 0; segment < segments; segment++)
-            {
-                int inner = 1 + segment;
-                int innerNext = 1 + (segment + 1) % segments;
-                int outer = 1 + segments + segment;
-                int outerNext = 1 + segments + (segment + 1) % segments;
-                triangles.Add(0); triangles.Add(inner); triangles.Add(innerNext);
-                triangles.Add(inner); triangles.Add(outer); triangles.Add(outerNext);
-                triangles.Add(innerNext); triangles.Add(inner); triangles.Add(0);
-                triangles.Add(outerNext); triangles.Add(outer); triangles.Add(inner);
-            }
+            for (int ring = 0; ring < rings - 1; ring++)
+                for (int segment = 0; segment < segments; segment++)
+                {
+                    int a = ring * segments + segment;
+                    int b = ring * segments + (segment + 1) % segments;
+                    int c = (ring + 1) * segments + (segment + 1) % segments;
+                    int d = (ring + 1) * segments + segment;
+                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
+                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                }
             Mesh mesh = new Mesh { name = name + " - mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
@@ -725,35 +749,108 @@ public sealed class AdminHumanCreator : MonoBehaviour
         public static GameObject Create(int style, bool female, Transform parent, Transform head,
             Material material)
         {
+            style = Mathf.Clamp(style, 0, 4);
             GameObject objectHair = new GameObject("Cheveux - coupe " + style);
             objectHair.transform.SetParent(head == null ? parent : head, false);
-            float width = female ? 0.14f : 0.13f;
-            float depth = 0.17f;
-            float length;
+            float width = female ? 0.115f : 0.105f;
+            float depth = female ? 0.105f : 0.095f;
+            CreateCap(objectHair, width, depth, material);
+
             if (female)
-                length = style == 1 ? 0.48f : (style == 3 ? 0.32f : (style == 4 ? 0.42f : (style == 0 ? 0.18f : 0.12f)));
+            {
+                if (style == 0)
+                {
+                    CreateLock(objectHair, "meche gauche", -width * 0.78f, 0.08f, 0.035f,
+                        0.045f, 0.055f, 0.14f, material, 0.01f);
+                    CreateLock(objectHair, "meche droite", width * 0.78f, 0.08f, 0.035f,
+                        0.045f, 0.055f, 0.14f, material, -0.01f);
+                }
+                else if (style == 1)
+                {
+                    CreateLock(objectHair, "longue gauche", -width * 0.86f, 0.08f, 0.0f,
+                        0.042f, 0.05f, 0.34f, material, 0.012f);
+                    CreateLock(objectHair, "longue droite", width * 0.86f, 0.08f, 0.0f,
+                        0.042f, 0.05f, 0.34f, material, -0.012f);
+                    CreateLock(objectHair, "longue arriere", 0f, 0.04f, -0.085f,
+                        0.075f, 0.045f, 0.34f, material, 0.015f);
+                }
+                else if (style == 2)
+                {
+                    CreateLock(objectHair, "queue gauche", -width * 0.72f, 0.05f, -0.09f,
+                        0.04f, 0.04f, 0.29f, material, 0.02f);
+                    CreateLock(objectHair, "queue droite", width * 0.72f, 0.05f, -0.09f,
+                        0.04f, 0.04f, 0.29f, material, -0.02f);
+                    CreateLock(objectHair, "frange", 0f, 0.10f, 0.085f,
+                        0.055f, 0.025f, 0.09f, material, 0f);
+                }
+                else if (style == 3)
+                {
+                    CreateLock(objectHair, "carre gauche", -width * 0.88f, 0.08f, 0.025f,
+                        0.048f, 0.05f, 0.24f, material, 0.008f);
+                    CreateLock(objectHair, "carre droite", width * 0.88f, 0.08f, 0.025f,
+                        0.048f, 0.05f, 0.24f, material, -0.008f);
+                }
+                else
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float x = (i - 1) * width * 0.72f;
+                        CreateLock(objectHair, "boucle " + i, x, 0.06f, -0.07f,
+                            0.045f, 0.045f, 0.27f + i * 0.025f, material,
+                            (i - 1) * 0.025f);
+                    }
+                }
+            }
             else
-                length = style == 2 ? 0.22f : (style == 3 ? 0.30f : (style == 4 ? 0.40f : (style == 0 ? 0.08f : 0.13f)));
-            bool curly = female && style == 4;
-            bool punk = !female && style == 2;
-            const int rows = 8;
-            const int columns = 40;
+            {
+                if (style == 0)
+                {
+                    CreateLock(objectHair, "frange courte", 0f, 0.105f, 0.07f,
+                        0.07f, 0.025f, 0.055f, material, 0f);
+                }
+                else if (style == 1)
+                {
+                    CreateLock(objectHair, "meche coiffee", -0.035f, 0.10f, 0.075f,
+                        0.065f, 0.03f, 0.09f, material, -0.012f);
+                }
+                else if (style == 2)
+                {
+                    for (int i = 0; i < 3; i++)
+                        CreateLock(objectHair, "point " + i, (i - 1) * 0.045f, 0.11f, 0.0f,
+                            0.035f, 0.035f, 0.10f + i * 0.025f, material, 0f);
+                }
+                else if (style == 3)
+                {
+                    CreateLock(objectHair, "cote gauche", -0.09f, 0.07f, 0.01f,
+                        0.035f, 0.04f, 0.19f, material, 0.01f);
+                    CreateLock(objectHair, "cote droit", 0.09f, 0.07f, 0.01f,
+                        0.035f, 0.04f, 0.19f, material, -0.01f);
+                }
+                else
+                {
+                    CreateLock(objectHair, "arriere homme", 0f, 0.06f, -0.075f,
+                        0.065f, 0.045f, 0.25f, material, 0f);
+                }
+            }
+            return objectHair;
+        }
+
+        private static void CreateCap(GameObject parent, float width, float depth, Material material)
+        {
+            const int rows = 5;
+            const int columns = 24;
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
             for (int row = 0; row < rows; row++)
             {
                 float t = row / (float)(rows - 1);
-                // Le sommet est pres du sommet du crane ; les cheveux longs
-                // descendent vers le cou au lieu de former un cone au-dessus.
-                float y = 0.18f - t * length;
-                float radius = Mathf.Lerp(width * 0.62f, width, t);
+                float radius = Mathf.Sin(t * Mathf.PI * 0.5f);
+                float y = 0.18f - t * 0.16f;
                 for (int col = 0; col < columns; col++)
                 {
                     float angle = col * Mathf.PI * 2f / columns;
-                    float wave = curly ? Mathf.Sin(angle * 5f + t * 4f) * 0.025f : 0f;
-                    float spikes = punk && t > 0.45f ? Mathf.Sin(angle * 7f) * 0.045f * t : 0f;
-                    vertices.Add(new Vector3(Mathf.Cos(angle) * (radius + wave + spikes), y,
-                        Mathf.Sin(angle) * ((radius + wave) * depth / width)));
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * width * radius, y,
+                        Mathf.Sin(angle) * depth * radius));
                 }
             }
             for (int row = 0; row < rows - 1; row++)
@@ -766,23 +863,61 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     triangles.Add(a); triangles.Add(c); triangles.Add(b);
                     triangles.Add(a); triangles.Add(d); triangles.Add(c);
                 }
-            Mesh mesh = new Mesh { name = "Cheveux - mesh" };
+            AddMesh(parent, "calotte", vertices, triangles, material);
+        }
+
+        private static void CreateLock(GameObject parent, string name, float centerX, float startY,
+            float centerZ, float radiusX, float radiusZ, float length, Material material, float bend)
+        {
+            const int rows = 5;
+            const int columns = 10;
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            for (int row = 0; row < rows; row++)
+            {
+                float t = row / (float)(rows - 1);
+                float y = startY - length * t;
+                float x = centerX + bend * Mathf.Sin(t * Mathf.PI);
+                float taper = 1f - t * 0.28f;
+                for (int col = 0; col < columns; col++)
+                {
+                    float angle = col * Mathf.PI * 2f / columns;
+                    vertices.Add(new Vector3(x + Mathf.Cos(angle) * radiusX * taper, y,
+                        centerZ + Mathf.Sin(angle) * radiusZ * taper));
+                }
+            }
+            for (int row = 0; row < rows - 1; row++)
+                for (int col = 0; col < columns; col++)
+                {
+                    int a = row * columns + col;
+                    int b = row * columns + (col + 1) % columns;
+                    int c = (row + 1) * columns + (col + 1) % columns;
+                    int d = (row + 1) * columns + col;
+                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
+                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                }
+            AddMesh(parent, name, vertices, triangles, material);
+        }
+
+        private static void AddMesh(GameObject parent, string name, List<Vector3> vertices,
+            List<int> triangles, Material material)
+        {
+            Mesh mesh = new Mesh { name = "Cheveux - " + name + " mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            MeshFilter filter = objectHair.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
-            MeshRenderer renderer = objectHair.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            return objectHair;
+            GameObject part = new GameObject("Cheveux - " + name);
+            part.transform.SetParent(parent.transform, false);
+            part.AddComponent<MeshFilter>().sharedMesh = mesh;
+            part.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
 
         public static void Animate(GameObject hair, int style, bool female, bool moving,
             bool running, float clock)
         {
             if (hair == null) return;
-            bool longHair = female ? style == 1 || style == 3 || style == 4
+            bool longHair = female ? style == 1 || style == 2 || style == 3 || style == 4
                 : style == 3 || style == 4;
             float amplitude = longHair ? (running ? 5f : 3f) : 1.2f;
             float phase = Time.time * (running ? 2.2f : 1.7f);
