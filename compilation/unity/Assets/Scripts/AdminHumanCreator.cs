@@ -181,6 +181,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Dictionary<string, int> boneIndexes;
         private Material skin;
         private Material hairMaterial;
+        private Texture2D skinTexture;
+        private Texture2D clothTexture;
+        private Texture2D paintedSkinTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -191,8 +194,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
-            Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
-            if (texture != null) skin.mainTexture = texture;
+            skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
+            clothTexture = Resources.Load<Texture2D>("LVTextures/LV_Cloth");
+            if (skinTexture != null) skin.mainTexture = skinTexture;
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -292,6 +296,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
+            if (paintedSkinTexture != null) UnityEngine.Object.Destroy(paintedSkinTexture);
+            paintedSkinTexture = obj.PaintUnderwearTexture(vertices, values.female,
+                skinTexture, clothTexture);
+            skin.mainTexture = paintedSkinTexture != null ? paintedSkinTexture : skinTexture;
             Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
@@ -306,10 +314,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            Material underwearMaterial = NewMaterial(
-                new Color(0.05f, 0.07f, 0.11f), 0f, 0.30f);
-            PixelClothingBuilder.Create(values.female, values.chestShape, values.hipShape,
-                values.belly, root.transform, bones, boneIndexes, underwearMaterial);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -534,146 +538,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
     // Les sous-vetements sont maintenant un sous-maillage du corps :
     // aucune geometrie flottante n est creee devant le personnage.
 
-    private static class PixelClothingBuilder
-    {
-        private const float Pixel = 0.012f;
-
-        public static void Create(bool female, float chestShape, float hipShape, float belly,
-            Transform parent, Transform[] bones, Dictionary<string, int> boneIndexes,
-            Material material)
-        {
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            float hipScale = Mathf.Clamp(1f + hipShape * 0.22f, 0.82f, 1.22f);
-            float bellyScale = Mathf.Clamp(1f + belly * 0.12f, 0.92f, 1.10f);
-            if (female)
-            {
-                AddBraPixels(vertices, triangles, chestShape);
-                AddBriefPixels(vertices, triangles, 0.18f * hipScale,
-                    0.13f * bellyScale);
-            }
-            else
-            {
-                AddBriefPixels(vertices, triangles, 0.20f * hipScale,
-                    0.14f * bellyScale);
-            }
-            Mesh mesh = new Mesh { name = "Sous-vetements - pixels mesh" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            GameObject garment = new GameObject("Sous-vetements - pixels");
-            garment.transform.SetParent(parent, false);
-            SkinnedMeshRenderer renderer = garment.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterial = material;
-            renderer.bones = bones;
-            int boneIndex = boneIndexes.ContainsKey("spine01")
-                ? boneIndexes["spine01"] : boneIndexes["root"];
-            renderer.rootBone = bones[boneIndexes.ContainsKey("root")
-                ? boneIndexes["root"] : boneIndex];
-            BoneWeight[] weights = new BoneWeight[mesh.vertexCount];
-            for (int i = 0; i < weights.Length; i++)
-            {
-                weights[i].boneIndex0 = boneIndex;
-                weights[i].weight0 = 1f;
-            }
-            mesh.boneWeights = weights;
-            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
-            for (int i = 0; i < bones.Length; i++)
-                bindposes[i] = bones[i].worldToLocalMatrix * garment.transform.localToWorldMatrix;
-            mesh.bindposes = bindposes;
-            renderer.updateWhenOffscreen = true;
-        }
-
-        private static void AddBraPixels(List<Vector3> vertices, List<int> triangles,
-            float chestShape)
-        {
-            float scale = Mathf.Clamp(1f + chestShape * 0.35f, 0.78f, 1.34f);
-            float radiusX = 0.14f * scale;
-            float radiusY = 0.12f * scale;
-            for (float y = 1.49f; y <= 1.74f; y += Pixel)
-                for (float x = -0.24f; x <= 0.24f; x += Pixel)
-                {
-                    float left = Mathf.Pow((x + 0.09f * scale) / radiusX, 2f)
-                        + Mathf.Pow((y - 1.61f) / radiusY, 2f);
-                    float right = Mathf.Pow((x - 0.09f * scale) / radiusX, 2f)
-                        + Mathf.Pow((y - 1.61f) / radiusY, 2f);
-                    if (Mathf.Min(left, right) <= 1f)
-                        AddPixelXY(vertices, triangles, x, y, 0.225f);
-                }
-
-            // Bande basse et bretelles dessinees pixel par pixel.
-            for (float y = 1.46f; y <= 1.53f; y += Pixel)
-                for (float x = -0.21f; x <= 0.21f; x += Pixel)
-                    AddPixelXY(vertices, triangles, x, y, 0.22f);
-            for (float y = 1.62f; y <= 1.90f; y += Pixel)
-            {
-                float t = Mathf.InverseLerp(1.62f, 1.90f, y);
-                AddPixelColumn(vertices, triangles, Mathf.Lerp(-0.09f, -0.16f, t), y, 0.225f);
-                AddPixelColumn(vertices, triangles, Mathf.Lerp(0.09f, 0.16f, t), y, 0.225f);
-            }
-        }
-
-        private static void AddBriefPixels(List<Vector3> vertices, List<int> triangles,
-            float hipWidth, float bellyDepth)
-        {
-            for (float y = 0.98f; y <= 1.26f; y += Pixel)
-            {
-                float width = Mathf.Lerp(hipWidth * 0.72f, hipWidth, Mathf.InverseLerp(0.98f, 1.26f, y));
-                for (float x = -width; x <= width; x += Pixel)
-                {
-                    AddPixelXY(vertices, triangles, x, y, bellyDepth + 0.035f);
-                    AddPixelXY(vertices, triangles, x, y, -bellyDepth - 0.025f);
-                }
-                for (float z = -bellyDepth - 0.025f; z <= bellyDepth + 0.035f; z += Pixel)
-                {
-                    AddPixelYZ(vertices, triangles, -width, y, z);
-                    AddPixelYZ(vertices, triangles, width, y, z);
-                }
-            }
-        }
-
-        private static void AddPixelColumn(List<Vector3> vertices, List<int> triangles,
-            float x, float y, float z)
-        {
-            AddPixelXY(vertices, triangles, x - Pixel * 0.5f, y, z);
-            AddPixelXY(vertices, triangles, x + Pixel * 0.5f, y, z);
-        }
-
-        private static void AddPixelXY(List<Vector3> vertices, List<int> triangles,
-            float x, float y, float z)
-        {
-            int start = vertices.Count;
-            float half = Pixel * 0.5f;
-            vertices.Add(new Vector3(x - half, y - half, z));
-            vertices.Add(new Vector3(x + half, y - half, z));
-            vertices.Add(new Vector3(x + half, y + half, z));
-            vertices.Add(new Vector3(x - half, y + half, z));
-            AddDoubleSidedQuad(triangles, start);
-        }
-
-        private static void AddPixelYZ(List<Vector3> vertices, List<int> triangles,
-            float x, float y, float z)
-        {
-            int start = vertices.Count;
-            float half = Pixel * 0.5f;
-            vertices.Add(new Vector3(x, y - half, z - half));
-            vertices.Add(new Vector3(x, y - half, z + half));
-            vertices.Add(new Vector3(x, y + half, z + half));
-            vertices.Add(new Vector3(x, y + half, z - half));
-            AddDoubleSidedQuad(triangles, start);
-        }
-
-        private static void AddDoubleSidedQuad(List<int> triangles, int start)
-        {
-            triangles.Add(start); triangles.Add(start + 1); triangles.Add(start + 2);
-            triangles.Add(start); triangles.Add(start + 2); triangles.Add(start + 3);
-            triangles.Add(start + 2); triangles.Add(start + 1); triangles.Add(start);
-            triangles.Add(start + 3); triangles.Add(start + 2); triangles.Add(start);
-        }
-    }
-
     private static class HairBuilder
     {
         public static GameObject Create(int style, bool female, Transform parent, Transform head,
@@ -883,6 +747,129 @@ public sealed class AdminHumanCreator : MonoBehaviour
             foreach (string line in text.text.Split('\n')) if (line.TrimStart().StartsWith("f ")) { string[] p = line.Trim().Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries); foreach (string token in p) { string[] bits = token.Split('/'); int vi = VertexIndex(token, data.vertices.Length), ti; if (vi >= 0 && bits.Length > 1 && int.TryParse(bits[1], out ti)) { ti = ti < 0 ? uvs.Count + ti : ti - 1; if (ti >= 0 && ti < uvs.Count && uvForVertex[vi] == 0) { data.uv[vi] = uvs[ti]; uvForVertex[vi] = ti + 1; } } } }
             return data;
         }
+        public Texture2D PaintUnderwearTexture(Vector3[] vertices, bool female,
+            Texture2D skinSource, Texture2D clothSource)
+        {
+            if (skinSource == null) return null;
+            const int size = 256;
+            Texture2D painted = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
+            Color[] pixels = new Color[size * size];
+            Color[] sourcePixels = skinSource.GetPixels();
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size;
+                    float v = (y + 0.5f) / size;
+                    int sourceX = Mathf.Clamp(Mathf.RoundToInt(u * (skinSource.width - 1)), 0,
+                        skinSource.width - 1);
+                    int sourceY = Mathf.Clamp(Mathf.RoundToInt(v * (skinSource.height - 1)), 0,
+                        skinSource.height - 1);
+                    pixels[y * size + x] = sourcePixels[sourceY * skinSource.width + sourceX];
+                }
+
+            Color clothTint = female
+                ? new Color(0.18f, 0.24f, 0.48f, 1f)
+                : new Color(0.12f, 0.16f, 0.30f, 1f);
+            foreach (ObjTriangle triangle in triangles)
+            {
+                Vector2 a = uv[triangle.a];
+                Vector2 b = uv[triangle.b];
+                Vector2 c = uv[triangle.c];
+                if (Mathf.Abs(a.x - b.x) > 0.5f || Mathf.Abs(a.x - c.x) > 0.5f
+                    || Mathf.Abs(b.x - c.x) > 0.5f) continue;
+                PaintTriangle(pixels, size, vertices[triangle.a], vertices[triangle.b],
+                    vertices[triangle.c], a, b, c, female, clothSource, clothTint);
+            }
+            painted.SetPixels(pixels);
+            painted.Apply(false, false);
+            painted.wrapMode = TextureWrapMode.Repeat;
+            painted.filterMode = FilterMode.Point;
+            return painted;
+        }
+
+        private static void PaintTriangle(Color[] pixels, int size, Vector3 p0, Vector3 p1,
+            Vector3 p2, Vector2 uv0, Vector2 uv1, Vector2 uv2, bool female,
+            Texture2D clothSource, Color clothTint)
+        {
+            float minU = Mathf.Min(uv0.x, Mathf.Min(uv1.x, uv2.x));
+            float maxU = Mathf.Max(uv0.x, Mathf.Max(uv1.x, uv2.x));
+            float minV = Mathf.Min(uv0.y, Mathf.Min(uv1.y, uv2.y));
+            float maxV = Mathf.Max(uv0.y, Mathf.Max(uv1.y, uv2.y));
+            int left = Mathf.Clamp(Mathf.FloorToInt(minU * size), 0, size - 1);
+            int right = Mathf.Clamp(Mathf.CeilToInt(maxU * size), 0, size - 1);
+            int bottom = Mathf.Clamp(Mathf.FloorToInt(minV * size), 0, size - 1);
+            int top = Mathf.Clamp(Mathf.CeilToInt(maxV * size), 0, size - 1);
+            float denominator = (uv1.y - uv2.y) * (uv0.x - uv2.x)
+                + (uv2.x - uv1.x) * (uv0.y - uv2.y);
+            if (Mathf.Abs(denominator) < 0.000001f) return;
+            for (int y = bottom; y <= top; y++)
+                for (int x = left; x <= right; x++)
+                {
+                    Vector2 point = new Vector2((x + 0.5f) / size, (y + 0.5f) / size);
+                    float w0 = ((uv1.y - uv2.y) * (point.x - uv2.x)
+                        + (uv2.x - uv1.x) * (point.y - uv2.y)) / denominator;
+                    float w1 = ((uv2.y - uv0.y) * (point.x - uv2.x)
+                        + (uv0.x - uv2.x) * (point.y - uv2.y)) / denominator;
+                    float w2 = 1f - w0 - w1;
+                    if (w0 < 0f || w1 < 0f || w2 < 0f) continue;
+                    Vector3 bodyPoint = p0 * w0 + p1 * w1 + p2 * w2;
+                    float coverage = UnderwearMask(bodyPoint, female);
+                    if (coverage <= 0.01f) continue;
+                    Color cloth = clothSource == null ? clothTint
+                        : clothSource.GetPixelBilinear(Mathf.Repeat(point.x * 3f, 1f),
+                            Mathf.Repeat(point.y * 3f, 1f));
+                    cloth *= clothTint;
+                    int index = y * size + x;
+                    pixels[index] = Color.Lerp(pixels[index], cloth, coverage);
+                }
+        }
+
+        private static float UnderwearMask(Vector3 point, bool female)
+        {
+            float side = Mathf.Abs(point.x);
+            float frontBack = Mathf.Abs(point.z);
+            float mask = 0f;
+            if (female && frontBack >= 0.045f)
+            {
+                float leftCup = Mathf.Pow((point.x + 0.09f) / 0.14f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
+                float rightCup = Mathf.Pow((point.x - 0.09f) / 0.14f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
+                float cupMask = 1f - Mathf.SmoothStep(0.78f, 1.08f,
+                    Mathf.Min(leftCup, rightCup));
+                float band = BandMask(point.y, 1.46f, 1.55f)
+                    * (1f - Mathf.SmoothStep(0.19f, 0.25f, side));
+                float t = Mathf.InverseLerp(1.61f, 1.90f, point.y);
+                float leftStrap = 1f - Mathf.SmoothStep(0.018f, 0.040f,
+                    Mathf.Abs(point.x - Mathf.Lerp(-0.09f, -0.16f, t)));
+                float rightStrap = 1f - Mathf.SmoothStep(0.018f, 0.040f,
+                    Mathf.Abs(point.x - Mathf.Lerp(0.09f, 0.16f, t)));
+                if (point.y < 1.61f || point.y > 1.90f)
+                {
+                    leftStrap = 0f;
+                    rightStrap = 0f;
+                }
+                mask = Mathf.Max(cupMask, band, leftStrap, rightStrap);
+            }
+            if (point.y >= 0.94f && point.y <= 1.30f)
+            {
+                float width = Mathf.Lerp(0.15f, 0.27f,
+                    Mathf.InverseLerp(0.94f, 1.30f, point.y));
+                float sides = 1f - Mathf.SmoothStep(width - 0.025f, width + 0.025f, side);
+                float lower = Mathf.SmoothStep(0.94f, 0.99f, point.y);
+                float upper = 1f - Mathf.SmoothStep(1.27f, 1.30f, point.y);
+                mask = Mathf.Max(mask, sides * Mathf.Min(lower, upper));
+            }
+            return Mathf.Clamp01(mask);
+        }
+
+        private static float BandMask(float value, float bottom, float top)
+        {
+            float lower = Mathf.SmoothStep(bottom - 0.025f, bottom + 0.025f, value);
+            float upper = 1f - Mathf.SmoothStep(top - 0.025f, top + 0.025f, value);
+            return lower * upper;
+        }
+
         public Mesh CreateMesh(Vector3[] vertices)
         {
             Mesh mesh = new Mesh
