@@ -305,7 +305,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 }
             }
             data.vertices = positions.ToArray(); data.uv = new Vector2[data.vertices.Length]; uvForVertex = new List<int>(new int[data.vertices.Length]);
-            foreach (string line in text.text.Split('\n')) if (line.TrimStart().StartsWith("f ")) { string[] p = line.Trim().Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries); foreach (string token in p) { string[] bits = token.Split('/'); int vi = VertexIndex(token, data.vertices.Length), ti; if (vi >= 0 && bits.Length > 1 && int.TryParse(bits[1], out ti)) { ti = ti < 0 ? uvs.Count + ti : ti - 1; if (ti >= 0 && ti < uvs.Count && uvForVertex[vi] == 0) { data.uv[vi] = uvs[ti]; uvForVertex[vi] = ti + 1; } } }
+            foreach (string line in text.text.Split('\n')) if (line.TrimStart().StartsWith("f ")) { string[] p = line.Trim().Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries); foreach (string token in p) { string[] bits = token.Split('/'); int vi = VertexIndex(token, data.vertices.Length), ti; if (vi >= 0 && bits.Length > 1 && int.TryParse(bits[1], out ti)) { ti = ti < 0 ? uvs.Count + ti : ti - 1; if (ti >= 0 && ti < uvs.Count && uvForVertex[vi] == 0) { data.uv[vi] = uvs[ti]; uvForVertex[vi] = ti + 1; } } } }
             return data;
         }
         public Mesh CreateMesh(Vector3[] vertices)
@@ -314,6 +314,4 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static float F(string value) { return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture); }
         private struct ObjTriangle { public int a, b, c; public ObjTriangle(int a, int b, int c) { this.a = a; this.b = b; this.c = c; } }
     }
-}
-
 }
