@@ -142,7 +142,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         female = UnityEngine.Random.value > 0.5f;
         skinTone = UnityEngine.Random.Range(0, 7);
         belly = UnityEngine.Random.Range(-0.65f, 0.75f);
-        chestShape = UnityEngine.Random.Range(-0.65f, 0.75f);
+        chestShape = UnityEngine.Random.Range(-0.24f, 0.75f);
         hipShape = UnityEngine.Random.Range(-0.65f, 0.75f);
         hairStyle = UnityEngine.Random.Range(0, 5);
         armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
