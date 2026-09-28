@@ -104,9 +104,14 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
-    // Apercu MakeHuman de l'ADMIN : le composant garde les reglages et
+    // Apercu humain de l'ADMIN : le composant garde les reglages et
     // pourra etre reutilise plus tard pour creer le personnage joueur.
     private AdminHumanCreator adminHumanCreator;
+    private int adminNpcListeSelection;
+    private int adminObjetListeSelection;
+    private int adminJoueurSelection;
+    private Vector2 adminObjetScroll;
+    private string adminEditionContexte = "Nouveau personnage";
     private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
@@ -659,7 +664,7 @@ public sealed class LibreViesGame : MonoBehaviour
             "materiaux", "environnement", "terrain", "route", "village",
             "riviere", "cloture et portails", "arbres", "herbe", "rochers",
             "decor (barils, caisses)", "lampadaires", "nuages", "heros",
-            "apercu humain MakeHuman", "monstres", "gardes", "objets a ramasser"
+            "apercu humain", "monstres", "gardes", "objets a ramasser"
         };
         System.Action[] travaux =
         {
@@ -5426,15 +5431,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreateHumanAdminPreview()
     {
         if (player == null) return;
-        GameObject creatorObject = new GameObject("ADMIN - Createur humain MakeHuman");
-        // Le mannequin reste dans le monde, juste a cote du joueur, pour que
-        // chaque modification de l'ADMIN soit jugeable avec la camera du jeu.
+        GameObject creatorObject = new GameObject("ADMIN - Createur humain");
+        // Le mannequin est rendu par la camera du panneau ADMIN, pas dans le
+        // monde principal. Il reste donc visible quel que soit le cadrage du
+        // joueur et chaque modification est immediate dans l'aperçu.
         creatorObject.transform.position = new Vector3(
             player.position.x + 3.4f,
             TerrainHeight(player.position.x + 3.4f, player.position.z) + 0.04f,
             player.position.z + 0.4f);
         adminHumanCreator = creatorObject.AddComponent<AdminHumanCreator>();
         adminHumanCreator.ResetPreview();
+        // La couche 31 est reservee a l'aperçu administratif.
+        if (gameCamera != null) gameCamera.cullingMask &= ~(1 << 31);
     }
 
     private void CreatePlayer()
@@ -6747,56 +6755,66 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private List<PnjState> ObtenirPnjsAdminTries()
+    {
+        List<PnjState> result = new List<PnjState>();
+        for (int i = 0; i < pnjs.Count; i++)
+            if (pnjs[i] != null && pnjs[i].Root != null) result.Add(pnjs[i]);
+        result.Sort((a, b) => string.Compare(NomAffichePnj(a), NomAffichePnj(b),
+            StringComparison.CurrentCultureIgnoreCase));
+        return result;
+    }
+
     private void DessinerAdminNpc(Rect contenu)
     {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 380f, 26f),
-            "NPC : bras et accessoire", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 45f, 380f, 22f),
-            "Personnage a regler", smallStyle);
-        string[] noms = { "Perso", "Maire", "Forgeron" };
-        for (int i = 0; i < noms.Length; i++)
+        List<PnjState> liste = ObtenirPnjsAdminTries();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
+            "NPC EN PLACE", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 520f, 22f),
+            "Selectionnez un NPC pour afficher ses caracteristiques et son edition humaine.", smallStyle);
+
+        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 190f, 350f);
+        GUI.Box(listeRect, "NPC", boxStyle);
+        for (int i = 0; i < liste.Count; i++)
         {
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 112f,
-                contenu.y + 68f, 104f, 28f), noms[i], adminNpcSelection == i))
-                adminNpcSelection = i;
+            string libelle = NomAffichePnj(liste[i]);
+            if (BoutonChoixAdmin(new Rect(listeRect.x + 10f, listeRect.y + 28f + i * 34f,
+                170f, 28f), libelle, adminNpcListeSelection == i))
+            {
+                adminNpcListeSelection = i;
+                adminEditionContexte = "NPC : " + libelle;
+                adminTab = 5;
+            }
         }
+        GUI.Label(new Rect(listeRect.x + 10f, listeRect.y + 28f + liste.Count * 34f,
+            170f, 42f), "Gardes en place : " + gardes.Count, smallStyle);
 
-        int mode = LireModeBrasAdminSelection();
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 108f, 380f, 22f),
-            "Bras a bouger", smallStyle);
-        string[] modes = { "Gauche", "Droit", "Stop", "Alternance" };
-        for (int i = 0; i < modes.Length; i++)
+        if (liste.Count == 0)
         {
-            if (BoutonChoixAdmin(new Rect(contenu.x + 18f + i * 96f,
-                contenu.y + 132f, 90f, 28f), modes[i], mode == i))
-                EcrireModeBrasAdminSelection(i);
+            GUI.Label(new Rect(contenu.x + 230f, contenu.y + 90f, 420f, 80f),
+                "Aucun NPC n'est encore charge.", smallStyle);
+            return;
         }
-
-        // Le controle Pivot objet etait celui qui changeait le cote visuel
-        // du personnage : il est donc expose sous le nom Placement de l'objet.
-        int placement = LirePivotAdminSelection();
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 174f, 380f, 22f),
-            "Placement de l'objet : " + NomCoteAdmin(placement), smallStyle);
-        if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 198f, 90f, 28f),
-            "G", placement == 0)) EcrirePivotAdminSelection(0);
-        if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 198f, 90f, 28f),
-            "D", placement == 1)) EcrirePivotAdminSelection(1);
-
-        // L'ancien controle Placement objet regle le point local dans le
-        // pivot : il est maintenant expose sous le nom Pivot objet.
-        int pivot = LireObjetAdminSelection();
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 236f, 380f, 22f),
-            "Pivot objet : " + NomCoteAdmin(pivot), smallStyle);
-        if (BoutonChoixAdmin(new Rect(contenu.x + 18f, contenu.y + 260f, 90f, 28f),
-            "G", pivot == 0)) EcrireObjetAdminSelection(0);
-        if (BoutonChoixAdmin(new Rect(contenu.x + 116f, contenu.y + 260f, 90f, 28f),
-            "D", pivot == 1)) EcrireObjetAdminSelection(1);
-
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 298f, 380f, 36f),
-            "Le choix est applique en jeu et sera inclus dans le fichier TXT.", smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 342f, 260f, 32f),
-            "GENERER admin_npc_reglages.txt", buttonStyle))
-            GenererRapportAdminNpc();
+        adminNpcListeSelection = Mathf.Clamp(adminNpcListeSelection, 0, liste.Count - 1);
+        PnjState selection = liste[adminNpcListeSelection];
+        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 84f, 400f, 30f),
+            NomAffichePnj(selection), titleStyle);
+        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 122f, 420f, 100f),
+            "Metier : " + NomAffichePnj(selection) + "\n"
+                + "Position : " + selection.Root.transform.position.ToString("F1") + "\n"
+                + "Personnage 3D : maillage humain en place\n"
+                + "Accessoire : " + (selection.Marteau != null ? "marteau"
+                    : (selection.Feuille != null ? "feuille" : "aucun")), smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 230f, contenu.y + 240f, 260f, 36f),
+            "OUVRIR L'EDITION HUMAINE", buttonStyle))
+        {
+            adminEditionContexte = "NPC : " + NomAffichePnj(selection);
+            adminTab = 5;
+            ShowInfo("Edition du " + NomAffichePnj(selection));
+        }
+        GUI.Label(new Rect(contenu.x + 230f, contenu.y + 292f, 380f, 70f),
+            "Les regles de gameplay restent conservees :\n"
+                + "bras fixes du Maire et du Forgeron, feuille et marteau reserves.", smallStyle);
     }
 
     private void DessinerAdminMonstres(Rect contenu)
@@ -6837,6 +6855,89 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
+    private List<ElementEdition> ObtenirObjetsAdminTries()
+    {
+        List<ElementEdition> result = new List<ElementEdition>();
+        for (int i = 0; i < objetsEdition.Count; i++)
+            if (objetsEdition[i] != null && objetsEdition[i].Root != null) result.Add(objetsEdition[i]);
+        result.Sort((a, b) => string.Compare(a.Type, b.Type,
+            StringComparison.CurrentCultureIgnoreCase));
+        return result;
+    }
+
+    private void DessinerAdminObjets(Rect contenu)
+    {
+        List<ElementEdition> liste = ObtenirObjetsAdminTries();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
+            "OBJETS EDITABLES", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 620f, 22f),
+            "Selectionnez un objet pour l'afficher dans le mode edition du monde.", smallStyle);
+        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 300f, 390f);
+        GUI.Box(listeRect, "Objets en place : " + liste.Count, boxStyle);
+        Rect vue = new Rect(listeRect.x + 8f, listeRect.y + 28f, listeRect.width - 16f, listeRect.height - 36f);
+        float hauteur = Mathf.Max(vue.height, liste.Count * 31f);
+        adminObjetScroll = GUI.BeginScrollView(vue, adminObjetScroll,
+            new Rect(0f, 0f, vue.width - 18f, hauteur));
+        for (int i = 0; i < liste.Count; i++)
+        {
+            ElementEdition element = liste[i];
+            string libelle = element.Type + "  " + element.Root.position.ToString("F1");
+            if (BoutonChoixAdmin(new Rect(0f, i * 31f, vue.width - 28f, 27f),
+                libelle, adminObjetListeSelection == i))
+                adminObjetListeSelection = i;
+        }
+        GUI.EndScrollView();
+        if (liste.Count == 0) return;
+        adminObjetListeSelection = Mathf.Clamp(adminObjetListeSelection, 0, liste.Count - 1);
+        ElementEdition selection = liste[adminObjetListeSelection];
+        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 86f, 330f, 30f),
+            selection.Type, titleStyle);
+        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 128f, 330f, 80f),
+            "Position : " + selection.Root.position.ToString("F2") + "\n"
+                + "Rotation : " + selection.Root.eulerAngles.ToString("F1") + "\n"
+                + "Echelle : " + selection.Root.localScale.ToString("F2"), smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 350f, contenu.y + 238f, 240f, 36f),
+            "OUVRIR LE MODE EDITION", buttonStyle))
+        {
+            elementEditionDernierSelectionne = selection;
+            elementEditionSelectionne = null;
+            editionOutilMaison = 0;
+            modeEdition = true;
+            adminOpen = false;
+            ShowInfo(selection.Type + " selectionne : mode edition actif");
+        }
+        GUI.Label(new Rect(contenu.x + 350f, contenu.y + 294f, 330f, 80f),
+            "Le clic maintenu deplace l'objet.\nECHAP annule le dernier deplacement.", smallStyle);
+    }
+
+    private void DessinerAdminJoueur(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
+            "JOUEURS", titleStyle);
+        string[] joueurs = { "Joueur principal" };
+        adminJoueurSelection = GUI.Popup(new Rect(contenu.x + 18f, contenu.y + 58f, 300f, 32f),
+            Mathf.Clamp(adminJoueurSelection, 0, joueurs.Length - 1), joueurs, buttonStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 110f, 440f, 150f),
+            player == null
+                ? "Joueur indisponible"
+                : "Nom : " + joueurs[adminJoueurSelection] + "\n"
+                    + "Points de vie : " + hp + " / " + MaxHp + "\n"
+                    + "Niveau : " + level + "\n"
+                    + "Or : " + coins + "\n"
+                    + "Cailloux : " + rocks + "\n"
+                    + "Position : " + player.position.ToString("F1"), smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 280f, 280f, 36f),
+            "OUVRIR L'EDITION HUMAINE", buttonStyle))
+        {
+            adminEditionContexte = "Joueur : " + joueurs[adminJoueurSelection];
+            adminTab = 5;
+            ShowInfo("Edition du personnage joueur");
+        }
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 336f, 500f, 58f),
+            "La liste est triee par nom et pourra accueillir les futurs joueurs\n"
+                + "multijoueurs sans changer l'interface ADMIN.", smallStyle);
+    }
+
     private float SliderHumain(Rect rect, string nom, float valeur)
     {
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
@@ -6850,17 +6951,25 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerAdminPersonnage(Rect contenu)
     {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 500f, 28f),
-            "CREATEUR HUMAIN MAKEHUMAN", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 720f, 28f),
+            "EDITEUR HUMAIN - " + adminEditionContexte, titleStyle);
         if (adminHumanCreator == null)
         {
             GUI.Label(new Rect(contenu.x + 18f, contenu.y + 54f, 480f, 70f),
-                "Apercu MakeHuman indisponible : les ressources CC0 n'ont pas ete chargees.", smallStyle);
+                "Apercu humain indisponible : les ressources du personnage n'ont pas ete chargees.", smallStyle);
             return;
         }
 
-        float gauche = contenu.x + 18f;
-        float droite = contenu.x + 250f;
+        Rect previewRect = new Rect(contenu.x + 18f, contenu.y + 48f, 190f, 300f);
+        GUI.Box(previewRect, "", boxStyle);
+        if (adminHumanCreator.PreviewReady && adminHumanCreator.PreviewTexture != null)
+            GUI.DrawTexture(previewRect, adminHumanCreator.PreviewTexture, ScaleMode.ScaleToFit, false);
+        else
+            GUI.Label(new Rect(previewRect.x + 12f, previewRect.y + 120f, 166f, 50f),
+                "Apercu en preparation...", smallStyle);
+
+        float gauche = contenu.x + 225f;
+        float droite = contenu.x + 465f;
         GUI.Label(new Rect(gauche, contenu.y + 45f, 230f, 22f), "Sexe", smallStyle);
         if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !adminHumanCreator.female))
         {
@@ -6920,16 +7029,16 @@ public sealed class LibreViesGame : MonoBehaviour
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
         GUI.Label(new Rect(droite, contenu.y + 274f, 250f, 44f),
-            "Le vrai maillage humain MakeHuman est\naffiche pres du joueur en temps reel.", smallStyle);
+            "Le vrai maillage humain est\naffiche ici en temps reel.", smallStyle);
         if (GUI.Button(new Rect(droite, contenu.y + 325f, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
-            ShowInfo("Personnage MakeHuman aleatoire genere");
+            ShowInfo("Personnage humain aleatoire genere");
         }
         if (GUI.Button(new Rect(droite + 122f, contenu.y + 325f, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
-            ShowInfo("Reglages MakeHuman reinitialises");
+            ShowInfo("Reglages humains reinitialises");
         }
         GUI.Label(new Rect(droite, contenu.y + 370f, 250f, 44f),
             "Cheveux, vetements et accessoires seront ajoutes\ndans une prochaine etape.", smallStyle);
@@ -6937,8 +7046,8 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerAdmin()
     {
-        Rect fenetre = new Rect(Screen.width * 0.5f - 350f,
-            Screen.height * 0.5f - 260f, 700f, 520f);
+        Rect fenetre = new Rect(Screen.width * 0.5f - 490f,
+            Screen.height * 0.5f - 325f, 980f, 650f);
         GUI.Box(fenetre, "", boxStyle);
         GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
             "ADMINISTRATION", titleStyle);
@@ -6949,7 +7058,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "Monstre", "Personnage" };
+        string[] onglets = { "Ville", "Joueur", "NPC", "Objet", "Monstre", "Personnage" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -6991,21 +7100,21 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else if (adminTab == 1)
         {
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
-                "JOUEUR", titleStyle);
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 120f),
-                player == null
-                    ? "Joueur indisponible"
-                    : "Points de vie : " + hp + " / " + MaxHp + "\n"
-                        + "Niveau : " + level + "\n"
-                        + "Position : " + player.position.ToString("F1"),
-                smallStyle);
+            DessinerAdminJoueur(contenu);
         }
         else if (adminTab == 2)
         {
-            DessinerAdminMonstres(contenu);
+            DessinerAdminNpc(contenu);
         }
         else if (adminTab == 3)
+        {
+            DessinerAdminObjets(contenu);
+        }
+        else if (adminTab == 4)
+        {
+            DessinerAdminMonstres(contenu);
+        }
+        else if (adminTab == 5)
         {
             DessinerAdminPersonnage(contenu);
         }

@@ -4,11 +4,11 @@ using System.Globalization;
 using System.IO;
 using UnityEngine;
 
-// Createur MakeHuman reutilisable dans le jeu.
-// Il est volontairement separe de l'interface ADMIN : le meme composant pourra
-// etre appele plus tard par l'ecran Nouvelle partie pour creer le joueur.
+// Createur humain reutilisable dans le jeu.
+// Le composant fournit aussi la camera et la texture de rendu du panneau ADMIN.
 public sealed class AdminHumanCreator : MonoBehaviour
 {
+    private const int PreviewLayer = 31;
     public bool female = true;
     public int skinTone;
     public float belly;
@@ -24,11 +24,62 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public float earsShape;
 
     private HumanPreview preview;
+    private Camera previewCamera;
+    private RenderTexture previewTexture;
+
+    public RenderTexture PreviewTexture
+    {
+        get { return previewTexture; }
+    }
+
+    public bool PreviewReady
+    {
+        get { return previewTexture != null && previewTexture.IsCreated(); }
+    }
 
     public void BuildPreview()
     {
+        EnsurePreviewCamera();
         if (preview == null) preview = new HumanPreview(transform);
         preview.Build(this);
+        preview.SetPresentationLayer(PreviewLayer);
+        PositionPreviewCamera();
+    }
+
+    private void EnsurePreviewCamera()
+    {
+        if (previewCamera != null) return;
+        previewTexture = new RenderTexture(360, 480, 24, RenderTextureFormat.ARGB32);
+        previewTexture.name = "ADMIN_HumanPreview_RenderTexture";
+        previewTexture.Create();
+        GameObject cameraObject = new GameObject("ADMIN - Camera apercu humain");
+        previewCamera = cameraObject.AddComponent<Camera>();
+        previewCamera.clearFlags = CameraClearFlags.SolidColor;
+        previewCamera.backgroundColor = new Color(0.035f, 0.047f, 0.08f, 1f);
+        previewCamera.fieldOfView = 30f;
+        previewCamera.nearClipPlane = 0.03f;
+        previewCamera.farClipPlane = 20f;
+        previewCamera.cullingMask = 1 << PreviewLayer;
+        previewCamera.targetTexture = previewTexture;
+        previewCamera.enabled = true;
+    }
+
+    private void PositionPreviewCamera()
+    {
+        if (previewCamera == null) return;
+        Vector3 cible = transform.position + Vector3.up * 1.08f;
+        previewCamera.transform.position = transform.position + new Vector3(0f, 1.10f, -3.60f);
+        previewCamera.transform.LookAt(cible);
+    }
+
+    private void OnDestroy()
+    {
+        if (previewCamera != null) UnityEngine.Object.Destroy(previewCamera.gameObject);
+        if (previewTexture != null)
+        {
+            previewTexture.Release();
+            UnityEngine.Object.Destroy(previewTexture);
+        }
     }
 
     public void Randomize()
@@ -103,11 +154,24 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 targetTexts[name] = Resources.Load<TextAsset>(Root + "MakeHumanTargets/" + name);
         }
 
+        public void SetPresentationLayer(int layer)
+        {
+            if (root == null) return;
+            SetLayerRecursively(root.transform, layer);
+        }
+
+        private static void SetLayerRecursively(Transform node, int layer)
+        {
+            node.gameObject.layer = layer;
+            for (int i = 0; i < node.childCount; i++)
+                SetLayerRecursively(node.GetChild(i), layer);
+        }
+
         public void Build(AdminHumanCreator values)
         {
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
-            root = new GameObject("ADMIN - apercu humain MakeHuman");
+            root = new GameObject("ADMIN - apercu humain");
             root.transform.SetParent(parent, false);
 
             Vector3[] deformed = (Vector3[])obj.vertices.Clone();
@@ -145,7 +209,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
             BuildBones(deformed, min.y);
             Mesh mesh = obj.CreateMesh(vertices);
-            GameObject meshObject = new GameObject("MakeHuman - apercu ADMIN");
+            GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = mesh;
@@ -309,7 +373,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             return data;
         }
         public Mesh CreateMesh(Vector3[] vertices)
-        { Mesh mesh = new Mesh { name = "MakeHuman hm08 - preview", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; mesh.vertices = vertices; mesh.uv = uv; List<int> indices = new List<int>(); foreach (ObjTriangle t in triangles) { indices.Add(t.a); indices.Add(t.b); indices.Add(t.c); } mesh.SetTriangles(indices, 0); mesh.RecalculateNormals(); mesh.RecalculateBounds(); return mesh; }
+        { Mesh mesh = new Mesh { name = "Humain - preview", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; mesh.vertices = vertices; mesh.uv = uv; List<int> indices = new List<int>(); foreach (ObjTriangle t in triangles) { indices.Add(t.a); indices.Add(t.b); indices.Add(t.c); } mesh.SetTriangles(indices, 0); mesh.RecalculateNormals(); mesh.RecalculateBounds(); return mesh; }
         private static int VertexIndex(string token, int count) { int index; if (!int.TryParse(token.Split('/')[0], out index)) return -1; return index < 0 ? count + index : index - 1; }
         private static float F(string value) { return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture); }
         private struct ObjTriangle { public int a, b, c; public ObjTriangle(int a, int b, int c) { this.a = a; this.b = b; this.c = c; } }
