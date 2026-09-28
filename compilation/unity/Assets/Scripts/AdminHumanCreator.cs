@@ -485,7 +485,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private static void BreastVolume(Vector3[] vertices, float amount, bool female)
         {
-            if (!female || Mathf.Abs(amount) < 0.001f) return;
+            if (!female) return;
+            // Une poitrine naturelle existe aussi a la valeur neutre. Le
+            // curseur ne remplace donc pas la poitrine : il ajoute ou retire
+            // seulement du volume a deux zones gauche/droite localisees.
+            float volume = Mathf.Clamp(0.34f + amount, 0.10f, 1.10f);
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 v = vertices[i];
@@ -496,8 +500,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 float weight = side * vertical * front;
                 // Le slider agit sur la profondeur de chaque sein, pas sur
                 // toute la cage thoracique.
-                v.z += amount * 0.82f * weight;
-                v.x += Mathf.Sign(v.x) * amount * 0.08f * weight;
+                v.z += volume * 0.82f * weight;
+                v.x += Mathf.Sign(v.x) * volume * 0.025f * weight;
                 vertices[i] = v;
             }
         }
@@ -536,19 +540,19 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (female)
             {
                 float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
-                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.56f, 1.60f,
-                    0.20f, material);
-                CreateCup("Bonnet gauche", parent, -0.11f * cupScale, 1.62f,
-                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, 0.205f, material);
-                CreateCup("Bonnet droit", parent, 0.11f * cupScale, 1.62f,
-                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, 0.205f, material);
-                CreateStrap("Bretelle gauche", parent, -0.11f, -0.20f, 1.65f, 1.86f, 0.215f, material);
-                CreateStrap("Bretelle droite", parent, 0.11f, 0.20f, 1.65f, 1.86f, 0.215f, material);
-                CreateBriefs("Culotte", parent, 0.91f, 1.28f, 0.28f, 0.17f, material);
+                CreateFrontPanel("Soutien-gorge sous-poitrine", parent, 1.42f, 1.46f,
+                    0.16f, 0.20f, material);
+                CreateCup("Bonnet gauche", parent, -0.09f * cupScale, 1.49f,
+                    0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
+                CreateCup("Bonnet droit", parent, 0.09f * cupScale, 1.49f,
+                    0.095f * cupScale, 0.060f * cupScale, 0.014f * cupScale, 0.205f, material);
+                CreateStrap("Bretelle gauche", parent, -0.09f, -0.16f, 1.51f, 1.86f, 0.215f, material);
+                CreateStrap("Bretelle droite", parent, 0.09f, 0.16f, 1.51f, 1.86f, 0.215f, material);
+                CreateBriefs("Culotte", parent, 1.00f, 1.25f, 0.18f, 0.13f, material);
             }
             else
             {
-                CreateBriefs("Calecon", parent, 0.86f, 1.30f, 0.31f, 0.18f, material);
+                CreateBriefs("Calecon", parent, 0.98f, 1.26f, 0.20f, 0.14f, material);
             }
         }
 
@@ -567,12 +571,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
 
         private static GameObject CreateFrontPanel(string name, Transform parent, float bottom,
-            float top, float front, Material material)
+            float top, float width, float front, Material material)
         {
             Vector3[] vertices =
             {
-                new Vector3(-0.20f, bottom, front), new Vector3(0.20f, bottom, front),
-                new Vector3(0.20f, top, front), new Vector3(-0.20f, top, front)
+                new Vector3(-width, bottom, front), new Vector3(width, bottom, front),
+                new Vector3(width, top, front), new Vector3(-width, top, front)
             };
             int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
             Mesh mesh = new Mesh { name = name + " - mesh" };
