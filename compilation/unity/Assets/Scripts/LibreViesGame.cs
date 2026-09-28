@@ -110,6 +110,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminNpcListeSelection;
     private int adminObjetListeSelection;
     private int adminJoueurSelection;
+    private bool adminJoueurMenuOuvert;
     private Vector2 adminObjetScroll;
     private string adminEditionContexte = "Nouveau personnage";
     private bool razVilleConfirmation;
@@ -6915,8 +6916,22 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
             "JOUEURS", titleStyle);
         string[] joueurs = { "Joueur principal" };
-        adminJoueurSelection = GUI.Popup(new Rect(contenu.x + 18f, contenu.y + 58f, 300f, 32f),
-            Mathf.Clamp(adminJoueurSelection, 0, joueurs.Length - 1), joueurs, buttonStyle);
+        adminJoueurSelection = Mathf.Clamp(adminJoueurSelection, 0, joueurs.Length - 1);
+        Rect choixJoueur = new Rect(contenu.x + 18f, contenu.y + 58f, 300f, 32f);
+        if (GUI.Button(choixJoueur, joueurs[adminJoueurSelection] + "  ▼", buttonStyle))
+            adminJoueurMenuOuvert = !adminJoueurMenuOuvert;
+        if (adminJoueurMenuOuvert)
+        {
+            for (int i = 0; i < joueurs.Length; i++)
+            {
+                if (GUI.Button(new Rect(choixJoueur.x, choixJoueur.y + 34f + i * 30f,
+                    choixJoueur.width, 28f), joueurs[i], buttonStyle))
+                {
+                    adminJoueurSelection = i;
+                    adminJoueurMenuOuvert = false;
+                }
+            }
+        }
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 110f, 440f, 150f),
             player == null
                 ? "Joueur indisponible"
@@ -6985,15 +7000,18 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(gauche, contenu.y + 104f, 240f, 22f), "Teinte de peau", smallStyle);
         Color[] teintes =
         {
-            new Color(0.78f, 0.49f, 0.37f), new Color(0.62f, 0.32f, 0.21f),
-            new Color(0.40f, 0.19f, 0.12f), new Color(0.25f, 0.10f, 0.06f)
+            new Color(1.00f, 0.92f, 0.88f), new Color(1.00f, 0.72f, 0.70f),
+            new Color(0.95f, 0.70f, 0.56f), new Color(0.78f, 0.49f, 0.37f),
+            new Color(0.62f, 0.32f, 0.21f), new Color(0.40f, 0.19f, 0.12f),
+            new Color(0.25f, 0.10f, 0.06f)
         };
         for (int i = 0; i < teintes.Length; i++)
         {
+            float x = gauche + i * 30f;
             GUI.color = teintes[i];
-            bool clic = GUI.Button(new Rect(gauche + i * 48f, contenu.y + 130f, 40f, 25f), "");
+            bool clic = GUI.Button(new Rect(x, contenu.y + 130f, 26f, 25f), "");
             GUI.color = i == adminHumanCreator.skinTone ? Color.yellow : Color.white;
-            GUI.Box(new Rect(gauche + i * 48f, contenu.y + 130f, 40f, 25f), "");
+            GUI.Box(new Rect(x, contenu.y + 130f, 26f, 25f), "");
             GUI.color = Color.white;
             if (clic)
             {

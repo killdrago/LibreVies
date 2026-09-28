@@ -85,7 +85,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public void Randomize()
     {
         female = UnityEngine.Random.value > 0.5f;
-        skinTone = UnityEngine.Random.Range(0, 4);
+        skinTone = UnityEngine.Random.Range(0, 7);
         belly = UnityEngine.Random.Range(-0.65f, 0.75f);
         armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
         armLength = UnityEngine.Random.Range(-0.65f, 0.7f);
@@ -224,7 +224,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private static Color SkinColor(int tone)
         {
-            Color[] colors = { new Color(0.78f, 0.49f, 0.37f), new Color(0.62f, 0.32f, 0.21f), new Color(0.40f, 0.19f, 0.12f), new Color(0.25f, 0.10f, 0.06f) };
+            Color[] colors =
+            {
+                new Color(1.00f, 0.92f, 0.88f), // peau tres claire ivoire
+                new Color(1.00f, 0.72f, 0.70f), // peau claire rose
+                new Color(0.95f, 0.70f, 0.56f), // peau claire chaude
+                new Color(0.78f, 0.49f, 0.37f),
+                new Color(0.62f, 0.32f, 0.21f),
+                new Color(0.40f, 0.19f, 0.12f),
+                new Color(0.25f, 0.10f, 0.06f)
+            };
             return colors[Mathf.Clamp(tone, 0, colors.Length - 1)];
         }
 
