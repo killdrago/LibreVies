@@ -536,11 +536,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (female)
             {
                 float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
-                CreateBand("Soutien-gorge", parent, 1.55f, 1.62f, 0.27f, 0.17f, material);
+                CreateBand("Soutien-gorge bande fine", parent, 1.56f, 1.60f, 0.24f, 0.19f, material);
                 CreateCup("Bonnet gauche", parent, -0.11f * cupScale, 1.62f,
                     0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
                 CreateCup("Bonnet droit", parent, 0.11f * cupScale, 1.62f,
                     0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
+                CreateStrap("Bretelle gauche", parent, -0.11f, -0.20f, 1.65f, 1.86f, 0.31f, material);
+                CreateStrap("Bretelle droite", parent, 0.11f, 0.20f, 1.65f, 1.86f, 0.31f, material);
                 CreateBriefs("Culotte", parent, 0.91f, 1.28f, 0.28f, 0.17f, material);
             }
             else
@@ -604,6 +606,30 @@ public sealed class AdminHumanCreator : MonoBehaviour
             panel.AddComponent<MeshFilter>().sharedMesh = mesh;
             panel.AddComponent<MeshRenderer>().sharedMaterial = material;
             return panel;
+        }
+
+        private static GameObject CreateStrap(string name, Transform parent, float bottomX, float topX,
+            float bottomY, float topY, float z, Material material)
+        {
+            const float halfWidth = 0.018f;
+            Vector3[] vertices =
+            {
+                new Vector3(bottomX - halfWidth, bottomY, z),
+                new Vector3(bottomX + halfWidth, bottomY, z),
+                new Vector3(topX + halfWidth, topY, z),
+                new Vector3(topX - halfWidth, topY, z)
+            };
+            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.vertices = vertices;
+            mesh.triangles = indices;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject strap = new GameObject(name);
+            strap.transform.SetParent(parent, false);
+            strap.AddComponent<MeshFilter>().sharedMesh = mesh;
+            strap.AddComponent<MeshRenderer>().sharedMaterial = material;
+            return strap;
         }
 
         private static GameObject CreateCup(string name, Transform parent, float centerX,

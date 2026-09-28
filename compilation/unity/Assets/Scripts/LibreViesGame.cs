@@ -296,7 +296,7 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class Configuration
     {
-        public int version = 3;
+        public int version = 4;
         public float brightness = 0.50f;
         public float contrast = 1f;
         public float cameraSensitivity = 3f;
@@ -7078,6 +7078,17 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumanCreator.PreviewDistance.ToString("0.0"), smallStyle);
     }
 
+    private float SliderHumainBornes(Rect rect, string nom, float valeur, float minimum, float maximum)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, minimum, maximum);
+        GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
     private void DessinerAdminPersonnage(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 720f, 28f),
@@ -7176,7 +7187,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "Corps et proportions", smallStyle);
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume", adminHumanCreator.chestShape);
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume", adminHumanCreator.chestShape, -0.24f, 1f);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f) { adminHumanCreator.chestShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
         nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches", adminHumanCreator.hipShape);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f) { adminHumanCreator.hipShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
@@ -7726,9 +7737,9 @@ public sealed class LibreViesGame : MonoBehaviour
                     // Les anciennes versions pouvaient conserver la luminosite
                     // a 100 %. La nouvelle reference demarre a 50 %, tout en
                     // laissant encore la possibilite de monter ou descendre.
-                    if (config.version < 3)
+                    if (config.version < 4)
                     {
-                        config.version = 3;
+                        config.version = 4;
                         config.brightness = 0.50f;
                     }
                     return config;
