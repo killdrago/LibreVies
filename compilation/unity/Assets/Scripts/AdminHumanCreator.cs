@@ -191,7 +191,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Transform parentBone = string.IsNullOrEmpty(definition.parent) || !boneIndexes.ContainsKey(definition.parent)
                 ? root.transform : bones[boneIndexes[definition.parent]];
             bone.transform.SetParent(parentBone, true);
-            bone.transform.position = root.TransformPoint(Average(definition.head, raw, minY));
+            bone.transform.position = root.transform.TransformPoint(Average(definition.head, raw, minY));
             bones[index] = bone.transform;
         }
 
