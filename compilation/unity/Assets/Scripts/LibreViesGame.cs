@@ -296,7 +296,7 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class Configuration
     {
-        public int version = 2;
+        public int version = 3;
         public float brightness = 0.50f;
         public float contrast = 1f;
         public float cameraSensitivity = 3f;
@@ -7725,10 +7725,10 @@ public sealed class LibreViesGame : MonoBehaviour
                 {
                     // Les anciennes versions pouvaient conserver la luminosite
                     // a 100 %. La nouvelle reference demarre a 50 %, tout en
-                    // laissant encore la plage 50-100 % dans les options.
-                    if (config.version < 2)
+                    // laissant encore la possibilite de monter ou descendre.
+                    if (config.version < 3)
                     {
-                        config.version = 2;
+                        config.version = 3;
                         config.brightness = 0.50f;
                     }
                     return config;

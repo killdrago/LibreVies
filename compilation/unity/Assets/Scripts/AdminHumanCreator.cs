@@ -516,47 +516,78 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (female)
             {
-                CreateBand("Soutien-gorge", parent, 1.54f, 1.62f, 0.29f, 0.18f, material);
-                CreateCup("Bonnet gauche", parent, -0.15f, 1.62f, 0.18f, 0.12f, 0.08f, material);
-                CreateCup("Bonnet droit", parent, 0.15f, 1.62f, 0.18f, 0.12f, 0.08f, material);
-                CreateBand("Culotte", parent, 0.82f, 1.28f, 0.31f, 0.18f, material);
+                CreateBand("Soutien-gorge", parent, 1.55f, 1.62f, 0.27f, 0.17f, material);
+                CreateCup("Bonnet gauche", parent, -0.11f, 1.62f, 0.12f, 0.075f, 0.025f, material);
+                CreateCup("Bonnet droit", parent, 0.11f, 1.62f, 0.12f, 0.075f, 0.025f, material);
+                CreateBriefs("Culotte", parent, 0.91f, 1.28f, 0.28f, 0.17f, material);
             }
             else
             {
-                CreateBand("Calecon", parent, 0.78f, 1.30f, 0.33f, 0.19f, material);
+                CreateBriefs("Calecon", parent, 0.86f, 1.30f, 0.31f, 0.18f, material);
             }
+        }
+
+        private static void CreateBriefs(string name, Transform parent, float bottom, float top,
+            float width, float depth, Material material)
+        {
+            CreateBriefPanel(name + " avant", parent, bottom, top, width, depth, material);
+            CreateBriefPanel(name + " arriere", parent, bottom, top, width, -depth, material);
+            CreateBand(name + " ceinture", parent, top - 0.07f, top, width, depth, material);
+        }
+
+        private static GameObject CreateBriefPanel(string name, Transform parent, float bottom, float top,
+            float width, float depth, Material material)
+        {
+            float bas = width * 0.55f;
+            Vector3[] vertices =
+            {
+                new Vector3(-width, top, depth), new Vector3(width, top, depth),
+                new Vector3(bas, bottom, depth), new Vector3(-bas, bottom, depth)
+            };
+            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.vertices = vertices;
+            mesh.triangles = indices;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject panel = new GameObject(name);
+            panel.transform.SetParent(parent, false);
+            panel.AddComponent<MeshFilter>().sharedMesh = mesh;
+            panel.AddComponent<MeshRenderer>().sharedMaterial = material;
+            return panel;
         }
 
         private static GameObject CreateCup(string name, Transform parent, float centerX,
             float centerY, float radiusX, float radiusY, float radiusZ, Material material)
         {
-            const int latitudes = 6;
-            const int longitudes = 16;
+            const int segments = 16;
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
-            for (int latitude = 0; latitude <= latitudes; latitude++)
+            vertices.Add(new Vector3(centerX, centerY, 0.18f + radiusZ));
+            for (int ring = 1; ring <= 2; ring++)
             {
-                float vertical = latitude / (float)latitudes;
-                float theta = vertical * Mathf.PI;
-                for (int longitude = 0; longitude < longitudes; longitude++)
+                float scale = ring == 1 ? 0.58f : 1f;
+                float dome = ring == 1 ? radiusZ * 0.45f : 0f;
+                for (int segment = 0; segment < segments; segment++)
                 {
-                    float phi = longitude * Mathf.PI * 2f / longitudes;
+                    float angle = segment * Mathf.PI * 2f / segments;
                     vertices.Add(new Vector3(
-                        centerX + Mathf.Cos(phi) * Mathf.Sin(theta) * radiusX,
-                        centerY + Mathf.Cos(theta) * radiusY,
-                        0.18f + Mathf.Sin(phi) * Mathf.Sin(theta) * radiusZ));
+                        centerX + Mathf.Cos(angle) * radiusX * scale,
+                        centerY + Mathf.Sin(angle) * radiusY * scale,
+                        0.18f + dome));
                 }
             }
-            for (int latitude = 0; latitude < latitudes; latitude++)
-                for (int longitude = 0; longitude < longitudes; longitude++)
-                {
-                    int a = latitude * longitudes + longitude;
-                    int b = latitude * longitudes + (longitude + 1) % longitudes;
-                    int c = (latitude + 1) * longitudes + (longitude + 1) % longitudes;
-                    int d = (latitude + 1) * longitudes + longitude;
-                    triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                    triangles.Add(a); triangles.Add(c); triangles.Add(d);
-                }
+            for (int segment = 0; segment < segments; segment++)
+            {
+                int inner = 1 + segment;
+                int innerNext = 1 + (segment + 1) % segments;
+                int outer = 1 + segments + segment;
+                int outerNext = 1 + segments + (segment + 1) % segments;
+                triangles.Add(0); triangles.Add(inner); triangles.Add(innerNext);
+                triangles.Add(inner); triangles.Add(outer); triangles.Add(outerNext);
+                triangles.Add(innerNext); triangles.Add(inner); triangles.Add(0);
+                triangles.Add(outerNext); triangles.Add(outer); triangles.Add(inner);
+            }
             Mesh mesh = new Mesh { name = name + " - mesh" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
@@ -621,13 +652,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             GameObject objectHair = new GameObject("Cheveux - coupe " + style);
             objectHair.transform.SetParent(head == null ? parent : head, false);
-            float width = female ? 0.28f : 0.26f;
-            float depth = 0.30f;
+            float width = female ? 0.19f : 0.18f;
+            float depth = 0.22f;
             float length;
             if (female)
-                length = style == 1 ? 0.82f : (style == 3 ? 0.54f : (style == 4 ? 0.68f : (style == 0 ? 0.34f : 0.20f)));
+                length = style == 1 ? 0.62f : (style == 3 ? 0.42f : (style == 4 ? 0.54f : (style == 0 ? 0.25f : 0.15f)));
             else
-                length = style == 2 ? 0.36f : (style == 3 ? 0.50f : (style == 4 ? 0.66f : (style == 0 ? 0.14f : 0.22f)));
+                length = style == 2 ? 0.27f : (style == 3 ? 0.38f : (style == 4 ? 0.52f : (style == 0 ? 0.10f : 0.16f)));
             bool curly = female && style == 4;
             bool punk = !female && style == 2;
             const int rows = 8;
@@ -640,7 +671,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // Le sommet est pres du sommet du crane ; les cheveux longs
                 // descendent vers le cou au lieu de former un cone au-dessus.
                 float y = 0.18f - t * length;
-                float radius = Mathf.Lerp(width, width * (punk ? 0.42f : 0.72f), t);
+                float radius = Mathf.Lerp(width * 0.62f, width, t);
                 for (int col = 0; col < columns; col++)
                 {
                     float angle = col * Mathf.PI * 2f / columns;
