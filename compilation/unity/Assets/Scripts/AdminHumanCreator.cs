@@ -306,6 +306,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             BuildBones(deformed, min.y);
             if (skin.HasProperty("_UnderwearFemale"))
                 skin.SetFloat("_UnderwearFemale", values.female ? 1f : 0f);
+            if (skin.HasProperty("_ClothColor"))
+                skin.SetColor("_ClothColor", new Color(1f, 0.84f, 0.05f, 1f));
             Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);

@@ -65,40 +65,16 @@ Shader "LibreVies/PersonnageOpaque"
 
             float underwearMask(float3 point)
             {
-                float side = abs(point.x);
-                float frontBack = abs(point.z);
-                float mask = 0.0;
-                if (_UnderwearFemale > 0.5 && frontBack >= 0.045)
-                {
-                    float leftCup = pow((point.x + 0.09) / 0.14, 2.0)
-                        + pow((point.y - 1.61) / 0.12, 2.0);
-                    float rightCup = pow((point.x - 0.09) / 0.14, 2.0)
-                        + pow((point.y - 1.61) / 0.12, 2.0);
-                    float cups = 1.0 - smoothstep(0.78, 1.08, min(leftCup, rightCup));
-                    float band = bandMask(point.y, 1.46, 1.55)
-                        * (1.0 - smoothstep(0.19, 0.25, side));
-                    float strapT = saturate((point.y - 1.61) / 0.29);
-                    float leftStrap = 1.0 - smoothstep(0.018, 0.040,
-                        abs(point.x - lerp(-0.09, -0.16, strapT)));
-                    float rightStrap = 1.0 - smoothstep(0.018, 0.040,
-                        abs(point.x - lerp(0.09, 0.16, strapT)));
-                    if (point.y < 1.61 || point.y > 1.90)
-                    {
-                        leftStrap = 0.0;
-                        rightStrap = 0.0;
-                    }
-                    mask = max(cups, max(band, max(leftStrap, rightStrap)));
-                }
-                if (point.y >= 0.94 && point.y <= 1.30)
-                {
-                    float width = lerp(0.15, 0.27,
-                        saturate((point.y - 0.94) / 0.36));
-                    float sides = 1.0 - smoothstep(width - 0.025, width + 0.025, side);
-                    float lower = smoothstep(0.94, 0.99, point.y);
-                    float upper = 1.0 - smoothstep(1.27, 1.30, point.y);
-                    mask = max(mask, sides * min(lower, upper));
-                }
-                return saturate(mask);
+                if (_UnderwearFemale <= 0.5 || abs(point.z) < 0.045)
+                    return 0.0;
+                // Test volontairement minimal : deux ronds jaunes a la place
+                // des seins, sans bande, bretelle, texture ou culotte.
+                float leftCircle = pow((point.x + 0.09) / 0.14, 2.0)
+                    + pow((point.y - 1.61) / 0.12, 2.0);
+                float rightCircle = pow((point.x - 0.09) / 0.14, 2.0)
+                    + pow((point.y - 1.61) / 0.12, 2.0);
+                return 1.0 - smoothstep(0.82, 1.02,
+                    min(leftCircle, rightCircle));
             }
 
             fixed4 frag(Varyings input) : SV_Target
@@ -107,8 +83,8 @@ Shader "LibreVies/PersonnageOpaque"
                 float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz);
                 float diffuse = saturate(dot(normal, lightDirection));
                 fixed3 skinAlbedo = tex2D(_MainTex, input.uv).rgb * _Color.rgb;
-                float2 clothUv = frac(input.localPosition.xy * 3.0);
-                fixed3 clothAlbedo = tex2D(_ClothTex, clothUv).rgb * _ClothColor.rgb;
+                // Le test utilise uniquement une couleur pleine, sans motif.
+                fixed3 clothAlbedo = _ClothColor.rgb;
                 fixed3 albedo = lerp(skinAlbedo, clothAlbedo,
                     underwearMask(input.localPosition));
                 fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz * 0.75 + fixed3(0.20, 0.20, 0.20);
