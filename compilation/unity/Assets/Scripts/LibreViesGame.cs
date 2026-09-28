@@ -7176,7 +7176,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "Corps et proportions", smallStyle);
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Poitrine", adminHumanCreator.chestShape);
+        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume", adminHumanCreator.chestShape);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f) { adminHumanCreator.chestShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
         nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches", adminHumanCreator.hipShape);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f) { adminHumanCreator.hipShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }

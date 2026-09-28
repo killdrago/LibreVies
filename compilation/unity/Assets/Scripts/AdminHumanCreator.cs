@@ -195,8 +195,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             underwearMaterial = NewMaterial(new Color(0.12f, 0.18f, 0.42f), 0f, 0.28f);
             Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (texture != null) skin.mainTexture = texture;
-            Texture2D hairTexture = Resources.Load<Texture2D>(Root + "HairDark");
-            if (hairTexture != null) hairMaterial.mainTexture = hairTexture;
+            // La coiffure procedurale reste volontairement brune et mate :
+            // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
         }
 
@@ -262,7 +262,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            ScaleRegion(deformed, values.chestShape, 2.9f, 5.6f, 2.45f, 0.16f, 0.20f);
+            BreastVolume(deformed, values.chestShape, values.female);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -311,7 +311,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             underwearMaterial.color = values.female
                 ? new Color(0.48f, 0.08f, 0.16f)
                 : new Color(0.10f, 0.16f, 0.42f);
-            ClothingBuilder.Create(values.female, root.transform, underwearMaterial);
+            ClothingBuilder.Create(values.female, values.chestShape, root.transform, underwearMaterial);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -483,6 +483,25 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private void Signed(Vector3[] vertices, float amount, string positive, string negative, float strength)
         { Add(vertices, Target(amount >= 0f ? positive : negative), Mathf.Abs(amount) * strength); }
 
+        private static void BreastVolume(Vector3[] vertices, float amount, bool female)
+        {
+            if (!female || Mathf.Abs(amount) < 0.001f) return;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 v = vertices[i];
+                if (v.y < 2.7f || v.y > 4.9f || v.z < 0.25f || Mathf.Abs(v.x) > 1.35f) continue;
+                float side = 1f - Mathf.Clamp01(Mathf.Abs(Mathf.Abs(v.x) - 0.68f) / 0.62f);
+                float vertical = 1f - Mathf.Clamp01(Mathf.Abs(v.y - 3.75f) / 1.1f);
+                float front = Mathf.Clamp01((v.z - 0.25f) / 1.2f);
+                float weight = side * vertical * front;
+                // Le slider agit sur la profondeur de chaque sein, pas sur
+                // toute la cage thoracique.
+                v.z += amount * 0.82f * weight;
+                v.x += Mathf.Sign(v.x) * amount * 0.08f * weight;
+                vertices[i] = v;
+            }
+        }
+
         private static void ScaleRegion(Vector3[] vertices, float amount, float bottom, float top,
             float halfWidth, float widthFactor, float depthFactor)
         {
@@ -512,13 +531,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     private static class ClothingBuilder
     {
-        public static void Create(bool female, Transform parent, Material material)
+        public static void Create(bool female, float chestShape, Transform parent, Material material)
         {
             if (female)
             {
+                float cupScale = Mathf.Clamp(1f + chestShape * 0.35f, 0.68f, 1.36f);
                 CreateBand("Soutien-gorge", parent, 1.55f, 1.62f, 0.27f, 0.17f, material);
-                CreateCup("Bonnet gauche", parent, -0.11f, 1.62f, 0.12f, 0.075f, 0.025f, material);
-                CreateCup("Bonnet droit", parent, 0.11f, 1.62f, 0.12f, 0.075f, 0.025f, material);
+                CreateCup("Bonnet gauche", parent, -0.11f * cupScale, 1.62f,
+                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
+                CreateCup("Bonnet droit", parent, 0.11f * cupScale, 1.62f,
+                    0.12f * cupScale, 0.075f * cupScale, 0.025f * cupScale, material);
                 CreateBriefs("Culotte", parent, 0.91f, 1.28f, 0.28f, 0.17f, material);
             }
             else
@@ -530,9 +552,36 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static void CreateBriefs(string name, Transform parent, float bottom, float top,
             float width, float depth, Material material)
         {
-            CreateBriefPanel(name + " avant", parent, bottom, top, width, depth, material);
-            CreateBriefPanel(name + " arriere", parent, bottom, top, width, -depth, material);
-            CreateBand(name + " ceinture", parent, top - 0.07f, top, width, depth, material);
+            float front = depth + 0.18f;
+            float back = -depth - 0.06f;
+            CreateBriefPanel(name + " avant", parent, bottom, top, width, front, material);
+            CreateBriefPanel(name + " arriere", parent, bottom, top, width, back, material);
+            CreateBriefSide(name + " cote gauche", parent, bottom, top, -width, -width * 0.55f,
+                front, back, material);
+            CreateBriefSide(name + " cote droit", parent, bottom, top, width, width * 0.55f,
+                front, back, material);
+            CreateBand(name + " ceinture", parent, top - 0.06f, top, width, depth + 0.08f, material);
+        }
+
+        private static GameObject CreateBriefSide(string name, Transform parent, float bottom, float top,
+            float topX, float bottomX, float front, float back, Material material)
+        {
+            Vector3[] vertices =
+            {
+                new Vector3(topX, top, front), new Vector3(topX, top, back),
+                new Vector3(bottomX, bottom, back), new Vector3(bottomX, bottom, front)
+            };
+            int[] indices = { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.vertices = vertices;
+            mesh.triangles = indices;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject side = new GameObject(name);
+            side.transform.SetParent(parent, false);
+            side.AddComponent<MeshFilter>().sharedMesh = mesh;
+            side.AddComponent<MeshRenderer>().sharedMaterial = material;
+            return side;
         }
 
         private static GameObject CreateBriefPanel(string name, Transform parent, float bottom, float top,
@@ -563,7 +612,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             const int segments = 16;
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
-            vertices.Add(new Vector3(centerX, centerY, 0.18f + radiusZ));
+            vertices.Add(new Vector3(centerX, centerY, 0.30f + radiusZ));
             for (int ring = 1; ring <= 2; ring++)
             {
                 float scale = ring == 1 ? 0.58f : 1f;
@@ -574,7 +623,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     vertices.Add(new Vector3(
                         centerX + Mathf.Cos(angle) * radiusX * scale,
                         centerY + Mathf.Sin(angle) * radiusY * scale,
-                        0.18f + dome));
+                        0.30f + dome));
                 }
             }
             for (int segment = 0; segment < segments; segment++)
@@ -652,13 +701,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             GameObject objectHair = new GameObject("Cheveux - coupe " + style);
             objectHair.transform.SetParent(head == null ? parent : head, false);
-            float width = female ? 0.19f : 0.18f;
-            float depth = 0.22f;
+            float width = female ? 0.14f : 0.13f;
+            float depth = 0.17f;
             float length;
             if (female)
-                length = style == 1 ? 0.62f : (style == 3 ? 0.42f : (style == 4 ? 0.54f : (style == 0 ? 0.25f : 0.15f)));
+                length = style == 1 ? 0.48f : (style == 3 ? 0.32f : (style == 4 ? 0.42f : (style == 0 ? 0.18f : 0.12f)));
             else
-                length = style == 2 ? 0.27f : (style == 3 ? 0.38f : (style == 4 ? 0.52f : (style == 0 ? 0.10f : 0.16f)));
+                length = style == 2 ? 0.22f : (style == 3 ? 0.30f : (style == 4 ? 0.40f : (style == 0 ? 0.08f : 0.13f)));
             bool curly = female && style == 4;
             bool punk = !female && style == 2;
             const int rows = 8;
