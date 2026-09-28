@@ -181,7 +181,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Dictionary<string, int> boneIndexes;
         private Material skin;
         private Material hairMaterial;
-        private Material underwearMaterial;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -191,15 +190,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
             this.parent = parent;
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
+            Shader characterShader = Shader.Find("LibreVies/PersonnageOpaque");
+            if (characterShader != null) skin.shader = characterShader;
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
-            underwearMaterial = NewMaterial(new Color(0.12f, 0.18f, 0.42f), 0f, 0.28f);
             Texture2D texture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (texture != null) skin.mainTexture = texture;
             Texture2D clothTexture = Resources.Load<Texture2D>("LVTextures/LV_Cloth");
-            if (clothTexture != null)
+            if (clothTexture != null && skin.HasProperty("_ClothTex"))
             {
-                underwearMaterial.mainTexture = clothTexture;
-                underwearMaterial.mainTextureScale = new Vector2(1.8f, 1.8f);
+                skin.SetTexture("_ClothTex", clothTexture);
+                skin.SetTextureScale("_ClothTex", new Vector2(1.8f, 1.8f));
             }
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
@@ -300,9 +300,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            // Les zones couvertes par les sous-vetements ne rendent plus la
-            // peau du corps : le tissu n'est pas pose sur une image, il
-            // remplace reellement la surface visible a cet endroit.
+            // Les zones couvertes gardent le vrai maillage humain, mais leur
+            // couleur et leur texture sont melangees vers le materiau textile.
             Mesh mesh = obj.CreateMesh(vertices, values.female);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
@@ -311,18 +310,21 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             skin.color = SkinColor(values.skinTone);
-            renderer.sharedMaterials = new[] { skin, underwearMaterial };
+            if (skin.HasProperty("_ClothColor"))
+            {
+                skin.SetColor("_ClothColor", values.female
+                    ? new Color(0.07f, 0.10f, 0.16f)
+                    : new Color(0.05f, 0.07f, 0.11f));
+            }
+            renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            underwearMaterial.color = values.female
-                ? new Color(0.07f, 0.10f, 0.16f)
-                : new Color(0.05f, 0.07f, 0.11f);
             // Les sous-vetements ne sont plus des objets poses devant le corps.
-            // Les faces correspondantes du maillage humain utilisent directement
-            // le materiau textile ci-dessus dans le second sous-maillage.
+            // Le masque de sommets est melange par le shader pour obtenir des
+            // bords obliques et progressifs sur le maillage humain.
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -765,53 +767,73 @@ public sealed class AdminHumanCreator : MonoBehaviour
             };
             mesh.vertices = vertices;
             mesh.uv = uv;
-            List<int> skinIndices = new List<int>();
-            List<int> underwearIndices = new List<int>();
+            Color[] materialMask = new Color[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++)
+                materialMask[i] = new Color(UnderwearMask(vertices[i], female), 0f, 0f, 1f);
+            mesh.colors = materialMask;
+            List<int> indices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
-                Vector3 centre = (vertices[triangle.a] + vertices[triangle.b] + vertices[triangle.c]) / 3f;
-                List<int> destination = UnderwearCovers(centre, female)
-                    ? underwearIndices : skinIndices;
-                destination.Add(triangle.a);
-                destination.Add(triangle.b);
-                destination.Add(triangle.c);
+                indices.Add(triangle.a);
+                indices.Add(triangle.b);
+                indices.Add(triangle.c);
             }
-            mesh.subMeshCount = 2;
-            mesh.SetTriangles(skinIndices, 0);
-            mesh.SetTriangles(underwearIndices, 1);
+            mesh.subMeshCount = 1;
+            mesh.SetTriangles(indices, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
         }
 
-        private static bool UnderwearCovers(Vector3 point, bool female)
+        private static float UnderwearMask(Vector3 point, bool female)
         {
             float side = Mathf.Abs(point.x);
             float frontBack = Mathf.Abs(point.z);
-            bool braZone = false;
-            if (female && frontBack >= 0.07f)
+            float mask = 0f;
+            if (female && frontBack >= 0.045f)
             {
-                // Deux zones ovales remplacent la peau par le tissu du
-                // soutien-gorge, au lieu de poser deux objets par-dessus.
-                float leftCup = Mathf.Pow((point.x + 0.09f) / 0.115f, 2f)
-                    + Mathf.Pow((point.y - 1.61f) / 0.085f, 2f);
-                float rightCup = Mathf.Pow((point.x - 0.09f) / 0.115f, 2f)
-                    + Mathf.Pow((point.y - 1.61f) / 0.085f, 2f);
-                bool cups = point.z > 0.07f && (leftCup <= 1f || rightCup <= 1f);
-                bool underBand = point.y >= 1.54f && point.y <= 1.60f && side <= 0.20f;
-                bool leftStrap = point.y >= 1.61f && point.y <= 1.90f
-                    && Mathf.Abs(point.x - Mathf.Lerp(-0.09f, -0.16f,
-                        Mathf.InverseLerp(1.61f, 1.90f, point.y))) <= 0.025f;
-                bool rightStrap = point.y >= 1.61f && point.y <= 1.90f
-                    && Mathf.Abs(point.x - Mathf.Lerp(0.09f, 0.16f,
-                        Mathf.InverseLerp(1.61f, 1.90f, point.y))) <= 0.025f;
-                braZone = cups || underBand || leftStrap || rightStrap;
+                // Les bords sont progressifs : la couleur suit une diagonale
+                // douce entre les sommets, au lieu de former un escalier de
+                // triangles ou de cubes.
+                float leftCup = Mathf.Pow((point.x + 0.09f) / 0.14f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
+                float rightCup = Mathf.Pow((point.x - 0.09f) / 0.14f, 2f)
+                    + Mathf.Pow((point.y - 1.61f) / 0.12f, 2f);
+                float cupMask = 1f - Mathf.SmoothStep(0.78f, 1.08f,
+                    Mathf.Min(leftCup, rightCup));
+                float underBand = BandMask(point.y, 1.47f, 1.56f) *
+                    (1f - Mathf.SmoothStep(0.19f, 0.24f, side));
+                float strapY = Mathf.InverseLerp(1.61f, 1.90f, point.y);
+                float leftStrap = 1f - Mathf.SmoothStep(0.018f, 0.035f,
+                    Mathf.Abs(point.x - Mathf.Lerp(-0.09f, -0.16f, strapY)));
+                float rightStrap = 1f - Mathf.SmoothStep(0.018f, 0.035f,
+                    Mathf.Abs(point.x - Mathf.Lerp(0.09f, 0.16f, strapY)));
+                if (point.y < 1.61f || point.y > 1.90f)
+                {
+                    leftStrap = 0f;
+                    rightStrap = 0f;
+                }
+                mask = Mathf.Max(cupMask, underBand, leftStrap, rightStrap);
             }
-            // La culotte et le calecon remplacent la peau du bassin, devant
-            // comme derriere, avec une forme ajustee a la largeur des hanches.
-            if (point.y < 0.94f || point.y > 1.30f || frontBack < 0.04f) return braZone;
-            float width = Mathf.Lerp(0.13f, 0.23f, Mathf.InverseLerp(0.94f, 1.30f, point.y));
-            return braZone || side <= width;
+            if (point.y >= 0.94f && point.y <= 1.30f)
+            {
+                // Cette forme enveloppe aussi les cotes du bassin, pas
+                // seulement le plan avant.
+                float width = Mathf.Lerp(0.15f, 0.27f,
+                    Mathf.InverseLerp(0.94f, 1.30f, point.y));
+                float sideMask = 1f - Mathf.SmoothStep(width - 0.025f, width + 0.025f, side);
+                float bottom = Mathf.SmoothStep(0.94f, 0.99f, point.y);
+                float top = 1f - Mathf.SmoothStep(1.27f, 1.30f, point.y);
+                mask = Mathf.Max(mask, sideMask * Mathf.Min(bottom, top));
+            }
+            return Mathf.Clamp01(mask);
+        }
+
+        private static float BandMask(float value, float bottom, float top)
+        {
+            float lower = Mathf.SmoothStep(bottom - 0.025f, bottom + 0.025f, value);
+            float upper = 1f - Mathf.SmoothStep(top - 0.025f, top + 0.025f, value);
+            return lower * upper;
         }
         private static int VertexIndex(string token, int count) { int index; if (!int.TryParse(token.Split('/')[0], out index)) return -1; return index < 0 ? count + index : index - 1; }
         private static float F(string value) { return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture); }
