@@ -183,8 +183,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Dictionary<string, int> boneIndexes;
         private Material skin;
         private Material hairMaterial;
-        private Texture2D skinTexture;
-        private Texture2D clothTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -194,17 +192,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             this.parent = parent;
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
-            Shader characterShader = Shader.Find("LibreVies/PersonnageOpaque");
-            if (characterShader != null) skin.shader = characterShader;
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
-            skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
-            clothTexture = Resources.Load<Texture2D>("LVTextures/LV_Cloth");
+            Texture2D skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            if (clothTexture != null && skin.HasProperty("_ClothTex"))
-            {
-                skin.SetTexture("_ClothTex", clothTexture);
-                skin.SetTextureScale("_ClothTex", new Vector2(3f, 3f));
-            }
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -304,10 +294,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            if (skin.HasProperty("_UnderwearFemale"))
-                skin.SetFloat("_UnderwearFemale", values.female ? 1f : 0f);
-            if (skin.HasProperty("_ClothColor"))
-                skin.SetColor("_ClothColor", new Color(1f, 0.84f, 0.05f, 1f));
             Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
@@ -322,6 +308,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
+            Material braMaterial = NewMaterial(new Color(1f, 0.84f, 0.05f), 0f, 0.28f);
+            BreastPatchBuilder.Create(values.female, values.chestShape, root.transform,
+                bones, boneIndexes, braMaterial);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -545,6 +534,70 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     // Les sous-vetements sont maintenant un sous-maillage du corps :
     // aucune geometrie flottante n est creee devant le personnage.
+
+    private static class BreastPatchBuilder
+    {
+        public static void Create(bool female, float chestShape, Transform parent,
+            Transform[] bones, Dictionary<string, int> boneIndexes, Material material)
+        {
+            if (!female) return;
+            float scale = Mathf.Clamp(1f + chestShape * 0.28f, 0.82f, 1.30f);
+            CreatePatch("Bonnet jaune gauche", -0.09f * scale, 1.61f,
+                0.12f * scale, 0.105f * scale, parent, bones, boneIndexes, material);
+            CreatePatch("Bonnet jaune droit", 0.09f * scale, 1.61f,
+                0.12f * scale, 0.105f * scale, parent, bones, boneIndexes, material);
+        }
+
+        private static void CreatePatch(string name, float centreX, float centreY,
+            float radiusX, float radiusY, Transform parent, Transform[] bones,
+            Dictionary<string, int> boneIndexes, Material material)
+        {
+            const int segments = 32;
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            float surface = 0.235f;
+            vertices.Add(new Vector3(centreX, centreY, surface + 0.004f));
+            for (int i = 0; i < segments; i++)
+            {
+                float angle = i * Mathf.PI * 2f / segments;
+                vertices.Add(new Vector3(centreX + Mathf.Cos(angle) * radiusX,
+                    centreY + Mathf.Sin(angle) * radiusY, surface));
+            }
+            for (int i = 0; i < segments; i++)
+            {
+                int next = (i + 1) % segments;
+                triangles.Add(0); triangles.Add(1 + i); triangles.Add(1 + next);
+                triangles.Add(1 + next); triangles.Add(1 + i); triangles.Add(0);
+            }
+            Mesh mesh = new Mesh { name = name + " - mesh" };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject patch = new GameObject(name);
+            patch.transform.SetParent(parent, false);
+            SkinnedMeshRenderer renderer = patch.AddComponent<SkinnedMeshRenderer>();
+            renderer.sharedMesh = mesh;
+            renderer.sharedMaterial = material;
+            renderer.bones = bones;
+            int boneIndex = boneIndexes.ContainsKey("spine02")
+                ? boneIndexes["spine02"] : boneIndexes["root"];
+            renderer.rootBone = bones[boneIndexes.ContainsKey("root")
+                ? boneIndexes["root"] : boneIndex];
+            BoneWeight[] weights = new BoneWeight[mesh.vertexCount];
+            for (int i = 0; i < weights.Length; i++)
+            {
+                weights[i].boneIndex0 = boneIndex;
+                weights[i].weight0 = 1f;
+            }
+            mesh.boneWeights = weights;
+            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
+            for (int i = 0; i < bones.Length; i++)
+                bindposes[i] = bones[i].worldToLocalMatrix * patch.transform.localToWorldMatrix;
+            mesh.bindposes = bindposes;
+            renderer.updateWhenOffscreen = true;
+        }
+    }
 
     private static class HairBuilder
     {
