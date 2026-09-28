@@ -750,7 +750,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
         public Texture2D PaintUnderwearTexture(Vector3[] vertices, bool female,
             Texture2D skinSource, Texture2D clothSource)
         {
-            if (skinSource == null) return null;
+            // Un import texture non lisible ne doit jamais faire disparaitre
+            // tout le preview : on garde alors la peau normale.
+            if (skinSource == null || !skinSource.isReadable) return null;
+            if (clothSource != null && !clothSource.isReadable) clothSource = null;
             const int size = 256;
             Texture2D painted = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
             Color[] pixels = new Color[size * size];
