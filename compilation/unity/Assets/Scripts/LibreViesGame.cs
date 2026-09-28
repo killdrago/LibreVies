@@ -187,6 +187,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private CapsuleCollider joueurCollider;
     private string heroineAnimationActuelle = "Idle";
     private Camera gameCamera;
+    private LibreViesScreenAdjust screenAdjustEffect;
     private float cameraDistance = 6.5f;
     private float cameraPitch = 18f;
     private float firstPersonPitch;
@@ -651,6 +652,9 @@ public sealed class LibreViesGame : MonoBehaviour
         gameCamera.clearFlags = CameraClearFlags.Skybox;
         // Champ de vision 55 : le cadrage de la reference de jeu.
         gameCamera.fieldOfView = 55f;
+        screenAdjustEffect = gameCamera.GetComponent<LibreViesScreenAdjust>();
+        if (screenAdjustEffect == null)
+            screenAdjustEffect = gameCamera.gameObject.AddComponent<LibreViesScreenAdjust>();
         LoadOptions();
         obstacles.Clear();
         batiments.Clear();
@@ -749,6 +753,8 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void Update()
     {
+        if (screenAdjustEffect != null)
+            screenAdjustEffect.SetAdjustments(brightness, contrast);
         imagesAffichees++;
         if (!mondePret)
         {
