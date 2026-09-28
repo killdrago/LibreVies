@@ -169,7 +169,7 @@ void ALVCharacterGenerator::AddTriangleFromFace(const TArray<FString>& FaceToken
 void ALVCharacterGenerator::LoadTarget(const FString& Name)
 {
     FString Text;
-    if (!FFileHelper::LoadFileToString(Text, *DataPath(Name + TEXT(".txt"))))
+    if (!FFileHelper::LoadFileToString(Text, *DataPath(FPaths::Combine(TEXT("MakeHumanTargets"), Name + TEXT(".txt")))))
     {
         return;
     }
