@@ -1,0 +1,2337 @@
+================================================================================
+LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
+Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
+Derniere mise a jour : 20/09/2026 - MAJ 79 : correction de compilation Unity 6 pour les coordonnées
+                        ; version 0.5.79
+                        launcher 4.1.0 / amorce (plus besoin de recompiler
+                        le launcher)
+Depot : https://github.com/killdrago/LibreVies
+Branche de travail et publiee : arena/01a0b32c-librevies
+================================================================================
+
+MAJ 79 — CORRECTION DE COMPILATION UNITY 6 POUR LES COORDONNEES (20/09/2026)
+- Unity 6 refusait de compiler GetInstanceID(), devenu une erreur obsolete.
+- Le suivi des objets deja utilises lors du chargement utilise maintenant leurs
+  references Transform, sans API obsolete.
+- Les appels FindObjectsByType utilisent la forme sans FindObjectsSortMode,
+  ce qui retire aussi les avertissements du compilateur Unity 6.
+- Version de cette MAJ : 0.5.79. La compilation Windows doit etre relancee.
+
+MAJ 78 — BRAS DROIT, DEPLACEMENT DES MAISONS ET SAUVEGARDE CHIFFREE (20/09/2026)
+- Le marteau est maintenant calcule depuis la transform Hand_R et le vecteur
+  coude droit -> paume droite ; il ne peut plus suivre le bras gauche.
+- En mode EDITION, appuyer sur une cage souleve la maison de 1 m. Tant que le
+  clic gauche reste enfonce, la maison suit le curseur horizontalement sur X/Z.
+  Relacher le clic la repose a sa nouvelle position.
+- Cliquer a nouveau sur EDITION repose une maison encore soulevee et enregistre
+  toutes les positions des objets racines de la scene.
+- Le fichier est cree dans le dossier edition, a cote de game, sous le nom
+  coordonee. Son contenu est binaire chiffre et n'est pas lisible comme du JSON.
+- Version de cette MAJ : 0.5.78. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
+
+MAJ 77 — OBJETS DANS LE PROLONGEMENT DU BRAS ET MAISONS SOULEVABLES (20/09/2026)
+- Le marteau du forgeron est aligne dynamiquement sur le vecteur coude ->
+  paume : son manche part de la main dans le prolongement du bras.
+- La feuille du maire suit le meme axe ; son bord est tenu par la main et sa
+  grande longueur reste dans le prolongement du bras pendant l'animation.
+- En mode EDITION, un clic dans la cage d'une maison la selectionne et la
+  souleve de 1 m. Un second clic sur la meme cage la repose exactement sur son
+  niveau de sol initial.
+- Une seule maison est soulevee a la fois ; cliquer une autre cage repose la
+  precedente avant de soulever la nouvelle. Quitter EDITION repose la maison.
+- Version de cette MAJ : 0.5.77. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
+
+MAJ 76 — ROTATION PRECEDENTE ET GRILLAGE DES MAISONS VISIBLE (20/09/2026)
+- La rotation precedente du marteau et la profondeur precedente de la feuille
+  sont restaurees a l'identique.
+- Le grillage du mode EDITION n'utilise plus LineRenderer : chaque barre est
+  une fine boite 3D avec un materiau du monde, pour rester visible dans la
+  build Windows.
+- Le bouton EDITION conserve son fonctionnement : un clic affiche les cages
+  de toutes les maisons entieres, un second clic les masque.
+- Version de cette MAJ : 0.5.76. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
+
+MAJ 75 — INVERSION AVANT/ARRIERE ET PREMIER MODE EDITION (20/09/2026)
+- Le marteau du forgeron et la feuille du maire sont inverses sur l'axe
+  avant/arriere, tout en restant enfants du point de main anime.
+- Le bouton EDITION bascule entre le mode normal et le mode edition.
+- En mode edition, chaque maison entiere est entouree d'un grillage cyan
+  comprenant le socle, les murs, le toit, la cheminee et l'enseigne.
+- Un second clic sur EDITION masque tous les grillages et revient au mode
+  normal. Les positions et les collisions des maisons ne sont pas modifiees.
+- Version de cette MAJ : 0.5.75. La compilation Unity Windows et le controle
+  visuel en jeu restent a effectuer avant de declarer le rendu valide.
+
+MAJ 67 — MARCHE STABLE, EAU INTERDITE AUX MONSTRES ET JOINTURES FERMEES (20/09/2026)
+================================================================================
+
+- La petite oscillation verticale de l'héroïne pendant la marche a été retirée :
+  le cycle anime les bras et les jambes sans faire sautiller le modèle.
+- Les anciens arbres procéduraux « boule ronde sur cylindre », vestiges du
+  prototype Godot, ne sont plus créés. Les arbres importés CC0 et les sapins de
+  secours restent disponibles.
+- Le fleuve constitue une zone interdite aux monstres terrestres, avec une marge
+  de sécurité. Une apparition ou une réapparition dans l'eau est repoussée sur
+  la berge ; lorsqu'une trajectoire touche la zone interdite, le monstre choisit
+  un virage tangent pour longer l'eau au lieu de rester bloqué face à la berge.
+- La bouche de l'héroïne est maintenant un OBJ indépendant généré dans
+  Characters/LibreViesHeroineParts/Mouth.obj et chargé avec les autres pièces.
+- Les segments de bras et de jambes se recouvrent volontairement autour des
+  coudes et des genoux afin de fermer les raccords pendant les flexions, sans
+  réintroduire les bouchons circulaires qui étaient visibles aux articulations.
+- Version de cette MAJ : 0.5.67. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 74 — POINT DE PAUME PRECIS POUR LE MARTEAU ET LA FEUILLE (20/09/2026)
+================================================================================
+
+- Le point de main des PNJ est maintenant enfant de la transform OBJ Hand_R,
+  avec une position correspondant exactement aux vertices de la paume.
+- Le marteau est enfant de ce point précis : il est réellement dans la main
+  droite du forgeron et suit le coude, le bras et la main.
+- La feuille du maire utilise le même point de paume et suit le mouvement de
+  sa main.
+- Version de cette MAJ : 0.5.74. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 73 — MARTEAU ET FEUILLE ATTACHES AUX MAINS (20/09/2026)
+================================================================================
+
+- Le marteau du forgeron est maintenant enfant direct du point de la main
+  droite. Il suit la position et la rotation de la main pendant tout le geste,
+  sans recalcul séparé qui pouvait l'envoyer à contre-mouvement.
+- La feuille du maire est également enfant du point de la main droite et suit
+  le mouvement du bras.
+- Version de cette MAJ : 0.5.73. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 72 — ROUTE DROITE, PORTAIL 8 M ET BOUTON EDITION (20/09/2026)
+================================================================================
+
+- La route traverse maintenant le village en ligne droite sur l'axe nord-sud,
+  avec une sortie droite au nord et une sortie droite au sud.
+- Les portails nord et sud ont 8 m de passage libre ; la clôture est interrompue
+  avec la même largeur afin de repartir exactement aux deux poteaux.
+- Le marteau du forgeron reprend maintenant la rotation du bras droit avec la
+  même phase : il avance avec le bras et recule avec lui.
+- Le bouton en bas à droite porte simplement le texte « EDITION » et affiche
+  la version du jeu lorsqu'il est activé.
+- Version de cette MAJ : 0.5.72. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 71 — PORTAIL 7 M, ATTAQUE CIBLEE ET JONCTIONS DES BRAS (20/09/2026)
+================================================================================
+
+- Les ouvertures nord et sud du village font maintenant 7 m de passage libre.
+  La détection de la clôture et les barrières exclues utilisent la même largeur
+  pour que le portique parte réellement des deux côtés de l'enclos.
+- Le bâtiment de la Forge est rehaussé de 50 cm.
+- Un clic gauche sur le sol ne déclenche plus le bras d'attaque : l'attaque à
+  la souris se déclenche seulement si le clic vise le corps d'un monstre. Le
+  bouton d'attaque remappé au clavier reste disponible.
+- Les bras utilisent des bouchons uniquement à leurs extrémités extérieures,
+  avec des recouvrements plus longs entre les segments pour supprimer les
+  jonctions cylindriques visibles et les trous aux épaules.
+- L'enclume est avancée et décalée vers la Forge pour dégager les jambes ; le
+  marteau est resynchronisé avec une amplitude inverse plus nette par rapport
+  au bras.
+- Un bouton « EDITION » apparaît en bas à droite et affiche la version du jeu.
+- Version de cette MAJ : 0.5.71. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 70 — PORTIQUE ELARGI, PERSONNAGES OPAQUES ET ATELIER DU FORGERON (20/09/2026)
+================================================================================
+
+- Les sorties nord et sud ont maintenant 5 m de passage libre entre les faces
+  internes des poteaux. Les linteaux, pancartes et textes sont recalcules sur
+  cette largeur ; les gardes restent décalés sur le côté de la route.
+- Les poches, revers rapportés et plaques trop visibles ont été retirés des
+  personnages. Les extrémités des bras importés sont fermées par des faces
+  orientées vers l'extérieur afin de supprimer les trous transparents aux
+  épaules et juste au-dessus des mains.
+- La maison de l'Entrepôt est 50 cm plus haute. La maison Esthétique est 1 m
+  plus large pour accueillir sa pancarte.
+- Le PNJ devant l'Entrepôt ne saute plus. Sa table est remplacée par des
+  cartons posés au sol.
+- Tous les PNJ restent maintenant à leur hauteur de terrain, sans oscillation
+  verticale. La feuille du maire est attachée à sa main.
+- Le marteau du forgeron suit la main avec un mouvement inverse du bras. Son
+  ancienne table-cube est remplacée par une enclume modélisée avec socle,
+  col, plateau et corne, posée au sol et plus haute.
+- Un clic gauche n'importe où sur le corps visible d'un PNJ ouvre la
+  conversation, et non plus seulement un clic sur ses pieds.
+- Version de cette MAJ : 0.5.70. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 69 — PORTAILS REALIGNES, MEDECIN ET CONVERSATIONS PNJ (20/09/2026)
+================================================================================
+
+- La route traverse maintenant l'enceinte au nord et au sud. Chaque portail
+  est recentre sur sa sortie, avec 50 cm de passage libre entre les faces
+  internes des poteaux. Le linteau et la pancarte sont dimensionnes sur
+  l'encombrement des poteaux afin de les rejoindre sans décalage latéral.
+- Les gardes restent à leur portail, mais sont décalés de 2 m sur le côté de
+  la route pour ne plus bloquer le passage au milieu des pavés.
+- Une maison du nord est renommée « ESTHÉTIQUE » avec une pancarte agrandie.
+  Un PNJ Médecin en blouse claire et croix rouge est placé devant.
+- Les poches et revers de veste ont été amincis : les plaques trop visibles du
+  torse et des genoux étaient des volumes de détail trop épais, pas une armure.
+- Un clic sur un PNJ proche ouvre une fenêtre de conversation. Elle affiche
+  « Bonjour », conserve l'historique, propose une zone de saisie en bas et un
+  bouton ENVOYER ; la réponse du PNJ est ajoutée à la conversation.
+- Version de cette MAJ : 0.5.69. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 68 — PERSONNAGES HUMANOÏDES, PORTIQUE DÉCALÉ ET PANNEAUX AGRANDIS (20/09/2026)
+================================================================================
+
+- L'héroïne et les PNJ utilisent maintenant 45 pièces OBJ indépendantes pour
+  obtenir une silhouette adulte plus détaillée : yeux blancs et iris, sourcils,
+  bouche, fermeture, revers, boutons et poches de veste et de jean. Le maillage
+  est plus fin et conserve les pivots d'animation des bras et des jambes.
+- Les PNJ devant les maisons ne sont plus des capsules/cubes : ils chargent le
+  même humanoïde importé et restent animés par pivots.
+- La hallebarde du garde a été recentrée sur la main droite et son pivot tourne
+  au niveau de la main ; elle ne doit plus traverser son épaule.
+- Le portique visuel est déplacé sur le côté de la route. Le passage logique et
+  les collisions restent à l'entrée de la ville, sans décor posé au milieu des
+  pavés.
+- Les pancartes Auberge, Atelier et Entrepot ont été élargies pour que les
+  lettres extrêmes restent dans le bois. La transparence forcée du personnage a
+  été supprimée : les bras et les autres pièces restent opaques.
+- Version de cette MAJ : 0.5.68. La compilation Unity Windows et le contrôle
+  visuel en jeu restent à effectuer avant de déclarer le rendu validé.
+
+MAJ 61 — HÉROÏNE ORIGINALE CC0 ET SHADER DE SECOURS (19/09/2026)
+================================================================================
+
+Le personnage KayKit a été retiré du projet afin de ne dépendre d'aucun pack
+externe. LibreVies utilise maintenant le maillage original
+LibreViesHeroine.obj et son fichier de matériaux LibreViesHeroine.mtl.
+
+Le maillage est généré par compilation/outils/generer_heroine_librevies.py :
+une héroïne humanoïde complète avec veste, jeans, chaussures, visage, yeux et
+chevelure rousse. C'est un asset importé par Unity, pas un assemblage de
+primitives Unity. Le modèle, le générateur et ses matériaux sont dédiés au
+projet sous CC0. L'image de référence sert uniquement de direction visuelle,
+elle n'est pas utilisée comme décor ni recopiée comme modèle.
+
+Le shader Assets/Resources/LVShaders/LVVisibleFallback.shader a été ajouté
+avec le nom LibreVies/RenduVisibleSecours. Il remplace le shader local qui
+apparaissait dans le rapport sous le nom vide et provoquait l'accolade
+inattendue à la ligne 59.
+
+MAJ 60 — COMPILATION UNITY 6 ET SHADER PBR (19/09/2026)
+================================================================================
+
+Le journal de compilation Unity 6000.6.1f1 fourni par l'utilisateur indique
+que l'export Windows se termine avec Build Finished, Result: Success et un
+code de retour 0. Il révélait cependant une erreur de compilation du shader
+RealistePBR : les entrées worldNormal utilisées par un surface shader Unity 6
+n'avaient pas INTERNAL_DATA. Le shader utilise désormais WorldNormalVector
+avec INTERNAL_DATA. L'appel obsolète FindObjectsOfType a aussi été remplacé
+par FindObjectsByType avec tri désactivé.
+
+Le journal mentionne encore un shader sans nom avec une accolade inattendue.
+Aucun fichier correspondant n'existe dans l'état actuel du dépôt ; ce message
+provient probablement d'un shader local supplémentaire du checkout Windows et
+doit être recherché si l'erreur persiste après synchronisation.
+
+MAJ 58 — RENDU FANTASY ET ASSETS CC0 (19/09/2026)
+================================================================================
+
+Le rendu du monde a été enrichi sans retirer les règles de gameplay de la MAJ
+57. Le dossier compilation/unity/Assets/Resources/WorldAssets contient une
+première sélection de modèles de nature provenant du Stylized Nature MegaKit
+Standard de Quaternius, sous licence CC0 : arbre, pin, buisson, fougère, fleurs,
+plante, herbe et rocher. Les GLB ont été convertis en OBJ avec leurs textures
+pour rester importables par Unity sans plugin externe. README_CC0.txt conserve
+la provenance et la licence.
+
+LibreViesGame.cs charge ces modèles par Resources.Load, les instancie dans le
+monde hors des bâtiments, de la route, du village et du fleuve, et ajoute des
+colliders Unity pour les arbres et rochers. Les primitives procédurales restent
+le repli si un asset manque. Le personnage est maintenant une aventurière
+stylisée avec tunique, visage, yeux, ceinture et cheveux rouges détaillés par
+plusieurs volumes.
+
+Important : cette MAJ n'est pas une compilation Windows Unity validée. La
+validation du rendu visuel et des importations OBJ doit encore être faite dans
+Unity Editor ; aucune exportation Windows ne doit être annoncée comme valide
+avant cette étape.
+
+MAJ 59 — VRAIE HÉROÏNE HUMAINE ET ROUTE (19/09/2026)
+================================================================================
+
+La primitive composée de cubes, sphères et capsules n'est plus utilisée quand
+le modèle est correctement importé. L'héroïne charge maintenant Rogue.fbx du
+KayKit Character Pack: Adventurers, sous licence CC0, avec corps humain,
+visage, vêtements, cape, accessoires et rigging. Le projet ajoute une
+chevelure rouge stylisée composée d'un volume de cheveux et de mèches courbes.
+Les animations Idle, Walking, Running et attaque sont recherchées dans les
+clips du FBX ; le repli procédural reste uniquement pour les installations où
+Unity n'aurait pas importé le modèle.
+
+La route a aussi été refaite : elle possède désormais une base terreuse, des
+bordures minérales et des dalles pavées répétées suivant toute la courbe. Le
+support du joueur est ajusté à la nouvelle hauteur des dalles. La rivière, le
+village, Maison_Sud et la mini-carte ne sont pas déplacés.
+
+Cette MAJ n'est toujours pas une compilation Windows Unity validée. Il faut
+ouvrir le projet dans Unity pour contrôler l'import FBX, l'orientation du
+modèle, les clips d'animation et le rendu de la route avant d'annoncer une
+exportation.
+
+COMMENT UTILISER CE FICHIER
+---------------------------
+Donne ce fichier a l'assistant en disant par exemple :
+
+  "Voici resumer.txt du projet LibreVies. Lis-le entierement, puis reprends le
+   travail exactement la ou il s'est arrete. Ne recommence pas ce qui est fait
+   et respecte les regles techniques de la section 7."
+
+L'assistant doit :
+  1. lire ce fichier en entier avant de toucher au code ;
+  2. verifier l'etat reel du depot (git log, git status) au lieu de supposer ;
+  3. ne jamais casser le contrat de la section 2 (deux dossiers) ;
+  4. lancer la recette (section 9) apres toute modification du launcher.
+
+
+================================================================================
+1. LE PROJET EN UNE PAGE
+================================================================================
+
+LibreVies est un jeu (MMO open world low-poly) developpe par l'utilisateur
+("Dragonus" sur GitHub : killdrago). Le jeu est une application UNITY :
+une seule scene (compilation/unity/Assets/Scenes/LibreVies.unity) et tout le
+jeu construit par code C# dans compilation/unity/Assets/Scripts/LibreViesGame.cs
+(~95 Ko, 2000 lignes : village, chateau, personnage, ennemis, combat, gardes,
+decor, HUD, sauvegarde).
+Version du jeu : 0.5.0 en preparation (Unity, export Windows 64 bits Mono).
+Derniere MAJ livree : 0.4.0. La 0.5.0 corrige le monde magenta, la camera sous
+le sol et la souris molle (MAJ 7) : elle doit encore etre compilee et publiee.
+
+Le but de la refonte terminee ici est la DISTRIBUTION :
+  - l'utilisateur ne veut plus envoyer le projet entier aux joueurs ;
+  - le joueur recoit UN SEUL fichier : LibreVies.exe (le launcher compile) ;
+  - le launcher telecharge tout seul le jeu complet et ses mises a jour ;
+  - Unity, Python, PyInstaller, GitHub, le projet Unity et les images de
+    travail restent strictement chez l'auteur.
+
+Parcours du joueur :
+  double-clic sur LibreVies.exe
+    -> verifie les mises a jour sur GitHub
+    -> telecharge le jeu complet (1re fois) avec reprise si la connexion coupe
+    -> installe dans game\ (controle md5)
+    -> bouton JOUER -> le jeu Unity demarre
+
+
+================================================================================
+2. CONTRAT DE STRUCTURE - A NE JAMAIS CASSER
+================================================================================
+
+Le depot contient exactement deux dossiers fonctionnels :
+
+  jeu/                 TOUT CE QUI CONCERNE LE JOUEUR, DANS UN SEUL DOSSIER
+    launcher.pyw       le launcher (source ; compile en LibreVies.exe)
+    version_url.json   le manifeste lu par le launcher
+    LIS-MOI.txt        explication envoyee au joueur
+    [LibreVies.exe]    le launcher COMPILE, depose ici par le build (ignore par git)
+    [game/]            le jeu : export Unity depose par le build, ou telecharge
+                       par le launcher chez le joueur (ignore par git)
+    [etat_jeu.json]    etat de l'installation (ignore par git)
+    [jeu.download.part] telechargement en cours (ignore par git)
+
+  compilation/         SERT UNIQUEMENT A COMPILER - JAMAIS telecharge par le joueur
+    unity/             le projet Unity (le jeu)
+    build_launcher.bat compile et depose tout DANS jeu\ (LibreVies.exe + game\)
+    build_unity_game.bat  export Unity seul (diagnostic)
+    setup_unity_build_tools.bat + download_unity_hub.ps1  installent Unity
+    image/             images de travail (bannieres, chapitres, logos)
+    outils/            publier_jeu, definir_url_publication, creer_icone,
+                       test_launcher (la recette)
+    [build/]           fichiers de travail du build (ignore par git)
+
++ README.md (2 sections : joueur / auteur) et resumer.txt (ce fichier).
+
+REGLES :
+  - le build DEPOSE ses resultats dans "jeu/" : c'est la demande explicite de
+    l'utilisateur ("au joueur il aura tous dans un seul dossier") ;
+  - rien de "compilation/" (sources Unity, images, outils) n'arrive dans "jeu/"
+    et le launcher n'en telecharge jamais ;
+  - "jeu/" ne contient que : launcher.pyw, version_url.json, LIS-MOI.txt,
+    plus LibreVies.exe et game/ produits par le build ou par le launcher.
+
+
+================================================================================
+3. COMMENT FONCTIONNE LE LAUNCHER (jeu/launcher.pyw, version 4.1.0)
+================================================================================
+
+3.0 AMORCE ET CODE (a comprendre avant tout le reste, MAJ 12)
+  Le launcher est en DEUX morceaux :
+    - jeu\LibreVies.exe : une AMORCE de ~200 lignes, compilee depuis
+      compilation\amorce\amorce_launcher.py. Elle ne fait que trois choses :
+      recuperer launcher.pyw a cote d'elle (au premier lancement elle recopie
+      la copie que PyInstaller a embarquee avec --add-data), l'executer comme
+      un programme, et ecrire journal_launcher.txt + une boite d'alerte si le
+      launcher plante.
+    - jeu\launcher.pyw : TOUT le launcher (interface, telechargements, mise a
+      jour). Il est publie avec son hash dans version_url.json.
+  POURQUOI : quand on change une phrase du launcher, seul launcher.pyw change ;
+  le hash change, le launcher le telecharge et redemarre tout seul. Il n'y a
+  donc PLUS JAMAIS de PyInstaller a relancer pour modifier le launcher. Seule
+  une modification de l'amorce elle-meme demanderait de recompiler l'exe.
+
+3.1 Suite : launcher.pyw est un fichier Python unique de ~650 Ko : ~1150 lignes + les
+images (banniere, icone, ICO) integrees en base64. Il n'a besoin d'AUCUNE
+bibliotheque externe : tkinter (livre avec Python) et, si present, Pillow
+(facultatif : sans lui, les PNG integres passent par tk.PhotoImage).
+
+3.2 Au lancement (1er passage)
+  - GAME_DIR = dossier du .exe (ou du .pyw en developpement).
+  - Il lit jeu/version_url.json recopie a cote de lui. S'il n'existe pas, il
+    utilise DEFAULT_RAW_URL ecrit en dur (valeur de secours).
+  - Il lit le manifeste distant (raw_url) : URL GitHub "raw".
+
+3.3 Mise a jour des petits fichiers (cle "files" du manifeste)
+  - Uniquement des fichiers TEXTE (md5 calcule sur le contenu normalise LF/CRLF).
+  - Quand on developpe avec launcher.pyw, les entrees launcher.pyw et
+    LibreVies.exe sont ignorees (sinon on ecraserait ses propres sources).
+  - Les chemins sont valides par _safe_local_path() : refus des chemins
+    absolus, des lecteurs Windows (C:) et de tout "..". Un manifeste corrompu
+    ne peut donc pas ecrire hors du dossier du launcher.
+  - Le launcher compile (LibreVies.exe) ne peut pas se remplacer pendant qu'il
+    tourne : il depose .new puis un .cmd remplace le fichier apres fermeture et
+    relance le launcher.
+  - launcher.pyw (le CODE du launcher, celui qui est en train de tourner) fait
+    partie de cette liste : si son hash change, il est telecharge puis le
+    launcher se contente de REDEMARRER (l'amorce relit le fichier a chaque
+    lancement). C'est ce qui rend toute recompilation inutile.
+
+3.4 Mise a jour du JEU COMPLET (cle "game_build" du manifeste)
+  C'est le coeur de la distribution. Le jeu n'est PAS telecharge fichier par
+  fichier : il arrive en UNE SEULE archive .zip.
+
+    {
+      "game_build": {
+        "moteur": "unity",
+        "version": "0.4.0",
+        "dossier": "game",           <- ou l'archive est installee
+        "exe": "LibreViesGame.exe",  <- lance par le bouton JOUER
+        "url": "https://github.com/.../releases/download/derniere/LibreVies_jeu_xxxx.zip",
+        "size": 39269570,
+        "hash": "md5 de l'archive"
+      }
+    }
+
+  Deroulement de installer_build_jeu() :
+    1. telechargement dans jeu.download.part avec en-tete HTTP Range si un
+       fichier partiel existe (reprise), verif que le serveur repond bien 206
+       sinon on repart de zero, barre de progression en Mo ;
+    2. controle de la TAILLE puis du MD5 annonces par le manifeste. Si l'un des
+       deux est faux : l'archive est effacee et l'installation existante reste
+       intacte (le joueur peut toujours jouer) ;
+    3. extraction dans game.install\ avec protection contre les archives
+       piegees (tout chemin contenant "..", absolu ou avec "C:" est refuse) ;
+    4. si l'archive contient un unique dossier racine, il est "remonte" ;
+    5. recherche de l'executable (LibreViesGame.exe) ;
+    6. remplacement ATOMIQUE : l'ancienne installation devient game.ancien\,
+       la nouvelle game\, puis game.ancien\ est supprime. En cas d'echec, on
+       remet l'ancienne en place ;
+    7. etat enregistre dans etat_jeu.json (hash, version, exe, date) ;
+    8. archive supprimee.
+
+  build_a_installer() decide s'il faut (re)telecharger :
+    - pas de hash dans le manifeste -> "aucune compilation Unity publiee"
+      (message affiche au joueur, bouton JOUER grise) ;
+    - hash different de etat_jeu.json -> "nouvelle compilation disponible" ;
+    - hash identique mais jeu absent/casse -> "fichiers du jeu a reparer" ;
+    - sinon -> "jeu a jour".
+
+3.5 Le deroulement attendu par l'utilisateur (sa description, mot pour mot)
+  "Je le mets en route, il telecharge le fichier version sur GitHub, il le
+   compare a celui en local : si des hash changent, il y a eu une maj sur tel
+   ou tel fichier ; dans ce cas il telecharge le ou les nouveaux fichiers,
+   remplace les vieux en local par les nouveaux, pareil pour le fichier
+   version, et redemarre le launcher qui va a nouveau verifier : si tout
+   correspond, il rend le bouton JOUER disponible et on demarre le jeu."
+  C'EST EXACTEMENT CE QUE FAIT LE LAUNCHER (voir 3.1 a 3.4). Une seule nuance,
+  qui compte pour ne pas se tromper :
+    - les PETITS FICHIERS (launcher.pyw, textes, exe du launcher) arrivent un
+      par un, par hash, exactement comme il le decrit ;
+    - le JEU lui-meme (le dossier game/) arrive en UNE SEULE archive .zip
+      publiee dans la release GitHub, controlee par son md5 (cle game_build).
+      C'est voulu : des milliers de fichiers Unity un par un seraient beaucoup
+      plus lents et fragiles.
+  CONSEQUENCE A DIRE A L'UTILISATEUR : il n'a plus jamais besoin de recompiler
+  le LAUNCHER (MAJ 12), mais quelqu'un doit compiler le JEU quand le code du
+  jeu change : seul son PC a Unity. Donc quand une correction touche
+  LibreViesGame.cs, il lance build_launcher.bat une fois (ou seulement l'export
+  Unity) puis publie ; tous les launchers, y compris le sien, se mettent a jour
+  tout seuls ensuite. La seule facon de supprimer aussi cette etape serait une
+  compilation automatique sur GitHub (GitHub Actions + licence Unity) : a
+  proposer seulement s'il le demande.
+
+3.6 Etat vide du manifeste (IMPORTANT pour comprendre l'etat actuel)
+  Aujourd'hui jeu/version_url.json a "game_build": {} et "files": {}.
+  Cela veut dire : AUCUNE compilation n'a encore ete publiee. Le launcher
+  affiche donc "aucune compilation Unity publiee" et le bouton JOUER reste
+  grise. C'est voulu : c'est la premiere publication (section 4) qui remplit
+  ce bloc, et tout devient automatique ensuite.
+
+
+================================================================================
+4. PUBLIER UNE MISE A JOUR (procedure normale, cote auteur, sous Windows)
+================================================================================
+
+  1. compilation\build_launcher.bat   (double-clic)
+     Il telecharge ce qui manque (voir section 6) puis COMPILE et DEPOSE tout
+     dans le dossier jeu\ :
+        jeu\LibreVies.exe   <- LE fichier a donner au joueur
+        jeu\game\           <- le jeu a publier
+     A la fin il demande : "Publier cette compilation maintenant ? [O/N]"
+
+  2. Repondre O  -> il enchaine sur outils\publier_jeu.bat, qui :
+       - rassemble jeu\game en UNE archive LibreVies_jeu_<md5>.zip ;
+       - l'envoie dans la release GitHub "derniere" (gh release upload) ;
+       - ecrit url/size/hash/moteur/exe/version dans jeu/version_url.json ;
+       - publie aussi jeu\LibreVies.exe (cle "files"/"LibreVies.exe")
+         pour que les launchers deja installes se mettent a jour ;
+       - note l'installation locale dans jeu\etat_jeu.json : le launcher d'ici
+         affiche "jeu a jour" sans retelecharger ce qui vient d'etre compile ;
+       - avec --pousser : git add/commit/push du manifeste.
+
+  3. Les joueurs recoivent la mise a jour au prochain lancement.
+
+  Le nom de l'archive contient son md5 : une nouvelle publication ne remplace
+  jamais l'archive sous les pieds d'un joueur en train de telecharger.
+  Sans gh installe, publier_jeu.py cree quand meme l'archive et le manifeste
+  et affiche l'URL exacte ou deposer le .zip a la main.
+
+
+================================================================================
+5. JOURNAL DES MISES A JOUR (ce qui a ete fait, dans l'ordre)
+================================================================================
+
+  Historique AVANT cette refonte (launcher, pour memoire) :
+    2.0/2.6/2.8/3.1 : auto-update, images integrees, retour aux md5 par
+    fichier, distribution Unity autonome. Ces notes sont dans NEWS, dans
+    jeu/launcher.pyw (elles s'affichent dans "Dernieres actualites").
+
+  MAJ 1 - Tri complet du depot (commit 8b57024)
+    - Creation des deux dossiers : jeu/ et compilation/.
+    - Deplacements : launcher.pyw, version_url.json -> jeu/ ;
+      unity/, image/, build_*.bat, setup_*, download_unity_hub.ps1,
+      README_RELEASE_FR.md -> compilation/.
+    - make_package_manifest.py supprime (voir incident 2).
+    - .gitignore reecrit pour les deux dossiers.
+
+  MAJ 2 - Launcher 4.0.0 : le jeu complet se telecharge tout seul (commit 8b57024)
+    - Nouveau modele "une archive" (game_build) a la place de "un fichier par
+      fichier" (package.files).
+    - Telechargement avec REPRISE (HTTP Range), controle taille + md5,
+      extraction securisee, remplacement atomique du dossier du jeu.
+    - etat_jeu.json pour savoir ce qui est installe.
+    - Message clair quand rien n'est publie ; JOUER grise.
+
+  MAJ 3 - Unity uniquement, plus aucune trace de l'ancien moteur (d14c200)
+    - game_build remis a {} : l'ancien manifeste pointait vers une archive
+      l'ancien moteur publiee par une CI d'une autre branche.
+    - NOMS_EXE_JEU = ("LibreViesGame.exe",) : le launcher ne cherche plus
+      LibreVies.exe comme jeu (c'est le nom du launcher).
+    - publier_jeu.py : moteur "unity" en dur, option --moteur supprimee.
+    - Commentaires C# du jeu nettoyes (plus de reference a l'ancien moteur).
+    - README + guide : Unity uniquement, premiere publication obligatoire.
+
+  MAJ 4 - build_launcher.bat : tout se telecharge tout seul (commit 0e1da6d)
+    - Etape 1 : si le dossier ne contient pas le projet, il telecharge
+      l'archive de la branche sur GitHub et copie les fichiers MANQUANTS
+      (robocopy /E /XC /XN /XO : aucun fichier local n'est jamais ecrase).
+    - Etape 2 : Python (winget, sinon python.org, avec tkinter) si absent.
+    - Etape 3 : PyInstaller si absent.
+    - Etape 4 : Unity Hub + Unity Editor si absents.
+    - Etapes 5-6 : export Unity + compilation du launcher, puis proposition
+      de publication.
+    - definir_url_publication.py met desormais TROIS references de branche
+      d'accord : manifeste, launcher, et BRANCHE du script de build.
+
+  MAJ 5 - Correctif de l'icone + exe allege
+    - Chemin d'icone ABSOLU pour PyInstaller (voir incident 5).
+    - --exclude-module pygame/numpy/psutil/setuptools/pip (incident 6).
+    - Suppression du .spec avant chaque build (evite les restes).
+
+  MAJ 6 - Le build depose tout dans jeu\ (demande de l'utilisateur)
+    - Avant : le build ecrivait dans compilation\release\.
+      Maintenant : jeu\LibreVies.exe (le launcher) et jeu\game\ (le jeu).
+      compilation\ ne sert plus qu'a compiler.
+    - build_launcher.bat : plus de dossier release ; Unity exporte directement
+      dans jeu\game, PyInstaller ecrit dans jeu\.
+    - build_unity_game.bat : export vers jeu\game aussi.
+    - publier_jeu.py / .bat : chemins par defaut = jeu\game et
+      jeu\LibreVies.exe (plus besoin de --jeu / --exe).
+    - publier_jeu.py note l'installation locale dans jeu\etat_jeu.json : apres
+      une publication, le launcher d'ici affiche "jeu a jour" au lieu de
+      retelecharger les 40 Mo qu'il vient de compiler. Un dossier jeu\ copie
+      tel quel (cle USB) est donc jouable immediatement, meme hors ligne.
+    - .gitignore : /jeu/LibreVies.exe et /jeu/game/ ignores (ce sont des
+      sorties de build, jamais des sources).
+    - VERIFIE : le launcher charge depuis jeu\ annonce bien "jeu a jour" et
+      trouve jeu\game\LibreViesGame.exe. La recette (31 controles) passe.
+
+  MAJ 7 - Monde magenta, camera sous le sol, souris molle : corriges
+    C'est la MAJ qui repond aux 3 bugs signales par l'utilisateur avec la
+    capture d'ecran du monde entier en rose fluo (upload image-1.png), puis
+    "fait moi pareil mais en unity" (reprendre le jeu de la branche de
+    reference arena/01a09a4d-librevies).
+
+    a) MONDE MAGENTA. Cause : le jeu cree TOUS ses materiaux par code avec
+       Shader.Find("Standard"). Unity supprime de la build les shaders
+       integres qu'aucun materiau du projet ne reference ; dans l'exe compile
+       Shader.Find renvoyait donc null, et Unity affiche en magenta tout objet
+       dont le materiau n'a pas de shader valide. Correctif : nouveau shader
+       du projet Assets/Resources/LVShaders/LVColor.shader (tout ce qui est
+       dans un dossier Resources est TOUJOURS embarque dans la build) et
+       chaine de secours dans ResoudreShader() :
+         Standard -> Resources LVColor -> Unlit/Color -> Sprites/Default ->
+         UI/Default -> (echec total : Debug.LogError + materiau null)
+       Le shader retenu est ecrit dans la console (Debug.Log) pour diagnostiquer
+       en une ligne chez le joueur. Les .meta des deux shaders sont ecrits a la
+       main avec des GUID fixes (a1b2c3d4e5f60718293a4b5c6d7e8f90 et
+       0f1e2d3c4b5a69788796a5b4c3d2e1f0) : Unity les importe tels quels.
+
+    b) CAMERA QUI DEMARRE SOUS LE SOL. Cause : la camera orbitait avec
+       Quaternion.Euler(cameraPitch = +18) * Vector3.forward, ce qui envoie la
+       camera VERS LE BAS (a l'ouverture : y = -0,85, donc sous le village,
+       d'ou l'ecran qui part du sol et remonte). Correctif : Vector3.back
+       (la camera se place derriere ET AU-DESSUS du heros) + filet de securite
+       identique a celui de la reference : jamais a moins de 0,6 au-dessus de
+       TerrainHeight(x, z). La vue 1re personne regarde desormais dans l'axe
+       du pitch (Quaternion.Euler(-pitch, yaw, 0)) au lieu de la rotation du
+       personnage.
+
+    c) SOURIS "LONGUE A LA DETENTE". Deux causes cumulees : Input.GetAxis
+       lisse les mouvements, et la sensibilite valait 0,3 alors que la
+       reference utilise 0,3 degre par pixel, soit 3 avec le facteur 0,1 que
+       Unity applique a Mouse X/Y (10 fois trop lent). Correctif :
+       Input.GetAxisRaw + sensibilite 3, reglable avec [ et ], memorisee dans
+       PlayerPrefs ("cameraSensitivity") et affichee dans le panneau Options.
+       Le clic droit pour tourner la camera est conserve (comme la reference).
+
+    d) RENDU ALIGNE sur la reference : ciel bleu vif avec horizon chaud
+       (Skybox/Procedural regle sur _SkyTint 0.30/0.46/0.78, _GroundColor
+       0.45/0.50/0.26, _Exposure 1.35 ; repli sur le shader du projet
+       Assets/Resources/LVShaders/LVSky.shader), soleil energie 1,3, couleur
+       (1 ; 0,90 ; 0,74), rotation (52, -32, 0), lumiere ambiante tricolore et
+       brouillard adouci (densite 0,0022), champ de vision 55 (celui de la
+       Camera3D de la reference, au lieu de 65).
+
+    - VERIFIE : accolades 122/122, parentheses 687/687, crochets 30/30 dans
+      LibreViesGame.cs, relecture du fichier modifie. Il n'y a AUCUN
+      compilateur C# dans le bac a sable (ni mono, ni dotnet) : la compilation
+      reelle se fait chez l'utilisateur. Le fichier doit donc compiler "a
+      l'aveugle" : styles C# 7.3 uniquement, pas de LINQ ajoute, pas de
+      nullable, types et methodes verifies un par un.
+    - Aucune trace de l'ancien moteur ne doit apparaitre dans le depot : le
+      controle : chercher le nom du moteur abandonne dans tout le depot
+      (insensible a la casse, hors .git) doit ne rien retourner. Il ne
+      retourne rien depuis ce commit : les mentions historiques de ce
+      fichier ont ete reformulees en "l'ancien moteur".
+    - COMMITS : 1e14528 puis 9bc6405 (doc + nettoyage), puis le commit
+      de la MAJ 8 pour les collisions. Tout est pousse sur
+      arena/01a0b32c-librevies.
+    - A FAIRE COTE UTILISATEUR : relancer compilation\build_launcher.bat (le
+      projet est retelecharge automatiquement, puis Unity compile avec les
+      nouveaux fichiers) et regarder la Console Unity : elle doit afficher
+      "LibreVies : shader utilise = Standard" (ou LVColor).
+
+  MAJ 8 - Parite gameplay avec la reference : on ne traverse plus les murs
+    (meme lot que la MAJ 7, non encore compilee/publiee)
+
+    Jusqu'ici le heros traversait les maisons, les arbres et les monstres : les
+    deplacements ecrivent directement dans transform.position, donc les
+    colliders Unity ne servaient a rien (aucun Rigidbody nulle part).
+
+    - Systeme de collisions repris de la reference, en C# : liste d'obstacles
+      (cercles et boites) + resolution mathematique du deplacement, deux
+      passes, elagage par portee. Fonctions : ColCercle, ColBoite,
+      ResoudreCollisions, HauteurSupport, DansVillage, DistRoute, ClotureEntre.
+    - Ce qui est enregistre comme obstacle : les 9 maisons (0,5 m de marge),
+      le donjon + les 4 tours + la porte du chateau, le bassin de la fontaine,
+      les 2 gardes, les 75 troncs d'arbres, les 22 caisses, et le corps de
+      chaque monstre (il suit la bete et disparait a sa mort).
+    - Le saut fait 1,60 m (8 m/s, gravite 20) : on saute donc sur les caisses
+      et par-dessus la cloture de 1 m, et on atterrit dessus (HauteurSupport).
+      La route est pavee : les pieds ne s'enfoncent plus dedans (+0,10 m).
+    - La cloture du village est un ANNEAU (rayon 26) bloqueur, sauf la ou passe
+      la route. Elle est dessinee avec 96 poteaux comme la reference, et les
+      deux portails ont des poteaux doubles de 5,20 m, un linteau, un panneau
+      en deux planches et le texte "LIBREVIES" (TextMesh, ignore proprement si
+      aucune police n'est disponible).
+    - Les monstres : errance quand le heros est loin (0,6x vitesse, direction
+      changee toutes les 1,5 a 4 s, 35 % de pauses), poursuite a moins de
+      10 m (1,4x), arret a 1,5 m, resolution des collisions (ils ne traversent
+      plus rien), et interdiction DEFINITIVE d'entrer dans le village (ils
+      longent la cloture) ; un monstre egare est remis dehors d'office.
+    - Combat aligne : cadence 0,50 s, portee 2,40 m, tous les ennemis a portee
+      sont touches, et INTERDIT de frapper a travers la cloture (ClotureEntre).
+    - Ramassage aligne : caillou 3,0 m puis retour apres 20 s, piece 3,5 m puis
+      retour apres 60 s, et tout ce qui est a portee est ramasse d'un coup.
+    - VERIFIE : accolades 159/159, parentheses 871/871, crochets 40/40. Pas de
+      compilateur C# ici : la compilation reelle se fait chez l'utilisateur, et
+      la correction ne vaut que si l'exe compile.
+    - RESTE DE LA PARITE A FAIRE (voir le TODO) : gardes qui patrouillent les
+      portails, degats flottants/sparks, lampadaires-panneaux-bannieres,
+      raccourcis de touches reconfigurables (AZERTY), camouflage, resolution et
+      sauvegarde de configuration hors PlayerPrefs.
+
+  MAJ 9 - Le script de fabrication met vraiment le projet a jour
+    PIEGE CRITIQUE CORRIGE : jusqu'ici build_launcher.bat commencait par
+    "si le projet est deja complet sur ce PC, je ne telecharge rien". Resultat :
+    une correction poussee sur GitHub n'arrivait JAMAIS chez l'utilisateur, et
+    il recompilait l'ancien jeu (c'est exactement ce qui se serait passe avec
+    le correctif magenta).
+
+    - Etape 1 refaite : a chaque lancement, le script interroge l'API GitHub
+      (api.github.com/repos/.../commits/<branche>) et compare le SHA avec celui
+      de la derniere compilation (memorise dans compilation\build\
+      branche_actuelle.txt). Identique = rien a telecharger (le build demarre
+      tout de suite, sans les 72 Mo d'images). Different = l'archive de la
+      branche est telechargee et les fichiers sont remis a jour dans
+      compilation\ puis dans jeu\.
+    - Avant tout remplacement : sauvegarde de l'ancienne version dans
+      compilation\build\sauvegarde_locale\ (unity, outils, jeu et les .bat ;
+      le dossier image\ de 72 Mo est volontairement ignore).
+    - Le script ne s'ecrase jamais lui-meme en cours d'execution : s'il a change
+      sur GitHub, la nouvelle version est posee a cote sous le nom
+      build_launcher.bat.maj et le script affiche a la fin qu'il faut la
+      renommer puis relancer.
+    - Si l'API GitHub ne repond pas (hors ligne), on retombe simplement sur le
+      telechargement de l'archive : jamais de blocage.
+    - Nouveau : compilation\outils\verifier_bat.py, le controleur de .bat
+      (ASCII, parentheses des echo en bloc, labels appeles mais absents).
+      A lancer apres chaque modification d'un .bat :
+        python compilation/outils/verifier_bat.py
+      Il a ete teste sur un fichier volontairement faux : les 4 pieges sont
+      bien detectes. Tous les .bat du projet le passent.
+    - build_unity_game.bat (script de diagnostic) previent maintenant qu'il ne
+      met PAS les sources a jour.
+
+  MAJ 10 - Decor du village comme la reference (lot demande par l'utilisateur)
+    Probleme : le village etait nu (seulement 22 caisses posees au hasard, dont
+    certaines dans les murs ou sur la route) et les sapins etaient des
+    cylindres empiles.
+
+    - Maillage procedural (classe Maillage) : c'est le seul moyen d'avoir des
+      CONES a notre sauce (Unity n'a que cube/sphere/cylindre/capsule) et des
+      touffes d'herbe faconnees. Une seule soupe de triangles, normales
+      recalculees, aucun asset externe.
+    - Sapins : tronc epais + souche + 4 renforts + 3 cones de feuillage (verts
+      de plus en plus clairs vers le haut), exactement le modele de la
+      reference. 80 sapins disperses, avec des regles qui manquaient :
+      JAMAIS sur la route ni dans un batiment (c'etait le cas avant : des
+      arbres poussaient sur la route).
+    - 6 arbres ronds (tronc + 2 masses de feuillage) aux positions de la
+      reference.
+    - Herbe : 3 nuances x 140 touffes = 420 touffes dans 3 maillages seulement
+      (l'equivalent du MultiMesh de la reference) : aucun cout visible.
+      Regles reprises : rien sur la route, rien au milieu du village.
+    - Rochers : 2 nuances x 45, hexaedres deformes, poses comme dans la
+      reference (jamais sur la route, jamais sur la clouture du village),
+      bloquants sauf ceux poses sur la route.
+    - Barils (5) pres de l'auberge et de la forge, caisses (positions de la
+      reference + 2 libres), petites cloutures le long de la route,
+      2 bannieres (bleue et rouge, epees croisees en embleme), 2 panneaux
+      indicateurs : tous avec collisions, tous verifies par EmplacementLibre
+      (rien n'est plante dans un mur : le decor occupe est simplement ignore).
+    - 3 lampadaires (socle, mat, bras, lanterne emissive, chapeau) le long de
+      la route a 3,4 m du bord, en alternance de cote comme la reference ; le
+      bras est oriente VERS la route. 13 m d'ecart dans la reference, 9 m ici
+      car notre trace de route a peu de sommets.
+    - Nouveaux materiaux : Bois_Clair, Metal, Lanterne (emissive), 3 verts de
+      sapin, 3 verts d'herbe, 2 gris de rocher, 2 tissus de banniere, Embleme,
+      Arbre_Rond.
+    - VERIFIE : syntaxe C# par tree-sitter (aucune erreur), accolades
+      226/226, parentheses 1264/1264, .bat propres. La pose des lampadaires a
+      ete simulee cote a cote en Python pour verifier que les 3 lampadaires
+      tombent bien a 3,4 m de la route et hors des batiments.
+
+  MAJ 11 - Gardes des portails + degats flottants (lots demandes par l'utilisateur)
+    a) GARDES. Avant : deux gardes plantes la, sans rien faire, loin des
+       portails. Maintenant : un garde DEVANT CHAQUE PORTAIL (position exacte
+       de la reference : 0,90 du rayon du village), en armure complete (casque,
+       cimier rouge, plastron, baudrier, spallieres, jambards, solerets) avec
+       une hallebarde entiere et des jambes ANIMEES.
+       Comportement (update_gardes de la reference) : il ne patrouille pas, il
+       reste a son poste et regarde vers l'exterieur ; si un monstre arrive a
+       moins de 2,5 m de SA porte, il va dessus et le tue en UN COUP ("-999"
+       dore + etincelles, message "Un garde du village a repousse X !"), puis
+       retourne a son poste. Le monstre revient 10 s plus tard.
+       Le garde tue ne rapporte NI experience NI monstre pour la quete : c'est
+       le garde qui l'a tue, pas le heros (comportement de la reference).
+    b) DEGATS FLOTTANTS ET ETINCELLES. Le "-25" blanc qui s'envole a chaque coup
+       de marteau, le "-6" rouge au-dessus du heros quand un monstre le touche,
+       le "-999" dore des gardes, et les etincelles jaunes croisees a l'impact
+       (elles grossissent et clignotent 0,25 s, exactement comme la reference).
+       C'est le seul moyen de savoir qu'on touche : le HUD OnGUI ne peut pas
+       suivre un point du monde en 3D.
+       Ecrit avec TextMesh (texte 3D) et non avec un Label3D : Unity n'a pas
+       l'equivalent, et le rendu reste lisible.
+    c) EQUILIBRE ALIGNE sur la reference : les monstres font 6 degats (et non 8),
+       toutes les 1,2 s (et non 0,8 s), a 1,6 m (et non 1,8 m). Le heros garde
+       100 PV et 25 degats par coup de marteau. A dire si l'utilisateur prefere
+       la difficulte precedente : c'est une seule ligne.
+    - VERIFIE : syntaxe C# OK, accolades 264/264, parentheses 1452/1452.
+      Nouveaute de l'outil : verifier_cs_syntaxe.py detecte maintenant aussi
+      les APPELS a des methodes qui n'existent pas (renommees ou supprimees).
+      Il a trouve un vrai bug de ce lot : CreateTown appelait encore
+      CreateGuard() alors que la methode avait ete remplacee.
+
+
+  MAJ 12 - Le launcher se met a jour tout seul (demande de l'utilisateur)
+    Demande exacte de l'utilisateur : "j'allume le launcher, il regarde le
+    fichier version, il regarde les hash, si ca a change il dl le nouveau
+    fichier version et les nouveaux fichiers avec les nouveaux hash. Je vais
+    pas a chaque fois refaire le build launcher."
+    Le probleme etait reel : LibreVies.exe contenait tout le launcher, donc
+    changer une phrase de l'interface obligeait a relancer PyInstaller.
+    Solution (voir section 3.0) : l'exe devient une AMORCE qui execute
+    launcher.pyw ; c'est launcher.pyw qui est publie avec son hash et se met a
+    jour tout seul. Plus aucune compilation du launcher n'est necessaire pour
+    le modifier.
+    a) jeu\launcher.pyw 4.1.0 : constante CORE_PATH (le fichier en cours
+       d'execution), mise a jour par hash + redemarrage automatique,
+       _relancer(), _finish_launcher_update() qui sait redemarrer sans
+       remplacer d'exe.
+    b) JOURNAL DU JEU : launch() ajoute -logFile
+       jeu\game\logs\LibreVies.log. Le journal du jeu est donc TOUJOURS a
+       cote du jeu (AppData\LocalLow n'est plus la seule piste). C'est la
+       reponse a l'incident 18 (plantage au demarrage sans trace).
+    c) Deux boutons en bas a droite : RAPPORT (ouvre le dossier des journaux
+       et celui des rapports de plantage Unity ; si aucun journal n'existe,
+       affiche les chemins a copier) et DOSSIER DU JEU.
+    d) compilation/amorce/amorce_launcher.py : l'amorce (execution du .pyw,
+       copie embarquee au 1er lancement, journal_launcher.txt + alerte si le
+       launcher plante, SystemExit conserve).
+    e) build_launcher.bat : compile l'amorce avec --add-data "launcher.pyw;."
+       au lieu du fichier complet, et applique SA PROPRE mise a jour tout seul
+       (intermediaire build\maj_launcher.bat : copie du .maj puis relance) :
+       plus de renommage manuel du script a chaque nouvelle version.
+    f) publier_jeu.py publie launcher.pyw (hash + taille) a chaque
+       publication : c'est ce qui declenche la mise a jour du launcher chez
+       les joueurs.
+    g) Recettes : test_launcher.py passe de 31 a 40 controles (dont -logFile et
+       la mise a jour du code par hash) ; NOUVEAU test_amorce.py (13 controles :
+       execution du .pyw, copie embarquee, message clair si le code manque,
+       journal en cas de plantage, SystemExit). tester_launcher.bat lance les
+       deux.
+    - VERIFIE ici : py_compile, recette launcher (40/40), recette amorce
+      (13/13), verifier_bat.py (7 scripts OK), aucune trace de l'ancien moteur.
+    - NON VERIFIE ici : la compilation PyInstaller de l'amorce et l'execution
+      de l'exe sous Windows (pas de Windows dans le bac a sable). Le premier
+      lancement chez l'utilisateur est le vrai test.
+
+
+  MAJ 13 - Demarrage du jeu : journal, etapes et ecran de chargement
+    CONTEXTE (18/09/2026) : l'utilisateur signale "mon jeu crash au demarrage".
+    Il a envoye trois journaux : Player-prev.log (ancienne build) et deux
+    copies identiques de Player.log (build actuelle). Analyse :
+      - la build actuelle TROUVE le shader du projet
+        ("LibreVies : shader utilisé = LibreVies/Couleur") : le monde magenta
+        est donc bien regle, et ce journal ne contient AUCUNE autre ligne ;
+      - aucune exception C#, aucun "Crash!!!" ni pile d'appels, pas de dossier
+        Crashes mentionne : ce n'est donc PAS un plantage natif classique ;
+      - le journal s'arrete ~0,45 s apres le premier materiau, et la ligne
+        "vsync is broken" vue dans l'ancienne build (preuve que le jeu
+        rendait des images) est absente : l'arret se produit pendant la
+        construction du monde, avant que des images soient affichees.
+      - conclusion probable : gel (ou process tue par l'utilisateur) pendant
+        le demarrage, ou demarrage si lent qu'il ressemble a un plantage ;
+        aucune correction ne peut etre faite a l'aveugle.
+    CE QUI A ETE FAIT (instrumentation, pour que le prochain journal soit
+    decisif) :
+      a) Journal "[LV] <secondes> s  <etape>" dans Player.log : machine
+         (SystemInfo, RAM, VRAM, API graphique, resolution, vsync), puis un
+         "debut :" et un "fin :" AUTOUR DE CHAQUE etape de construction
+         (materiaux, environnement, terrain, route, village, chateau, cloture,
+         arbres, herbe, rochers, decor, lampadaires, nuages, heros, monstres,
+         gardes, objets). Le DERNIER "debut" sans "fin" designe le coupable.
+      b) Une etape = une image (coroutine ConstruireMonde) : le jeu repond
+         pendant la construction, et chaque etape a son temps dans le journal.
+      c) Chaque etape est protegee par try/catch : une exception est ecrite
+         dans le journal et n'empeche plus le monde de finir de se construire.
+      d) ECRAN DE CHARGEMENT (DessinerChargement) : fond sombre, "LIBREVIES",
+         "Chargement du monde...", l'etape en cours et une barre de
+         progression. Fini l'ecran noir qui fait croire a un plantage.
+      e) Battement de coeur : "premiere image affichee" a la premiere image,
+         "construction en cours : <etape>" toutes les 5 s pendant la
+         construction, puis "jeu en cours : image N, X i/s" toutes les 60 s.
+         Si l'affichage se fige, le journal s'arrete net au dernier battement.
+      f) Compteur d'objets crees, affiche a la fin de chaque etape et au
+         demarrage termine (detecte une explosion du nombre d'objets).
+      g) Titre du HUD : "LIBREVIES  •  MMO OPEN WORLD" (l'ancien affichait
+         "UNITY", ce qui n'a rien a faire chez le joueur).
+    - NON VERIFIE ici : compilation Unity et rendu (pas d'Unity dans le bac a
+      sable). VERIFIE : syntaxe C# (verifier_cs_syntaxe.py) et relecture.
+    PROCHAINE ETAPE : faire recompiler les dernieres sources a l'utilisateur,
+    puis lui demander la derniere ligne "[LV]" du journal. C'est elle qui
+    dira si le jeu se bloque (gel) ou s'il est simplement tres lent.
+
+
+  MAJ 14 - Degats en arc, barres de vie des monstres, ressources qui voyagent
+    Demande exacte de l'utilisateur (18/09/2026, dictee avec son correcteur) :
+    "le degats qui monte puis qui redescend un petit peu", "la barre de vie",
+    "des choses qui apparaissent dans le temps comme la pile de cristaux qui
+    apparait au milieu du village". Il precise : a faire de preference APRES le
+    plantage au demarrage (MAJ 13), mais autorise a les faire avant si c'est
+    rapide. Interpretation de la "pile de cristaux" : les ressources de
+    l'ancien code etaient 5 objets FIXES dont 3 plantaient AU MILIEU DU
+    VILLAGE ; la reference les seme dehors et les fait revenir ailleurs.
+    a) DEGATS FLOTTANTS EN ARC : position = depart + (1,9 t - 1,7 t^2) vers le
+       haut, au lieu d'une montee en ligne droite de 1,6 m/s. Le chiffre
+       jaillit, redescend un peu, et s'efface (1 s, comme avant).
+    b) BARRES DE VIE DES MONSTRES (port de la reference) : fond 0,9 x 0,10 x
+       0,03 m sombre (0,15/0,05/0,05) et remplissage 0,86 x 0,07 x 0,03 m rouge
+       (0,90/0,12/0,12) a 0,02 m devant. Hauteur 1,10 m pour les araignees,
+       0,75 m pour les autres. Cachee tant que les PV sont au maximum, orientee
+       vers la camera (LookAt), remplissage : scale.x = max(pv/max, 0,001) et
+       position.x = -(1 - pv/max) x 0,43 (le cote gauche ne bouge pas).
+    c) MONSTRES ALIGNES SUR LA REFERENCE : 18 betes (6 zones de 3, centres
+       (25,20) (-25,-20) souris / (30,-25) (-30,25) rats / (15,35) (-18,-38)
+       araignees, +/-8 m) au lieu de 12 au hasard. PV : souris 25, rat 50,
+       araignee 75 (le marteau fait 25 : une souris meurt en un coup, un rat en
+       deux, une araignee en trois). Vitesse tiree au hasard entre 1,2 et
+       2,0 m/s. La souris est une silhouette a 70 %. Reapparition 10 s apres la
+       mort, a +/-3 m du point de depart, jamais dans le village.
+    d) RESSOURCES QUI VOYAGENT : 15 cailloux (+/-50 m) et 3 pieces (+/-40 m),
+       JAMAIS dans le village (rayon + 2 m) ni sur la route (moins de 3 m).
+       Tailles de la reference (caillou 0,28 x 0,22 x 0,28 a 0,14 m ; piece de
+       0,36 m de diametre et 0,05 m d'epaisseur a 0,12 m). Quand on les
+       ramasse, ils reviennent AILLEURS, au hasard (caillou 20 s, piece 60 s,
+       portees de ramassage 3,0 m / 3,5 m). Seules les pieces tournent.
+       Fin de l'effet "pile de cristaux au milieu du village".
+    - VERIFIE : syntaxe C# (tree-sitter), appels a des methodes inconnues = 0,
+      accolades equilibrees. NON VERIFIE : rendu (pas d'Unity dans le bac a
+      sable) - a confirmer sur la capture de l'utilisateur.
+
+
+  MAJ 15 - GEL DU JEU CORRIGE : boucle infinie dans la cloture du village
+    C'est LA panne qui empechait l'utilisateur de jouer depuis le lot de la
+    cloture (MAJ 8). Mystere resolu grace au journal [LV] ajoute en MAJ 13 :
+    son journal s'arretait sur :
+        [LV] 0,41 s  debut : cloture et portails
+    ...sans jamais ecrire "fin : cloture et portails". Le gel etait donc dans
+    CreateFence(), et nulle part ailleurs.
+    CAUSE (incident 19) : la methode declarait une variable locale nommee
+    'portails' -- le meme nom que le CHAMP 'portails' de la classe. Ce champ
+    garde la position des portails pour les gardes (un garde par portail).
+    Deux consequences :
+      1. la liste des intervalles d'angle masquait le champ : CreateGuards()
+         n'aurait recu AUCUN portail (donc aucun garde) ;
+      2. la boucle de construction des portails faisait
+         'for (int g = 0; g < portails.Count; g++)' en AJOUTANT dans
+         'portails' : la liste grandissait a chaque tour, la condition restait
+         vraie -> boucle infinie. Unity ne dit rien, aucun journal, aucune
+         erreur : la fenetre reste figee. L'utilisateur a du la fermer a la
+         main (le journal s'arrete net, sans arret propre).
+    CORRECTION : la liste des intervalles s'appelle maintenant 'intervalles' et
+    ne masque plus rien ; les positions sont bien ajoutees au CHAMP 'portails'.
+    Verifie par simulation : 2 portails (nord 6,35 m a (0,9 ; 26) et sud
+    6,58 m a (2,2 ; -25,9)), 88 poteaux sur 96, donc 2 gardes (un par portail).
+    PROTECTIONS AJOUTEES (pour que cette faute ne revienne jamais) :
+      - verifier_cs_syntaxe.py signale maintenant les BOUCLES INFINIES :
+        toute boucle 'for (... ; i < X.Count ; ...)' qui contient 'X.Add(' ou
+        'X.Insert(' est une erreur bloquante. Teste sur une copie ou le bug a
+        ete reintroduit volontairement : detecte.
+      - il signale aussi les variables locales qui MASQUENT un champ de la
+        classe principale (meme incident), en ignorant les classes imbriquees
+        (Maillage, EnemyState...) ou le masquage est sans consequence.
+      - une variable locale 'avancement' d'UpdateEffects a ete renommee
+        'progression' pour la meme raison.
+    - A FAIRE COTE UTILISATEUR : recompiler (build_launcher.bat) et relancer.
+      C'est la premiere fois depuis la MAJ 8 que le jeu doit demarrer en entier.
+
+
+================================================================================
+6. JOURNAL DES PROBLEMES RENCONTRES ET DE LEURS SOLUTIONS
+   (a lire avant de "corriger" quoi que ce soit : la plupart sont des pieges)
+================================================================================
+
+INCIDENT 1 - Le depot melangeait deux moteurs (l'ancien + Unity)
+  Symptome : plusieurs branches avec des versions differentes du jeu ; le
+  manifeste pointait un coup vers l'ancien moteur, un coup vers Unity.
+  Cause    : historique du projet (portage de l'ancien moteur vers Unity par
+  une autre IA) ; la branche de travail choisie par l'utilisateur est celle
+  d'Unity.
+  Solution : decision de l'utilisateur = UNITY UNIQUEMENT. Toutes les traces
+  de l'ancien moteur ont ete retirees du depot (manifeste, launcher, outils,
+  commentaires).
+  Reste a faire : 3 archives de l'ancien moteur (~117 Mo) trainent dans la release
+  GitHub "derniere" (LibreVies_Windows*.zip). Plus rien ne pointe dessus.
+  Attente de la decision de l'utilisateur pour les supprimer.
+
+INCIDENT 2 - Le modele "un fichier par fichier" ne tenait pas
+  Symptome : package.files devait lister chaque fichier de la build (dll,
+  dossiers *_Data, ressources...) avec son md5. Des centaines d'entrees a
+  regenerer a chaque build, et une coupure de connexion obligeait a tout
+  reprendre.
+  Solution : le jeu est publie en UNE archive .zip identifiee par son md5.
+  make_package_manifest.py (qui generait ce manifeste par fichier) a ete
+  supprime ; c'est publier_jeu.py qui remplit game_build.
+
+INCIDENT 3 - L'etape "icone" du build echouait TOUJOURS
+  Symptome : le build s'arretait avec "ERREUR : impossible de creer icon.ico".
+  Cause : le script utilisait python -c "... spec_from_file_location('lv',
+  'launcher.pyw') ...". spec_from_file_location ne reconnait pas l'extension
+  .pyw : il renvoie None et module_from_spec plante (AttributeError).
+  Solution : nouvel outil compilation/outils/creer_icone.py qui utilise
+  importlib.machinery.SourceFileLoader (qui charge n'importe quelle extension),
+  verifie l'en-tete du .ico et la taille. Si l'icone echoue, le build CONTINUE
+  sans icone au lieu de s'arreter.
+
+INCIDENT 4 - Le telechargement du projet ecrasait des fichiers locaux (risque)
+  Symptome : aucun, mais le risque etait reel : si on ecrase le dossier de
+  l'auteur avec l'archive GitHub, on perd son travail en cours.
+  Solution : robocopy /E /XC /XN /XO (copie uniquement ce qui est ABSENT).
+  Verifie par simulation : les fichiers deja presents sont intacts.
+
+INCIDENT 5 - PyInstaller ne trouvait pas l'icone (rapporte par l'utilisateur)
+  Symptome exact :
+    FileNotFoundError: Icon input file
+    ...\compilation\build\icon.ico not found
+    (le .ico existait pourtant dans ...\compilation\icon.ico)
+  Cause : PyInstaller resout un chemin d'icone RELATIF au dossier du fichier
+  .spec (--specpath, donc build\), pas au dossier courant.
+  Solution : passage du chemin ABSOLU et entre guillemets:
+      set "ICONE_ARG=--icon="%ROOT%icon.ico""
+  Le double guillemet externe de set "VAR=..." et les guillemets internes
+  sont volontaires : le dossier de l'utilisateur contient des espaces
+  (C:\Users\Dragonus\Desktop\Jeu\LibreVies\unity2\compilation\...).
+
+INCIDENT 6 - LibreVies.exe aspirait pygame/numpy
+  Symptome (visible dans le journal du build) : PyInstaller analysait
+  hook-pygame/hook-numpy/hook-PIL/hook-psutil et "pygame 2.6.1 ... Hello from
+  the pygame community" s'affichait pendant le build.
+  Cause : ces paquets sont installes dans le Python de l'auteur ; un fichier
+  .pth de site-packages provoque leur import pendant l'analyse, et PyInstaller
+  embarque tout ce qu'il a vu -> executable inutilement enorme.
+  Solution : --exclude-module pygame --exclude-module numpy --exclude-module
+  psutil --exclude-module setuptools --exclude-module pip (aucun n'est utilise
+  par le launcher). Pillow reste inclus : il sert a redimensionner la banniere.
+
+INCIDENT 7 - Un de mes outils a corrompu le launcher (le plus grave)
+  Symptome : IndentationError: unexpected indent, launcher.pyw line 88.
+  Cause : definir_url_publication.py (1re version) remplacait DEFAULT_RAW_URL
+  avec une REGEX multi-lignes trop gourmande : elle a avale le bloc
+  "def start_update" qui suivait.
+  Solution : remplacement LIGNE PAR LIGNE (on part de la ligne qui commence
+  par "DEFAULT_RAW_URL" et on compte les parentheses), plus deux garde-fous :
+  compile() sur le resultat et comparaison du nombre de lignes. Rien n'est
+  ecrit si l'un des deux echoue. Le launcher a ete reconstruit depuis git.
+  LECON : ne jamais modifier launcher.pyw avec une regex multi-lignes ; et
+  toujours verifier avec py_compile/compile() avant/arriere.
+
+INCIDENT 8 - cmd.exe : parentheses dans un echo a l'interieur d'un bloc
+  Symptome : erreur de syntaxe du .bat, ou texte tronque.
+  Cause : dans un bloc ( ... ), une parenthese non echappee ferme le bloc.
+  Solution : ^( et ^) partout dans les echo places dans un bloc.
+  Comme le developpement se fait sous Linux (pas de cmd.exe), un CONTROLEUR
+  Python verifie chaque .bat : equilibre des blocs, parentheses en milieu de
+  ligne, guillemets impairs, et presence des etiquettes (labels) appelees.
+  Ce controle a trouve une vraie faute : une ligne "echo ... l''acces ..."
+  (double apostrophe) corrigee.
+
+INCIDENT 9 - choix [O/N] avec une logique inversee
+  Cause : errorlevel de choice = INDEX de la touche (1 pour O, 2 pour N), pas
+  un code d'erreur ; "if errorlevel 1" est donc vrai dans les deux cas.
+  Solution : "if errorlevel 2 goto :fin" puis "if not errorlevel 1 goto :fin"
+  (seul un O explicite lance la publication).
+
+INCIDENT 10 - Tester le launcher sans tkinter (bac a sable Linux)
+  Cause : tkinter n'est pas installable/installe dans l'environnement de
+  developpement de l'IA.
+  Solution : la recette (outils/test_launcher.py) injecte un faux module
+  tkinter dans sys.modules et charge le launcher avec SourceFileLoader. On
+  teste ainsi TOUTE la logique (telechargement, md5, installation, reprise,
+  securite) sans interface graphique.
+
+INCIDENT 11 - Chez le joueur : ecriture impossible a cote du launcher
+  Cause : si LibreVies.exe est dans C:\Program Files, Windows interdit
+  l'ecriture et le jeu ne peut pas s'installer.
+  Solution : LIS-MOI.txt demande de mettre LibreVies.exe sur le Bureau, dans
+  Documents ou sur une cle USB.
+
+INCIDENT 12 - Le depot est un clone superficiel (shallow)
+  Cause : la session de travail est clonee en --depth 1 et certaines branches
+  distantes n'existaient pas localement.
+  Solution : "git fetch origin 'refs/heads/*:refs/remotes/origin/*'" avant
+  toute comparaison de branches. Ne pas supposer que l'historique est complet.
+
+INCIDENT 13 - rmdir /s /q sur le mauvais dossier (piege du renommage)
+  Contexte : en remplacant le dossier de sortie release\ par jeu\ dans
+  build_launcher.bat, un remplacement global a transforme
+  'if exist "release" rmdir /s /q "release"' en 'if exist "jeu" rmdir /s /q
+  "jeu"' : le script aurait EFFACE jeu\ en entier (launcher.pyw,
+  version_url.json, LIS-MOI.txt) a chaque build.
+  Solution : la ligne supprime desormais uniquement %JEU%\game (l'ancien
+  export), et un controle automatique verifie que toute cible de rmdir /s
+  est bien un sous-dossier connu (game, game.install, game.ancien, Library,
+  launcher, build).
+  LECON : apres un remplacement de chemins dans un .bat, relire CHAQUE ligne
+  de suppression. Un "rmdir /s /q" mal cible detruit le travail.
+
+INCIDENT 14 - Pas d'acces reseau direct a GitHub dans le bac a sable
+  Symptome : curl vers raw.githubusercontent.com / release-assets.githubusercontent.com
+  echoue (SSL_ERROR_SYSCALL, EOF).
+  Solution : passer par l'API (gh api) pour verifier qu'un fichier est bien
+  publie sur une branche, et tester le launcher avec un serveur HTTP local
+  (outils/test_launcher.py) au lieu de taper sur GitHub.
+
+INCIDENT 15 - Le jeu compile affichait tout en magenta (rapporte par l'utilisateur)
+  Symptome : capture d'ecran du joueur = collines, batiments et arbres en rose
+  fluo ; le HUD, lui, s'affichait normalement.
+  Cause    : le HUD est dessine par OnGUI (immediat, shader interne de
+  l'interface, toujours present), alors que TOUS les objets 3D recoivent un
+  materiau cree par code avec Shader.Find("Standard"). Unity retire de la
+  build les shaders integres qu'aucun materiau du projet ne reference (aucun
+  materiau ici : tout est cree a l'execution). Dans l'exe, Shader.Find
+  renvoyait null -> materiau sans shader -> magenta. Un jeu entier en magenta
+  = signe quasi certain de ce probleme, pas d'un probleme de couleur.
+  Solution : shader du projet dans Assets/Resources/LVShaders/LVColor.shader
+  (Resources = toujours embarque) + chaine de secours, et LOG du shader
+  retenu. Pour tout nouveau materiau cree par code : passer par
+  ResoudreShader(), jamais par Shader.Find seul.
+  ATTENTION : ce bug n'apparait PAS dans l'editeur Unity, seulement dans
+  l'exe compile. Toujours tester l'exe, pas seulement Play.
+
+INCIDENT 16 - La camera demarrait sous le terrain (rapporte par l'utilisateur)
+  Symptome : "la camera demarre sous le sol" puis remonte, et la souris met un
+  temps fou a repondre (meme plainte, meme correctif).
+  Cause    : deux bugs independants dans UpdateCamera() et Update() :
+             - Quaternion.Euler(cameraPitch = +18) * Vector3.forward place la
+               camera SOUS le heros (y negatif) : pour mettre une camera en
+               orbite au-dessus, il faut Vector3.back (Unity regarde vers +Z).
+             - Input.GetAxis("Mouse X") est lisse, et la sensibilite 0,3
+               correspondait a 0,03 degre par pixel au lieu de 0,3.
+  Solution : Vector3.back + plafond de securite (0,6 au-dessus du terrain) ;
+  GetAxisRaw + sensibilite 3. Voir MAJ 7.
+
+INCIDENT 17 - Les corrections ne partaient pas chez l'utilisateur (le plus sournois)
+  Symptome : aucune erreur nulle part, mais le jeu recompile chez l'utilisateur
+  restait exactement l'ancien (monde magenta). C'est le genre de piege qu'aucun
+  message de log ne signale.
+  Cause    : build_launcher.bat commencait par "si le projet existe deja, on ne
+  telecharge rien" (pour ne pas ecraser le travail local). Les sources sur ce PC
+  n'etaient donc jamais rafraichies, alors que c'est le depot GitHub qui fait
+  foi.
+  Solution : mise a jour a chaque lancement, avec deux garde-fous : sauvegarde
+  de l'ancienne version dans build\sauvegarde_locale\ AVANT de remplacer, et
+  le script de fabrication lui-meme n'est jamais ecrase pendant son execution
+  (il est pose a cote en .maj). Voir MAJ 9.
+  A retenir : apres avoir pousse une correction du jeu, TOUJOURS verifier
+  qu'elle arrive jusqu'a l'exe du joueur (et pas seulement dans le depot).
+
+
+
+INCIDENT 18 - Le jeu plante au demarrage chez l'utilisateur, sans aucune trace
+  Symptome (18/09/2026) : "mon jeu crash au demarrage", sans autre detail : ni
+  message, ni fichier. Impossible de diagnostiquer a distance.
+  Cause du silence : rien ne garantissait qu'un journal soit ecrit, et l'endroit
+  ou Unity l'ecrit d'habitude (AppData\LocalLow\LibreVies\LibreVies) n'est
+  pas un endroit qu'un joueur connait.
+  Solution (MAJ 12) : le launcher lance le jeu avec -logFile
+  jeu\game\logs\LibreVies.log, donc le journal est TOUJOURS a cote du jeu, et
+  le bouton RAPPORT ouvre directement les dossiers utiles.
+  Fichiers a demander (ou ouverts par RAPPORT) :
+    - jeu\game\logs\LibreVies.log : notre journal, le plus direct ;
+    - %USERPROFILE%\AppData\LocalLow\LibreVies\LibreVies\Player.log et
+      Player-prev.log : journal standard Unity (Player-prev = lancement d'avant) ;
+    - %USERPROFILE%\AppData\Local\Temp\LibreVies\LibreVies\Crashes\
+      <horodatage>\error.log (+ crash.dmp) : ecrit par le gestionnaire de
+      plantage d'Unity, c'est LUI qui donne la pile d'appels ;
+    - jeu\journal_launcher.txt : si c'est le LAUNCHER qui plante (l'amorce).
+  Ordre de lecture : error.log d'abord (pile d'appels), sinon la fin de
+  LibreVies.log. A savoir : une exception C# n'arrete PAS un jeu Unity, elle
+  s'ecrit dans le journal ; un vrai plantage vient plutot d'un module natif, du
+  Graphics API, ou d'un plantage du gestionnaire de plantage. Verifier aussi
+  qu'il a bien compile les bonnes sources (MAJ 7 a 11) et demander QUOI il a
+  lance : jeu\LibreVies.exe (le launcher) ou jeu\game\LibreViesGame.exe (le jeu).
+
+INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
+  qu'elle parcourt (le plus grave de tous : il bloquait le jeu entier)
+  Symptome (18/09/2026) : "mon jeu crash au demarrage" ; la fenetre affichait
+  "Chargement du monde..." puis plus rien, barre figee, aucun message, aucun
+  fichier de plantage. Deux journaux strictement identiques, sans aucune
+  exception : ce n'etait donc ni un plantage C# ni un plantage natif.
+  Comment on l'a trouve : le journal [LV] de la MAJ 13 entoure chaque etape de
+  construction d'un "debut :" et d'un "fin :". Le dernier "debut : cloture et
+  portails" sans "fin" -> le gel etait dans CreateFence(). Sans ce journal, on
+  cherchait a l'aveugle dans 2000 lignes de code (et on ne pouvait pas
+  reproduire : pas d'Unity ni de Windows dans le bac a sable).
+  Cause : une variable locale nommee 'portails' masquait le champ 'portails', et
+  la boucle qui construisait les portails parcourait 'portails.Count' tout en
+  ajoutant dans 'portails' -> boucle infinie (la liste grandit d'un element par
+  tour, la condition reste toujours vraie) et, accessoirement, plus aucun
+  portail transmis aux gardes.
+  Quand a-t-elle ete introduite : dans le lot de la cloture (MAJ 8, commit
+  8e75875). Toutes les compilations depuis ce lot etaient donc injouables : le
+  jeu se figeait ~0,4 s apres le lancement, en plein chargement.
+  Correction : MAJ 15 (deux listes distinctes).
+  Regle a retenir : un compilateur NE SIGNALE PAS cette faute, et Unity ne dit
+  rien a l'execution. C'est pour cela que verifier_cs_syntaxe.py controle
+  maintenant les boucles qui gonflent la liste qu'elles parcourent, ainsi que
+  les variables locales qui masquent un champ.
+  A retenir aussi : un journal d'etapes coute 20 lignes de code et fait gagner
+  des heures. Toute etape construite par code doit avoir son "debut"/"fin".
+
+================================================================================
+7. REGLES TECHNIQUES A RESPECTER (pour ne pas reproduire les incidents)
+================================================================================
+
+  R1. Ne jamais modifier launcher.pyw par regex multi-lignes. Remplacement
+      ligne par ligne + compile() de controle (voir incident 7).
+  R2. Apres TOUTE modification du launcher, lancer :
+        python compilation/outils/test_launcher.py     (40 controles, local)
+        python compilation/outils/test_amorce.py      (13 controles, local)
+      (ou compilation\outils\tester_launcher.bat qui lance les deux)
+      et verifier python -m py_compile jeu/launcher.pyw.
+  R3. Les .bat sont ecrits en ASCII, sans accents, et doivent passer le
+      controleur de blocs/parentheses/labels (incident 8). On ne peut pas les
+      executer sous Linux : la relecture automatique est obligatoire.
+  R4. Le dossier jeu/ ne contient que launcher.pyw, version_url.json,
+      LIS-MOI.txt (plus les fichiers telecharges, ignores par git).
+  R5. Le launcher ne telecharge jamais rien venant de compilation/.
+  R6. Toute entree du manifeste passe par _safe_local_path : pas de "..",
+      pas de chemin absolu, pas de "C:".
+  R7. Une archive de jeu publiee ne doit jamais etre ecrasee : son nom
+      contient son md5 (LibreVies_jeu_<md5 8 car.>.zip).
+  R8. Le jeu ne se met a jour que par une archive complete (game_build) ;
+      le contenu de l'archive est place A LA RACINE du zip (pas de dossier
+      enveloppe : le launcher remonte quand meme un dossier unique).
+  R9. Une panne reseau ne doit jamais bloquer un jeu deja installe : hors
+      ligne, le launcher affiche "Hors ligne" mais JOUER marche encore.
+  R10. Ne jamais demander de mot de passe, token ou identifiant GitHub : la
+      connexion git/gh est deja configuree dans l'environnement.
+  R11. Ne pas changer de branche : le travail est publie sur
+      arena/01a0b32c-librevies (branche de la session). Pour publier depuis
+      une autre branche (main par exemple), utiliser
+      outils/definir_url_publication.py --branche main.
+  R12. AUCUN materiau 3D ne se cree avec Shader.Find seul : passer par
+      ResoudreShader() (incident 15). Tout shader utilise par un materiau cree
+      par code doit vivre dans Assets/Resources/ pour survivre a la compilation.
+  R13. Une correction de rendu ne se valide QUE dans l'exe compile, jamais dans
+      l'editeur Unity (le magenta n'apparaissait pas dans Play, incident 15).
+  R14. Le launcher vit dans jeu/launcher.pyw et NULLE PART ailleurs. L'amorce
+      (compilation/amorce/amorce_launcher.py) ne doit contenir que le lancement
+      du .pyw, le journal et les messages d'erreur. Tout import ajoute a
+      launcher.pyw doit etre ajoute aussi dans l'amorce, sinon l'exe compile ne
+      le contiendra pas (le .pyw est charge dynamiquement : PyInstaller ne peut
+      pas deviner ses imports).
+  R15 bis. Un compilateur ne voit PAS une boucle qui ajoute dans la liste
+      qu'elle parcourt (incident 19 : gel total du jeu). Avant TOUT commit qui
+      touche du C# : python compilation/outils/verifier_cs_syntaxe.py, qui
+      signale maintenant aussi les boucles infinies et les variables locales
+      masquant un champ. Corollaire de style : ne JAMAIS nommer une variable
+      locale comme un champ de la classe (ex. 'portails', 'gardes', 'enemies').
+  R15 ter. Toute etape de construction d'un monde doit etre entouree d'un
+      "debut"/"fin" dans le journal [LV] : c'est ce qui permet de trouver un
+      gel a distance, sans pouvoir reproduire (voir MAJ 13 et incident 19).
+  R15. Ne jamais demander a l'utilisateur de remplacer un fichier a la main.
+      Tout ce qui peut se mettre a jour par hash doit le faire : launcher.pyw
+      (cle "files"), le jeu (cle "game_build") et build_launcher.bat (SHA de la
+      branche, qu'il applique desormais tout seul). Exception historique :
+      la toute premiere mise a jour de build_launcher.bat sur sa machine, dont
+      l'ancienne version ne savait que poser un .maj.
+
+
+================================================================================
+8. ETAT ACTUEL DU DEPOT (a verifier avec git log avant de continuer)
+================================================================================
+
+  Branche : arena/01a0b32c-librevies (poussee sur GitHub)
+  Base    : e47ada3 "Show Unity village from the correct camera start"
+  Commits de cette refonte :
+    8b57024  Tri du depot : jeu/ (joueur) + compilation/ (auteur)
+    d14c200  Unity uniquement : plus aucune trace de l'ancien moteur
+    0e1da6d  build_launcher.bat : tout se telecharge tout seul
+    +        correctif icone PyInstaller, exclusions, resumer.txt (ce fichier)
+
+  Suite de la refonte (chaque commit = un lot, la branche est poussee) :
+    1e14528 / 9bc6405  rendu corrige (monde magenta, camera, souris) = MAJ 7
+    8e75875            collisions et IA des monstres = MAJ 8
+    31eadc7 / 6a57f7d  build_launcher.bat auto-mis a jour, verifier_bat = MAJ 9
+    2db7fa1            verifier_cs_syntaxe.py (controle du C#) = outil
+    5bdbe7d            decor du village = MAJ 10
+    5c56645            gardes des portails + degats flottants = MAJ 11
+    (a venir)          amorce + journal du jeu + bouton RAPPORT = MAJ 12
+
+  Publie sur GitHub (verifie via gh api) :
+    jeu/version_url.json   -> game_build: {}  (aucune compilation publiee)
+    jeu/launcher.pyw       -> launcher 4.1.0 (le code complet du launcher)
+    jeu/LibreVies.exe      -> amorce : l'utilisateur doit le reconstruire UNE
+                              FOIS avec build_launcher.bat pour passer au
+                              nouveau systeme (ensuite, plus jamais)
+
+  Release GitHub "derniere" : 3 archives de l'ancien moteur - a nettoyer
+  Ulterieurement si l'utilisateur le demande.
+
+  Disposition des sorties (demande de l'utilisateur) : le build ecrit dans
+  jeu\ (jeu\LibreVies.exe + jeu\game\), plus dans compilation\release\.
+  compilation\ ne sert qu'a compiler.
+
+  Cote machine de l'auteur (Windows, chemin ...\unity2\) :
+    - build_launcher.bat a deja recupere le projet tout seul (etape 1 OK)
+    - Python 3.11.9 + PyInstaller 6.21.0 presents
+    - Unity 6000.6.1f1 present
+    - l'export Unity a reussi
+    - la compilation du launcher a echoue UNIQUEMENT sur l'icone (corrige)
+    => il suffit de relancer build_launcher.bat
+
+
+================================================================================
+8.5 MAJ 16 - SYNCHRONISATION DIFFERENTIELLE ET OPTIONS UNITY
+================================================================================
+
+  - Une virgule dans le code du jeu exige bien une nouvelle compilation Unity,
+    mais build_launcher.bat ne retetelecharge plus toute l'archive du depot :
+    synchroniser_sources.ps1 compare les SHA des blobs Git et telecharge seuls
+    les fichiers modifies. Le joueur, lui, ne compile jamais rien.
+  - Les onglets Graphique et Controle sont colores differemment, avec
+    luminosite 30 %, contraste 100 %, resolution, inversion X/Y, detection
+    AZERTY/QWERTY et boutons de reconfiguration par action.
+  - Les reglages sont ecrits dans persistentDataPath/librevies_config.json,
+    avec compatibilite PlayerPrefs. Le HUD a trois barres a gauche, or et
+    cailloux sous les PV, mini-carte en haut a droite et quete repliable.
+    La grande ligne d'aide des touches a ete retiree.
+
+================================================================================
+8.6 MAJ 17 - MONDE VISUEL, ROUTE, CHATEAU ET PNJ
+================================================================================
+
+  - La route est maintenant un ruban Catmull-Rom continu : courbes reelles,
+    bord de terre et bande centrale de paves, au lieu de rectangles anguleux.
+  - Les toits des maisons sont des prismes triangulaires, avec couleurs douces
+    et toiture bleue de la mairie ; aucun toit carre plat ni petit auvent inutile.
+  - La mairie est decalee du passage ; la fontaine est au sud sur le terrain
+    libre. La boule qui flottait a ete retiree : il reste une eau plate et un
+    jet dans un bassin stable au sol.
+  - La colline du chateau est elargie et recentree sous le chateau. Le chateau
+    a ete reconstruit avec une salle interieure, une entree centrale ouverte,
+    murs, torches, tours et collisions par morceaux : le joueur peut passer par
+    la porte au lieu de heurter un bloc plein.
+  - Forgeron, Vendeur, Maire et Marchand existent devant leurs batiments et ont
+    chacun une animation idle distincte. Les arbres gardent leur tronc ; les
+    couleurs de mur/toit ont ete adoucies.
+  - Le heros a un bras d'attaque anime qui part vers l'avant puis redescend ;
+    son marteau est maintenant une tete sans manche.
+
+  R17. Une construction visuelle doit utiliser la position reelle du terrain et
+       une collision coherente : aucun objet flottant ne doit etre introduit.
+
+================================================================================
+8.7 MAJ 18 - CAMOUFLAGE, OBJETS TRANSLUCIDES ET MOTIFS VISUELS
+================================================================================
+
+  - LVFade.shader fournit le materiau mat_fade : les obstacles entre la
+    camera et le heros deviennent translucides au lieu de cacher la vue.
+  - La touche C active/desactive le camouflage du heros, avec le meme materiau
+    translucide et un message visible.
+  - LVColor.shader est maintenant le premier choix dans la build Unity : les
+    murs, toits, paves, pierres et terrain recoivent un micro-motif procedural
+    doux (eclairage Lambert, sans asset externe), au lieu d'aplats parfaitement
+    uniformes. Le secours Standard reste disponible.
+
+  R18. Le camouflage et la transparence ne suppriment pas les collisions :
+       ils ne changent que le rendu.
+
+================================================================================
+8.8 MAJ 19 - FINITIONS DES DEMANDES 10.2 A 10.8
+================================================================================
+
+  - Le message d'accueil automatique de fin de chargement a ete retire.
+  - L'onglet Controle expose maintenant toutes les actions : avancer,
+    reculer, gauche, droite, sauter, courir, ramasser, attaquer, inventaire,
+    options, quete, camera et renaitre. Chaque touche se configure par bouton.
+  - Le passage central du chateau est vraiment libre : la collision de l'arc
+    superieur ne descend plus jusqu'au sol. Les murs lateraux et le fond restent
+    bloquants, donc on peut entrer sans traverser le chateau.
+  - Le garde-fou reste en place : monstres hors village, attaque interdite au
+    travers de la cloture, objets bas franchissables en saut et atterrissage
+    sur les caisses.
+
+================================================================================
+8.9 MAJ 20 - CORRECTION DE RENDU DES TOITS
+================================================================================
+
+  - Le sens des triangles des deux pignons a ete corrige : les faces sont
+    visibles des deux cotes dans le rendu Unity (plus de pignon noir/invisible
+    a cause du culling).
+
+================================================================================
+8.10 MAJ 21 - BUILD PLUS RAPIDE
+================================================================================
+
+  - Apres synchronisation differentielle des sources, build_launcher.bat ne
+    relance plus PyInstaller si compilation/amorce/amorce_launcher.py n'a pas
+    change et si jeu/LibreVies.exe existe deja. Le hash SHA-256 de l'amorce est
+    conserve dans compilation/build/amorce.sha256.
+  - Une modification du C# ou des shaders continue de declencher l'export Unity
+    complet du dossier jeu/game : c'est necessaire pour obtenir un ensemble
+    coherent de fichiers Unity. Le gain concerne le telechargement des sources
+    et la compilation inutile de l'amorce, pas le temps de build Unity lui-meme.
+
+================================================================================
+8.11 MAJ 22 - CORRECTION DE COMPILATION UNITY
+================================================================================
+
+  - Le premier export reel chez l'auteur a fourni l'erreur exacte :
+      CS0103 JsonUtility introuvable (lignes 2665 et 2709).
+  - Cause : le projet minimal ne declarait pas le module Unity
+    com.unity.modules.jsonserialize ; Unity ne mettait donc pas
+    UnityEngine.JsonSerializeModule.dll dans les references C#.
+  - Correction : ajout de com.unity.modules.jsonserialize 1.0.0 dans
+    compilation/unity/Packages/manifest.json. Le fichier de configuration
+    JSON du jeu peut maintenant etre compile normalement.
+
+================================================================================
+8.12 MAJ 23 - HUD, PORTAILS ET TOITS
+================================================================================
+
+  - Le texte HUD "LIBREVIES MMO OPEN WORLD" a ete retire.
+  - La quete est en haut a gauche avec un bouton X pour la fermer ; les barres
+    PV/ENDURANCE/EXPERIENCE et les compteurs or/cailloux sont colles dessous.
+    Le compteur Rats/Araignees a cote de la carte a ete retire.
+  - Le haut des portiques est maintenant ferme par un panneau plein et un
+    linteau epais. Le mot LIBREVIES est reduit et pose sur un vrai panneau.
+  - LVColor est double face pour que les pignons et les faces fermees des toits
+    restent visibles dans la build Windows.
+
+================================================================================
+8.13 MAJ 24 - CAMERA, HUD, DECOR, MORT ET PNJ
+================================================================================
+
+  - Options > Controle contient maintenant un curseur de vitesse camera lie a
+    cameraSensitivity (0,5 a 10) ; la valeur continue d'etre sauvegardee dans
+    la configuration JSON persistante et dans le secours PlayerPrefs.
+  - Le cadre de quete est maintenant sous le cadre PV/ENDURANCE/EXPERIENCE ;
+    son bouton X et le bouton de reouverture restent au meme endroit.
+  - Les trois cones de feuillage des sapins ont ete rapproches du tronc pour
+    supprimer l'espace visible entre le tronc et le feuillage superieur.
+  - L'orientation des panneaux/linteaux de portique a recu la rotation locale
+    de 90 degres necessaire pour que leur largeur suive les poteaux.
+  - Les deux lignes informatives Luminosite par defaut et Contraste par defaut
+    ont ete retirees de l'onglet Graphique.
+  - A la mort, le corps du heros est couche au sol et son collider est desactive
+    jusqu'a la renaissance. Respawn remet le corps debout et active 30 secondes
+    d'invincibilite contre les degats.
+  - Chaque toit triangulaire recoit maintenant un MeshCollider : le raycast
+    camera peut donc le toucher et LVFade le rendre translucide quand il cache
+    le heros, sans retirer sa collision de gameplay.
+  - Les PNJ ont ete decales sur le cote des passages. Une affiche indiquant le
+    nom ou le type est creee au-dessus de chaque porte du village.
+  - Le forgeron dispose d'une enclume et frappe un marteau, le maire tient une
+    feuille animee, et les vendeur/marchand disposent d'un etal anime avec
+    marchandises visibles.
+  - Controle statique C# et scripts BAT passes. Le premier export Unity Windows
+    reel apres cette MAJ a revele une erreur de type sur le collider du joueur ;
+    elle est corrigee ci-dessous en MAJ 25.
+
+================================================================================
+8.14 MAJ 25 - CORRECTION DE COMPILATION DU COLLIDER JOUEUR
+================================================================================
+
+  - Le build Unity 6000.6.1f1 a bien charge com.unity.modules.jsonserialize,
+    puis a atteint la compilation C#.
+  - Erreur observee dans le log auteur : `Collider` ne possede pas les membres
+    `center`, `height` et `radius` aux lignes de creation du heros.
+  - Cause : le champ joueurCollider avait ete declare avec le type general
+    `Collider`, alors que ces proprietes appartiennent a `CapsuleCollider`.
+  - Correction : joueurCollider est maintenant un `CapsuleCollider`. Le build
+    doit etre relance sur le PC Windows pour confirmer l'export complet.
+
+================================================================================
+8.15 MAJ 26 - CARTE, FACADES, TOITS ET DECOR CORRIGES
+================================================================================
+
+  - La transparence des toits utilise maintenant un materiau neutre blanc :
+    un toit rouge ou bleu ne colore plus la vue quand il devient translucide.
+  - Portes, fenetres et affiches des maisons sont passes sur la facade sud
+    (+z). L'orientation des TextMesh a ete corrigee pour que AUBERGE se lise
+    normalement depuis l'exterieur et ne soit plus visible a travers l'arriere.
+  - Le panneau de portail LIBREVIES est deux fois plus petit, blanc, avec une
+    face en bois sombre pour le contraste.
+  - La mini-carte est ronde, affiche N/S/E/W, la route, l'enceinte, les maisons
+    et le joueur. Les boutons + et - ainsi que les touches + et - permettent
+    de zoomer et dezoomer autour du joueur.
+  - La fontaine est placee dans un espace libre au sud-est de la ville, hors
+    des maisons et de la route.
+  - Le PNJ Vendeur inutile devant une maison et son etal ont ete retires.
+    Le Marchand de l'entrepot est decale sur le cote de la porte, et le maire
+    ainsi que le forgeron sont repositionnes devant leur facade sud.
+  - Maison_Nord est decalee pour supprimer le chevauchement avec Maison_Ouest.
+  - Verification C# statique et scripts BAT reussies. L'export Unity Windows
+    doit etre relance pour controler le rendu final dans la build.
+
+================================================================================
+8.16 MAJ 27 - VILLAGE AGRANDI, TEXTES ET CARTE ORIENTEE
+================================================================================
+
+  - Les inscriptions des maisons sont retournees pour etre lisibles depuis la
+    facade sud. Leur Renderer est masque quand la camera se trouve derriere la
+    facade : les noms ne sont plus visibles a travers le cube de la maison.
+  - Chaque portique possede maintenant deux textes LIBREVIES dos a dos, un
+    pour l'exterieur et un pour l'interieur. Le texte est remonte dans le
+    panneau pour ne plus depasser dessous.
+  - La mini-carte tourne avec l'orientation du joueur ; la texture et les
+    reperes N/S/E/W pivotent ensemble. Le zoom +/− reste disponible.
+  - Le marteau du forgeron est maintenant a l'echelle normale et sa position
+    est recalculee dans la main du bras droit avant son animation de frappe.
+  - Le rayon du village passe de 26 a 52 et les points de route sont etendus
+    pour conserver les deux portails. Les maisons sont reparties sur ce nouvel
+    espace, la Maison_Nord ne chevauche plus Maison_Ouest, et les zones de
+    monstres sont repoussees hors de l'enceinte.
+  - Verification C# statique et scripts BAT reussies. L'export Unity Windows
+    doit etre relance pour verifier orientation, occlusion, carte et marteau.
+
+================================================================================
+8.17 MAJ 28 - VILLAGE RECENTRE, GARDES ET HUD
+================================================================================
+
+  - Le village a ete ramene a la moitie du diametre de la MAJ 27 : rayon 26,
+    route et portails revenus a leur echelle coherente. Les maisons gardent
+    les positions espacees de la MAJ 26, avec la mairie placee au centre-est,
+    hors de l'axe de la route.
+  - Les gardes sont rapproches des portiques (95 % du rayon au lieu de 90 %).
+  - La ligne Energie 100/100 a ete retiree du HUD. La valeur PV est maintenant
+    affichee au centre de la barre de vie sous la forme PV/MaxPV.
+  - La course consomme l'endurance. Quand l'endurance atteint zero, la vitesse
+    repasse automatiquement a la marche et la barre se recharge avant de
+    permettre de courir a nouveau.
+  - Controle C# statique et scripts BAT reussis. Un nouvel export Unity Windows
+    doit confirmer les distances finales, la mairie et le comportement HUD.
+
+================================================================================
+8.18 MAJ 29 - VILLAGE 40 M, TOITS ET TEXTES OCCLUS
+================================================================================
+
+  - Le rayon du village est maintenant de 40 m et la route a ete etendue au
+    nord pour conserver les deux portiques. Les maisons sont reparties dans
+    cet espace et la mairie est proche du centre, hors de l'axe de la route.
+  - La mini-carte suit maintenant cameraYaw : elle pivote quand la camera
+    tourne, et ses reperes cardinaux pivotent avec elle.
+  - Les textes des maisons sont masques par un raycast d'occlusion lorsqu'un
+    mur ou un autre batiment se trouve entre la camera et l'affiche. Ils ne
+    passent plus au travers des maisons.
+  - Le panneau des portiques est devenu epais et opaque. Les textes interieur
+    et exterieur sont poses en haut, de part et d'autre de la plaque, et un
+    seul cote est visible selon la position de la camera.
+  - La transparence camera ne cible plus le sol, la route ou la fontaine :
+    seuls les objets nommes Murs et Toit_* peuvent recevoir LVFade. Le toit
+    recouvre maintenant legerement le haut du mur pour supprimer le jour.
+  - Controle C# statique et scripts BAT reussis. L'export Unity Windows doit
+    etre relance pour verifier les distances, l'occlusion et la transparence.
+
+================================================================================
+8.19 MAJ 30 - FONTAINE, PNJ, PORTIQUES ET TERRAIN
+================================================================================
+
+  - La fontaine est deplacee sur le terrain libre devant la mairie.
+  - Le forgeron, le marchand et le maire sont places juste a cote de la porte
+    de leur batiment ; le marchand reste du cote interieur de son etal.
+  - Les plaques LIBREVIES des portiques ont un vrai collider opaque : le texte
+    oppose est masque par la plaque et ne peut plus se voir au travers.
+  - La Maison_Sud est sortie de la pente de la colline du chateau et posee sur
+    le terrain plat du village.
+  - Le rayon du village reste fixe a 40 m, avec route, portiques et mairie
+    coherents avec cette echelle.
+  - Controle C# statique et scripts BAT reussis. Relancer l'export Unity
+    Windows pour confirmer les positions et la profondeur des panneaux.
+
+================================================================================
+8.20 MAJ 31 - RENDU PBR, TEXTURES ORIGINALES ET FORMES BATIES
+================================================================================
+
+  - Nouveau shader `Assets/Resources/LVShaders/LVRealistic.shader`, compatible
+    avec le pipeline Built-in utilise par le projet : surface Standard PBR,
+    eclairage fullforwardshadows, metallic, smoothness, occlusion et emission.
+    Son mapping triplanaire utilise les coordonnees monde ; les maillages
+    proceduraux sans UV (terrain, route, rochers, murs et toits) recoivent donc
+    bien une texture repetee sans casser leurs collisions.
+  - Les cinq textures originales generees pour ce lot ont ete deplacees dans
+    `Assets/Resources/LVTextures/` afin que `Resources.Load` les embarque dans
+    l'export : LV_PlasterWall, LV_TerracottaRoof, LV_ConcretePaving, LV_Wood et
+    LV_Ground. Des .meta stables ont ete ajoutes pour eviter une regeneration
+    des GUID a l'import Unity.
+  - `LibreViesGame.cs` choisit automatiquement la texture par famille : murs
+    en platre, toits en terre cuite (teintes mairie/forge conservees), route et
+    pierres en beton, portes/poutres en bois, terrain/terre/herbe en texture
+    de sol. Les reglages de repetition, metallic et brillance sont appliques
+    au moment de la creation des materiaux. LVColor reste le repli si le
+    shader PBR manque, ce qui conserve le filet anti-magenta des MAJ precedentes.
+  - Le rendu global passe en espace de couleur lineaire. Le ciel, la lumiere
+    ambiante, le brouillard et les reflets sont regles pour le shader PBR ; le
+    soleil conserve ses ombres douces et beneficie de cascades haute resolution
+    sur 100 m.
+  - Les fenetres utilisent maintenant un materiau Glass distinct. Les maisons
+    gardent strictement leurs positions et emprises de collision, mais recoivent
+    un soubassement, des chainages d'angle, des rives de toit et des cheminees.
+    Le mur principal est un maillage procedural biseaute au lieu d'un cube brut;
+    son MeshCollider, les collisions mathematiques, le toit sans jour et les
+    textes occlus sont conserves.
+  - Aucun asset GTA ou modele externe n'a ete ajoute : la migration reste
+    Unity-only et les formes restent generees par le code du projet.
+  - Controle effectue dans le bac a sable : verifier_cs_syntaxe.py OK,
+    git diff --check OK. La compilation et le rendu Unity Windows restent a
+    confirmer avec `compilation\build_launcher.bat`, Unity n'etant pas installe
+    dans cet environnement.
+
+================================================================================
+8.21 MAJ 32 - EXPORT PBR ROBUSTE ET WARNING NETTOYE
+================================================================================
+
+  - Le log Windows du 18/09/2026 confirmait la compilation C# et l'export des
+    assemblies, puis echouait uniquement pendant la copie de resources.assets,
+    unity_builtin_extra et des fichiers *_Data avec "Acces refuse".
+  - Cause probable : l'ancien LibreViesGame.exe ou un fichier de jeu etait
+    encore verrouille pendant que Unity exportait directement dans jeu\game.
+  - build_launcher.bat et build_unity_game.bat exportent maintenant dans
+    build\unity_export (dossier temporaire), puis remplacent jeu\game seulement
+    apres un export complet. Si l'ancien dossier est verrouille, le message
+    indique clairement de fermer LibreViesGame.exe et conserve le nouvel export.
+  - La variable energie devenue inutilisee apres la modification du HUD a ete
+    retiree : le warning CS0414 n'apparait plus.
+  - MAJ 31 reste le lot du rendu PBR : RealistePBR, textures mur/toit/sol/bois,
+    formes de batiments biseautees, soubassements, chainages, rives et cheminees.
+  - Controle C# statique, scripts BAT et diff Git propres. Relancer
+    build_launcher.bat pour produire la nouvelle build visuelle.
+
+================================================================================
+8.22 MAJ 33 - EXPORT UNITY PBR VALIDE
+================================================================================
+
+  - Controle utilisateur du 18/09/2026, Unity 6000.6.1f1 sous Windows 10 :
+    la compilation C# et l'export Windows Mono se terminent correctement.
+  - Le log confirme : "Build Finished, Result: Success", puis
+    "LibreVies Unity exporte" et enfin "Exiting batchmode successfully now".
+    Le code retour Unity final est 0.
+  - Le chemin d'export temporaire confirme que MAJ 32 est bien utilise :
+    compilation\build\unity_export\LibreViesGame.exe.
+  - Un passage intermediaire Bee affiche ExitCode 4 pendant la construction
+    incrementale, mais Unity relance ses etapes puis termine avec succes. Ce
+    code intermediaire n'est pas l'echec du build final.
+  - Le message "Native extension for WindowsStandalone target not found" est
+    non bloquant dans ce log : le support WindowsStandalone est bien utilise et
+    le player est genere.
+  - Le log ne montre pas encore la sortie du batch apres Unity (deplacement de
+    unity_export vers jeu\game). Si build_launcher.bat a ete laisse aller
+    jusqu'au bout, le deplacement et la compilation du launcher ont suivi ;
+    sinon relancer le script apres fermeture de l'ancien jeu.
+  - Prochaine verification visuelle : lancer la nouvelle version et confirmer
+    dans une capture que les murs, toits, sol, routes, bois et pierres affichent
+    bien les textures PBR de MAJ 31, et non l'ancien export plat.
+
+================================================================================
+8.23 MAJ 34 - DIAGNOSTIC DU MONDE VISUEL NON MIS A JOUR
+================================================================================
+
+  - Controle utilisateur : l'ecran affiche encore le ciel bleu, le sol vert et
+    le HUD (mini-carte, PV, quete, cases 1 a 5), sans constater la nouvelle
+    version visuelle.
+  - Le log Unity fourni confirme seulement que le nouvel executable a ete
+    genere dans compilation\build\unity_export\LibreViesGame.exe. Il ne
+    prouve pas que cet executable a ete lance ni publie dans la release.
+  - Verification du depot et de GitHub : jeu/version_url.json contient encore
+    game_build: {} et la release derniere ne connait donc aucune compilation
+    PBR MAJ 31. Un launcher existant pouvait malgre tout trouver un ancien
+    jeu/game/ et activer JOUER : c'etait trompeur.
+  - Correction dans jeu/launcher.pyw : JOUER ne devient actif que si le
+    manifeste contient une URL et un hash d'archive, et si etat_jeu.json porte
+    exactement ce meme hash. Une ancienne build locale ne peut plus masquer
+    l'absence de publication.
+  - Pour rendre MAJ 31 visible a tous, il faut terminer le cycle Windows apres
+    l'export : compilation\outils\publier_jeu.bat, avec une version (ex.
+    0.5.0), afin de creer l'archive, l'envoyer dans la release derniere et
+    remplir game_build. Ce n'est pas possible depuis ce sandbox sans le binaire
+    genere sur le PC Windows.
+  - Pour verifier localement sans launcher, lancer directement
+    jeu\game\LibreViesGame.exe apres le deplacement reussi de unity_export.
+    Le journal runtime a examiner est jeu\game\logs\LibreVies.log.
+
+================================================================================
+8.24 MAJ 35 - RECONSTRUCTION DEPUIS LE SEUL BUILD LAUNCHER
+================================================================================
+
+  - Incident Windows : apres suppression de tous les fichiers sauf
+    compilation\build_launcher.bat, le script appelait directement
+    compilation\outils\synchroniser_sources.ps1, qui avait lui aussi ete
+    supprime. PowerShell signalait donc un chemin inexistant puis le projet
+    Unity restait introuvable.
+  - Correction : build_launcher.bat telecharge maintenant d'abord ce seul
+    outil de synchronisation depuis raw.githubusercontent.com, dans le dossier
+    outils\, avant de lancer la synchronisation differentielle. Il peut donc
+    reconstruire compilation\unity, jeu\ et tous les outils a partir du seul
+    build_launcher.bat.
+  - Version du lot visuel : 0.5.0. Elle est dans le bundleVersion Unity, dans
+    le journal runtime, dans le launcher et dans le manifeste source.
+  - Le titre du launcher affiche maintenant "LibreVies - v0.5.0" et son
+    bandeau affiche "LibreVies v0.5.0". Le titre de la fenetre du jeu Windows
+    affiche aussi "LibreVies - v0.5.0" via user32.dll, pour distinguer sans
+    ambiguite l'ancien export 0.4 de la nouvelle build.
+  - Le manifeste conserve game_build: {} tant que l'archive Windows 0.5.0
+    n'est pas fabriquee et publiee : aucun faux hash n'est ajoute.
+  - Controle Python, C#, BAT et diff Git propres.
+
+================================================================================
+8.25 MAJ 36 - APPEL UNITY SANS ETIQUETTE FRAGILE
+================================================================================
+
+  - Controle utilisateur : apres la synchronisation (49 fichiers a jour),
+    Windows affichait "Le systeme ne trouve pas le nom de fichier de commandes
+    - etape_unity" juste apres PyInstaller.
+  - Cause de compatibilite : l'appel `call :etape_unity` vers une etiquette
+    de sous-routine placee plus bas dans un .bat telecharge en LF/PowerShell
+    n'etait pas accepte par le CMD utilise sur ce PC, alors que les premieres
+    sous-routines etaient deja passees.
+  - Correction : la detection de Unity 6000.6.1f1/2022/6000 est maintenant
+    executee inline apres PyInstaller. L'etiquette et l'appel fragiles ont ete
+    supprimes ; le message [4/6] doit apparaitre directement.
+  - Les autres sous-routines (projet, Python, PyInstaller) restent utilisees,
+    controlees par verifier_bat.py.
+  - Relancer le meme build_launcher.bat : la synchronisation telechargera la
+    nouvelle version du script si necessaire, puis la fabrication reprendra.
+
+================================================================================
+8.26 MAJ 37 - PLAYER 0.5 SANS MONDE VISIBLE
+================================================================================
+
+  - Controle utilisateur : le titre confirme la version 0.5.0, mais l'image
+    montre uniquement le bleu du ciel et le vert du bas, avec le HUD. Le nouvel
+    executable est donc bien lance, mais aucun objet 3D n'est rendu a l'ecran.
+  - Hypothese technique prioritaire : le shader charge dynamiquement depuis
+    Resources n'est pas supporte dans le player Windows, ce qui pouvait laisser
+    les MeshRenderer sans materiau visible sans empecher le HUD OnGUI.
+  - Ajout de `LVVisibleFallback.shader`, un shader vertex/fragment simple,
+    texturable et triplanaire, place dans Assets/Resources/LVShaders. Il est
+    utilise si LVRealistic ou LVColor est absent/non supporte ; les formes du
+    monde restent alors visibles au lieu de disparaitre.
+  - ResoudreShader() verifie maintenant `shader.isSupported`, journalise le
+    shader choisi et affiche une erreur explicite si aucun shader ne peut etre
+    charge. La fin de la construction journalise aussi le nombre de Renderer.
+  - Controle statique C#, BAT et Python propre. Recompiler le player 0.5.0,
+    puis lire jeu\game\logs\LibreVies.log si le monde reste invisible :
+    les lignes `shader utilise`, `controle rendu`, `debut` et `ECHEC` donnent
+    enfin le point exact du probleme.
+
+================================================================================
+8.27 MAJ 38 - VERSION 0.5.37 ET JOURNAL DANS jeu\game\logs
+================================================================================
+
+  - La convention demandee est appliquee : chaque lot visuel porte maintenant
+    une version lisible. MAJ 37 est donc le jeu 0.5.37, et non plus seulement
+    0.5.0.
+  - Le numero 0.5.37 est present dans le titre du launcher, le bandeau du
+    launcher, le titre de la fenetre Unity, ProjectSettings.bundleVersion et
+    le journal de demarrage.
+  - Le jeu cree maintenant lui-meme `jeu\game\logs\LibreViesRuntime.log`
+    des le lancement, meme si l'executable est lance manuellement sans
+    l'option Unity `-logFile`. Il enregistre les erreurs Unity, les etapes de
+    construction, le shader choisi, le nombre de Renderer et les exceptions.
+  - Les deux executables normaux de l'export sont attendus :
+    LibreViesGame.exe (jeu) et UnityCrashHandler64.exe (outil de rapport Unity).
+    Les DLL, d3d12, MonoBleedingEdge et LibreViesGame_Data sont indispensables
+    et doivent rester dans `jeu\game`.
+  - `game_build: {}` explique toujours le message du launcher tant que
+    publier_jeu.bat n'a pas envoye l'archive 0.5.37 dans la release GitHub.
+  - Controle C#, BAT, Python et diff Git propres. Recompiler avant de juger
+    la presence du nouveau journal et du nouveau titre.
+
+================================================================================
+8.28 MAJ 39 - RETOUR AU RENDU HISTORIQUE, PBR ROUTE UNIQUEMENT
+================================================================================
+
+  - Le monde 3D restait invisible dans le player 0.5.37 malgre le titre de
+    version correct. Pour isoler la panne au lieu de casser tout le monde,
+    les materiaux ordinaires reviennent a LVColor, comme avant MAJ 31.
+  - Le shader `LibreVies/RealistePBR` n'est plus utilise que par le materiau
+    `Route_PBR`, affecte aux deux rubans de la route (`Route_Sinueuse` et
+    `Paves_Route`). Les murs, toits, terrain, chateau, arbres, PNJ, monstres
+    et rochers reviennent au rendu historique.
+  - Le shader de secours global LVVisibleFallback a ete retire : le test est
+    volontairement limite a une seule famille de geometrie.
+  - Version de cette MAJ : 0.5.39. La regle est maintenant MAJ N -> version
+    0.5.N ; le titre de la fenetre permet de verifier directement la build.
+  - Le journal automatique reste actif dans `jeu\game\logs\LibreViesRuntime.log`.
+  - Controle C#, BAT, Python et diff Git propres. Recompiler 0.5.39 puis
+    comparer : si tout le monde reapparait sauf la route, la panne est isolee
+    au shader PBR ; si rien ne reapparait, elle est dans la creation/camera,
+    independamment du shader.
+
+================================================================================
+8.29 MAJ 40 - DIAGNOSTIC DU PBR ROUTE
+================================================================================
+
+  - Controle utilisateur : les batiments sont revenus avec le rendu historique,
+    mais la route reste noire. Le probleme est donc maintenant isole au
+    materiau/shader de la route, et non plus a la construction generale du
+    monde.
+  - Version de ce lot : 0.5.40, selon la convention MAJ N -> 0.5.N.
+  - `ChargerShader()` journalise maintenant chaque cas : shader absent dans
+    Resources, shader non supporte avec GPU/API, ou shader charge correctement.
+  - `ResoudreShaderRoute()` journalise explicitement si RealistePBR est utilise.
+    Si le chargement echoue, Route_PBR revient automatiquement au shader
+    historique LVColor : la route ne doit plus devenir noire et le journal
+    conserve la cause exacte.
+  - `MakeMaterial()` journalise aussi la presence de
+    LVTextures/LV_ConcretePaving pour Route_PBR.
+  - Journal a lire apres lancement : `jeu\game\logs\LibreViesRuntime.log`.
+    Lignes importantes : `[LV_SHADER]`, `[LV_SHADER_ROUTE]`, `Route_PBR`
+    et `controle rendu`.
+  - Controle BAT/Python propre. Le parseur C# n'est pas disponible dans cet
+    environnement de controle, mais la version MAJ 39 precedente avait deja
+    passe ce controle et les modifications restent des appels Unity/.NET
+    connus.
+
+================================================================================
+8.30 MAJ 41 - CORRECTION ROUTE NOIRE SUR AMD R7 200
+================================================================================
+
+  - Le journal 0.5.40 a donne la cause exploitable : le shader
+    `LibreVies/RealistePBR` etait bien charge, la texture
+    `LVTextures/LV_ConcretePaving` etait bien associee, et Route_PBR etait
+    bien construit. Le probleme n'etait donc ni l'absence du materiau ni la
+    creation de la route.
+  - Sur la carte AMD Radeon R7 200 / Direct3D11, son surface shader Standard
+    produisait toutefois une sortie noire.
+  - MAJ 41 ajoute `LVRouteStable.shader`, un shader vertex/fragment triplanaire
+    avec lumiere diffuse, ambiance, reflet metallique leger et plancher de
+    luminosite. Il evite la variante surface shader qui posait probleme.
+  - Route_PBR utilise maintenant RoutePBRStable en priorite et garde
+    RealistePBR dans le projet pour une comparaison future. Si le nouveau
+    shader est indisponible, la route revient au shader historique au lieu de
+    devenir noire.
+  - Version de la build : 0.5.41. Les lignes `[LV_SHADER_ROUTE]` du journal
+    doivent afficher `PBR stable applique a la route`.
+  - Controle BAT/Python propre. Le parseur C# n'est pas installe dans ce
+    sandbox, mais les modifications restent sur des API deja utilisees.
+
+================================================================================
+8.31 MAJ 42 - PBR STABLE SUR TOUT LE MONDE
+================================================================================
+
+  - La route en 0.5.41 est visible avec `LibreVies/StablePBR`. Le test est
+    donc valide sur AMD Radeon R7 200 / Direct3D11.
+  - Le meme shader vertex/fragment stable est maintenant selectionne par
+    `ResoudreShader()` pour tous les materiaux : murs, toits, terrain, route,
+    bois, pierres, vegetation, PNJ, monstres et objets.
+  - Les textures originales sont appliquees a chaque famille qui en possede
+    une (`Wall`, `Roof`, `Wood`, `Terrain`, `Dirt`, `Stone`, `Roche`, Touffe),
+    avec mapping triplanaire. Les couleurs des autres familles sont conservees.
+  - L'emission des lanternes et objets lumineux reste supportee par le shader.
+  - `LVColor` reste le repli si le shader stable est absent/non supporte.
+  - Version de cette build : 0.5.42. Le titre et le journal permettent de
+    verifier que cette propagation globale est bien celle lancee.
+  - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
+    sandbox. Recompiler puis verifier le journal `[LV_SHADER] shader general
+    applique = LibreVies/StablePBR`.
+
+================================================================================
+8.32 MAJ 43 - STABLEPBR SUR TOUS LES RENDERERS DU MONDE
+================================================================================
+
+  - La route en 0.5.41 est visible avec `LibreVies/StablePBR`. Le meme shader
+    vertex/fragment stable est maintenant le shader general pour toutes les
+    geometries : murs, toits, terrain, route, bois, pierres, gazon, arbres,
+    lampadaires, fontaine, balustrades, personnages, PNJ, armes, monstres et
+    objets du decor.
+  - Les textures originales restent affectees par famille via le mapping
+    triplanaire, et l'emission des lanternes reste disponible.
+  - Route_PBR partage maintenant exactement le shader general : il n'y a plus
+    un rendu special route qui masquerait une difference de shader.
+  - Le controle de fin de construction journalise le nombre de renderers
+    `StablePBR` et les eventuels autres renderers (les textes 3D sont exclus,
+    car ils utilisent la texture de police ; le skybox et le post-traitement
+    restent eux aussi des passes dediees, pas des surfaces du monde).
+  - Version de la build : 0.5.43. Attendu dans le journal :
+    `couverture shader monde : N/N renderer(s) StablePBR`.
+  - Controle BAT/Python propre ; le parseur C# n'est pas installe dans ce
+    sandbox.
+
+================================================================================
+8.33 MAJ 44 - CARTE AGRANDIE, EAU ET NAGE
+================================================================================
+
+  - Version de la build : 0.5.44. La mini-carte passe a 231 px d'affichage
+    et sa texture interne passe de 128 a 192 px ; riviere, branche en Y,
+    douves et chateau sont dessines avec l'orientation de la camera.
+  - La colline du chateau est retiree. Le chateau repose sur une plaine et
+    ses douves forment un anneau d'eau avec un pont-levis en bois et chaines.
+  - La riviere principale et sa derivation vers les douves partagent une
+    jonction visible en Y. Le lit est abaisse pour que l'eau ne disparaisse
+    pas sous le terrain ; les objets et ressources ne se placent pas dedans.
+  - Les bandes de route sont maintenant des maillages continus a normales
+    partagees, avec un soubassement plus large : les trous verts des virages
+    entre deux carres obliques sont supprimes.
+  - Le joueur peut entrer dans l'eau et nager : ESPACE monte, CTRL ou C
+    descend. Sous l'eau, l'endurance se vide ; a endurance nulle, la noyade
+    retire 1 PV par seconde. La vitesse a pied et la course sont legerement
+    augmentees.
+  - Ajout de textures StablePBR pour les feuilles, la pierre, le metal, les
+    drapeaux et l'eau ; caisse, lampadaire, fenetre, porte, caillou, sapin,
+    panneau et joueur utilisent maintenant une famille texture appropriee.
+
+================================================================================
+8.34 MAJ 45 - COMPILATION ET MONDE EXTERIEUR AGRANDI
+================================================================================
+
+  - Correction de la compilation Unity 6.6 : les touches de nage fixes
+    utilisent maintenant Input.GetKey(KeyCode...) au lieu de passer un KeyCode
+    a la methode Touche(int). La build ne doit plus produire les quatre erreurs
+    CS1503 signalees dans build\unity.log.
+  - Vitesse demandee : marche conservee a 5 m/s ; course fixee a 11 m/s.
+  - La mini-carte conserve sa taille d'origine (154 px d'affichage et texture
+    128 px). Le monde jouable exterieur passe de 90 a 125 m de demi-taille.
+  - Les arbres, monstres, cailloux et pieces sont repartis dans cette zone plus
+    large. La riviere utilise l'espace exterieur et garde sa jonction en Y vers
+    les douves du chateau.
+  - Version de la build : 0.5.45. La compilation Windows reelle doit encore
+    etre relancee sur le PC avant de remplir game_build et de publier.
+
+================================================================================
+8.35 MAJ 46 - VILLAGE SEC, DOUVES ET CAMERA CORRIGES
+================================================================================
+
+  - La riviere principale reste entierement a l'exterieur du cercle du village.
+    Un garde-fou dans EstDansEau et TerrainHeight interdit aussi toute future
+    intrusion d'eau ou d'abaissement du sol dans le village ; les maisons
+    retrouvent leur sol plat et leurs positions d'origine.
+  - Les douves sont elargies : rayon interieur 14,5 m, rayon exterieur 23,5 m.
+    Les murs du chateau restent sur une bande de terre seche et l'eau fait un
+    anneau complet. Le pont-levis relie maintenant la porte a la berge externe.
+  - Une dalle plane est ajoutee sous le chateau et des lits plats sous la
+    riviere, la branche et les douves pour supprimer les jours entre le sol et
+    l'eau.
+  - L'endurance descend des que le joueur entre dans l'eau. La noyade reste a
+    1 PV par seconde seulement sous la surface lorsque l'endurance est vide.
+  - Les commandes +, -, x1.00 et les points cardinaux de la mini-carte gardent
+    la mini-carte a sa taille d'origine, passent en noir et les commandes sont
+    regroupees dans son coin superieur droit.
+  - Les textes de degats sont billboardes vers la camera : 25 et -6 ne sont
+    plus lus a l'envers.
+  - En premiere personne, le corps, les bras et la tete du joueur sont caches.
+    Un vrai pitch independant permet maintenant de regarder vers le bas comme
+    vers le haut.
+  - Version de la build : 0.5.46. Relancer la compilation Windows et lire le
+    journal avant de remplir game_build.
+
+================================================================================
+8.36 MAJ 47 - LITS D'EAU, CHATEAU ET RIVIERE NORD
+================================================================================
+
+  - Le lit de la riviere, de la branche et des douves est maintenant calcule
+    avec TerrainHeight a chaque bord : il suit les baisses et les bosses du sol
+    au lieu de rester une plaque horizontale decalee.
+  - Le nord du village reste sec : le cours d'eau passe droit au nord, sans
+    couper l'entree. Le village conserve ses maisons, ses positions et son sol.
+  - Le chateau est eloigne vers le sud (centre z = -90). La route, les
+    collisions, la branche de riviere et la carte suivent ce nouveau centre.
+  - Les rayons des douves sont agrandis de 50 pour cent : interieur 21,75 m,
+    exterieur 35,25 m. L'eau fait un tour complet, y compris le cote droit,
+    avec une bande de terre seche autour des murs et un pont-levis prolonge.
+  - Le sol interieur du chateau et la plaine autour sont plats et continus.
+  - Les textes de la mini-carte repassent en blanc ; les commandes restent
+    regroupees en haut a droite.
+  - Version de la build : 0.5.47. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.37 MAJ 48 - EAU CONFORME AU RELIEF ET CHATEAU NETTOYE
+================================================================================
+
+  - La surface de la riviere et des douves est maintenant generee sur le
+    relief naturel echantillonne, et non plus comme une plaque horizontale.
+    Elle suit les montees et descentes du terrain.
+  - Le terrain sous l'eau est creuse a profondeur constante sous ce relief ;
+    le lit reste colle au sol sans eau qui disparait dans une bosse ou flotte
+    au-dessus d'un creux.
+  - Le pont-levis utilise la hauteur locale de l'eau et reste au-dessus de la
+    surface, meme si la plateforme change de niveau.
+  - La route ne traverse plus les douves ni la cour : elle s'arrete a la berge
+    exterieure du chateau.
+  - Les deux lampadaires/torches du chateau sont retires.
+  - Le sol du chateau et la plateforme autour des douves sont aplatis ; les
+    anciennes bosses de terrain ne peuvent plus remonter dans l'anneau.
+  - Les textes de degats utilisent l'orientation inverse du TextMesh pour que
+    les nombres soient lus dans le bon sens face a la camera.
+  - Version de la build : 0.5.48. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.38 MAJ 49 - EAU SANS HERBE ET INTERFACE STABLE
+================================================================================
+
+  - Les touffes d'herbe ne sont plus generees dans les rivieres ni les douves.
+    Le lit utilise un materiau de vase uni, sans texture de gazon.
+  - Les surfaces d'eau et leurs lits sont masques pendant la nage sous-marine :
+    le shader opaque ne peut plus traverser la camera et faire scintiller l'image.
+  - Les boutons +, - et x1.00 sont places a droite, hors de la texture de la
+    mini-carte, sans la recouvrir.
+  - Le panneau AUBERGE est elargi et son texte agrandi pour afficher le mot
+    complet. La Maison_Sud est decalee de 1,5 m vers la gauche pour ne plus
+    deborder sur la route.
+  - Les lampadaires restent reserves au village et aucun ancien objet de lampe
+    ne peut etre recree dans la zone du chateau.
+  - Version de la build : 0.5.49. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.39 MAJ 50 - DALLE COMPLETE DU CHATEAU
+================================================================================
+
+  - La dalle de cour du chateau est agrandie au-dela du rayon interieur des
+    douves et utilise maintenant un materiau de pierre/paves, pas de gazon.
+  - Toute la cour reste plane sous les murs, les angles et l'interieur : aucun
+    vide ne reste entre le sol pave et le lit de l'eau.
+  - Version de la build : 0.5.50. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.40 MAJ 51 - BERGES ET SOL DU CHATEAU RACCORDEES
+================================================================================
+
+  - Le profil de creusement de la riviere revient a zero sur chaque berge :
+    la terre rejoint la surface de l'eau au lieu de rester trop basse.
+  - Le profil des douves remonte de la meme facon sur leurs bords interieur et
+    exterieur, ce qui supprime les espaces et les bandes de gazon visibles.
+  - Le lit de l'eau reste sans texture d'herbe et les touffes sont interdites
+    dans les zones d'eau.
+  - La nage utilise une hysteresis de surface et masque les surfaces opaques
+    pendant toute l'immersion, ce qui supprime le scintillement en mouvement.
+  - Une dalle ronde en pierre couvre toute l'enceinte du chateau jusqu'a la
+    berge ; les bosses vertes et les trous autour des paves sont supprimes.
+  - La maison devant l'auberge est remise sur l'axe precedent puis decalee de
+    l'autre cote, vers x = 9,5.
+  - Version de la build : 0.5.51. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.41 MAJ 52 - FLEUVE CONSERVE, CHATEAU RETIRE
+================================================================================
+
+  - Le chateau est retire de la construction du monde.
+  - Les douves, leur branche, le pont-levis, la dalle et toutes leurs
+    collisions sont retires.
+  - La route ne continue plus vers l'ancien chateau : elle reste dans le
+    village.
+  - Le seul cours d'eau restant est le fleuve principal qui traverse la carte.
+  - Le lit et la surface du fleuve suivent toujours le relief, et l'herbe ne
+    peut pas etre generee dans son emprise.
+  - Pendant la nage, les surfaces opaques de l'eau sont masquees pour eviter
+    le scintillement de la camera sous l'eau.
+  - Version de la build : 0.5.52. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.42 MAJ 53 - FLEUVE CONTINU ET EAU MASQUEE SOUS LA CAMERA
+================================================================================
+
+  - La surface du fleuve utilise une hauteur unique par section, choisie au
+    niveau le plus haut de ses deux berges : les rubans ne se croisent plus et
+    le fleuve ne se fragmente plus en triangles.
+  - Le lit utilise la hauteur de son axe et reste sous la surface.
+  - Le lit est brun, sans couleur de gazon ; les touffes restent interdites
+    dans l'emprise du fleuve.
+  - L'eau est masquee si le joueur nage, si sa tete est sous l'eau ou si la
+    camera passe sous la surface : elle ne reste plus visible sous la camera.
+  - Version de la build : 0.5.53. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.43 MAJ 54 - EAU TOUJOURS VISIBLE, SANS LIT SEPARE
+================================================================================
+
+  - Le lit colore separe est retire : seul le ruban d'eau est rendu.
+  - Le fleuve est elargi et sa hauteur de section est stabilisee au niveau de
+    la berge la plus haute, afin d'eviter les ruptures et les zones qui passent
+    sous le terrain.
+  - L'eau n'est plus masquee lorsque le joueur entre dans le fleuve : elle
+    reste visible autour de lui et le voile bleu accompagne l'immersion.
+  - Version de la build : 0.5.54. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.44 MAJ 55 - FLEUVE POSE DANS LE SOL
+================================================================================
+
+  - Le sol sous le fleuve est maintenant abaisse sur une emprise plus large et
+    profonde : visuellement, le fleuve remplace le sol au lieu de flotter sur
+    une plaque.
+  - La surface est presque au niveau du sol naturel, avec seulement 3 cm de
+    marge, et couvre toute la largeur du chenal.
+  - Le lit separe colore reste retire : seul le maillage bleu de l'eau est
+    rendu.
+  - Le fleuve reste visible lorsque le joueur entre dans l'eau ; aucune logique
+    ne desactive plus son renderer pendant la nage.
+  - Version de la build : 0.5.55. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.45 MAJ 56 - JOUEUR EN SURFACE ET CHENAL SANS HERBE
+================================================================================
+
+  - Le joueur n'est plus teleporte sous la surface des qu'il entre dans la
+    zone horizontale du fleuve. La limite haute est maintenant la surface plus
+    35 cm : il peut rester debout dans une eau peu profonde.
+  - Le creusement du chenal reste profond sous la largeur du fleuve, puis
+    remonte hors du lit : le sol ne remonte plus au milieu de l'eau.
+  - La surface du fleuve suit l'axe naturel du terrain sans etre remontee au
+    niveau d'une berge plus haute.
+  - Le lit separe colore reste absent ; seule l'eau recouvre le chenal.
+  - L'eau reste rendue pendant toute la nage.
+  - Version de la build : 0.5.56. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+8.46 MAJ 57 - TEXTURE D'EAU DANS LE CHENAL
+================================================================================
+
+  - Le terrain est maintenant une grille plus fine et possede deux sous-meshes :
+    terrain avec la texture de gazon hors du fleuve, texture d'eau dans toute
+    la zone du chenal. Il ne peut donc plus y avoir de gazon au milieu de l'eau.
+  - La surface bleue reste seule visible au-dessus : aucun lit brun, vert ou
+    noir n'est cree.
+  - Le joueur reste a la surface dans les zones peu profondes et l'eau reste
+    rendue pendant toute la nage.
+  - Version de la build : 0.5.58. Relancer la compilation Windows avant la
+    publication.
+
+================================================================================
+9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
+================================================================================
+
+  [ ] 0. GEL AU DEMARRAGE : CORRIGE en MAJ 15 (boucle infinie de CreateFence,
+          incident 19). Il reste a faire CONFIRMER par l'utilisateur :
+            - recompiler avec build_launcher.bat puis lancer ;
+            - le journal doit maintenant montrer TOUTES les etapes du demarrage
+              jusqu'a "[LV] demarrage termine : N objets, ..." ;
+            - s'il se fige encore : la derniere ligne "[LV] debut :" sans
+              "fin :" designe la methode a corriger (et si c'est une boucle,
+              verifier_cs_syntaxe.py la signalera).
+          Le plateau de depart doit afficher l'ecran "Chargement du monde..."
+          puis le village : c'est la premiere fois que le jeu demarrera en
+          entier depuis la MAJ 8. La Console doit maintenant afficher
+          "LibreVies : shader utilisé = LibreVies/RealistePBR" (ou LVColor en
+          repli).
+
+  [ ] 1. UTILISATEUR : lancer build_launcher.bat (celui qu'il a deja).
+          - S'il affiche "une nouvelle version de build_launcher.bat a ete
+            telechargee", c'est la TRANSITION : renommer une derniere fois
+            build_launcher.bat.maj en build_launcher.bat puis relancer. Apres
+            cette fois, le script s'installe tout seul (MAJ 12) et il n'y aura
+            plus jamais rien a remplacer a la main.
+          - Ce lancement exporte le jeu Unity. Il ne reconstruit l'AMORCE
+            (jeu\LibreVies.exe) que si amorce_launcher.py a change ou si
+            l'executable manque ; une modification de launcher.pyw arrive par
+            hash, sans PyInstaller.
+          - Attendu : jeu\LibreVies.exe (~10-15 Mo) + jeu\game\
+            (LibreViesGame.exe, UnityPlayer.dll, LibreViesGame_Data\...) +
+            jeu\launcher.pyw (le code, a cote de l'exe).
+          - Pendant la compilation Unity, la Console doit afficher
+          "LibreVies : shader utilise = LibreVies/RealistePBR" (ou "LVColor" en
+            repli). Si elle affiche autre chose, le dire plutot que de publier.
+
+  [ ] 2. UTILISATEUR : repondre O a la question de publication, ou lancer
+          compilation\outils\publier_jeu.bat --version 0.5.0 --pousser.
+          Attendu : archive LibreVies_jeu_<md5>.zip dans la release
+          "derniere", jeu/version_url.json rempli, git push.
+          => A PARTIR DE LA, le jeu est telechargeable par les joueurs.
+          Version conseillee pour cette MAJ : 0.5.0 (le jeu change beaucoup).
+
+  [ ] 3. TESTER de bout en bout : copier jeu\LibreVies.exe dans un dossier
+          vide sur un autre PC (ou un dossier vide sur le meme PC), le lancer,
+          verifier : telechargement, barre de progression, JOUER qui s'active,
+          le jeu qui demarre. Puis relancer pour verifier "A jour !".
+
+  [x] 3 quater. Demandes de la MAJ 24 codees : curseur camera, disposition
+          quete/barres, arbres, panneaux, suppression des valeurs graphiques,
+          mort couchee, invincibilite 30 s, colliders de toits, PNJ decales,
+          affiches et accessoires/animations contextualises. Reste la validation
+          visuelle dans un export Unity Windows.
+
+  [x] 3 bis. Parite principale codee en MAJ 16-17 : controles/resolution,
+          configuration, route pavee courbe, mairie/fontaine, toits triangulaires,
+          colline et interieur du chateau, PNJ idle, attaque et marteau sans
+          manche. Reste une validation dans une vraie build Unity sur le PC de
+          l'auteur.
+
+  [x] 3 ter. Camouflage mat_fade, transparence des objets entre la camera et
+          le heros et motif visuel procedural : code present en MAJ 18.
+          Validation de rendu/collisions dans la build reelle reste a faire.
+
+  [ ] 4. OPTIONNEL (decision utilisateur en attente) : supprimer les 3
+          archives de l'ancien moteur de la release "derniere".
+
+  [ ] 5. OPTIONNEL : remettre une CI Unity (GitHub Actions) pour compiler a
+          chaque push. Necessite des secrets de licence Unity
+          (UNITY_EMAIL/UNITY_PASSWORD/UNITY_LICENSE) : a ne faire que si
+          l'utilisateur les fournit. Sinon on reste en local.
+
+  [ ] 6. OPTIONNEL : tenir a jour NEWS dans jeu/launcher.pyw a chaque MAJ
+          (c'est ce qui s'affiche dans "Dernieres actualites" chez le joueur)
+          et le bloc "notes" de jeu/version_url.json.
+
+  [ ] 7. OPTIONNEL : bouton "Reinstaller le jeu" dans le launcher (supprimer
+          etat_jeu.json + game\ pour forcer un retelechargement complet).
+
+
+================================================================================
+10. FICHIERS CLES ET CE QU'ILS FONT
+================================================================================
+
+  jeu/launcher.pyw
+    Interface tkinter (1024x768, banniere + actualites + classement + annonces)
+    et toute la logique : load_local_config, save_local_config,
+    normalize_raw_url, _safe_local_path, _manifest_files, check_for_updates,
+    apply_updates, schedule_launcher_restart, _telecharger_archive,
+    _extraire_zip, installer_build_jeu, build_a_installer, find_game, launch.
+    Constantes : LAUNCHER_VERSION 4.1.0, GAME_VERSION 0.4.0, CORE_PATH (le
+    fichier en cours d'execution : c'est lui qui declenche le redemarrage
+    apres une mise a jour), DEFAULT_RAW_URL, DOSSIER_JEU_DEFAUT "game",
+    NOMS_EXE_JEU.
+    Fonctions d'aide aux joueurs : dossier_journaux_jeu (dossier logs a cote
+    du jeu), _dossiers_journaux, _ouvrir_dossier, ouvrir_dossier_jeu, rapport
+    et _montrer_chemins (bouton RAPPORT). launch() ajoute -logFile pour que le
+    journal du jeu soit toujours dans jeu\game\logs\LibreVies.log.
+    La version affichee dans la fenetre vient de LAUNCHER_VERSION, et publier
+    une nouvelle version de ce fichier suffit a mettre a jour le launcher.
+
+  jeu/version_url.json
+    Manifeste lu par le launcher. "files" = petits fichiers texte a mettre a
+    jour ; "game_build" = l'archive du jeu (rempli par publier_jeu.py).
+
+  compilation/outils/publier_jeu.py / .bat
+    Archive jeu\game -> LibreVies_jeu_<md5>.zip, envoi dans la release,
+    mise a jour du manifeste (game_build + launcher.pyw + LibreVies.exe),
+    publication du launcher compile, notation de l'installation locale
+    (jeu\etat_jeu.json), option --pousser pour git.
+    Chemins par defaut : --jeu jeu\game et --exe jeu\LibreVies.exe.
+    Depuis la MAJ 12, il publie aussi launcher.pyw avec son hash : c'est ce qui
+    fait arriver les nouveautes du launcher chez les joueurs SANS recompiler.
+
+  compilation/outils/definir_url_publication.py / .bat
+    Change la branche publiee dans les 3 endroits, avec garde-fous.
+
+  compilation/amorce/amorce_launcher.py
+    L'AMORCE : c'est ce fichier qui est compile en jeu\LibreVies.exe (voir
+    section 3.0). Elle execute jeu\launcher.pyw, recopie la copie embarquee
+    (--add-data) au premier lancement, et ecrit journal_launcher.txt + une
+    boite d'alerte si le launcher plante. Ne JAMAIS y remettre de logique du
+    launcher. Les imports du haut (tkinter, urllib, zipfile, subprocess...)
+    servent a les faire EMBARQUER par PyInstaller : tout nouvel import de
+    launcher.pyw doit etre ajoute ici, sinon l'exe compile ne le contiendra pas.
+
+  compilation/outils/test_amorce.py
+    Recette de l'amorce (13 controles) : le code du launcher est bien execute
+    comme un programme, la copie embarquee est recopiee au premier lancement,
+    un message clair s'affiche si le code manque, un plantage du launcher
+    laisse un journal exploitable, et SystemExit traverse l'amorce.
+        python compilation/outils/test_amorce.py
+
+  compilation/outils/test_launcher.py / tester_launcher.bat
+    Recette complete, hors ligne, sans tkinter. 40 controles :
+    premiere installation, mise a jour, reprise apres coupure, archive
+    corrompue (refusee sans casser l'installation), archive piegee (../),
+    chemins interdits du manifeste, lancement du jeu (avec -logFile), mise a
+    jour du code du launcher par hash, cas "rien de publie".
+    tester_launcher.bat lance test_launcher.py PUIS test_amorce.py.
+
+  compilation/outils/creer_icone.py / creer_icone.bat
+    Reextrait icon.ico depuis les octets integres au launcher.
+
+  compilation/outils/verifier_cs_syntaxe.py
+    Controleur de SYNTAXE des fichiers C# (grammaire tree-sitter) : attrape les
+    accolades/points-virgules manquants AVANT de lancer Unity, alors qu'il n'y
+    a aucun compilateur C# dans le bac a sable. Il signale aussi les APPELS a
+    des methodes qui n'existent nulle part (methode renommee ou supprimee) :
+    c'est ce qui a permis de trouver CreateGuard() appele apres sa suppression.
+    Il ne verifie PAS les types (a completer par une relecture).
+        pip install --break-system-packages tree_sitter tree_sitter_c_sharp
+        python compilation/outils/verifier_cs_syntaxe.py
+    Teste sur une faute volontaire (point-virgule retire) : detectee.
+    LIMITE : le paquet pip est perdu a chaque nouvelle session (bac a sable
+    re-clone), il faut le reinstaller.
+
+  compilation/outils/verifier_bat.py
+    Controleur de scripts .bat : ASCII uniquement, parentheses non echappees
+    dans un echo en bloc, labels appeles par call/goto mais inexistants,
+    parentheses de bloc non equilibrees. A lancer apres chaque modification
+    d'un .bat (incidents 8 et 9).
+
+  compilation/unity/Assets/Scripts/LibreViesGame.cs
+    Le jeu lui-meme (tout est construit par code C# : monde, heros, ennemis,
+    combat, HUD OnGUI, sauvegarde).
+    MISE EN GARDE (incident 15) : tous les materiaux 3D sont crees a
+    l'execution. Ils DOIVENT passer par ResoudreShader() et jamais par un
+    Shader.Find seul, sinon le jeu sort en magenta dans l'exe compile.
+    Depuis la MAJ 24, CreateBuilding() ajoute aussi un MeshCollider aux toits
+    pour que RendreObstaclesTranslucides() les detecte par raycast.
+
+  compilation/unity/Assets/Resources/LVShaders/LVRealistic.shader
+    Shader de materiau principal de la MAJ 31 : PBR Standard, mapping
+    triplanaire monde pour les proceduraux sans UV, ombres avant et reglages
+    metallic/smoothness/occlusion. Son .meta est versionne avec lui.
+
+  compilation/unity/Assets/Resources/LVTextures/
+    Cinq textures originales chargees par Resources.Load : platre des murs,
+    tuiles terre cuite, beton des routes/pierres, bois et sol herbeux/terre.
+    Les fichiers PNG et leurs .meta sont distribues avec le projet de
+    compilation, pas avec un dossier joueur separe.
+
+  compilation/unity/Assets/Resources/LVShaders/LVColor.shader
+    Shader d'eclairage du projet (Lambert : _Color + _EmissionColor) utilise
+    comme secours par ResoudreShader(). Dans Resources\ donc toujours embarque
+    dans la build. Ses .meta ont des GUID ecrits a la main.
+
+  compilation/unity/Assets/Resources/LVShaders/LVSky.shader
+    Ciel degrade en 3 couleurs (haut, horizon, sol), secours de CreateSky()
+    si Skybox/Procedural n'est pas disponible dans la build.
+
+
+================================================================================
+11. AIDES-MEMOIRE POUR LA SUITE
+================================================================================
+
+  - Verifier l'etat :        git log --oneline -5 ; git status --short
+  - Verifier la syntaxe :    python -m py_compile jeu/launcher.pyw
+  - Lancer les recettes :    python compilation/outils/test_launcher.py
+                             python compilation/outils/test_amorce.py
+                             (ou compilation\outils\tester_launcher.bat)
+  - Verifier les .bat :      python compilation/outils/verifier_bat.py
+  - Verifier le C# :         python compilation/outils/verifier_cs_syntaxe.py
+                             (installer d'abord : pip install
+                              --break-system-packages tree_sitter
+                              tree_sitter_c_sharp)
+  - Empreinte de la branche (build) : compilation\build\branche_actuelle.txt
+  - Aucune trace de l'ancien moteur (regle de l'utilisateur) : chercher son
+    nom dans tout le depot (option -i, insensible a la casse, hors .git) doit
+    ne RIEN afficher. Oui, y compris dans ce fichier et dans les
+    commentaires du code : ne jamais ecrire le nom du moteur abandonne.
+  - Verifier que le launcher est bien en deux morceaux (MAJ 12) :
+        jeu/launcher.pyw = tout le launcher ; compilation/amorce/
+        amorce_launcher.py = l'exe qui l'execute. Un changement de launcher
+        ne doit JAMAIS obliger a relancer PyInstaller.
+  - Verifier les shaders du jeu :
+        ls compilation/unity/Assets/Resources/LVShaders/   (4 fichiers : 2
+        .shader + 2 .meta ; les .meta sont obligatoires, sinon Unity regenere
+        des GUID et les references Resources.Load cassent)
+  - Verifier un fichier publie :
+        gh api "repos/killdrago/LibreVies/contents/jeu/version_url.json?ref=arena/01a0b32c-librevies"
+  - Voir la release :        gh release view derniere
+  - Tester le launcher sans toucher a GitHub : la recette utilise un serveur
+    HTTP local (SimpleHTTPRequestHandler), aucun appel externe.
+
+  Phrase a retenir : le joueur n'a qu'un fichier (LibreVies.exe) ; tout le
+  reste (jeu, mises a jour) arrive par le manifeste et une archive verifiee
+  par md5. Toute nouvelle fonctionnalite doit respecter ce principe simple.
+================================================================================

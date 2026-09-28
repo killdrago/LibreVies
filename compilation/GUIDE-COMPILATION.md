@@ -1,67 +1,193 @@
-# Guide de compilation Unreal — LibreVies
+# LibreVies — guide de compilation (côté auteur uniquement)
 
-`compilation/` est le cote auteur. Il contient le projet Unreal, les sources
-C++, les assets MakeHuman CC0, les caches et les outils de compilation.
+Ce dossier ne part **jamais** chez le joueur. Il contient tout ce qu'il faut
+pour fabriquer le launcher et publier le jeu.
 
-```text
-compilation/
-  unreal/
-    LibreVies.uproject
-    Content/Characters/MakeHuman/  mesh et cibles morphologiques CC0
-    Content/SourceAssets/          sources a convertir pour le monde
-    Source/LibreVies/              code du jeu, du createur et de l'atelier
-  build_launcher.bat               build Windows Unreal
-  INSTALLATION-UNREAL.md            logiciels a installer pour l'auteur
+```
+jeu/                       ce que le joueur utilise
+  launcher.pyw             le launcher (source)
+  version_url.json         le manifeste lu par le launcher
+  LIS-MOI.txt              explication envoyee au joueur
 
-jeu/
-  game/                             package Unreal a donner au joueur
+compilation/               reserve a l'auteur
+  unity/                   projet Unity (le jeu)
+  personnage/              projet Unity séparé du créateur humain 3D
+  build_launcher.bat       fabrique LibreVies.exe + le jeu + le créateur
+  build_personnage.bat     exporte uniquement le créateur vers jeu\personnage\
+  build_unity_game.bat     exporte le jeu et le créateur (diagnostic local)
+  setup_unity_build_tools.bat / download_unity_hub.ps1
+                           installation automatique d'Unity
+  image/                   images de travail (bannieres, chapitres, logos)
+  outils/
+    publier_jeu.bat/.py    met le jeu en ligne pour tous les joueurs
+    definir_url_publication.bat/.py
+                           change la branche surveillee par le launcher
+    tester_launcher.bat/.py recette : telechargement, md5, reprise, securite
+    creer_icone.bat/.py    reextrait l'icone du launcher (utilise par le build)
+  release/                 (cree au build, ignore par git)
 ```
 
-## Build
+## 1. Fabriquer la distribution
 
-Après l'installation décrite dans `INSTALLATION-UNREAL.md`, lancer :
+Double-clic sur `build_launcher.bat`. **Il se débrouille tout seul** : il
+télécharge d'abord ce qui manque, puis il compile.
+
+Ce qu'il télécharge automatiquement (uniquement si c'est absent) :
+
+| Élément | Source | Quand |
+|---|---|---|
+| le projet (Unity + launcher + outils) | GitHub, branche indiquée par `BRANCHE` | si le dossier ne contient que ce `.bat` |
+| Python | winget, sinon python.org | si `python` n'est pas installé |
+| PyInstaller | `pip` | si absent (une seule fois) |
+| Unity Hub + Unity Editor | site officiel Unity | si Unity absent (gros, une seule fois) |
+
+Puis il compile et **dépose tout dans `jeu/`** — le dossier du joueur :
+
+| Résultat du build | Destinataire |
+|---|---|
+| `jeu\LibreVies.exe` | le launcher du jeu principal |
+| `jeu\game\` (LibreViesGame.exe + UnityPlayer.dll + *_Data) | à publier (étape 2) |
+| `jeu\personnage\LibreViesPersonnage.exe` + son dossier `_Data` | créateur humain autonome à prendre avec le build |
+
+Le créateur de personnages est construit par le même `build_launcher.bat`, mais
+reste séparé du jeu principal. Il contient la base humaine, les morphologies et
+le rig : il ne demande aucune installation au joueur.
+
+Si tu as déjà téléchargé les sources dans `compilation/` mais que le créateur
+manque dans `jeu/`, lance directement `compilation\build_personnage.bat`.
+Il fabrique l'exécutable puis déplace tout son dossier Unity (exe, `*_Data`,
+`UnityPlayer.dll`, etc.) dans `jeu\personnage\`. Le build du jeu principal
+n'est pas nécessaire pour cette étape. `build_unity_game.bat` appelle aussi ce
+script après l'export du jeu.
+
+Il ne touche à rien d'autre dans `jeu/` : `launcher.pyw`, `version_url.json` et
+`LIS-MOI.txt` restent en place. **`compilation/` ne sert qu'à compiler** : après
+avoir vérifié que `jeu\personnage\LibreViesPersonnage.exe` démarre, tu peux
+supprimer localement `compilation\personnage\` pour récupérer de la place.
+Ne supprime jamais `jeu\personnage\` : ce dossier contient le logiciel livré.
+Si tu veux reconstruire plus tard après avoir supprimé les sources, relance
+`build_launcher.bat` ; il téléchargera de nouveau le projet du créateur.
+
+Deux garanties importantes :
+
+* **Aucun fichier local n'est écrasé.** Seuls les fichiers *absents* sont
+  récupérés depuis GitHub : tu peux travailler dans ce dossier sans risque.
+* **Rien de tout cela n'arrive chez le joueur.** Ni Python, ni PyInstaller, ni
+  Unity, ni ce dossier `compilation\` : le joueur ne reçoit que `LibreVies.exe`.
+  La licence Unity (compte Unity + licence Personal, demandée par Unity Hub)
+  n'est nécessaire que pour *fabriquer* la build, jamais pour jouer.
+
+Pour changer la branche dont le script récupère le projet :
 
 ```bat
-compilation\build_launcher.bat
+set LIBREVIES_BRANCHE=main
+build_launcher.bat
 ```
 
-Le script lance Unreal Automation Tool, compile le module C++, cuisine les
-assets, crée les Paks et place la distribution dans :
+ou en ligne de commande : `build_launcher.bat main`.
+(`outils\definir_url_publication.py` met aussi cette branche à jour tout seul.)
 
-```text
-jeu\game\
+## 2. Publier la compilation (les joueurs la reçoivent)
+
+> **Première fois : cette étape est obligatoire.** Tant qu'aucune compilation
+> n'a été publiée, le manifeste contient `"game_build": {}` et le launcher
+> affiche « aucune compilation Unity publiee » (le bouton JOUER reste grisé).
+> Dès la première publication, tout s'enchaîne : le launcher télécharge le jeu,
+> puis se met à jour tout seul à chaque nouvelle publication.
+
+Double-clic sur `outils\publier_jeu.bat` (ou lance-le avec la version en
+paramètre). Par défaut il travaille sur `jeu\game` et `jeu\LibreVies.exe`.
+Le script :
+
+1. rassemble `jeu\game\` en **une seule archive** `LibreVies_jeu_<md5>.zip` ;
+2. l'envoie dans la release GitHub `derniere` (via `gh`) ;
+3. met à jour `jeu/version_url.json` : `url`, `size`, `hash` (md5), `moteur`, `exe` ;
+4. publie aussi `jeu\LibreVies.exe` : le launcher des joueurs se met à jour
+   tout seul ;
+5. note l'installation locale dans `jeu/etat_jeu.json` : le launcher installé
+   ici affiche « jeu à jour » au lieu de retélécharger ce qu'il vient de compiler ;
+6. avec `--pousser` (utilisé par le `.bat`), il envoie le manifeste dans git.
+
+Sans GitHub CLI (`gh`) sur la machine, le script fabrique quand même l'archive
+et met le manifeste à jour : il indique alors l'URL exacte où déposer le `.zip`
+à la main (release → *Edit* → *Attach binaries*).
+
+Commande équivalente en ligne de commande :
+
+```bat
+python outils\publier_jeu.py --version 0.5.0 ^
+    --notes "Village Unity, camera corrigee" --pousser
 ```
 
-Ne pas donner uniquement le `.exe`. Le joueur reçoit le dossier entier.
+## 3. Ce que fait le joueur
 
-Le createur de personnages n'est plus un deuxieme logiciel externe : il est
-intégré au projet Unreal et pourra devenir l'écran **Nouvelle partie** du jeu.
-La base MakeHuman est chargee par le generateur, les cibles sont appliquees par
-les curseurs et le preset est sauvegarde en JSON.
+1. Il double-clique sur `LibreVies.exe`.
+2. Le launcher lit `jeu/version_url.json` (branche indiquée par `raw_url`),
+   compare les hashs, télécharge l'archive du jeu **avec reprise** si la
+   connexion coupe, vérifie son md5, l'installe dans `game\`.
+3. Il clique sur **JOUER** — le jeu démarre.
 
-## Atelier d'objets
+Rien n'est installé ailleurs que dans le dossier du launcher :
 
-L'interface de présentation contient les premières commandes réutilisables :
+```
+jeu\                     UN SEUL dossier pour le joueur
+  LibreVies.exe          le launcher (il verifie les MAJ et telecharge le jeu)
+  version_url.json       le manifeste
+  LIS-MOI.txt            l'explication
+  game\                  le jeu (LibreViesGame.exe + UnityPlayer.dll + *_Data)
+  etat_jeu.json          version installee (hash, date, exe)
+  jeu.download.part      telechargement en cours (reprise)
+  game.install\ / game.ancien\   dossiers de travail, supprimes apres coup
+```
 
-- arbre ;
-- chaise ;
-- brique ;
-- arme ;
-- prototype de vêtement.
+Le joueur peut aussi recevoir **tout le dossier `jeu\`** (clé USB, zip) : le
+launcher y trouve le jeu déjà installé et JOUER est disponible immédiatement,
+même sans Internet.
 
-Ces boutons fabriquent des prototypes modulaires. L'étape suivante consiste à
-remplacer chaque prototype par un mesh artistique, des matériaux, des sockets,
-un rig ou une simulation de tissu selon l'objet. L'interface et les appels
-resteront les mêmes.
+## 4. Changer la branche publiée
 
-## Migration
+Trois fichiers indiquent la branche utilisée : `jeu/version_url.json` (`raw_url`,
+lu par le launcher), `jeu/launcher.pyw` (`DEFAULT_RAW_URL`, valeur de secours) et
+`compilation/build_launcher.bat` (`BRANCHE`, d'où le build récupère le projet
+quand il est absent). Après avoir fusionné le travail dans `main` :
 
-Le depot ne contient plus l ancien projet moteur. Les règles de jeu historiques restent
-à réimplémenter dans les acteurs Unreal : bras fixes du Maire et du Forgeron,
-feuille du Maire, marteau du Forgeron uniquement et aucun marteau sur le joueur.
-Elles doivent être validées dans une scène de village Unreal avant publication.
+```bat
+python outils\definir_url_publication.py --branche main
+```
 
-Le code Unreal de cette première étape valide le socle technique : projet C++,
-chargement de la base MakeHuman, morphologie, preset et atelier. Les caches
-`Binaries`, `Intermediate`, `Saved` et `DerivedDataCache` peuvent être supprimés
-sans supprimer les sources.
+Le script met les trois d'accord, vérifie que le launcher compile toujours et que
+le `.bat` garde ses étiquettes, puis il reste à faire `git add` / `commit` / `push`.
+
+## 5. Vérifier avant de publier
+
+```bat
+python outils\test_launcher.py
+```
+
+La recette simule un joueur avec un serveur local : première installation,
+mise à jour, téléchargement coupé puis repris, archive corrompue (refusée sans
+casser le jeu installé) et archive piégée (`../`). Aucun fichier du dépôt n'est
+touché.
+
+## 6. En cas de problème
+
+| Symptôme | Cause probable |
+|---|---|
+| « Hors ligne » chez le joueur | `raw_url` pointe une branche qui n'existe plus, ou pas de connexion |
+| « Jeu : aucune compilation publiee » | le manifeste n'a pas encore de `game_build` : lance `publier_jeu.bat` |
+| Le joueur reste sur une vieille version | le manifeste n'a pas été envoyé (`git push`) ou l'archive n'est pas dans la release |
+| Le launcher ne se met pas à jour | publie aussi `LibreVies.exe` (`--exe`) : la mise à jour du launcher passe par lui |
+| L'export Unity échoue | regarde `compilation\build\unity.log` |
+| `FileNotFoundError: Icon input file ...\build\icon.ico` | PyInstaller résout un chemin d'icône **relatif au dossier du `.spec`**. Le script passe donc l'icône en chemin absolu. Si ça revient : lance `outils\creer_icone.bat`, il doit afficher « Icone prete » |
+| `LibreVies.exe` énorme (pygame, numpy dedans) | ces modules sont installés sur la machine de build et PyInstaller les aspire : ils sont exclus dans `build_launcher.bat` (`--exclude-module`) |
+
+## Rappels utiles
+
+* Règle des mises à jour : tout changement de fichier suivi = nouveau hash dans
+  `jeu/version_url.json`. Pour le jeu, c'est l'archive entière qui a un hash :
+  une nouvelle compilation = une nouvelle archive.
+* Une archive publiée n'est jamais écrasée en silence : son nom contient son
+  md5 (`LibreVies_jeu_<md5>.zip`), donc un joueur qui télécharge n'est jamais
+  coupé au milieu par une nouvelle publication.
+* L'archive publiée est un `.zip` dont les fichiers sont **à la racine** : le
+  launcher la dézippe directement dans `game\`.

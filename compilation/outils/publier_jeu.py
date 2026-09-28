@@ -14,7 +14,7 @@ le manifeste et telecharge l'archive ici publiee.
 Exemple (Windows, depuis le dossier compilation) :
 
     python outils\\publier_jeu.py --version 0.5.0 ^
-        --notes "Village Unreal + createur MakeHuman"
+        --notes "Village Unity + camera corrigee"
 
 Les chemins par defaut sont ceux du depot : --jeu jeu\\game et
 --exe jeu\\LibreVies.exe.
@@ -39,8 +39,8 @@ RACINE = Path(__file__).resolve().parents[2]      # racine du depot
 MANIFESTE = RACINE / "jeu" / "version_url.json"
 LAUNCHER = RACINE / "jeu" / "launcher.pyw"
 DOSSIER_BUILD = RACINE / "compilation" / "build"
-# Le jeu est une compilation Unreal : le package peut contenir LibreVies.exe.
-NOMS_EXE = ("LibreVies.exe", "LibreViesGame.exe")
+# Le jeu est une compilation Unity : son executable s'appelle LibreViesGame.exe.
+NOMS_EXE = ("LibreViesGame.exe",)
 
 
 def md5_fichier(chemin: Path) -> str:
@@ -69,7 +69,7 @@ def noter_installation_locale(manifeste: dict, dossier_jeu: Path) -> None:
         exe_relatif = "game/%s" % exe.name
     etat = {
         "hash": build.get("hash", ""),
-        "moteur": build.get("moteur", "unreal"),
+        "moteur": build.get("moteur", "unity"),
         "version": build.get("version", manifeste.get("game_version", "")),
         "dossier": build.get("dossier", "game"),
         "exe": exe_relatif,
@@ -165,10 +165,10 @@ def main() -> int:
         return 1
     exe = trouver_exe(dossier_jeu)
     if not exe:
-        print("ERREUR : aucun executable Unreal dans %s (package Unreal manquant ?)"
+        print("ERREUR : aucun LibreViesGame.exe dans %s (export Unity manquant ?)"
               % dossier_jeu)
         return 1
-    moteur = "unreal"
+    moteur = "unity"
 
     print("== 1. archive du jeu ==")
     provisoire = DOSSIER_BUILD / "jeu_tmp.zip"
@@ -261,7 +261,7 @@ def main() -> int:
 
     print()
     print("== resume ==")
-    print("   jeu     : %s (Unreal, %s Mo)" % (args.version, "%.1f" % (taille / 1048576.0)))
+    print("   jeu     : %s (Unity, %s Mo)" % (args.version, "%.1f" % (taille / 1048576.0)))
     print("   archive : %s" % nom_archive)
     print("   url     : %s" % url_archive)
     if not envoye:

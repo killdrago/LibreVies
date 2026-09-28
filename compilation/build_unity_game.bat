@@ -1,0 +1,128 @@
+@echo off
+setlocal EnableExtensions
+rem ============================================================
+rem  LibreVies - export local de diagnostic
+rem
+rem  Le cas normal est de lancer build_launcher.bat, qui met a jour les
+rem  sources et fabrique toute la distribution. Ce script-ci sert a refaire
+rem  rapidement les exports Unity deja telecharges : jeu ET createur humain.
+rem
+rem  ATTENTION : ce script ne met PAS les sources a jour (il n'ouvre meme pas
+rem  Internet). Si les projets locaux ne contiennent pas les dernieres
+rem  corrections, lancer build_launcher.bat, qui les telecharge depuis GitHub.
+rem ============================================================
+set "ROOT=%~dp0"
+set "JEU=%ROOT%..\jeu"
+set "PROJECT=%ROOT%unity"
+
+if not exist "%PROJECT%\Assets" (
+    echo ERREUR : projet Unity absent : %PROJECT%
+    echo Lance d'abord build_launcher.bat : il telecharge tout seul ce qui manque.
+    pause
+    exit /b 1
+)
+
+rem Force le backend Mono meme si l'installation locale conserve un ancien reglage IL2CPP.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Join-Path $env:PROJECT 'ProjectSettings\ProjectSettings.asset'; if (Test-Path $p) { $c = Get-Content -Raw $p; $c = $c -replace '(?m)^([ \t]*Standalone:[ \t]*)1[ \t]*$', '${1}0'; Set-Content -Path $p -Value $c -Encoding UTF8 }"
+if errorlevel 1 (
+    echo ERREUR : impossible de configurer le backend Mono Unity.
+    pause
+    exit /b 1
+)
+for /d %%D in ("%PROJECT%\Library\PackageCache\com.unity.collab-proxy@*") do if exist "%%~fD" (
+    echo Nettoyage de l'ancien package Unity Collab incompatible avec Unity 6.6...
+    rmdir /s /q "%PROJECT%\Library"
+    if exist "%PROJECT%\Packages\packages-lock.json" del /q "%PROJECT%\Packages\packages-lock.json"
+)
+
+echo ========================================
+echo   LibreVies - export du jeu Unity
+echo ========================================
+echo.
+echo Script de diagnostic : le joueur n'a jamais besoin d'Unity.
+echo.
+
+set "UNITY=%LIBREVIES_UNITY%"
+if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\6000.6.1f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\6000.6.1f1\Editor\Unity.exe"
+if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe"
+if not defined UNITY if exist "%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe" set "UNITY=%ProgramFiles%\Unity\Hub\Editor\6000.0.43f1\Editor\Unity.exe"
+if not defined UNITY if exist "%ProgramFiles(x86)%\Unity\Editor\Unity.exe" set "UNITY=%ProgramFiles(x86)%\Unity\Editor\Unity.exe"
+if not defined UNITY for /r "%ProgramFiles%\Unity\Hub\Editor" %%F in (Unity.exe) do if not defined UNITY set "UNITY=%%F"
+if not defined UNITY (
+    echo Unity Editor absent : lancement de l'installation automatique...
+    call "%ROOT%setup_unity_build_tools.bat"
+    if errorlevel 1 (
+        echo ERREUR : installation automatique de Unity impossible.
+        pause
+        exit /b 1
+    )
+    set "UNITY=%LIBREVIES_UNITY%"
+)
+if not defined UNITY (
+    echo ERREUR : Unity Editor introuvable apres l'installation.
+    pause
+    exit /b 1
+)
+if not exist "%UNITY%" (
+    echo ERREUR : executable Unity introuvable : %UNITY%
+    pause
+    exit /b 1
+)
+
+if not exist "%ROOT%build" mkdir "%ROOT%build"
+set "EXPORT=%ROOT%build\unity_export"
+if exist "%EXPORT%" rmdir /s /q "%EXPORT%"
+if exist "%EXPORT%" (
+    echo ERREUR : dossier temporaire d'export verrouille : %EXPORT%
+    pause
+    exit /b 1
+)
+mkdir "%EXPORT%"
+if exist "%ROOT%build\unity.log" del /q "%ROOT%build\unity.log"
+
+echo Export Windows Unity en cours...
+"%UNITY%" -batchmode -nographics -quit -projectPath "%PROJECT%" -executeMethod LibreViesBuild.BuildWindows -buildPath "%EXPORT%\LibreViesGame.exe" -logFile "%ROOT%build\unity.log"
+if errorlevel 1 (
+    echo ERREUR : Unity a echoue. Consultez build\unity.log
+    pause
+    exit /b 1
+)
+if not exist "%EXPORT%\LibreViesGame.exe" (
+    echo ERREUR : LibreViesGame.exe n'a pas ete cree.
+    pause
+    exit /b 1
+)
+if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
+if exist "%JEU%\game" (
+    echo ERREUR : fermez LibreViesGame.exe avant de remplacer jeu\game.
+    echo Le nouvel export reste dans %EXPORT%
+    pause
+    exit /b 1
+)
+move /Y "%EXPORT%" "%JEU%\game" >nul
+if errorlevel 1 (
+    echo ERREUR : remplacement de jeu\game impossible.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Jeu exporte dans %JEU%\game\
+echo IMPORTANT : Unity a aussi genere UnityPlayer.dll et un dossier *_Data.
+echo Conserve tout le dossier game, pas seulement le .exe.
+echo.
+echo Creation du createur humain autonome dans jeu\personnage\...
+call "%ROOT%build_personnage.bat"
+if errorlevel 1 (
+    echo ERREUR : le jeu est pret, mais le createur n'a pas ete exporte.
+    echo Consultez compilation\build\personnage.log
+    pause
+    exit /b 1
+)
+echo.
+echo Createur exporte dans %JEU%\personnage\
+echo Le dossier contient l'executable et toutes ses dependances Unity.
+echo.
+echo Pour publier cette compilation : outils\publier_jeu.bat
+echo.
+pause
