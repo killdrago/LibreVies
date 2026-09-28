@@ -105,7 +105,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
         GameObject cameraObject = new GameObject("ADMIN - Camera apercu humain");
         previewCamera = cameraObject.AddComponent<Camera>();
         previewCamera.clearFlags = CameraClearFlags.SolidColor;
-        previewCamera.backgroundColor = new Color(0.035f, 0.047f, 0.08f, 1f);
+        // Fond gris neutre : il reste lisible quel que soit le type de
+        // daltonisme et contraste mieux avec la peau et les vetements fonces.
+        previewCamera.backgroundColor = new Color(0.32f, 0.32f, 0.32f, 1f);
         previewCamera.fieldOfView = 30f;
         previewCamera.nearClipPlane = 0.03f;
         previewCamera.farClipPlane = 20f;
