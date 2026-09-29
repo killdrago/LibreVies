@@ -671,7 +671,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             TextAsset mask = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge_alpha");
             if (mask == null) { alphaRows = new string[0]; return; }
             List<string> rows = new List<string>();
-            foreach (string line in mask.text.Split('\\n'))
+            foreach (string line in mask.text.Split('\n'))
             {
                 string row = line.Trim();
                 if (row.Length >= MaskWidth) rows.Add(row.Substring(0, MaskWidth));
