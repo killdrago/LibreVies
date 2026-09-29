@@ -83,14 +83,13 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le personnage féminin est maintenant construit avec un maillage de corps et
-un maillage de sous-vêtements skines dans la même creation. Le soutien-gorge
-frontal est une forme opaque composee de deux bonnets, d'un pont et de
-bretelles ; les triangles de peau sous les bonnets sont retires. Les bretelles
-et la bande du dos suivent la surface arrière. Une culotte est également créée
-autour des hanches et la peau correspondante est retiree. Ces meshes partagent
-les os et les poids du corps : ce ne sont pas des images flottantes ni un quad
-frontal.
+Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
+corps et les sous-vêtements. Les triangles correspondant aux bonnets, aux
+bretelles et a la culotte sont envoyes dans le second sous-maillage avec le
+materiau opaque des sous-vêtements ; ils ne sont donc plus dessines avec le
+materiau peau. C'est un rendu de type tatouage/texture integree : aucune peau
+ne reste sous ces zones, et aucun quad ou mesh de vetement n'est ajoute devant
+le corps. Les os, les poids et les curseurs ADMIN restent ceux du personnage.
 
 ## Limite importante, franchement
 

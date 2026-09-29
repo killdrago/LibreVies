@@ -219,8 +219,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Material skin;
         private Material underwearMaterial;
         private Material hairMaterial;
-        private BoneWeight[] bodyBoneWeights;
-        private Matrix4x4[] bodyBindposes;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -335,11 +333,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            // Le corps reste entier sous les vetements : les surfaces opaques
-            // du soutien-gorge et de la culotte le recouvrent comme dans un
-            // FBX habille. On ne decoupe donc plus de triangles qui laisseraient
-            // des trous transparents autour du vetement.
-            Mesh mesh = obj.CreateMesh(vertices);
+            Func<Vector3, bool> underwearCoverage = values.female
+                ? (Func<Vector3, bool>)(point => UnderwearCoverage.IsCovered(point,
+                    values.garmentScale, values.garmentOffsetX,
+                    values.garmentOffsetY))
+                : null;
+            Mesh mesh = obj.CreateMesh(vertices, underwearCoverage);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -347,14 +346,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             skin.color = SkinColor(values.skinTone);
-            renderer.sharedMaterial = skin;
+            renderer.sharedMaterials = values.female
+                ? new[] { skin, underwearMaterial }
+                : new[] { skin };
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            if (values.female)
-                CreateUnderwear(values, vertices);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -497,343 +496,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 }
             }
             mesh.boneWeights = result;
-            bodyBoneWeights = result;
             Matrix4x4 meshMatrix = renderer.transform.localToWorldMatrix;
-            bodyBindposes = new Matrix4x4[bones.Length];
-            for (int i = 0; i < bones.Length; i++) bodyBindposes[i] = bones[i].worldToLocalMatrix * meshMatrix;
-            mesh.bindposes = bodyBindposes;
-        }
-
-        private void CreateUnderwear(AdminHumanCreator values, Vector3[] bodyVertices)
-        {
-            GarmentMeshData bra = new GarmentMeshData("Soutien-gorge integre");
-            float factor = Mathf.Clamp(values.garmentScale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + values.garmentOffsetY;
-            AddFrontBraSurface(bra, bodyVertices, width, height, centerY,
-                values.garmentOffsetX);
-            AddBackStrap(bra, bodyVertices, values.garmentOffsetX, centerY,
-                factor, false);
-            AddBackStrap(bra, bodyVertices, values.garmentOffsetX, centerY,
-                factor, true);
-            AddBackBand(bra, bodyVertices, values.garmentOffsetX, centerY,
-                width, factor);
-            CreateGarmentRenderer(bra, underwearMaterial, bodyVertices);
-
-            GarmentMeshData panty = new GarmentMeshData("Culotte integree");
-            AddPantySurface(panty, bodyVertices, values.garmentOffsetX);
-            CreateGarmentRenderer(panty, underwearMaterial, bodyVertices);
-        }
-
-        private void CreateGarmentRenderer(GarmentMeshData data, Material material,
-            Vector3[] bodyVertices)
-        {
-            if (data.vertices.Count == 0) return;
-            Mesh mesh = new Mesh
-            {
-                name = data.name + " mesh",
-                indexFormat = UnityEngine.Rendering.IndexFormat.UInt32
-            };
-            mesh.SetVertices(data.vertices);
-            mesh.SetUVs(0, data.uv);
-            mesh.SetTriangles(data.triangles, 0);
-            mesh.boneWeights = GarmentWeights(data.vertices, bodyVertices);
-            mesh.bindposes = bodyBindposes;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-
-            GameObject objectGarment = new GameObject(data.name);
-            objectGarment.transform.SetParent(root.transform, false);
-            SkinnedMeshRenderer renderer = objectGarment.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.bones = bones;
-            renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
-            renderer.sharedMaterial = material;
-            renderer.updateWhenOffscreen = true;
-        }
-
-        private BoneWeight[] GarmentWeights(List<Vector3> garmentVertices, Vector3[] bodyVertices)
-        {
-            BoneWeight[] result = new BoneWeight[garmentVertices.Count];
-            if (bodyBoneWeights == null || bodyBoneWeights.Length == 0) return result;
-            for (int i = 0; i < garmentVertices.Count; i++)
-            {
-                int nearest = 0;
-                float best = float.MaxValue;
-                for (int j = 0; j < bodyVertices.Length; j++)
-                {
-                    float distance = (garmentVertices[i] - bodyVertices[j]).sqrMagnitude;
-                    if (distance < best)
-                    {
-                        best = distance;
-                        nearest = j;
-                    }
-                }
-                result[i] = bodyBoneWeights[Mathf.Min(nearest, bodyBoneWeights.Length - 1)];
-            }
-            return result;
-        }
-
-        private void AddFrontBraSurface(GarmentMeshData data, Vector3[] bodyVertices,
-            float width, float height, float centerY, float offsetX)
-        {
-            float cupWidth = width * 0.34f;
-            float cupHeight = height * 0.34f;
-            AddCup(data, bodyVertices, offsetX - width * 0.29f,
-                centerY - height * 0.14f, cupWidth, cupHeight, true);
-            AddCup(data, bodyVertices, offsetX + width * 0.29f,
-                centerY - height * 0.14f, cupWidth, cupHeight, false);
-            AddFrontBridge(data, bodyVertices, offsetX, centerY, width);
-            AddFrontStrap(data, bodyVertices, offsetX - width * 0.29f,
-                centerY + height * 0.02f, false, width);
-            AddFrontStrap(data, bodyVertices, offsetX + width * 0.29f,
-                centerY + height * 0.02f, true, width);
-        }
-
-        private void AddCup(GarmentMeshData data, Vector3[] bodyVertices,
-            float centerX, float centerY, float radiusX, float radiusY, bool left)
-        {
-            const int rings = 5;
-            const int segments = 18;
-            int center = data.vertices.Count;
-            data.vertices.Add(SurfacePoint(bodyVertices, centerX, centerY, true, 0.030f));
-            data.uv.Add(new Vector2(left ? 0.30f : 0.70f, 0.20f));
-            int firstRing = data.vertices.Count;
-            for (int ring = 1; ring <= rings; ring++)
-            {
-                float radius = ring / (float)rings;
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    float angle = segment * Mathf.PI * 2f / segments;
-                    float x = centerX + Mathf.Cos(angle) * radiusX * radius;
-                    float y = centerY + Mathf.Sin(angle) * radiusY * radius;
-                    float depth = 0.006f + (1f - radius) * 0.024f;
-                    data.vertices.Add(SurfacePoint(bodyVertices, x, y, true, depth));
-                    data.uv.Add(new Vector2(left ? 0.08f + radius * 0.40f : 0.52f + radius * 0.40f,
-                        0.08f + (Mathf.Sin(angle) * 0.18f + 0.20f) * radius));
-                }
-            }
-            for (int segment = 0; segment < segments; segment++)
-            {
-                int a = firstRing + segment;
-                int b = firstRing + (segment + 1) % segments;
-                data.triangles.Add(center); data.triangles.Add(a); data.triangles.Add(b);
-            }
-            for (int ring = 1; ring < rings; ring++)
-            {
-                int current = firstRing + (ring - 1) * segments;
-                int next = current + segments;
-                for (int segment = 0; segment < segments; segment++)
-                {
-                    int a = current + segment;
-                    int b = current + (segment + 1) % segments;
-                    int c = next + (segment + 1) % segments;
-                    int d = next + segment;
-                    data.triangles.Add(a); data.triangles.Add(b); data.triangles.Add(c);
-                    data.triangles.Add(a); data.triangles.Add(c); data.triangles.Add(d);
-                }
-            }
-        }
-
-        private void AddFrontBridge(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX, float centerY, float width)
-        {
-            const int samples = 8;
-            int start = data.vertices.Count;
-            float y = centerY - 0.025f;
-            for (int i = 0; i < samples; i++)
-            {
-                float t = i / (float)(samples - 1);
-                float x = offsetX + Mathf.Lerp(-width * 0.16f, width * 0.16f, t);
-                data.vertices.Add(SurfacePoint(bodyVertices, x, y + 0.018f, true, 0.010f));
-                data.vertices.Add(SurfacePoint(bodyVertices, x, y - 0.018f, true, 0.010f));
-                data.uv.Add(Vector2.zero); data.uv.Add(Vector2.zero);
-            }
-            AddRibbonTriangles(data.triangles, start, samples);
-        }
-
-        private void AddFrontStrap(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX, float startY, bool right, float width)
-        {
-            const int samples = 10;
-            int start = data.vertices.Count;
-            float endX = offsetX + (right ? width * 0.40f : -width * 0.40f);
-            float endY = startY + width * 0.68f;
-            for (int i = 0; i < samples; i++)
-            {
-                float t = i / (float)(samples - 1);
-                float x = Mathf.Lerp(offsetX, endX, t);
-                float y = Mathf.Lerp(startY, endY, t);
-                float nextX = Mathf.Lerp(offsetX, endX, Mathf.Min(1f, t + 0.03f));
-                float nextY = Mathf.Lerp(startY, endY, Mathf.Min(1f, t + 0.03f));
-                Vector2 tangent = new Vector2(nextX - x, nextY - y).normalized;
-                Vector2 normal = new Vector2(-tangent.y, tangent.x) * width * 0.045f;
-                data.vertices.Add(SurfacePoint(bodyVertices, x + normal.x, y + normal.y, true, 0.010f));
-                data.vertices.Add(SurfacePoint(bodyVertices, x - normal.x, y - normal.y, true, 0.010f));
-                data.uv.Add(Vector2.zero); data.uv.Add(Vector2.zero);
-            }
-            AddRibbonTriangles(data.triangles, start, samples);
-        }
-
-        private void AddBackStrap(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX, float centerY, float factor, bool right)
-        {
-            const int samples = 12;
-            int start = data.vertices.Count;
-            for (int i = 0; i < samples; i++)
-            {
-                float t = i / (float)(samples - 1);
-                float x = right
-                    ? Mathf.Lerp(0.15f, 0.18f, t)
-                    : Mathf.Lerp(-0.15f, -0.18f, t);
-                float y = Mathf.Lerp(-0.28f, 0.19f, t);
-                float nextX = right
-                    ? Mathf.Lerp(0.15f, 0.18f, Mathf.Min(1f, t + 0.02f))
-                    : Mathf.Lerp(-0.15f, -0.18f, Mathf.Min(1f, t + 0.02f));
-                float nextY = Mathf.Lerp(-0.28f, 0.19f, Mathf.Min(1f, t + 0.02f));
-                Vector2 tangent = new Vector2(nextX - x, nextY - y).normalized;
-                Vector2 normal = new Vector2(-tangent.y, tangent.x) * 0.015f * factor;
-                float strapU = right
-                    ? 0.93f - (1f - t) * 0.08f
-                    : 0.07f + (1f - t) * 0.08f;
-                Vector3 left = SurfacePoint(bodyVertices, offsetX + x + normal.x,
-                    centerY + y + normal.y, false, -0.006f);
-                Vector3 rightPoint = SurfacePoint(bodyVertices, offsetX + x - normal.x,
-                    centerY + y - normal.y, false, -0.006f);
-                data.vertices.Add(left);
-                data.vertices.Add(rightPoint);
-                data.uv.Add(new Vector2(strapU - (right ? -0.018f : 0.018f), 0.45f + t * 0.55f));
-                data.uv.Add(new Vector2(strapU + (right ? -0.018f : 0.018f), 0.45f + t * 0.55f));
-            }
-            AddRibbonTriangles(data.triangles, start, samples);
-        }
-
-        private void AddBackBand(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX, float centerY, float width, float factor)
-        {
-            const int samples = 14;
-            int start = data.vertices.Count;
-            float y = centerY - width * 0.38f;
-            for (int i = 0; i < samples; i++)
-            {
-                float t = i / (float)(samples - 1);
-                float x = offsetX + Mathf.Lerp(-width * 0.46f, width * 0.46f, t);
-                float bandWidth = 0.026f * factor;
-                data.vertices.Add(SurfacePoint(bodyVertices, x, y + bandWidth, false, -0.006f));
-                data.vertices.Add(SurfacePoint(bodyVertices, x, y - bandWidth, false, -0.006f));
-                data.uv.Add(new Vector2(Mathf.Lerp(0.08f, 0.92f, t), 0.20f));
-                data.uv.Add(new Vector2(Mathf.Lerp(0.08f, 0.92f, t), 0.20f));
-            }
-            AddRibbonTriangles(data.triangles, start, samples);
-        }
-
-        private void AddPantySurface(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX)
-        {
-            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.34f, 0.27f, true);
-            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.34f, 0.27f, false);
-        }
-
-        private void AddWrapGrid(GarmentMeshData data, Vector3[] bodyVertices,
-            float offsetX, float bottom, float top, float halfWidth, bool front)
-        {
-            const int columns = 14;
-            const int rows = 8;
-            int start = data.vertices.Count;
-            for (int row = 0; row < rows; row++)
-            {
-                float v = row / (float)(rows - 1);
-                for (int column = 0; column < columns; column++)
-                {
-                    float u = column / (float)(columns - 1);
-                    float rowWidth = Mathf.Lerp(halfWidth * 0.76f, halfWidth, v);
-                    float x = offsetX + (u - 0.5f) * rowWidth * 2f;
-                    float y = Mathf.Lerp(bottom, top, v);
-                    data.vertices.Add(SurfacePoint(bodyVertices, x, y, front, front ? 0.007f : -0.007f));
-                    data.uv.Add(Vector2.zero);
-                }
-            }
-            AddGridTriangles(data.triangles, start, columns, rows);
-        }
-
-        private Vector3 SurfacePoint(Vector3[] bodyVertices, float x, float y,
-            bool front, float offset)
-        {
-            // On cherche d'abord la proximite dans le plan XY, puis on choisit
-            // le vertex avant ou arriere parmi les voisins immediats. L'ancien
-            // rayon de recherche de 10 cm pouvait attraper un bras ou une
-            // jambe et etirer le vetement en grand polygone.
-            float nearestXY = float.MaxValue;
-            for (int i = 0; i < bodyVertices.Length; i++)
-            {
-                float dx = bodyVertices[i].x - x;
-                float dy = bodyVertices[i].y - y;
-                nearestXY = Mathf.Min(nearestXY, dx * dx + dy * dy);
-            }
-            float allowed = nearestXY + 0.0025f;
-            int nearest = -1;
-            float bestDepth = front ? -float.MaxValue : float.MaxValue;
-            for (int i = 0; i < bodyVertices.Length; i++)
-            {
-                Vector3 candidate = bodyVertices[i];
-                float dx = candidate.x - x;
-                float dy = candidate.y - y;
-                if (dx * dx + dy * dy > allowed) continue;
-                if (front && candidate.z > bestDepth)
-                {
-                    bestDepth = candidate.z;
-                    nearest = i;
-                }
-                else if (!front && candidate.z < bestDepth)
-                {
-                    bestDepth = candidate.z;
-                    nearest = i;
-                }
-            }
-            Vector3 result = nearest < 0 ? new Vector3(x, y, front ? 0.16f : -0.13f)
-                : bodyVertices[nearest];
-            result.x = x;
-            result.y = y;
-            result.z += offset;
-            return result;
-        }
-
-        private static void AddGridTriangles(List<int> triangles, int start,
-            int columns, int rows)
-        {
-            for (int row = 0; row < rows - 1; row++)
-                for (int column = 0; column < columns - 1; column++)
-                {
-                    int a = start + row * columns + column;
-                    int b = a + 1;
-                    int c = a + columns + 1;
-                    int d = a + columns;
-                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
-                }
-        }
-
-        private static void AddRibbonTriangles(List<int> triangles, int start, int samples)
-        {
-            for (int i = 0; i < samples - 1; i++)
-            {
-                int a = start + i * 2;
-                int b = a + 1;
-                int c = a + 2;
-                int d = a + 3;
-                triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                triangles.Add(b); triangles.Add(c); triangles.Add(d);
-            }
-        }
-
-        private sealed class GarmentMeshData
-        {
-            public string name;
-            public List<Vector3> vertices = new List<Vector3>();
-            public List<Vector2> uv = new List<Vector2>();
-            public List<int> triangles = new List<int>();
-            public GarmentMeshData(string name) { this.name = name; }
+            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
+            for (int i = 0; i < bones.Length; i++) bindposes[i] = bones[i].worldToLocalMatrix * meshMatrix;
+            mesh.bindposes = bindposes;
         }
 
         private Dictionary<int, Vector3> Target(string name)
@@ -907,6 +573,70 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
+    }
+
+    private static class UnderwearCoverage
+    {
+        public static bool IsCovered(Vector3 point, float scale, float offsetX, float offsetY)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY;
+            Vector2 p = new Vector2(point.x - offsetX, point.y - centerY);
+
+            if (point.z >= 0f)
+            {
+                float cupY = -height * 0.14f;
+                float cupX = width * 0.29f;
+                float cupRadiusX = width * 0.34f * 1.15f;
+                float cupRadiusY = height * 0.34f * 1.15f;
+                if (InsideEllipse(p, new Vector2(-cupX, cupY), cupRadiusX, cupRadiusY)
+                    || InsideEllipse(p, new Vector2(cupX, cupY), cupRadiusX, cupRadiusY)) return true;
+                if (Mathf.Abs(p.x) <= width * 0.20f
+                    && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
+                if (StrapDistance(p, -cupX, cupY + height * 0.02f,
+                    -width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.055f) return true;
+                if (StrapDistance(p, cupX, cupY + height * 0.02f,
+                    width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.055f) return true;
+            }
+            else
+            {
+                if (StrapDistance(p, -0.15f, -0.28f, -0.18f, 0.19f) <= 0.040f * factor) return true;
+                if (StrapDistance(p, 0.15f, -0.28f, 0.18f, 0.19f) <= 0.040f * factor) return true;
+                if (Mathf.Abs(p.y + width * 0.38f) <= 0.050f
+                    && Mathf.Abs(p.x) <= width * 0.52f) return true;
+            }
+
+            // Les faces avant et arriere de la culotte sont colorees dans le
+            // second sous-maillage : aucune peau ne reste sous cette zone.
+            if (point.y >= 1.02f && point.y <= 1.34f)
+            {
+                float t = Mathf.InverseLerp(1.02f, 1.34f, point.y);
+                float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
+                if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
+            }
+            return false;
+        }
+
+        private static bool InsideEllipse(Vector2 point, Vector2 center,
+            float radiusX, float radiusY)
+        {
+            float x = (point.x - center.x) / Mathf.Max(radiusX, 0.001f);
+            float y = (point.y - center.y) / Mathf.Max(radiusY, 0.001f);
+            return x * x + y * y <= 1f;
+        }
+
+        private static float StrapDistance(Vector2 point, float x0, float y0,
+            float x1, float y1)
+        {
+            Vector2 start = new Vector2(x0, y0);
+            Vector2 end = new Vector2(x1, y1);
+            Vector2 segment = end - start;
+            float amount = Mathf.Clamp01(Vector2.Dot(point - start, segment)
+                / Mathf.Max(segment.sqrMagnitude, 0.0001f));
+            return Vector2.Distance(point, start + segment * amount);
+        }
     }
 
     private static class HairBuilder
@@ -1126,7 +856,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             return CreateMesh(vertices, null);
         }
 
-        public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> hideTriangle)
+        // Les triangles vetement restent dans le meme SkinnedMeshRenderer que
+        // le corps, mais utilisent le second materiau. Il n'y a donc ni peau
+        // dessinee sous le vetement ni objet vetement ajoute devant le corps.
+        public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> garmentTriangle)
         {
             Mesh mesh = new Mesh
             {
@@ -1135,17 +868,28 @@ public sealed class AdminHumanCreator : MonoBehaviour
             };
             mesh.vertices = vertices;
             mesh.uv = uv;
-            List<int> indices = new List<int>();
+            List<int> bodyIndices = new List<int>();
+            List<int> garmentIndices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
                 Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
                     + vertices[triangle.c]) / 3f;
-                if (hideTriangle != null && hideTriangle(centre)) continue;
-                indices.Add(triangle.a);
-                indices.Add(triangle.b);
-                indices.Add(triangle.c);
+                List<int> destination = garmentTriangle != null && garmentTriangle(centre)
+                    ? garmentIndices : bodyIndices;
+                destination.Add(triangle.a);
+                destination.Add(triangle.b);
+                destination.Add(triangle.c);
             }
-            mesh.SetTriangles(indices, 0);
+            if (garmentTriangle == null)
+            {
+                mesh.SetTriangles(bodyIndices, 0);
+            }
+            else
+            {
+                mesh.subMeshCount = 2;
+                mesh.SetTriangles(bodyIndices, 0);
+                mesh.SetTriangles(garmentIndices, 1);
+            }
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
