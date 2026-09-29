@@ -1,0 +1,67 @@
+# Atelier de vetements LibreVies
+
+Ce dossier contient un petit logiciel Python autonome pour preparer les futurs
+vetements du jeu.
+
+## Installation Windows
+
+1. Installer Python 3.10 ou plus recent depuis python.org.
+2. Double-cliquer sur `lancer_vetement.bat`.
+3. Le script installe Pillow puis ouvre l'atelier.
+
+Installation manuelle :
+
+```text
+python -m pip install -r requirements.txt
+python vetement.py
+```
+
+## Fonctionnement actuel
+
+### Depuis une image
+
+- `Importer une image` charge un PNG, JPG ou WEBP.
+- `Decouper le fond` rend transparent le fond connecte aux bords de l'image.
+- L'image transparente est exportee dans un GLB avec son motif.
+- Le GLB est un panneau 3D epais, utile pour une image decoupee, un logo, un
+  motif ou une piece plane.
+
+### Depuis un modele parametrique
+
+L'atelier propose des formes de depart :
+
+- soutien-gorge ;
+- culotte ;
+- calecon ;
+- pull ;
+- pantalon ;
+- chaussure ;
+- armure.
+
+On peut modifier largeur, hauteur, epaisseur, echelle, rotation et position.
+
+### Fichiers produits
+
+L'export produit :
+
+- `nom.glb` : modele 3D importable dans Unity, Blender ou Godot ;
+- `nom.json` : position, zone d'attache et zone de couverture du corps.
+
+Le JSON est reserve au futur branchement du vetement sur le joueur : le jeu
+pourra lire `anchor` et `coverage` pour masquer ou non la peau sous le vetement.
+
+## Limite importante, franchement
+
+La decoupe d'une image ne peut pas deviner seule la vraie profondeur d'un
+vetement, ses coutures, ses bretelles 3D et son adaptation a tous les os. La
+premiere version fabrique donc un objet image epais ou une forme parametrique.
+Pour un vrai vetement deformable sur un personnage, il faudra ensuite :
+
+1. positionner le GLB sur le personnage ;
+2. ajuster les points d'attache ;
+3. ajouter un skinning sur le squelette ;
+4. definir les zones de peau a cacher.
+
+Le format GLB est utilise en priorite car son export est possible directement
+en Python. L'export FBX depend d'un logiciel externe comme Blender et n'est pas
+fabrique par ce script.
