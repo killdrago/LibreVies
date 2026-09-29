@@ -70,11 +70,17 @@ Shader "LibreVies/GarmentSkinMasked"
                     && depth >= _MaskMinDepth && depth <= _MaskMaxDepth
                     // Les bretelles passent sur une surface un peu tournee :
                     // on conserve une marge pour couvrir les epaules sans
-                    // decouper la peau du dos.
+                    // peindre le dos.
                     && front > -0.15)
                 {
-                    fixed garmentAlpha = tex2D(_GarmentTex, float2(u, v)).a;
-                    clip(garmentAlpha - _MaskAlphaClip);
+                    fixed4 garment = tex2D(_GarmentTex, float2(u, v));
+                    if (garment.a > _MaskAlphaClip)
+                    {
+                        // Le maillage de peau recoit directement la couleur
+                        // du vetement : ce n'est pas un rectangle pose devant.
+                        // Les pixels transparents gardent la peau d'origine.
+                        skin.rgb = lerp(skin.rgb, garment.rgb, garment.a);
+                    }
                 }
             }
 

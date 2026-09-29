@@ -83,11 +83,12 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le maillage de peau utilise le meme alpha du soutien-gorge pour supprimer la
-peau sous la forme du vetement : le resultat n'est donc pas une simple image
-posee par-dessus. Lorsqu'un profil feminin est valide, le personnage applique
-le meme masquage et le vetement reste reglable avec les quatre curseurs. Le
-JSON conserve le placement exact pour la prochaine etape de remplacement de
+Le matériau du maillage humain utilise le meme alpha pour remplacer la texture
+de peau par les pixels du soutien-gorge dans la zone couverte : le resultat
+n'est donc pas une simple image posee par-dessus. Les pixels transparents
+conservent la peau. Lorsqu'un profil feminin est valide, le personnage applique
+le meme remplacement et le vetement reste reglable avec les quatre curseurs.
+Le JSON conserve le placement exact pour la prochaine etape de remplacement de
 la zone `torse_avant` sur le maillage final.
 
 ## Limite importante, franchement
