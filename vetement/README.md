@@ -83,11 +83,11 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le maillage humain conserve ici son matériau Standard d'origine pour rester
-stable dans l'aperçu. Les triangles de peau couverts par l'alpha du soutien-gorge
-sont retires du maillage de preview, puis la texture transparente les remplace
-visuellement devant. Les deux bretelles arrière utilisent la même découpe de
-peau et sont calculées sur la surface dorsale du maillage afin de ne pas flotter.
+Le maillage humain reste un seul SkinnedMeshRenderer avec ses os et ses poids.
+Le shader compose directement SkinBase et `soutien_gorge.png` sur cette surface :
+les pixels opaques du PNG remplacent la peau, tandis que les pixels transparents
+laissent apparaitre la peau normale. Les bretelles arrière utilisent le même PNG
+et la même surface du dos, sans quad frontal ni bande horizontale independante.
 La culotte et le calecon restent volontairement reportes.
 
 ## Limite importante, franchement
