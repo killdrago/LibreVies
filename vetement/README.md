@@ -70,6 +70,24 @@ les os du torse/bassin et appliquer `anchor`/`coverage` du JSON. C'est cette
 etape qui permettra de remplacer la peau sous le vetement sans detruire le
 maillage humain.
 
+### Placement du soutien-gorge dans l'aperçu ADMIN
+
+Le projet Unity contient une copie transparente de la texture dans :
+
+`compilation/unity/Assets/Resources/Characters/Clothing/soutien_gorge.png`
+
+Dans ADMIN > Personnage, l'aperçu féminin affiche cette image comme repere
+reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
+`Profondeur Z` reconstruisent l'aperçu a chaque modification. Le bouton
+`SAUVER POSITION` ecrit `soutien_gorge_placement.json` dans le dossier
+`Application.persistentDataPath/LibreVies` et affiche le chemin exact a
+transmettre avec le modele.
+
+Cette image n'est volontairement pas appliquee au personnage reel lors de la
+validation : elle sert a choisir le placement. Le JSON valide sera reutilise
+ensuite pour masquer ou remplacer la zone de peau `torse_avant`, afin de ne
+pas laisser une simple superposition definitive.
+
 ## Limite importante, franchement
 
 La decoupe d'une image ne peut pas deviner seule la vraie profondeur d'un

@@ -235,6 +235,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private string conversationInput = "";
     private readonly List<string> conversationMessages = new List<string>();
     private string infoMessage = "";
+    private string garmentPlacementPath = "";
     private float infoTimer;
     private float brightness = 0.5f;
     private float contrast = 1f;
@@ -7204,23 +7205,60 @@ public sealed class LibreViesGame : MonoBehaviour
         nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
-        GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 44f),
-            "Le vrai maillage humain est\naffiche ici en temps reel.", smallStyle);
-        if (GUI.Button(new Rect(droite, contenu.y + 382f, 112f, 34f), "ALEATOIRE", buttonStyle))
+        GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
+            "Placement soutien-gorge", smallStyle);
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 355f, 238f, 24f),
+            "Taille", adminHumanCreator.garmentScale, 0.40f, 1.80f);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentScale) > 0.001f)
+        {
+            adminHumanCreator.garmentScale = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 385f, 238f, 24f),
+            "Deplacement X", adminHumanCreator.garmentOffsetX, -0.40f, 0.40f);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetX) > 0.001f)
+        {
+            adminHumanCreator.garmentOffsetX = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 415f, 238f, 24f),
+            "Deplacement Y", adminHumanCreator.garmentOffsetY, -0.40f, 0.40f);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetY) > 0.001f)
+        {
+            adminHumanCreator.garmentOffsetY = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 445f, 238f, 24f),
+            "Profondeur Z", adminHumanCreator.garmentOffsetZ, 0.05f, 0.50f);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetZ) > 0.001f)
+        {
+            adminHumanCreator.garmentOffsetZ = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        if (GUI.Button(new Rect(droite, contenu.y + 475f, 234f, 30f),
+            "SAUVER POSITION", buttonStyle))
+        {
+            garmentPlacementPath = adminHumanCreator.SaveGarmentPlacement();
+            ShowInfo("Position sauvee : " + garmentPlacementPath);
+        }
+        if (!string.IsNullOrEmpty(garmentPlacementPath))
+            GUI.Label(new Rect(droite, contenu.y + 508f, 234f, 42f),
+                "Fichier a transmettre :\n" + garmentPlacementPath, smallStyle);
+        if (GUI.Button(new Rect(droite, contenu.y + 555f, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
             ShowInfo("Personnage humain aleatoire genere");
         }
-        if (GUI.Button(new Rect(droite + 122f, contenu.y + 382f, 112f, 34f), "REINITIALISER", buttonStyle))
+        if (GUI.Button(new Rect(droite + 122f, contenu.y + 555f, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
             ShowInfo("Reglages humains reinitialises");
         }
-        if (GUI.Button(new Rect(droite, contenu.y + 430f, 234f, 36f),
+        if (GUI.Button(new Rect(droite, contenu.y + 595f, 234f, 36f),
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
-        GUI.Label(new Rect(droite, contenu.y + 478f, 250f, 44f),
-            "Sous-vetements et coiffure sont crees\navec le personnage par defaut.", smallStyle);
+        GUI.Label(new Rect(droite, contenu.y + 635f, 250f, 34f),
+            "Le GLB est un repere de placement.\nLe JSON peut etre envoye separement.", smallStyle);
     }
 
     private void DessinerAdmin()

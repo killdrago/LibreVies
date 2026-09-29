@@ -26,6 +26,25 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public float earsShape;
     public int hairStyle;
 
+    // Placement de l'image de soutien-gorge dans le preview ADMIN.
+    public float garmentScale = 1f;
+    public float garmentOffsetX;
+    public float garmentOffsetY;
+    public float garmentOffsetZ = 0.235f;
+
+    [Serializable]
+    private sealed class GarmentPlacementData
+    {
+        public string asset = "soutien_gorge.png";
+        public string anchor = "torse";
+        public string coordinateSpace = "preview_human_local";
+        public int version = 1;
+        public float scale;
+        public float offsetX;
+        public float offsetY;
+        public float offsetZ;
+    }
+
     private HumanPreview preview;
     private Camera previewCamera;
     private RenderTexture previewTexture;
@@ -170,6 +189,22 @@ public sealed class AdminHumanCreator : MonoBehaviour
         BuildPreview();
     }
 
+    public string SaveGarmentPlacement()
+    {
+        string directory = Path.Combine(Application.persistentDataPath, "LibreVies");
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "soutien_gorge_placement.json");
+        GarmentPlacementData data = new GarmentPlacementData
+        {
+            scale = garmentScale,
+            offsetX = garmentOffsetX,
+            offsetY = garmentOffsetY,
+            offsetZ = garmentOffsetZ
+        };
+        File.WriteAllText(path, JsonUtility.ToJson(data, true));
+        return path;
+    }
+
     private sealed class HumanPreview
     {
         private const float Scale = 0.13f;
@@ -308,6 +343,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
+            if (facePreviewCamera)
+                GarmentPreviewBuilder.Create(values.female, values.garmentScale,
+                    values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
+                    root.transform);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -529,8 +568,67 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    // Les sous-vetements sont maintenant un sous-maillage du corps :
-    // aucune geometrie flottante n est creee devant le personnage.
+    // Cette image sert uniquement de repere reglable dans l'outil ADMIN.
+    // Le masquage de peau sera applique apres validation du placement.
+
+    private static class GarmentPreviewBuilder
+    {
+        public static void Create(bool female, float scale, float offsetX, float offsetY,
+            float offsetZ, Transform parent)
+        {
+            if (!female) return;
+            Texture2D texture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
+            if (texture == null) return;
+            Shader shader = Shader.Find("Unlit/Transparent");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) return;
+            Material material = new Material(shader);
+            material.name = "Soutien-gorge - transparent";
+            material.mainTexture = texture;
+            material.color = Color.white;
+            material.renderQueue = 3000;
+            float width = 0.36f * Mathf.Clamp(scale, 0.25f, 3f);
+            float height = width * texture.height / Mathf.Max(1f, texture.width);
+            float centerY = 1.61f + offsetY;
+            float z = offsetZ;
+            Vector3[] vertices =
+            {
+                new Vector3(offsetX - width * 0.5f, centerY - height * 0.5f, z),
+                new Vector3(offsetX + width * 0.5f, centerY - height * 0.5f, z),
+                new Vector3(offsetX + width * 0.5f, centerY + height * 0.5f, z),
+                new Vector3(offsetX - width * 0.5f, centerY + height * 0.5f, z)
+            };
+            Mesh mesh = new Mesh { name = "Soutien-gorge - transparent mesh" };
+            mesh.vertices = vertices;
+            mesh.uv = new[]
+            {
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(1f, 1f), new Vector2(0f, 1f)
+            };
+            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject garment = new GameObject("Preview - soutien-gorge a placer");
+            garment.transform.SetParent(parent, false);
+            garment.AddComponent<MeshFilter>().sharedMesh = mesh;
+            garment.AddComponent<MeshRenderer>().sharedMaterial = material;
+            GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
+            resources.Mesh = mesh;
+            resources.Material = material;
+        }
+    }
+
+    private sealed class GarmentPreviewResources : MonoBehaviour
+    {
+        public Mesh Mesh;
+        public Material Material;
+
+        private void OnDestroy()
+        {
+            if (Mesh != null) UnityEngine.Object.Destroy(Mesh);
+            if (Material != null) UnityEngine.Object.Destroy(Material);
+        }
+    }
 
     private static class HairBuilder
     {
