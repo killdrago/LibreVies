@@ -217,7 +217,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
-        private Material braMaterial;
         private Material underwearMaterial;
         private Material hairMaterial;
         private BoneWeight[] bodyBoneWeights;
@@ -234,8 +233,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             Texture2D skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            Texture2D braTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
-            braMaterial = NewBraMaterial(braTexture);
             underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
             if (underwearMaterial.HasProperty("_Cull"))
                 underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
@@ -338,7 +335,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Mesh mesh = obj.CreateMesh(vertices);
+            Func<Vector3, bool> hideSkin = values.female
+                ? (Func<Vector3, bool>)(point => UnderwearCoverage.HideSkin(point,
+                    values.garmentScale, values.garmentOffsetX, values.garmentOffsetY))
+                : null;
+            Mesh mesh = obj.CreateMesh(vertices, hideSkin);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -518,7 +519,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 factor, true);
             AddBackBand(bra, bodyVertices, values.garmentOffsetX, centerY,
                 width, factor);
-            CreateGarmentRenderer(bra, braMaterial, bodyVertices);
+            CreateGarmentRenderer(bra, underwearMaterial, bodyVertices);
 
             GarmentMeshData panty = new GarmentMeshData("Culotte integree");
             AddPantySurface(panty, bodyVertices, values.garmentOffsetX);
@@ -577,22 +578,102 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private void AddFrontBraSurface(GarmentMeshData data, Vector3[] bodyVertices,
             float width, float height, float centerY, float offsetX)
         {
-            const int columns = 18;
-            const int rows = 12;
-            int start = data.vertices.Count;
-            for (int row = 0; row < rows; row++)
+            float cupWidth = width * 0.31f;
+            float cupHeight = height * 0.31f;
+            AddCup(data, bodyVertices, offsetX - width * 0.29f,
+                centerY - height * 0.17f, cupWidth, cupHeight, true);
+            AddCup(data, bodyVertices, offsetX + width * 0.29f,
+                centerY - height * 0.17f, cupWidth, cupHeight, false);
+            AddFrontBridge(data, bodyVertices, offsetX, centerY, width);
+            AddFrontStrap(data, bodyVertices, offsetX - width * 0.29f,
+                centerY + height * 0.02f, false, width);
+            AddFrontStrap(data, bodyVertices, offsetX + width * 0.29f,
+                centerY + height * 0.02f, true, width);
+        }
+
+        private void AddCup(GarmentMeshData data, Vector3[] bodyVertices,
+            float centerX, float centerY, float radiusX, float radiusY, bool left)
+        {
+            const int rings = 5;
+            const int segments = 18;
+            int center = data.vertices.Count;
+            data.vertices.Add(SurfacePoint(bodyVertices, centerX, centerY, true, 0.030f));
+            data.uv.Add(new Vector2(left ? 0.30f : 0.70f, 0.20f));
+            int firstRing = data.vertices.Count;
+            for (int ring = 1; ring <= rings; ring++)
             {
-                float v = row / (float)(rows - 1);
-                for (int column = 0; column < columns; column++)
+                float radius = ring / (float)rings;
+                for (int segment = 0; segment < segments; segment++)
                 {
-                    float u = column / (float)(columns - 1);
-                    float x = offsetX + (u - 0.5f) * width;
-                    float y = centerY + (v - 0.5f) * height;
-                    data.vertices.Add(SurfacePoint(bodyVertices, x, y, true, 0.006f));
-                    data.uv.Add(new Vector2(u, v));
+                    float angle = segment * Mathf.PI * 2f / segments;
+                    float x = centerX + Mathf.Cos(angle) * radiusX * radius;
+                    float y = centerY + Mathf.Sin(angle) * radiusY * radius;
+                    float depth = 0.006f + (1f - radius) * 0.024f;
+                    data.vertices.Add(SurfacePoint(bodyVertices, x, y, true, depth));
+                    data.uv.Add(new Vector2(left ? 0.08f + radius * 0.40f : 0.52f + radius * 0.40f,
+                        0.08f + (Mathf.Sin(angle) * 0.18f + 0.20f) * radius));
                 }
             }
-            AddGridTriangles(data.triangles, start, columns, rows);
+            for (int segment = 0; segment < segments; segment++)
+            {
+                int a = firstRing + segment;
+                int b = firstRing + (segment + 1) % segments;
+                data.triangles.Add(center); data.triangles.Add(a); data.triangles.Add(b);
+            }
+            for (int ring = 1; ring < rings; ring++)
+            {
+                int current = firstRing + (ring - 1) * segments;
+                int next = current + segments;
+                for (int segment = 0; segment < segments; segment++)
+                {
+                    int a = current + segment;
+                    int b = current + (segment + 1) % segments;
+                    int c = next + (segment + 1) % segments;
+                    int d = next + segment;
+                    data.triangles.Add(a); data.triangles.Add(b); data.triangles.Add(c);
+                    data.triangles.Add(a); data.triangles.Add(c); data.triangles.Add(d);
+                }
+            }
+        }
+
+        private void AddFrontBridge(GarmentMeshData data, Vector3[] bodyVertices,
+            float offsetX, float centerY, float width)
+        {
+            const int samples = 8;
+            int start = data.vertices.Count;
+            float y = centerY - 0.025f;
+            for (int i = 0; i < samples; i++)
+            {
+                float t = i / (float)(samples - 1);
+                float x = offsetX + Mathf.Lerp(-width * 0.16f, width * 0.16f, t);
+                data.vertices.Add(SurfacePoint(bodyVertices, x, y + 0.018f, true, 0.010f));
+                data.vertices.Add(SurfacePoint(bodyVertices, x, y - 0.018f, true, 0.010f));
+                data.uv.Add(Vector2.zero); data.uv.Add(Vector2.zero);
+            }
+            AddRibbonTriangles(data.triangles, start, samples);
+        }
+
+        private void AddFrontStrap(GarmentMeshData data, Vector3[] bodyVertices,
+            float offsetX, float startY, bool right, float width)
+        {
+            const int samples = 10;
+            int start = data.vertices.Count;
+            float endX = offsetX + (right ? width * 0.17f : -width * 0.17f);
+            float endY = startY + width * 0.72f;
+            for (int i = 0; i < samples; i++)
+            {
+                float t = i / (float)(samples - 1);
+                float x = Mathf.Lerp(offsetX, endX, t);
+                float y = Mathf.Lerp(startY, endY, t);
+                float nextX = Mathf.Lerp(offsetX, endX, Mathf.Min(1f, t + 0.03f));
+                float nextY = Mathf.Lerp(startY, endY, Mathf.Min(1f, t + 0.03f));
+                Vector2 tangent = new Vector2(nextX - x, nextY - y).normalized;
+                Vector2 normal = new Vector2(-tangent.y, tangent.x) * width * 0.045f;
+                data.vertices.Add(SurfacePoint(bodyVertices, x + normal.x, y + normal.y, true, 0.010f));
+                data.vertices.Add(SurfacePoint(bodyVertices, x - normal.x, y - normal.y, true, 0.010f));
+                data.uv.Add(Vector2.zero); data.uv.Add(Vector2.zero);
+            }
+            AddRibbonTriangles(data.triangles, start, samples);
         }
 
         private void AddBackStrap(GarmentMeshData data, Vector3[] bodyVertices,
@@ -823,31 +904,50 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static Material NewMaterial(Color color, float metallic, float smoothness)
         { Shader shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Unlit/Color"); Material material = new Material(shader); material.color = color; if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", metallic); if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", smoothness); return material; }
 
-        private static Material NewBraMaterial(Texture2D texture)
-        {
-            Shader shader = Shader.Find("Unlit/Transparent") ?? Shader.Find("Sprites/Default") ?? Shader.Find("Standard");
-            Material material = new Material(shader) { name = "Soutien-gorge integre" };
-            if (texture != null) material.mainTexture = texture;
-            material.color = Color.white;
-            // Alpha seulement autour des bords du vetement : le tissu lui-meme
-            // reste une surface opaque qui suit le corps.
-            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 3f);
-            if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-            material.DisableKeyword("_ALPHATEST_ON");
-            material.EnableKeyword("_ALPHABLEND_ON");
-            if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            material.renderQueue = 3000;
-            return material;
-        }
-
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    // Le PNG est maintenant compose dans le shader du meme maillage skine :
-    // aucune image frontale ni bretelle flottante n'est creee.
+    private static class UnderwearCoverage
+    {
+        public static bool HideSkin(Vector3 point, float scale, float offsetX, float offsetY)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY;
+            if (point.z >= 0f)
+            {
+                float leftX = offsetX - width * 0.29f;
+                float rightX = offsetX + width * 0.29f;
+                float cupY = centerY - height * 0.17f;
+                float rx = width * 0.31f * 1.18f;
+                float ry = height * 0.31f * 1.18f;
+                if (InsideEllipse(point.x, point.y, leftX, cupY, rx, ry)
+                    || InsideEllipse(point.x, point.y, rightX, cupY, rx, ry)) return true;
+                if (Mathf.Abs(point.x - offsetX) <= width * 0.18f
+                    && Mathf.Abs(point.y - (centerY - 0.025f)) <= 0.035f) return true;
+            }
+
+            // La culotte retire la peau de ses deux faces. La forme se resserre
+            // vers l'entrejambe pour eviter une grande plaque rectangulaire.
+            if (point.y >= 1.00f && point.y <= 1.42f)
+            {
+                float t = Mathf.InverseLerp(1.00f, 1.42f, point.y);
+                float halfWidth = Mathf.Lerp(0.21f, 0.29f, t) * factor;
+                if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
+            }
+            return false;
+        }
+
+        private static bool InsideEllipse(float x, float y, float centerX, float centerY,
+            float radiusX, float radiusY)
+        {
+            float dx = (x - centerX) / Mathf.Max(radiusX, 0.001f);
+            float dy = (y - centerY) / Mathf.Max(radiusY, 0.001f);
+            return dx * dx + dy * dy <= 1f;
+        }
+    }
 
     private static class HairBuilder
     {

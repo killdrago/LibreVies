@@ -85,11 +85,12 @@ transmettre avec le modele.
 
 Le personnage féminin est maintenant construit avec un maillage de corps et
 un maillage de sous-vêtements skines dans la même creation. Le soutien-gorge
-frontal suit les points de surface du torse et utilise `soutien_gorge.png` pour
-sa couleur et ses contours alpha ; les bretelles et la bande du dos suivent la
-surface arrière. Une culotte est également créée autour des hanches avec le
-même materiau de couleur. Ces meshes partagent les os et les poids du corps,
-ils ne sont donc pas des images flottantes ni un quad frontal.
+frontal est une forme opaque composee de deux bonnets, d'un pont et de
+bretelles ; les triangles de peau sous les bonnets sont retires. Les bretelles
+et la bande du dos suivent la surface arrière. Une culotte est également créée
+autour des hanches et la peau correspondante est retiree. Ces meshes partagent
+les os et les poids du corps : ce ne sont pas des images flottantes ni un quad
+frontal.
 
 ## Limite importante, franchement
 
