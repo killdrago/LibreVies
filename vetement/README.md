@@ -83,12 +83,13 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le maillage humain reste un seul SkinnedMeshRenderer avec ses os et ses poids.
-Le shader compose directement SkinBase et `soutien_gorge.png` sur cette surface :
-les pixels opaques du PNG remplacent la peau, tandis que les pixels transparents
-laissent apparaitre la peau normale. Les bretelles arrière utilisent le même PNG
-et la même surface du dos, sans quad frontal ni bande horizontale independante.
-La culotte et le calecon restent volontairement reportes.
+Le personnage féminin est maintenant construit avec un maillage de corps et
+un maillage de sous-vêtements skines dans la même creation. Le soutien-gorge
+frontal suit les points de surface du torse et utilise `soutien_gorge.png` pour
+sa couleur et ses contours alpha ; les bretelles et la bande du dos suivent la
+surface arrière. Une culotte est également créée autour des hanches avec le
+même materiau de couleur. Ces meshes partagent les os et les poids du corps,
+ils ne sont donc pas des images flottantes ni un quad frontal.
 
 ## Limite importante, franchement
 
