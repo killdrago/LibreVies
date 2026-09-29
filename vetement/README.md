@@ -84,12 +84,12 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 transmettre avec le modele.
 
 Le maillage humain conserve ici son matériau Standard d'origine pour rester
-stable dans l'aperçu. Les triangles de peau couverts par l'alpha du soutien-gorge
-sont retires du premier sous-maillage, puis le PNG est dessine dans un second
-sous-maillage du meme SkinnedMeshRenderer, avec les memes vertices, os et poids.
-Le devant et les bretelles arrière suivent ainsi directement la surface du corps :
-il n'y a plus de quad frontal ni de ruban flottant. La culotte et le calecon
-restent volontairement reportes.
+stable dans l'aperçu. Les triangles de peau sous les bonnets sont retires du
+premier sous-maillage, puis le PNG est dessine dans un second sous-maillage du
+meme SkinnedMeshRenderer, avec les memes vertices, os et poids. Les bretelles
+et la bande horizontale du dos suivent la surface du corps sans decouper les
+triangles transparents situes autour d'elles : il n'y a plus de quad frontal ni
+de ruban flottant. La culotte et le calecon restent volontairement reportes.
 
 ## Limite importante, franchement
 

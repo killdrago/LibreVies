@@ -331,8 +331,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Func<Vector3, bool> vetementCoverage = values.female
-                ? (Func<Vector3, bool>)(point => GarmentCoverage.IsCovered(point,
+            Func<Vector3, bool> hideSkin = values.female
+                ? (Func<Vector3, bool>)(point => GarmentCoverage.HideSkin(point,
+                    values.garmentScale, values.garmentOffsetX,
+                    values.garmentOffsetY, values.garmentOffsetZ))
+                : null;
+            Func<Vector3, bool> garmentSurface = values.female
+                ? (Func<Vector3, bool>)(point => GarmentCoverage.IsGarmentSurface(point,
                     values.garmentScale, values.garmentOffsetX,
                     values.garmentOffsetY, values.garmentOffsetZ))
                 : null;
@@ -341,7 +346,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     values.garmentScale, values.garmentOffsetX,
                     values.garmentOffsetY, values.garmentOffsetZ))
                 : null;
-            Mesh mesh = obj.CreateMesh(vertices, vetementCoverage, garmentUv);
+            Mesh mesh = obj.CreateMesh(vertices, hideSkin, garmentSurface, garmentUv);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -582,6 +587,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Texture2D texture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
             if (texture != null) material.mainTexture = texture;
             material.color = Color.white;
+            if (material.HasProperty("_Cutoff")) material.SetFloat("_Cutoff", 0.015f);
             return material;
         }
 
@@ -595,7 +601,24 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private const int MaskHeight = 60;
         private static string[] alphaRows;
 
-        public static bool IsCovered(Vector3 point, float scale, float offsetX,
+        // Les bonnets remplacent la peau. Les bretelles restent sur la peau
+        // sous-jacente : les pixels transparents du PNG ne decoupent donc pas
+        // des triangles entiers et ne laissent plus de trous gris.
+        public static bool HideSkin(Vector3 point, float scale, float offsetX,
+            float offsetY, float offsetZ)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY;
+            float u = (point.x - offsetX) / width + 0.5f;
+            float v = (point.y - centerY) / height + 0.5f;
+            float frontSide = Mathf.Min(0f, offsetZ * 0.1f);
+            return point.z >= frontSide && u >= 0f && u <= 1f && v >= 0f && v <= 1f
+                && v < 0.56f && SampleAlpha(u, v);
+        }
+
+        public static bool IsGarmentSurface(Vector3 point, float scale, float offsetX,
             float offsetY, float offsetZ)
         {
             Vector2 ignored;
@@ -657,19 +680,31 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     Mathf.Min(DistanceToSegment(p, right0, right1),
                         Mathf.Min(DistanceToSegment(p, right1, right2),
                             DistanceToSegment(p, right2, right3)))));
-            if (distance > 0.026f * strapScale)
+            if (distance <= 0.040f * strapScale)
             {
-                result = Vector2.zero;
-                return false;
+                float t = Mathf.Clamp01((p.y + 0.28f * strapScale) / (0.47f * strapScale));
+                bool left = p.x < 0f;
+                float strapU = left
+                    ? 0.07f + (1f - t) * 0.08f
+                    : 0.93f - (1f - t) * 0.08f;
+                result = new Vector2(strapU, 0.45f + t * 0.55f);
+                return true;
             }
 
-            float t = Mathf.Clamp01((p.y + 0.28f * strapScale) / (0.47f * strapScale));
-            bool left = p.x < 0f;
-            float strapU = left
-                ? 0.07f + (1f - t) * 0.08f
-                : 0.93f - (1f - t) * 0.08f;
-            result = new Vector2(strapU, 0.45f + t * 0.55f);
-            return true;
+            // Bande horizontale dorsale : elle reste un sous-maillage de la
+            // surface du dos, mais ne depend pas des petits triangles des
+            // bretelles. Le PNG fournit sa meme teinte beige opaque.
+            float bandY = -0.24f * strapScale;
+            if (Mathf.Abs(p.y - bandY) <= 0.045f * strapScale
+                && Mathf.Abs(p.x) <= 0.31f * strapScale)
+            {
+                float bandU = Mathf.Clamp01(p.x / (0.62f * strapScale) + 0.5f);
+                result = new Vector2(bandU, 0.20f);
+                return true;
+            }
+
+            result = Vector2.zero;
+            return false;
         }
 
         private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
@@ -931,11 +966,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> hideTriangle)
         {
-            return CreateMesh(vertices, hideTriangle, null);
+            return CreateMesh(vertices, hideTriangle, hideTriangle, null);
         }
 
         public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> hideTriangle,
-            Func<Vector3, Vector2> garmentUv)
+            Func<Vector3, bool> garmentTriangle, Func<Vector3, Vector2> garmentUv)
         {
             Mesh mesh = new Mesh
             {
@@ -950,11 +985,20 @@ public sealed class AdminHumanCreator : MonoBehaviour
             {
                 Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
                     + vertices[triangle.c]) / 3f;
-                bool garment = hideTriangle != null && hideTriangle(centre);
-                List<int> destination = garment ? garmentIndices : bodyIndices;
-                destination.Add(triangle.a);
-                destination.Add(triangle.b);
-                destination.Add(triangle.c);
+                bool hide = hideTriangle != null && hideTriangle(centre);
+                bool garment = garmentTriangle != null && garmentTriangle(centre);
+                if (!hide)
+                {
+                    bodyIndices.Add(triangle.a);
+                    bodyIndices.Add(triangle.b);
+                    bodyIndices.Add(triangle.c);
+                }
+                if (garment)
+                {
+                    garmentIndices.Add(triangle.a);
+                    garmentIndices.Add(triangle.b);
+                    garmentIndices.Add(triangle.c);
+                }
             }
 
             if (garmentUv == null)
