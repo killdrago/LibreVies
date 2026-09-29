@@ -331,6 +331,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
+            if (values.female)
+                FlattenChestForBra(vertices, values.garmentScale,
+                    values.garmentOffsetX, values.garmentOffsetY);
 
             BuildBones(deformed, min.y);
             Func<Vector3, bool> underwearCoverage = values.female
@@ -361,6 +364,32 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
+        }
+
+        private static void FlattenChestForBra(Vector3[] vertices, float scale,
+            float offsetX, float offsetY)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY;
+            float halfWidth = width * 0.40f;
+            float bottom = centerY - height * 0.50f;
+            float top = centerY + height * 0.32f;
+            // On aplatit uniquement l'avant de la cage thoracique couverte
+            // par le soutien-gorge. Les seins et les tetons ne peuvent donc
+            // plus former une bosse sous le materiau du vetement.
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 point = vertices[i];
+                if (point.z <= 0f || point.x < offsetX - halfWidth
+                    || point.x > offsetX + halfWidth
+                    || point.y < bottom || point.y > top) continue;
+                float side = Mathf.Abs(point.x - offsetX) / Mathf.Max(halfWidth, 0.001f);
+                float vertical = Mathf.InverseLerp(bottom, top, point.y);
+                float targetDepth = 0.135f + vertical * 0.010f - side * 0.008f;
+                vertices[i].z = Mathf.Min(vertices[i].z, targetDepth);
+            }
         }
 
         public void Animate(bool moving, bool running, float clock)
@@ -577,6 +606,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     private static class UnderwearCoverage
     {
+        private const int MaskWidth = 64;
+        private const int MaskHeight = 60;
+        private static string[] alphaRows;
+
         public static bool IsCovered(Vector3 point, float scale, float offsetX, float offsetY)
         {
             float factor = Mathf.Clamp(scale, 0.25f, 3f);
@@ -587,6 +620,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
             if (point.z >= 0f)
             {
+                float imageU = p.x / width + 0.5f;
+                float imageV = p.y / height + 0.5f;
+                if (imageU >= 0f && imageU <= 1f && imageV >= 0f && imageV <= 1f
+                    && SampleAlpha(imageU, imageV)) return true;
                 float cupY = -height * 0.14f;
                 float cupX = width * 0.29f;
                 float cupRadiusX = width * 0.34f * 1.15f;
@@ -610,13 +647,36 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
             // Les faces avant et arriere de la culotte sont colorees dans le
             // second sous-maillage : aucune peau ne reste sous cette zone.
-            if (point.y >= 1.02f && point.y <= 1.34f)
+            if (point.y >= 0.96f && point.y <= 1.22f)
             {
-                float t = Mathf.InverseLerp(1.02f, 1.34f, point.y);
+                float t = Mathf.InverseLerp(0.96f, 1.22f, point.y);
                 float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
                 if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
             }
             return false;
+        }
+
+        private static bool SampleAlpha(float u, float v)
+        {
+            EnsureMask();
+            if (alphaRows == null || alphaRows.Length != MaskHeight) return false;
+            int x = Mathf.Clamp(Mathf.FloorToInt(u * MaskWidth), 0, MaskWidth - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt((1f - v) * MaskHeight), 0, MaskHeight - 1);
+            return alphaRows[y][x] == '1';
+        }
+
+        private static void EnsureMask()
+        {
+            if (alphaRows != null) return;
+            TextAsset mask = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge_alpha");
+            if (mask == null) { alphaRows = new string[0]; return; }
+            List<string> rows = new List<string>();
+            foreach (string line in mask.text.Split('\\n'))
+            {
+                string row = line.Trim();
+                if (row.Length >= MaskWidth) rows.Add(row.Substring(0, MaskWidth));
+            }
+            alphaRows = rows.Count == MaskHeight ? rows.ToArray() : new string[0];
         }
 
         private static bool InsideEllipse(Vector2 point, Vector2 center,

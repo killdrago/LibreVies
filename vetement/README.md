@@ -87,9 +87,12 @@ Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
 corps et les sous-vêtements. Les triangles correspondant aux bonnets, aux
 bretelles et a la culotte sont envoyes dans le second sous-maillage avec le
 materiau opaque des sous-vêtements ; ils ne sont donc plus dessines avec le
-materiau peau. C'est un rendu de type tatouage/texture integree : aucune peau
-ne reste sous ces zones, et aucun quad ou mesh de vetement n'est ajoute devant
-le corps. Les os, les poids et les curseurs ADMIN restent ceux du personnage.
+materiau peau. La zone pectorale est aplatie avant le rendu pour ne pas laisser
+apparaitre les tetons ou le relief des seins sous le vetement. C'est un rendu de
+type tatouage/texture integree : aucune peau ne reste sous ces zones, et aucun
+quad ou mesh de vetement n'est ajoute devant le corps. La culotte est placee en
+taille basse sur les hanches. Les os, les poids et les curseurs ADMIN restent
+ceux du personnage.
 
 ## Limite importante, franchement
 
