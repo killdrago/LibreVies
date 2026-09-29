@@ -83,17 +83,13 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le matériau du maillage humain utilise le meme alpha pour remplacer la texture
-de peau par les pixels du soutien-gorge dans la zone couverte : le resultat
-n'est donc pas une simple image posee par-dessus. Les pixels transparents
-conservent la peau. Lorsqu'un profil feminin est valide, le personnage applique
-le meme remplacement et le vetement reste reglable avec les quatre curseurs.
-Le JSON conserve le placement exact pour la prochaine etape de remplacement de
-la zone `torse_avant` sur le maillage final. Le dos du soutien-gorge utilise
-le meme remplacement directement sur la peau : les deux bretelles sont tracees
-sur la surface arriere du corps, sans objet flottant. La culotte et le calecon
-restent volontairement reportes pour eviter de creer un volume approximatif
-avant validation du soutien-gorge.
+Le maillage humain conserve ici son matériau Standard d'origine pour rester
+stable dans l'aperçu. Le soutien-gorge est rendu séparément avec sa texture
+alpha et le JSON conserve son placement exact. Les deux bretelles arrière sont
+calculées sur la surface dorsale du maillage afin de ne pas flotter derrière le
+corps. La culotte et le calecon restent volontairement reportes ; le
+remplacement direct de la texture `torse_avant` sera repris après validation du
+placement et du rendu.
 
 ## Limite importante, franchement
 
