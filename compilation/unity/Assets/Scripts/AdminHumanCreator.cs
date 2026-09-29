@@ -538,6 +538,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Material material)
         {
             style = Mathf.Clamp(style, 0, 4);
+            // La coupe 0 est la base MakeHuman sans cheveux : elle ne doit
+            // produire aucun halo autour du crane.
+            if (style == 0) return null;
             GameObject objectHair = new GameObject("Cheveux - coupe " + style);
             objectHair.transform.SetParent(head == null ? parent : head, false);
             float width = female ? 0.115f : 0.105f;
