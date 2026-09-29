@@ -592,11 +592,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Debug.LogError("[LV] Soutien-gorge : shader ou texture introuvable, remplacement de peau desactive.");
                 return;
             }
-            Texture2D skinTexture = skin.mainTexture as Texture2D;
+            Texture2D skinTexture = Resources.Load<Texture2D>("Characters/MakeHuman/SkinBase");
             Color skinColor = skin.color;
             if (skin.shader != shader) skin.shader = shader;
-            skin.mainTexture = skinTexture;
-            skin.color = skinColor;
+            // mainTexture depends on the shader's main-texture annotation in
+            // Unity 6. Reappliquer explicitement les deux propriétés evite de
+            // perdre SkinBase lorsque le materiau change de shader.
+            if (skinTexture != null) skin.SetTexture("_MainTex", skinTexture);
+            skin.SetColor("_Color", skinColor);
             float width = 0.36f * Mathf.Clamp(scale, 0.25f, 3f);
             float height = width * garmentTexture.height / Mathf.Max(1f, garmentTexture.width);
             Vector3 localCenter = new Vector3(offsetX, 1.61f + offsetY, offsetZ);

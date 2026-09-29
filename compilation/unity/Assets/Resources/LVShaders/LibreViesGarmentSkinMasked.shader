@@ -2,8 +2,8 @@ Shader "LibreVies/GarmentSkinMasked"
 {
     Properties
     {
-        _Color ("Skin color", Color) = (1,1,1,1)
-        _MainTex ("Skin texture", 2D) = "white" {}
+        [MainColor] _Color ("Skin color", Color) = (1,1,1,1)
+        [MainTexture] _MainTex ("Skin texture", 2D) = "white" {}
         _Metallic ("Metallic", Range(0,1)) = 0
         _Glossiness ("Smoothness", Range(0,1)) = 0.35
         _GarmentTex ("Garment alpha", 2D) = "black" {}
