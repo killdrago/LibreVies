@@ -83,10 +83,12 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Cette image n'est volontairement pas appliquee au personnage reel lors de la
-validation : elle sert a choisir le placement. Le JSON valide sera reutilise
-ensuite pour masquer ou remplacer la zone de peau `torse_avant`, afin de ne
-pas laisser une simple superposition definitive.
+Le maillage de peau utilise le meme alpha du soutien-gorge pour supprimer la
+peau sous la forme du vetement : le resultat n'est donc pas une simple image
+posee par-dessus. Lorsqu'un profil feminin est valide, le personnage applique
+le meme masquage et le vetement reste reglable avec les quatre curseurs. Le
+JSON conserve le placement exact pour la prochaine etape de remplacement de
+la zone `torse_avant` sur le maillage final.
 
 ## Limite importante, franchement
 

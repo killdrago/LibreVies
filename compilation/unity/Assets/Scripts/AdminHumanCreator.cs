@@ -29,8 +29,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
     // Placement de l'image de soutien-gorge dans le preview ADMIN.
     public float garmentScale = 1f;
     public float garmentOffsetX;
-    public float garmentOffsetY;
-    public float garmentOffsetZ = 0.235f;
+    public float garmentOffsetY = 0.0509090908f;
+    public float garmentOffsetZ = 0.24318181f;
 
     [Serializable]
     private sealed class GarmentPlacementData
@@ -343,10 +343,19 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            if (facePreviewCamera)
+            if (values.female)
+            {
                 GarmentPreviewBuilder.Create(values.female, values.garmentScale,
                     values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
                     root.transform);
+                GarmentPreviewBuilder.ConfigureSkinMask(skin, values.garmentScale,
+                    values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
+                    root.transform);
+            }
+            else
+            {
+                GarmentPreviewBuilder.DisableSkinMask(skin);
+            }
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -568,8 +577,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    // Cette image sert uniquement de repere reglable dans l'outil ADMIN.
-    // Le masquage de peau sera applique apres validation du placement.
+    // Repere reglable de l'outil ADMIN : son alpha masque la peau en dessous
+    // afin que le vetement ne reste pas une simple superposition.
 
     private static class GarmentPreviewBuilder
     {
@@ -615,6 +624,50 @@ public sealed class AdminHumanCreator : MonoBehaviour
             GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
             resources.Mesh = mesh;
             resources.Material = material;
+        }
+
+        public static void ConfigureSkinMask(Material skin, float scale, float offsetX,
+            float offsetY, float offsetZ, Transform root)
+        {
+            if (skin == null || root == null) return;
+            Shader shader = Shader.Find("LibreVies/GarmentSkinMasked");
+            Texture2D garmentTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
+            if (shader == null || garmentTexture == null)
+            {
+                DisableSkinMask(skin);
+                return;
+            }
+            Texture2D skinTexture = skin.mainTexture as Texture2D;
+            Color skinColor = skin.color;
+            if (skin.shader != shader) skin.shader = shader;
+            skin.mainTexture = skinTexture;
+            skin.color = skinColor;
+            float width = 0.36f * Mathf.Clamp(scale, 0.25f, 3f);
+            float height = width * garmentTexture.height / Mathf.Max(1f, garmentTexture.width);
+            Vector3 localCenter = new Vector3(offsetX, 1.61f + offsetY, offsetZ);
+            Vector3 center = root.TransformPoint(localCenter);
+            Vector3 right = root.TransformDirection(Vector3.right).normalized;
+            Vector3 up = root.TransformDirection(Vector3.up).normalized;
+            Vector3 forward = root.TransformDirection(Vector3.forward).normalized;
+            float worldWidth = root.TransformVector(Vector3.right * width).magnitude;
+            float worldHeight = root.TransformVector(Vector3.up * height).magnitude;
+            skin.SetTexture("_GarmentTex", garmentTexture);
+            skin.SetVector("_MaskCenterWS", new Vector4(center.x, center.y, center.z, 1f));
+            skin.SetVector("_MaskRightWS", new Vector4(right.x, right.y, right.z, 0f));
+            skin.SetVector("_MaskUpWS", new Vector4(up.x, up.y, up.z, 0f));
+            skin.SetVector("_MaskForwardWS", new Vector4(forward.x, forward.y, forward.z, 0f));
+            skin.SetFloat("_MaskWidth", worldWidth);
+            skin.SetFloat("_MaskHeight", worldHeight);
+            skin.SetFloat("_MaskMinDepth", -0.50f);
+            skin.SetFloat("_MaskMaxDepth", 0.15f);
+            skin.SetFloat("_MaskAlphaClip", 0.08f);
+            skin.SetFloat("_MaskEnabled", 1f);
+        }
+
+        public static void DisableSkinMask(Material skin)
+        {
+            if (skin == null) return;
+            if (skin.HasProperty("_MaskEnabled")) skin.SetFloat("_MaskEnabled", 0f);
         }
     }
 
