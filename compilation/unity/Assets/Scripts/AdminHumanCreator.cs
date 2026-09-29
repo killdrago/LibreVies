@@ -573,7 +573,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private static Material NewGarmentSkinMaterial(Texture2D skinTexture, Texture2D garmentTexture)
         {
-            Shader shader = Shader.Find("LibreVies/SoutienGorgeSkin") ?? Shader.Find("Standard");
+            Shader shader = Resources.Load<Shader>("LVShaders/LibreViesGarmentSkin")
+                ?? Shader.Find("LibreVies/SoutienGorgeSkin")
+                ?? Shader.Find("Standard");
             Material material = new Material(shader) { name = "Peau et sous-vetements integres" };
             if (material.HasProperty("_MainTex") && skinTexture != null)
                 material.SetTexture("_MainTex", skinTexture);
