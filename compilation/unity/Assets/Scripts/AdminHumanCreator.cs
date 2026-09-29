@@ -678,15 +678,26 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Vector3 SurfacePoint(Vector3[] bodyVertices, float x, float y,
             bool front, float offset)
         {
+            // On cherche d'abord la proximite dans le plan XY, puis on choisit
+            // le vertex avant ou arriere parmi les voisins immediats. L'ancien
+            // rayon de recherche de 10 cm pouvait attraper un bras ou une
+            // jambe et etirer le vetement en grand polygone.
+            float nearestXY = float.MaxValue;
+            for (int i = 0; i < bodyVertices.Length; i++)
+            {
+                float dx = bodyVertices[i].x - x;
+                float dy = bodyVertices[i].y - y;
+                nearestXY = Mathf.Min(nearestXY, dx * dx + dy * dy);
+            }
+            float allowed = nearestXY + 0.0025f;
             int nearest = -1;
-            float best = float.MaxValue;
             float bestDepth = front ? -float.MaxValue : float.MaxValue;
             for (int i = 0; i < bodyVertices.Length; i++)
             {
                 Vector3 candidate = bodyVertices[i];
                 float dx = candidate.x - x;
                 float dy = candidate.y - y;
-                if (Mathf.Abs(dx) > 0.10f || Mathf.Abs(dy) > 0.10f) continue;
+                if (dx * dx + dy * dy > allowed) continue;
                 if (front && candidate.z > bestDepth)
                 {
                     bestDepth = candidate.z;
@@ -696,16 +707,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 {
                     bestDepth = candidate.z;
                     nearest = i;
-                }
-                best = Mathf.Min(best, dx * dx + dy * dy);
-            }
-            if (nearest < 0)
-            {
-                for (int i = 0; i < bodyVertices.Length; i++)
-                {
-                    float distance = (bodyVertices[i].x - x) * (bodyVertices[i].x - x)
-                        + (bodyVertices[i].y - y) * (bodyVertices[i].y - y);
-                    if (distance < best) { best = distance; nearest = i; }
                 }
             }
             Vector3 result = nearest < 0 ? new Vector3(x, y, front ? 0.16f : -0.13f)
@@ -824,7 +825,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private static Material NewBraMaterial(Texture2D texture)
         {
-            Shader shader = Shader.Find("Standard") ?? Shader.Find("Unlit/Transparent");
+            Shader shader = Shader.Find("Unlit/Transparent") ?? Shader.Find("Sprites/Default") ?? Shader.Find("Standard");
             Material material = new Material(shader) { name = "Soutien-gorge integre" };
             if (texture != null) material.mainTexture = texture;
             material.color = Color.white;
