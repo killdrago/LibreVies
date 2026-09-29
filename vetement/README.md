@@ -83,14 +83,16 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le personnage féminin utilise un seul SkinnedMeshRenderer. Le shader compose
-SkinBase et le PNG du soutien-gorge directement sur les fragments de la surface
-skinee : les bords suivent donc la texture du vetement, sans decouper des
-triangles et sans ajouter un quad devant le corps. Les seins restent dans la
-forme naturelle du corps mais les pixels opaques du soutien-gorge masquent la
-peau et les tetons. Les bretelles et la bande du dos utilisent la meme surface,
-et la culotte est calculee en taille basse jusqu'au haut des cuisses. Les os,
-les poids et les curseurs ADMIN restent ceux du personnage.
+Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
+corps et les sous-vêtements. Les triangles correspondant aux bonnets, aux
+bretelles et a la culotte sont envoyes dans le second sous-maillage avec le
+materiau opaque des sous-vêtements ; ils ne sont donc plus dessines avec le
+materiau peau. La zone pectorale est aplatie avant le rendu pour ne pas laisser
+apparaitre les tetons ou le relief des seins sous le vetement. C'est un rendu de
+type tatouage/texture integree : aucune peau ne reste sous ces zones, et aucun
+quad ou mesh de vetement n'est ajoute devant le corps. La culotte est placee en
+taille basse sur les hanches. Les os, les poids et les curseurs ADMIN restent
+ceux du personnage.
 
 ## Limite importante, franchement
 
