@@ -7258,7 +7258,7 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
         GUI.Label(new Rect(droite, contenu.y + 635f, 250f, 34f),
-            "Le soutien-gorge remplace la peau.\nCulotte / calecon en volume.", smallStyle);
+            "Le soutien-gorge remplace la peau.\nBretelles prolongees dans le dos.", smallStyle);
     }
 
     private void DessinerAdmin()

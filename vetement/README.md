@@ -90,9 +90,9 @@ conservent la peau. Lorsqu'un profil feminin est valide, le personnage applique
 le meme remplacement et le vetement reste reglable avec les quatre curseurs.
 Le JSON conserve le placement exact pour la prochaine etape de remplacement de
 la zone `torse_avant` sur le maillage final. Le dos du soutien-gorge est
-complete par deux bretelles et une bande dorsale en volume. L'aperçu feminin
-cree aussi une culotte ; l'aperçu masculin cree un calecon, avec la meme
-couleur textile.
+complete uniquement par les deux bretelles qui prolongent celles de devant.
+La culotte et le calecon restent volontairement reportes pour eviter de creer
+un volume approximatif avant validation du soutien-gorge.
 
 ## Limite importante, franchement
 
