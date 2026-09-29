@@ -630,11 +630,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float offsetY, float offsetZ, Transform root)
         {
             if (skin == null || root == null) return;
-            Shader shader = Shader.Find("LibreVies/GarmentSkinMasked");
+            Shader shader = Resources.Load<Shader>("LVShaders/LibreViesGarmentSkinMasked");
+            if (shader == null) shader = Shader.Find("LibreVies/GarmentSkinMasked");
             Texture2D garmentTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
             if (shader == null || garmentTexture == null)
             {
                 DisableSkinMask(skin);
+                Debug.LogError("[LV] Soutien-gorge : shader ou texture introuvable, remplacement de peau desactive.");
                 return;
             }
             Texture2D skinTexture = skin.mainTexture as Texture2D;
