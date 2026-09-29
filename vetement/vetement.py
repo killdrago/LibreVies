@@ -207,6 +207,10 @@ class GLBWriter:
             image_json = [{"bufferView": image_view, "mimeType": "image/png"}]
             texture_json = [{"source": 0}]
             material["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
+            # Le PNG peut contenir de l'alpha : sans ce mode, Unity et
+            # certains visionneurs affichent les pixels transparents en noir.
+            material["alphaMode"] = "BLEND"
+            material["doubleSided"] = True
 
         root = {
             "asset": {"version": "2.0", "generator": "LibreVies Atelier Vetement"},

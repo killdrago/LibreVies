@@ -47,8 +47,28 @@ L'export produit :
 - `nom.glb` : modele 3D importable dans Unity, Blender ou Godot ;
 - `nom.json` : position, zone d'attache et zone de couverture du corps.
 
-Le JSON est reserve au futur branchement du vetement sur le joueur : le jeu
-pourra lire `anchor` et `coverage` pour masquer ou non la peau sous le vetement.
+Les images avec alpha sont exportees avec `alphaMode: BLEND` dans le GLB. Le
+fond noir d'un visionneur qui ne gere pas l'alpha ne fait donc pas partie du
+vetement.
+
+Le JSON est reserve au branchement du vetement sur le joueur : le jeu pourra
+lire `anchor` et `coverage` pour masquer ou non la peau sous le vetement.
+
+## Mettre un GLB dans Unity
+
+Le projet Unity ne lit pas les GLB nativement. Deux solutions sont possibles :
+
+1. ouvrir le GLB dans Blender, appliquer le materiau transparent, puis
+   exporter en FBX ;
+2. ajouter le package Unity **glTFast** via le Package Manager, puis charger le
+   GLB avec son importeur.
+
+Copier simplement le fichier dans `Assets` ne suffit pas encore pour le joueur :
+le GLB exporte par cet atelier est un vetement rigide, pas encore skine sur les
+os du personnage. Il faudra ensuite le placer sur le rig MakeHuman, lui donner
+les os du torse/bassin et appliquer `anchor`/`coverage` du JSON. C'est cette
+etape qui permettra de remplacer la peau sous le vetement sans detruire le
+maillage humain.
 
 ## Limite importante, franchement
 
