@@ -335,11 +335,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Func<Vector3, bool> hideSkin = values.female
-                ? (Func<Vector3, bool>)(point => UnderwearCoverage.HideSkin(point,
-                    values.garmentScale, values.garmentOffsetX, values.garmentOffsetY))
-                : null;
-            Mesh mesh = obj.CreateMesh(vertices, hideSkin);
+            // Le corps reste entier sous les vetements : les surfaces opaques
+            // du soutien-gorge et de la culotte le recouvrent comme dans un
+            // FBX habille. On ne decoupe donc plus de triangles qui laisseraient
+            // des trous transparents autour du vetement.
+            Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -578,12 +578,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private void AddFrontBraSurface(GarmentMeshData data, Vector3[] bodyVertices,
             float width, float height, float centerY, float offsetX)
         {
-            float cupWidth = width * 0.31f;
-            float cupHeight = height * 0.31f;
+            float cupWidth = width * 0.34f;
+            float cupHeight = height * 0.34f;
             AddCup(data, bodyVertices, offsetX - width * 0.29f,
-                centerY - height * 0.17f, cupWidth, cupHeight, true);
+                centerY - height * 0.14f, cupWidth, cupHeight, true);
             AddCup(data, bodyVertices, offsetX + width * 0.29f,
-                centerY - height * 0.17f, cupWidth, cupHeight, false);
+                centerY - height * 0.14f, cupWidth, cupHeight, false);
             AddFrontBridge(data, bodyVertices, offsetX, centerY, width);
             AddFrontStrap(data, bodyVertices, offsetX - width * 0.29f,
                 centerY + height * 0.02f, false, width);
@@ -658,8 +658,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             const int samples = 10;
             int start = data.vertices.Count;
-            float endX = offsetX + (right ? width * 0.17f : -width * 0.17f);
-            float endY = startY + width * 0.72f;
+            float endX = offsetX + (right ? width * 0.40f : -width * 0.40f);
+            float endY = startY + width * 0.68f;
             for (int i = 0; i < samples; i++)
             {
                 float t = i / (float)(samples - 1);
@@ -731,8 +731,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private void AddPantySurface(GarmentMeshData data, Vector3[] bodyVertices,
             float offsetX)
         {
-            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.40f, 0.29f, true);
-            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.40f, 0.29f, false);
+            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.34f, 0.27f, true);
+            AddWrapGrid(data, bodyVertices, offsetX, 1.03f, 1.34f, 0.27f, false);
         }
 
         private void AddWrapGrid(GarmentMeshData data, Vector3[] bodyVertices,
@@ -747,7 +747,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 for (int column = 0; column < columns; column++)
                 {
                     float u = column / (float)(columns - 1);
-                    float x = offsetX + (u - 0.5f) * halfWidth * 2f;
+                    float rowWidth = Mathf.Lerp(halfWidth * 0.76f, halfWidth, v);
+                    float x = offsetX + (u - 0.5f) * rowWidth * 2f;
                     float y = Mathf.Lerp(bottom, top, v);
                     data.vertices.Add(SurfacePoint(bodyVertices, x, y, front, front ? 0.007f : -0.007f));
                     data.uv.Add(Vector2.zero);
@@ -906,47 +907,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
-    }
-
-    private static class UnderwearCoverage
-    {
-        public static bool HideSkin(Vector3 point, float scale, float offsetX, float offsetY)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY;
-            if (point.z >= 0f)
-            {
-                float leftX = offsetX - width * 0.29f;
-                float rightX = offsetX + width * 0.29f;
-                float cupY = centerY - height * 0.17f;
-                float rx = width * 0.31f * 1.18f;
-                float ry = height * 0.31f * 1.18f;
-                if (InsideEllipse(point.x, point.y, leftX, cupY, rx, ry)
-                    || InsideEllipse(point.x, point.y, rightX, cupY, rx, ry)) return true;
-                if (Mathf.Abs(point.x - offsetX) <= width * 0.18f
-                    && Mathf.Abs(point.y - (centerY - 0.025f)) <= 0.035f) return true;
-            }
-
-            // La culotte retire la peau de ses deux faces. La forme se resserre
-            // vers l'entrejambe pour eviter une grande plaque rectangulaire.
-            if (point.y >= 1.00f && point.y <= 1.42f)
-            {
-                float t = Mathf.InverseLerp(1.00f, 1.42f, point.y);
-                float halfWidth = Mathf.Lerp(0.21f, 0.29f, t) * factor;
-                if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
-            }
-            return false;
-        }
-
-        private static bool InsideEllipse(float x, float y, float centerX, float centerY,
-            float radiusX, float radiusY)
-        {
-            float dx = (x - centerX) / Mathf.Max(radiusX, 0.001f);
-            float dy = (y - centerY) / Mathf.Max(radiusY, 0.001f);
-            return dx * dx + dy * dy <= 1f;
-        }
     }
 
     private static class HairBuilder
