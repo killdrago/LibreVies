@@ -217,7 +217,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
-        private Material underwearMaterial;
+        private Material garmentSkin;
         private Material hairMaterial;
         private GameObject hair;
         private int hairStyle;
@@ -231,9 +231,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             Texture2D skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
-            if (underwearMaterial.HasProperty("_Cull"))
-                underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            garmentSkin = NewGarmentSkinMaterial(skinTexture,
+                Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge"));
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -331,27 +330,25 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
-            if (values.female)
-                FlattenChestForBra(vertices, values.garmentScale,
-                    values.garmentOffsetX, values.garmentOffsetY);
-
             BuildBones(deformed, min.y);
-            Func<Vector3, bool> underwearCoverage = values.female
-                ? (Func<Vector3, bool>)(point => UnderwearCoverage.IsCovered(point,
-                    values.garmentScale, values.garmentOffsetX,
-                    values.garmentOffsetY))
-                : null;
-            Mesh mesh = obj.CreateMesh(vertices, underwearCoverage);
+            Mesh mesh = obj.CreateMesh(vertices);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = mesh;
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
-            skin.color = SkinColor(values.skinTone);
-            renderer.sharedMaterials = values.female
-                ? new[] { skin, underwearMaterial }
-                : new[] { skin };
+            Color skinColor = SkinColor(values.skinTone);
+            skin.color = skinColor;
+            if (values.female)
+            {
+                ConfigureGarmentSkin(values, skinColor);
+                renderer.sharedMaterial = garmentSkin;
+            }
+            else
+            {
+                renderer.sharedMaterial = skin;
+            }
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
             root.transform.localRotation = facePreviewCamera
@@ -364,32 +361,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
-        }
-
-        private static void FlattenChestForBra(Vector3[] vertices, float scale,
-            float offsetX, float offsetY)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY;
-            float halfWidth = width * 0.40f;
-            float bottom = centerY - height * 0.50f;
-            float top = centerY + height * 0.32f;
-            // On aplatit uniquement l'avant de la cage thoracique couverte
-            // par le soutien-gorge. Les seins et les tetons ne peuvent donc
-            // plus former une bosse sous le materiau du vetement.
-            for (int i = 0; i < vertices.Length; i++)
-            {
-                Vector3 point = vertices[i];
-                if (point.z <= 0f || point.x < offsetX - halfWidth
-                    || point.x > offsetX + halfWidth
-                    || point.y < bottom || point.y > top) continue;
-                float side = Mathf.Abs(point.x - offsetX) / Mathf.Max(halfWidth, 0.001f);
-                float vertical = Mathf.InverseLerp(bottom, top, point.y);
-                float targetDepth = 0.135f + vertical * 0.010f - side * 0.008f;
-                vertices[i].z = Mathf.Min(vertices[i].z, targetDepth);
-            }
         }
 
         public void Animate(bool moving, bool running, float clock)
@@ -600,103 +571,29 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static Material NewMaterial(Color color, float metallic, float smoothness)
         { Shader shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Unlit/Color"); Material material = new Material(shader); material.color = color; if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", metallic); if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", smoothness); return material; }
 
+        private static Material NewGarmentSkinMaterial(Texture2D skinTexture, Texture2D garmentTexture)
+        {
+            Shader shader = Shader.Find("LibreVies/SoutienGorgeSkin") ?? Shader.Find("Standard");
+            Material material = new Material(shader) { name = "Peau et sous-vetements integres" };
+            if (material.HasProperty("_MainTex") && skinTexture != null)
+                material.SetTexture("_MainTex", skinTexture);
+            if (material.HasProperty("_GarmentTex") && garmentTexture != null)
+                material.SetTexture("_GarmentTex", garmentTexture);
+            return material;
+        }
+
+        private void ConfigureGarmentSkin(AdminHumanCreator values, Color skinColor)
+        {
+            if (garmentSkin == null) return;
+            if (garmentSkin.HasProperty("_Color")) garmentSkin.SetColor("_Color", skinColor);
+            if (garmentSkin.HasProperty("_GarmentScale")) garmentSkin.SetFloat("_GarmentScale", Mathf.Clamp(values.garmentScale, 0.25f, 3f));
+            if (garmentSkin.HasProperty("_OffsetX")) garmentSkin.SetFloat("_OffsetX", values.garmentOffsetX);
+            if (garmentSkin.HasProperty("_OffsetY")) garmentSkin.SetFloat("_OffsetY", values.garmentOffsetY);
+            if (garmentSkin.HasProperty("_UnderwearColor")) garmentSkin.SetColor("_UnderwearColor", new Color(0.80f, 0.71f, 0.62f, 1f));
+        }
+
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
-    }
-
-    private static class UnderwearCoverage
-    {
-        private const int MaskWidth = 64;
-        private const int MaskHeight = 60;
-        private static string[] alphaRows;
-
-        public static bool IsCovered(Vector3 point, float scale, float offsetX, float offsetY)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY;
-            Vector2 p = new Vector2(point.x - offsetX, point.y - centerY);
-
-            if (point.z >= 0f)
-            {
-                float imageU = p.x / width + 0.5f;
-                float imageV = p.y / height + 0.5f;
-                if (imageU >= 0f && imageU <= 1f && imageV >= 0f && imageV <= 1f
-                    && SampleAlpha(imageU, imageV)) return true;
-                float cupY = -height * 0.14f;
-                float cupX = width * 0.29f;
-                float cupRadiusX = width * 0.34f * 1.15f;
-                float cupRadiusY = height * 0.34f * 1.15f;
-                if (InsideEllipse(p, new Vector2(-cupX, cupY), cupRadiusX, cupRadiusY)
-                    || InsideEllipse(p, new Vector2(cupX, cupY), cupRadiusX, cupRadiusY)) return true;
-                if (Mathf.Abs(p.x) <= width * 0.20f
-                    && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
-                if (StrapDistance(p, -cupX, cupY + height * 0.02f,
-                    -width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.055f) return true;
-                if (StrapDistance(p, cupX, cupY + height * 0.02f,
-                    width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.055f) return true;
-            }
-            else
-            {
-                if (StrapDistance(p, -0.15f, -0.28f, -0.18f, 0.19f) <= 0.040f * factor) return true;
-                if (StrapDistance(p, 0.15f, -0.28f, 0.18f, 0.19f) <= 0.040f * factor) return true;
-                if (Mathf.Abs(p.y + width * 0.38f) <= 0.050f
-                    && Mathf.Abs(p.x) <= width * 0.52f) return true;
-            }
-
-            // Les faces avant et arriere de la culotte sont colorees dans le
-            // second sous-maillage : aucune peau ne reste sous cette zone.
-            if (point.y >= 0.96f && point.y <= 1.22f)
-            {
-                float t = Mathf.InverseLerp(0.96f, 1.22f, point.y);
-                float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
-                if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
-            }
-            return false;
-        }
-
-        private static bool SampleAlpha(float u, float v)
-        {
-            EnsureMask();
-            if (alphaRows == null || alphaRows.Length != MaskHeight) return false;
-            int x = Mathf.Clamp(Mathf.FloorToInt(u * MaskWidth), 0, MaskWidth - 1);
-            int y = Mathf.Clamp(Mathf.FloorToInt((1f - v) * MaskHeight), 0, MaskHeight - 1);
-            return alphaRows[y][x] == '1';
-        }
-
-        private static void EnsureMask()
-        {
-            if (alphaRows != null) return;
-            TextAsset mask = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge_alpha");
-            if (mask == null) { alphaRows = new string[0]; return; }
-            List<string> rows = new List<string>();
-            foreach (string line in mask.text.Split('\n'))
-            {
-                string row = line.Trim();
-                if (row.Length >= MaskWidth) rows.Add(row.Substring(0, MaskWidth));
-            }
-            alphaRows = rows.Count == MaskHeight ? rows.ToArray() : new string[0];
-        }
-
-        private static bool InsideEllipse(Vector2 point, Vector2 center,
-            float radiusX, float radiusY)
-        {
-            float x = (point.x - center.x) / Mathf.Max(radiusX, 0.001f);
-            float y = (point.y - center.y) / Mathf.Max(radiusY, 0.001f);
-            return x * x + y * y <= 1f;
-        }
-
-        private static float StrapDistance(Vector2 point, float x0, float y0,
-            float x1, float y1)
-        {
-            Vector2 start = new Vector2(x0, y0);
-            Vector2 end = new Vector2(x1, y1);
-            Vector2 segment = end - start;
-            float amount = Mathf.Clamp01(Vector2.Dot(point - start, segment)
-                / Mathf.Max(segment.sqrMagnitude, 0.0001f));
-            return Vector2.Distance(point, start + segment * amount);
-        }
     }
 
     private static class HairBuilder
@@ -913,14 +810,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
         public Mesh CreateMesh(Vector3[] vertices)
         {
-            return CreateMesh(vertices, null);
-        }
-
-        // Les triangles vetement restent dans le meme SkinnedMeshRenderer que
-        // le corps, mais utilisent le second materiau. Il n'y a donc ni peau
-        // dessinee sous le vetement ni objet vetement ajoute devant le corps.
-        public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> garmentTriangle)
-        {
             Mesh mesh = new Mesh
             {
                 name = "Humain - preview",
@@ -928,28 +817,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             };
             mesh.vertices = vertices;
             mesh.uv = uv;
-            List<int> bodyIndices = new List<int>();
-            List<int> garmentIndices = new List<int>();
+            List<int> indices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
-                Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
-                    + vertices[triangle.c]) / 3f;
-                List<int> destination = garmentTriangle != null && garmentTriangle(centre)
-                    ? garmentIndices : bodyIndices;
-                destination.Add(triangle.a);
-                destination.Add(triangle.b);
-                destination.Add(triangle.c);
+                indices.Add(triangle.a);
+                indices.Add(triangle.b);
+                indices.Add(triangle.c);
             }
-            if (garmentTriangle == null)
-            {
-                mesh.SetTriangles(bodyIndices, 0);
-            }
-            else
-            {
-                mesh.subMeshCount = 2;
-                mesh.SetTriangles(bodyIndices, 0);
-                mesh.SetTriangles(garmentIndices, 1);
-            }
+            mesh.SetTriangles(indices, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
