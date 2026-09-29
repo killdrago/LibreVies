@@ -345,9 +345,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 : Quaternion.identity;
             if (values.female)
             {
-                GarmentPreviewBuilder.Create(values.female, values.garmentScale,
+                GarmentPreviewBuilder.CreateBackStraps(values.garmentScale,
                     values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
                     root.transform);
+                GarmentPreviewBuilder.CreateLowerUnderwear(values.female,
+                    values.hipShape, root.transform);
                 GarmentPreviewBuilder.ConfigureSkinMask(skin, values.garmentScale,
                     values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
                     root.transform);
@@ -577,53 +579,189 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    // Repere reglable de l'outil ADMIN : son alpha masque la peau en dessous
-    // afin que le vetement ne reste pas une simple superposition.
+    // Vetements de l'outil ADMIN : le soutien-gorge remplace la texture de peau
+    // sur le torse, tandis que le dos et le bas sont de vrais volumes fermes.
 
     private static class GarmentPreviewBuilder
     {
-        public static void Create(bool female, float scale, float offsetX, float offsetY,
+        private static readonly Color UnderwearColor = new Color(0.80f, 0.71f, 0.62f);
+
+        public static void CreateBackStraps(float scale, float offsetX, float offsetY,
             float offsetZ, Transform parent)
         {
-            if (!female) return;
-            Texture2D texture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
-            if (texture == null) return;
-            Shader shader = Shader.Find("Unlit/Transparent");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            if (shader == null) return;
-            Material material = new Material(shader);
-            material.name = "Soutien-gorge - transparent";
-            material.mainTexture = texture;
-            material.color = Color.white;
-            material.renderQueue = 3000;
-            float width = 0.36f * Mathf.Clamp(scale, 0.25f, 3f);
-            float height = width * texture.height / Mathf.Max(1f, texture.width);
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float strapWidth = 0.035f * factor;
+            float backZ = -Mathf.Max(0.14f, offsetZ * 0.70f);
+            GameObject garment = new GameObject("Vetement - dos soutien-gorge");
+            garment.transform.SetParent(parent, false);
+            Material material = NewClothingMaterial("Soutien-gorge - dos");
+            List<Mesh> meshes = new List<Mesh>();
             float centerY = 1.61f + offsetY;
-            float z = offsetZ;
+            CreateStrapBox("Bretelle dos gauche", new Vector3(offsetX - 0.15f * factor,
+                    centerY - 0.06f * factor, backZ),
+                new Vector3(offsetX - 0.18f * factor, centerY + 0.19f * factor, backZ),
+                strapWidth, material, garment.transform, meshes);
+            CreateStrapBox("Bretelle dos droite", new Vector3(offsetX + 0.15f * factor,
+                    centerY - 0.06f * factor, backZ),
+                new Vector3(offsetX + 0.18f * factor, centerY + 0.19f * factor, backZ),
+                strapWidth, material, garment.transform, meshes);
+            CreateSolidBox("Bande dos soutien-gorge", new Vector3(offsetX,
+                    centerY - 0.30f * factor, backZ),
+                new Vector3(0.46f * factor, 0.07f * factor, 0.035f), 0f,
+                material, garment.transform, meshes);
+            GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
+            resources.Meshes = meshes.ToArray();
+            resources.Material = material;
+        }
+
+        public static void CreateLowerUnderwear(bool female, float hipShape, Transform parent)
+        {
+            GameObject garment = new GameObject(female
+                ? "Vetement - culotte"
+                : "Vetement - calecon");
+            garment.transform.SetParent(parent, false);
+            Material material = NewClothingMaterial(female ? "Culotte" : "Calecon");
+            List<Mesh> meshes = new List<Mesh>();
+            float width = Mathf.Clamp(0.29f + hipShape * 0.018f, 0.25f, 0.34f);
+            float depth = Mathf.Clamp(0.18f + hipShape * 0.008f, 0.15f, 0.21f);
+            if (female)
+            {
+                CreateRing("Culotte", new[]
+                {
+                    new ClothingRing(0f, 0.78f, width * 0.86f, depth * 0.84f),
+                    new ClothingRing(0f, 0.88f, width, depth),
+                    new ClothingRing(0f, 1.13f, width * 1.04f, depth * 1.04f),
+                    new ClothingRing(0f, 1.19f, width * 1.01f, depth)
+                }, material, garment.transform, meshes);
+            }
+            else
+            {
+                CreateRing("Calecon", new[]
+                {
+                    new ClothingRing(0f, 0.60f, width * 0.91f, depth * 0.90f),
+                    new ClothingRing(0f, 0.69f, width, depth),
+                    new ClothingRing(0f, 1.11f, width * 1.05f, depth * 1.04f),
+                    new ClothingRing(0f, 1.18f, width * 1.02f, depth)
+                }, material, garment.transform, meshes);
+            }
+            GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
+            resources.Meshes = meshes.ToArray();
+            resources.Material = material;
+        }
+
+        private static Material NewClothingMaterial(string name)
+        {
+            Shader shader = Shader.Find("Standard") ?? Shader.Find("Unlit/Color");
+            Material material = new Material(shader) { name = name };
+            material.color = UnderwearColor;
+            if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
+            if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.55f);
+            return material;
+        }
+
+        private static void CreateStrapBox(string name, Vector3 bottom, Vector3 top,
+            float width, Material material, Transform parent, List<Mesh> meshes)
+        {
+            Vector3 delta = top - bottom;
+            float angle = -Mathf.Atan2(delta.x, delta.y) * Mathf.Rad2Deg;
+            CreateSolidBox(name, (bottom + top) * 0.5f,
+                new Vector3(width, delta.magnitude, 0.035f), angle,
+                material, parent, meshes);
+        }
+
+        private static void CreateSolidBox(string name, Vector3 center, Vector3 size, float angle,
+            Material material, Transform parent, List<Mesh> meshes)
+        {
+            Vector3 half = size * 0.5f;
             Vector3[] vertices =
             {
-                new Vector3(offsetX - width * 0.5f, centerY - height * 0.5f, z),
-                new Vector3(offsetX + width * 0.5f, centerY - height * 0.5f, z),
-                new Vector3(offsetX + width * 0.5f, centerY + height * 0.5f, z),
-                new Vector3(offsetX - width * 0.5f, centerY + height * 0.5f, z)
+                new Vector3(-half.x, -half.y, -half.z), new Vector3(half.x, -half.y, -half.z),
+                new Vector3(half.x, -half.y, half.z), new Vector3(-half.x, -half.y, half.z),
+                new Vector3(-half.x, half.y, -half.z), new Vector3(half.x, half.y, -half.z),
+                new Vector3(half.x, half.y, half.z), new Vector3(-half.x, half.y, half.z)
             };
-            Mesh mesh = new Mesh { name = "Soutien-gorge - transparent mesh" };
+            Mesh mesh = new Mesh { name = name + " mesh" };
             mesh.vertices = vertices;
-            mesh.uv = new[]
+            mesh.triangles = new[]
             {
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(1f, 1f), new Vector2(0f, 1f)
+                0, 3, 2, 0, 2, 1, 4, 5, 6, 4, 6, 7,
+                0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2,
+                1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3
             };
-            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0 };
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            GameObject garment = new GameObject("Preview - soutien-gorge a placer");
-            garment.transform.SetParent(parent, false);
-            garment.AddComponent<MeshFilter>().sharedMesh = mesh;
-            garment.AddComponent<MeshRenderer>().sharedMaterial = material;
-            GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
-            resources.Mesh = mesh;
-            resources.Material = material;
+            GameObject part = new GameObject(name);
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = center;
+            part.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            part.AddComponent<MeshFilter>().sharedMesh = mesh;
+            part.AddComponent<MeshRenderer>().sharedMaterial = material;
+            meshes.Add(mesh);
+        }
+
+        private struct ClothingRing
+        {
+            public float centerX, y, radiusX, radiusZ;
+            public ClothingRing(float centerX, float y, float radiusX, float radiusZ)
+            {
+                this.centerX = centerX;
+                this.y = y;
+                this.radiusX = radiusX;
+                this.radiusZ = radiusZ;
+            }
+        }
+
+        private static void CreateRing(string name, ClothingRing[] rings, Material material,
+            Transform parent, List<Mesh> meshes)
+        {
+            const int segments = 28;
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            for (int r = 0; r < rings.Length; r++)
+            {
+                for (int i = 0; i < segments; i++)
+                {
+                    float angle = i * Mathf.PI * 2f / segments;
+                    vertices.Add(new Vector3(
+                        rings[r].centerX + Mathf.Cos(angle) * rings[r].radiusX,
+                        rings[r].y,
+                        Mathf.Sin(angle) * rings[r].radiusZ));
+                }
+            }
+            for (int r = 0; r < rings.Length - 1; r++)
+            {
+                for (int i = 0; i < segments; i++)
+                {
+                    int next = (i + 1) % segments;
+                    int a = r * segments + i;
+                    int b = r * segments + next;
+                    int c = (r + 1) * segments + next;
+                    int d = (r + 1) * segments + i;
+                    triangles.AddRange(new[] { a, b, c, a, c, d });
+                }
+            }
+            int bottomCenter = vertices.Count;
+            vertices.Add(new Vector3(rings[0].centerX, rings[0].y, 0f));
+            int topCenter = vertices.Count;
+            vertices.Add(new Vector3(rings[rings.Length - 1].centerX,
+                rings[rings.Length - 1].y, 0f));
+            for (int i = 0; i < segments; i++)
+            {
+                int next = (i + 1) % segments;
+                triangles.AddRange(new[] { bottomCenter, next, i });
+                int top = (rings.Length - 1) * segments;
+                triangles.AddRange(new[] { topCenter, top + i, top + next });
+            }
+            Mesh mesh = new Mesh { name = name + " mesh" };
+            mesh.vertices = vertices.ToArray();
+            mesh.triangles = triangles.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            GameObject objectClothing = new GameObject(name);
+            objectClothing.transform.SetParent(parent, false);
+            objectClothing.AddComponent<MeshFilter>().sharedMesh = mesh;
+            objectClothing.AddComponent<MeshRenderer>().sharedMaterial = material;
+            meshes.Add(mesh);
         }
 
         public static void ConfigureSkinMask(Material skin, float scale, float offsetX,
@@ -676,11 +814,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private sealed class GarmentPreviewResources : MonoBehaviour
     {
         public Mesh Mesh;
+        public Mesh[] Meshes;
         public Material Material;
 
         private void OnDestroy()
         {
             if (Mesh != null) UnityEngine.Object.Destroy(Mesh);
+            if (Meshes != null)
+            {
+                for (int i = 0; i < Meshes.Length; i++)
+                    if (Meshes[i] != null) UnityEngine.Object.Destroy(Meshes[i]);
+            }
             if (Material != null) UnityEngine.Object.Destroy(Material);
         }
     }

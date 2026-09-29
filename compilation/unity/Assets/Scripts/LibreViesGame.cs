@@ -7258,7 +7258,7 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
         GUI.Label(new Rect(droite, contenu.y + 635f, 250f, 34f),
-            "Le GLB est un repere de placement.\nLe JSON peut etre envoye separement.", smallStyle);
+            "Le soutien-gorge remplace la peau.\nCulotte / calecon en volume.", smallStyle);
     }
 
     private void DessinerAdmin()
