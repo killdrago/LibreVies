@@ -308,9 +308,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            Material braMaterial = NewMaterial(new Color(1f, 0.84f, 0.05f), 0f, 0.28f);
-            BreastPatchBuilder.Create(values.female, values.chestShape, root.transform,
-                bones, boneIndexes, braMaterial);
             hairStyle = values.hairStyle;
             hairFemale = values.female;
             hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
@@ -534,70 +531,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     // Les sous-vetements sont maintenant un sous-maillage du corps :
     // aucune geometrie flottante n est creee devant le personnage.
-
-    private static class BreastPatchBuilder
-    {
-        public static void Create(bool female, float chestShape, Transform parent,
-            Transform[] bones, Dictionary<string, int> boneIndexes, Material material)
-        {
-            if (!female) return;
-            float scale = Mathf.Clamp(1f + chestShape * 0.28f, 0.82f, 1.30f);
-            CreatePatch("Bonnet jaune gauche", -0.09f * scale, 1.61f,
-                0.12f * scale, 0.105f * scale, parent, bones, boneIndexes, material);
-            CreatePatch("Bonnet jaune droit", 0.09f * scale, 1.61f,
-                0.12f * scale, 0.105f * scale, parent, bones, boneIndexes, material);
-        }
-
-        private static void CreatePatch(string name, float centreX, float centreY,
-            float radiusX, float radiusY, Transform parent, Transform[] bones,
-            Dictionary<string, int> boneIndexes, Material material)
-        {
-            const int segments = 32;
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            float surface = 0.235f;
-            vertices.Add(new Vector3(centreX, centreY, surface + 0.004f));
-            for (int i = 0; i < segments; i++)
-            {
-                float angle = i * Mathf.PI * 2f / segments;
-                vertices.Add(new Vector3(centreX + Mathf.Cos(angle) * radiusX,
-                    centreY + Mathf.Sin(angle) * radiusY, surface));
-            }
-            for (int i = 0; i < segments; i++)
-            {
-                int next = (i + 1) % segments;
-                triangles.Add(0); triangles.Add(1 + i); triangles.Add(1 + next);
-                triangles.Add(1 + next); triangles.Add(1 + i); triangles.Add(0);
-            }
-            Mesh mesh = new Mesh { name = name + " - mesh" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            GameObject patch = new GameObject(name);
-            patch.transform.SetParent(parent, false);
-            SkinnedMeshRenderer renderer = patch.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterial = material;
-            renderer.bones = bones;
-            int boneIndex = boneIndexes.ContainsKey("spine02")
-                ? boneIndexes["spine02"] : boneIndexes["root"];
-            renderer.rootBone = bones[boneIndexes.ContainsKey("root")
-                ? boneIndexes["root"] : boneIndex];
-            BoneWeight[] weights = new BoneWeight[mesh.vertexCount];
-            for (int i = 0; i < weights.Length; i++)
-            {
-                weights[i].boneIndex0 = boneIndex;
-                weights[i].weight0 = 1f;
-            }
-            mesh.boneWeights = weights;
-            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
-            for (int i = 0; i < bones.Length; i++)
-                bindposes[i] = bones[i].worldToLocalMatrix * patch.transform.localToWorldMatrix;
-            mesh.bindposes = bindposes;
-            renderer.updateWhenOffscreen = true;
-        }
-    }
 
     private static class HairBuilder
     {
