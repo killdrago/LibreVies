@@ -52,14 +52,14 @@ Shader "LibreVies/SoutienGorgeSurface"
 
             fixed4 frag(Varyings input) : SV_Target
             {
-                fixed4 sample = tex2D(_MainTex, input.garmentUv) * _Color;
-                clip(sample.a - _Cutoff);
+                fixed4 clothingSample = tex2D(_MainTex, input.garmentUv) * _Color;
+                clip(clothingSample.a - _Cutoff);
                 float3 normal = normalize(input.normal);
                 float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz);
                 float diffuse = saturate(dot(normal, lightDirection));
                 fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz * 0.75 + fixed3(0.20, 0.20, 0.20);
-                fixed3 colour = sample.rgb * (ambient + diffuse * 0.72);
-                return fixed4(max(colour, sample.rgb * 0.22), 1.0);
+                fixed3 colour = clothingSample.rgb * (ambient + diffuse * 0.72);
+                return fixed4(max(colour, clothingSample.rgb * 0.22), 1.0);
             }
             ENDCG
         }
