@@ -84,12 +84,11 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 transmettre avec le modele.
 
 Le maillage humain conserve ici son matériau Standard d'origine pour rester
-stable dans l'aperçu. Le soutien-gorge est rendu séparément avec sa texture
-alpha et le JSON conserve son placement exact. Les deux bretelles arrière sont
-calculées sur la surface dorsale du maillage afin de ne pas flotter derrière le
-corps. La culotte et le calecon restent volontairement reportes ; le
-remplacement direct de la texture `torse_avant` sera repris après validation du
-placement et du rendu.
+stable dans l'aperçu. Les triangles de peau couverts par l'alpha du soutien-gorge
+sont retires du maillage de preview, puis la texture transparente les remplace
+visuellement devant. Les deux bretelles arrière utilisent la même découpe de
+peau et sont calculées sur la surface dorsale du maillage afin de ne pas flotter.
+La culotte et le calecon restent volontairement reportes.
 
 ## Limite importante, franchement
 

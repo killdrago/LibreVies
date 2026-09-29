@@ -329,7 +329,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Mesh mesh = obj.CreateMesh(vertices);
+            Func<Vector3, bool> vetementCoverage = values.female
+                ? (Func<Vector3, bool>)(point => GarmentCoverage.IsCovered(point,
+                    values.garmentScale, values.garmentOffsetX,
+                    values.garmentOffsetY, values.garmentOffsetZ))
+                : null;
+            Mesh mesh = obj.CreateMesh(vertices, vetementCoverage);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -574,6 +579,86 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
+    }
+
+    private static class GarmentCoverage
+    {
+        private const int MaskWidth = 64;
+        private const int MaskHeight = 60;
+        private static string[] alphaRows;
+
+        public static bool IsCovered(Vector3 point, float scale, float offsetX,
+            float offsetY, float offsetZ)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY;
+            float u = (point.x - offsetX) / width + 0.5f;
+            float v = (point.y - centerY) / height + 0.5f;
+            // La peau du devant est positive sur l'axe Z. On ne retire jamais
+            // par erreur les triangles du dos avec le masque frontal.
+            bool front = point.z >= 0f && u >= 0f && u <= 1f && v >= 0f && v <= 1f
+                && SampleAlpha(u, v);
+            if (front) return true;
+
+            // Les deux bretelles arriere utilisent le meme remplacement de
+            // peau, mais leur forme est continue entre l'epaule et le dos.
+            if (point.z >= -0.01f) return false;
+            float strapScale = factor;
+            Vector2 p = new Vector2(point.x - offsetX, point.y - centerY);
+            Vector2 left0 = new Vector2(-0.15f, -0.28f) * strapScale;
+            Vector2 left1 = new Vector2(-0.18f, -0.10f) * strapScale;
+            Vector2 left2 = new Vector2(-0.19f, 0.12f) * strapScale;
+            Vector2 left3 = new Vector2(-0.18f, 0.19f) * strapScale;
+            Vector2 right0 = new Vector2(0.15f, -0.28f) * strapScale;
+            Vector2 right1 = new Vector2(0.18f, -0.10f) * strapScale;
+            Vector2 right2 = new Vector2(0.19f, 0.12f) * strapScale;
+            Vector2 right3 = new Vector2(0.18f, 0.19f) * strapScale;
+            float distance = Mathf.Min(
+                Mathf.Min(DistanceToSegment(p, left0, left1),
+                    DistanceToSegment(p, left1, left2)),
+                Mathf.Min(DistanceToSegment(p, left2, left3),
+                    Mathf.Min(DistanceToSegment(p, right0, right1),
+                        Mathf.Min(DistanceToSegment(p, right1, right2),
+                            Mathf.Min(DistanceToSegment(p, right2, right3))))));
+            return distance <= 0.026f * strapScale;
+        }
+
+        private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+        {
+            Vector2 segment = end - start;
+            float amount = Mathf.Clamp01(Vector2.Dot(point - start, segment)
+                / Mathf.Max(segment.sqrMagnitude, 0.0001f));
+            return Vector2.Distance(point, start + segment * amount);
+        }
+
+        private static bool SampleAlpha(float u, float v)
+        {
+            EnsureMask();
+            if (alphaRows == null) return true;
+            int x = Mathf.Clamp(Mathf.FloorToInt(u * MaskWidth), 0, MaskWidth - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt((1f - v) * MaskHeight), 0, MaskHeight - 1);
+            return alphaRows[y][x] == '1';
+        }
+
+        private static void EnsureMask()
+        {
+            if (alphaRows != null) return;
+            TextAsset mask = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge_alpha");
+            if (mask == null)
+            {
+                alphaRows = new string[0];
+                return;
+            }
+            List<string> rows = new List<string>();
+            foreach (string line in mask.text.Split('\n'))
+            {
+                string row = line.Trim();
+                if (row.Length >= MaskWidth) rows.Add(row.Substring(0, MaskWidth));
+            }
+            alphaRows = rows.Count == MaskHeight ? rows.ToArray() : new string[0];
+        }
     }
 
     // Le materiau Standard du corps reste inchange : le devant utilise l'image
@@ -977,6 +1062,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
         public Mesh CreateMesh(Vector3[] vertices)
         {
+            return CreateMesh(vertices, null);
+        }
+
+        public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> hideTriangle)
+        {
             Mesh mesh = new Mesh
             {
                 name = "Humain - preview",
@@ -987,6 +1077,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             List<int> indices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
+                Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
+                    + vertices[triangle.c]) / 3f;
+                if (hideTriangle != null && hideTriangle(centre)) continue;
                 indices.Add(triangle.a);
                 indices.Add(triangle.b);
                 indices.Add(triangle.c);
