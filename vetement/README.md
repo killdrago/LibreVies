@@ -85,10 +85,11 @@ transmettre avec le modele.
 
 Le maillage humain conserve ici son matériau Standard d'origine pour rester
 stable dans l'aperçu. Les triangles de peau couverts par l'alpha du soutien-gorge
-sont retires du maillage de preview, puis la texture transparente les remplace
-visuellement devant. Les deux bretelles arrière utilisent la même découpe de
-peau et sont calculées sur la surface dorsale du maillage afin de ne pas flotter.
-La culotte et le calecon restent volontairement reportes.
+sont retires du premier sous-maillage, puis le PNG est dessine dans un second
+sous-maillage du meme SkinnedMeshRenderer, avec les memes vertices, os et poids.
+Le devant et les bretelles arrière suivent ainsi directement la surface du corps :
+il n'y a plus de quad frontal ni de ruban flottant. La culotte et le calecon
+restent volontairement reportes.
 
 ## Limite importante, franchement
 
