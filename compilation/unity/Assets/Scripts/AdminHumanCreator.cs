@@ -347,7 +347,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             {
                 GarmentPreviewBuilder.ConfigureSkinMask(skin, values.garmentScale,
                     values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
-                    root.transform);
+                    root.transform, SkinColor(values.skinTone));
             }
             else
             {
@@ -580,7 +580,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private static class GarmentPreviewBuilder
     {
         public static void ConfigureSkinMask(Material skin, float scale, float offsetX,
-            float offsetY, float offsetZ, Transform root)
+            float offsetY, float offsetZ, Transform root, Color skinColor)
         {
             if (skin == null || root == null) return;
             Shader shader = Resources.Load<Shader>("LVShaders/LibreViesGarmentSkinMasked");
@@ -593,7 +593,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 return;
             }
             Texture2D skinTexture = Resources.Load<Texture2D>("Characters/MakeHuman/SkinBase");
-            Color skinColor = skin.color;
             if (skin.shader != shader) skin.shader = shader;
             // mainTexture depends on the shader's main-texture annotation in
             // Unity 6. Reappliquer explicitement les deux propriétés evite de

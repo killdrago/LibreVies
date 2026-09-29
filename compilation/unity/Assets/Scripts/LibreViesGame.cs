@@ -407,6 +407,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public Obstacle Corps;
         public Vector2 Poste;      // la ou il revient quand tout est calme
         public Vector2 Portail;    // la porte qu'il surveille
+        public bool Nord;          // garde verrouille dans son hemisphere
         public float Recharge;
         public float Phase;
     }
@@ -4176,17 +4177,25 @@ public sealed class LibreViesGame : MonoBehaviour
     // vers l'exterieur, et va frapper tout monstre qui approche de SA porte.
     private void CreateGuards()
     {
-        for (int i = 0; i < portails.Count; i++)
+        // Les portails sont parcourus par angle autour du cercle : cet ordre
+        // peut changer lorsque la route est retouchee. On trie explicitement
+        // nord puis sud pour ne jamais inverser les deux gardes.
+        List<Vector2> portailsOrdonnes = new List<Vector2>(portails);
+        portailsOrdonnes.Sort((a, b) => b.y.CompareTo(a.y));
+        for (int i = 0; i < portailsOrdonnes.Count; i++)
         {
-            Vector2 portail = portails[i];
+            Vector2 portail = portailsOrdonnes[i];
             float distance = portail.magnitude;
             if (distance < 0.001f) continue;
+            bool nord = portail.y >= 0f;
             Vector2 tangente = TangenteRouteProche(portail);
             Vector2 coteRoute = new Vector2(-tangente.y, tangente.x).normalized;
-            // Le garde reste à l'intérieur de la clôture, au-delà de la
-            // bordure de la route : le passage et les dalles restent libres.
-            Vector2 poste = portail.normalized * (VillageRadius * 0.95f) + coteRoute * 4.2f;
-            CreerGarde(poste, portail);
+            // L'axe nord/sud est fixe sur z : on ne recalcule plus le poste
+            // avec le vecteur radial, qui pouvait envoyer un garde au portail
+            // oppose lorsque la tangente changeait de sens.
+            Vector2 poste = new Vector2(coteRoute.x * 4.2f,
+                nord ? VillageRadius * 0.95f : -VillageRadius * 0.95f);
+            CreerGarde(poste, portail, nord);
         }
     }
 
@@ -4227,13 +4236,16 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private void CreerGarde(Vector2 poste, Vector2 portail)
+    private void CreerGarde(Vector2 poste, Vector2 portail, bool nord)
     {
         const string dossier = "Characters/LibreViesGuardParts";
         float y = TerrainHeight(poste.x, poste.y);
-        var root = new GameObject("Garde").transform;
+        var root = new GameObject(nord ? "Garde_Nord" : "Garde_Sud").transform;
         root.position = new Vector3(poste.x, y, poste.y);
-        var state = new GardeState { Root = root.gameObject, Poste = poste, Portail = portail };
+        var state = new GardeState
+        {
+            Root = root.gameObject, Poste = poste, Portail = portail, Nord = nord
+        };
         GameObject model = new GameObject("Garde_Humanoide_Original_CC0");
         model.transform.SetParent(root, false);
         state.Model = model.transform;
@@ -4307,6 +4319,11 @@ public sealed class LibreViesGame : MonoBehaviour
             garde.Recharge -= dt;
             garde.Phase += dt;
             var position = new Vector2(garde.Root.transform.position.x, garde.Root.transform.position.z);
+            // Securite : un garde nord ne peut jamais traverser l'axe central
+            // vers le sud, et inversement, meme si une cible ou une sauvegarde
+            // ancienne lui fournit une position incoherente.
+            if ((garde.Nord && position.y < 0f) || (!garde.Nord && position.y > 0f))
+                position = garde.Poste;
 
             EnemyState cible = null;
             for (int e = 0; e < enemies.Count; e++)
