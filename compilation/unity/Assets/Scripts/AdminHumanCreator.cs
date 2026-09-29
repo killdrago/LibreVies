@@ -615,7 +615,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float v = (point.y - centerY) / height + 0.5f;
             float frontSide = Mathf.Min(0f, offsetZ * 0.1f);
             return point.z >= frontSide && u >= 0f && u <= 1f && v >= 0f && v <= 1f
-                && v < 0.56f && SampleAlpha(u, v);
+                // Les pixels les plus hauts sont uniquement les bretelles :
+                // on garde la peau dessous pour que leur transparence ne
+                // transforme pas un triangle entier en trou gris.
+                && v < 0.40f && SampleAlpha(u, v);
         }
 
         public static bool IsGarmentSurface(Vector3 point, float scale, float offsetX,
