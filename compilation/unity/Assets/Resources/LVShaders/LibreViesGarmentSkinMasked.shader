@@ -17,6 +17,12 @@ Shader "LibreVies/GarmentSkinMasked"
         _MaskMaxDepth ("Mask maximum depth", Float) = 0.15
         _MaskEnabled ("Mask enabled", Float) = 0
         _MaskAlphaClip ("Mask alpha threshold", Range(0,1)) = 0.08
+        _BackStrapColor ("Back strap color", Color) = (0.8,0.71,0.62,1)
+        _BackStrapScale ("Back strap scale", Float) = 1
+        _BackStrapWidth ("Back strap width", Float) = 0.026
+        _BackStrapMinDepth ("Back strap minimum depth", Float) = -0.5
+        _BackStrapMaxDepth ("Back strap maximum depth", Float) = -0.08
+        _BackStrapEnabled ("Back straps enabled", Float) = 0
     }
 
     SubShader
@@ -43,6 +49,20 @@ Shader "LibreVies/GarmentSkinMasked"
         float _MaskMaxDepth;
         float _MaskEnabled;
         float _MaskAlphaClip;
+        fixed4 _BackStrapColor;
+        float _BackStrapScale;
+        float _BackStrapWidth;
+        float _BackStrapMinDepth;
+        float _BackStrapMaxDepth;
+        float _BackStrapEnabled;
+
+        float DistanceToSegment(float2 point, float2 start, float2 end)
+        {
+            float2 segment = end - start;
+            float amount = saturate(dot(point - start, segment)
+                / max(dot(segment, segment), 0.0001));
+            return length(point - (start + segment * amount));
+        }
 
         struct Input
         {
@@ -81,6 +101,32 @@ Shader "LibreVies/GarmentSkinMasked"
                         // Les pixels transparents gardent la peau d'origine.
                         skin.rgb = lerp(skin.rgb, garment.rgb, garment.a);
                     }
+                }
+
+                if (_BackStrapEnabled > 0.5)
+                {
+                    float strapScale = max(_BackStrapScale, 0.25);
+                    float2 point = float2(dot(relative, right), dot(relative, up));
+                    float2 left0 = float2(-0.15, -0.28) * strapScale;
+                    float2 left1 = float2(-0.18, -0.10) * strapScale;
+                    float2 left2 = float2(-0.19, 0.12) * strapScale;
+                    float2 left3 = float2(-0.18, 0.19) * strapScale;
+                    float2 right0 = float2(0.15, -0.28) * strapScale;
+                    float2 right1 = float2(0.18, -0.10) * strapScale;
+                    float2 right2 = float2(0.19, 0.12) * strapScale;
+                    float2 right3 = float2(0.18, 0.19) * strapScale;
+                    float leftDistance = min(DistanceToSegment(point, left0, left1),
+                        min(DistanceToSegment(point, left1, left2),
+                            DistanceToSegment(point, left2, left3)));
+                    float rightDistance = min(DistanceToSegment(point, right0, right1),
+                        min(DistanceToSegment(point, right1, right2),
+                            DistanceToSegment(point, right2, right3)));
+                    float backFacing = dot(normalize(IN.worldNormal), -forward);
+                    bool onBack = depth >= _BackStrapMinDepth
+                        && depth <= _BackStrapMaxDepth && backFacing > -0.15;
+                    if (onBack && min(leftDistance, rightDistance)
+                        <= _BackStrapWidth * strapScale)
+                        skin.rgb = _BackStrapColor.rgb;
                 }
             }
 

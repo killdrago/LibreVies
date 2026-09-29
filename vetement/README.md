@@ -89,10 +89,11 @@ n'est donc pas une simple image posee par-dessus. Les pixels transparents
 conservent la peau. Lorsqu'un profil feminin est valide, le personnage applique
 le meme remplacement et le vetement reste reglable avec les quatre curseurs.
 Le JSON conserve le placement exact pour la prochaine etape de remplacement de
-la zone `torse_avant` sur le maillage final. Le dos du soutien-gorge est
-complete uniquement par les deux bretelles qui prolongent celles de devant.
-La culotte et le calecon restent volontairement reportes pour eviter de creer
-un volume approximatif avant validation du soutien-gorge.
+la zone `torse_avant` sur le maillage final. Le dos du soutien-gorge utilise
+le meme remplacement directement sur la peau : les deux bretelles sont tracees
+sur la surface arriere du corps, sans objet flottant. La culotte et le calecon
+restent volontairement reportes pour eviter de creer un volume approximatif
+avant validation du soutien-gorge.
 
 ## Limite importante, franchement
 

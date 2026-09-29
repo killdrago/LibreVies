@@ -345,9 +345,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 : Quaternion.identity;
             if (values.female)
             {
-                GarmentPreviewBuilder.CreateBackStraps(values.garmentScale,
-                    values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
-                    root.transform);
                 GarmentPreviewBuilder.ConfigureSkinMask(skin, values.garmentScale,
                     values.garmentOffsetX, values.garmentOffsetY, values.garmentOffsetZ,
                     root.transform);
@@ -577,97 +574,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    // Le soutien-gorge reprend la texture de peau du torse via le shader.
-    // Ici, on ajoute uniquement la continuation fine des bretelles dans le dos.
+    // Le soutien-gorge reprend directement la texture de peau du torse et du dos
+    // via le shader : aucun rectangle flottant n'est cree.
 
     private static class GarmentPreviewBuilder
     {
-        private static readonly Color UnderwearColor = new Color(0.80f, 0.71f, 0.62f);
-
-        public static void CreateBackStraps(float scale, float offsetX, float offsetY,
-            float offsetZ, Transform parent)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float strapWidth = 0.026f * factor;
-            float strapDepth = 0.012f;
-            float backZ = -Mathf.Max(0.14f, offsetZ * 0.70f);
-            float centerY = 1.61f + offsetY;
-            GameObject garment = new GameObject("Vetement - bretelles dos soutien-gorge");
-            garment.transform.SetParent(parent, false);
-            Material material = NewClothingMaterial("Soutien-gorge - bretelles dos");
-            List<Mesh> meshes = new List<Mesh>();
-            CreateStrapRibbon("Bretelle dos gauche", new[]
-            {
-                new Vector3(offsetX - 0.15f * factor, centerY - 0.28f * factor, backZ),
-                new Vector3(offsetX - 0.18f * factor, centerY - 0.10f * factor, backZ),
-                new Vector3(offsetX - 0.19f * factor, centerY + 0.12f * factor, backZ),
-                new Vector3(offsetX - 0.18f * factor, centerY + 0.19f * factor, backZ)
-            }, strapWidth, strapDepth, material, garment.transform, meshes);
-            CreateStrapRibbon("Bretelle dos droite", new[]
-            {
-                new Vector3(offsetX + 0.15f * factor, centerY - 0.28f * factor, backZ),
-                new Vector3(offsetX + 0.18f * factor, centerY - 0.10f * factor, backZ),
-                new Vector3(offsetX + 0.19f * factor, centerY + 0.12f * factor, backZ),
-                new Vector3(offsetX + 0.18f * factor, centerY + 0.19f * factor, backZ)
-            }, strapWidth, strapDepth, material, garment.transform, meshes);
-            GarmentPreviewResources resources = garment.AddComponent<GarmentPreviewResources>();
-            resources.Meshes = meshes.ToArray();
-            resources.Material = material;
-        }
-
-        private static Material NewClothingMaterial(string name)
-        {
-            Shader shader = Shader.Find("Standard") ?? Shader.Find("Unlit/Color");
-            Material material = new Material(shader) { name = name };
-            material.color = UnderwearColor;
-            if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
-            if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.55f);
-            return material;
-        }
-
-        private static void CreateStrapRibbon(string name, Vector3[] path, float width,
-            float depth, Material material, Transform parent, List<Mesh> meshes)
-        {
-            List<Vector3> vertices = new List<Vector3>();
-            for (int i = 0; i < path.Length; i++)
-            {
-                Vector2 previous = new Vector2(path[Mathf.Max(0, i - 1)].x,
-                    path[Mathf.Max(0, i - 1)].y);
-                Vector2 next = new Vector2(path[Mathf.Min(path.Length - 1, i + 1)].x,
-                    path[Mathf.Min(path.Length - 1, i + 1)].y);
-                Vector2 tangent = (next - previous).normalized;
-                Vector2 normal = new Vector2(-tangent.y, tangent.x) * width * 0.5f;
-                vertices.Add(new Vector3(path[i].x + normal.x, path[i].y + normal.y,
-                    path[i].z - depth * 0.5f));
-                vertices.Add(new Vector3(path[i].x - normal.x, path[i].y - normal.y,
-                    path[i].z - depth * 0.5f));
-                vertices.Add(new Vector3(path[i].x + normal.x, path[i].y + normal.y,
-                    path[i].z + depth * 0.5f));
-                vertices.Add(new Vector3(path[i].x - normal.x, path[i].y - normal.y,
-                    path[i].z + depth * 0.5f));
-            }
-            List<int> triangles = new List<int>();
-            for (int i = 0; i < path.Length - 1; i++)
-            {
-                int a = i * 4;
-                int b = (i + 1) * 4;
-                triangles.AddRange(new[] { a, b, b + 1, a, b + 1, a + 1 });
-                triangles.AddRange(new[] { a + 2, a + 3, b + 3, a + 2, b + 3, b + 2 });
-                triangles.AddRange(new[] { a, a + 2, b + 2, a, b + 2, b });
-                triangles.AddRange(new[] { a + 1, b + 1, b + 3, a + 1, b + 3, a + 3 });
-            }
-            Mesh mesh = new Mesh { name = name + " mesh" };
-            mesh.vertices = vertices.ToArray();
-            mesh.triangles = triangles.ToArray();
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            GameObject strap = new GameObject(name);
-            strap.transform.SetParent(parent, false);
-            strap.AddComponent<MeshFilter>().sharedMesh = mesh;
-            strap.AddComponent<MeshRenderer>().sharedMaterial = material;
-            meshes.Add(mesh);
-        }
-
         public static void ConfigureSkinMask(Material skin, float scale, float offsetX,
             float offsetY, float offsetZ, Transform root)
         {
@@ -705,6 +616,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             skin.SetFloat("_MaskMinDepth", -0.50f);
             skin.SetFloat("_MaskMaxDepth", 0.15f);
             skin.SetFloat("_MaskAlphaClip", 0.08f);
+            skin.SetColor("_BackStrapColor", new Color(0.80f, 0.71f, 0.62f, 1f));
+            skin.SetFloat("_BackStrapScale", Mathf.Clamp(scale, 0.25f, 3f));
+            skin.SetFloat("_BackStrapWidth", 0.026f);
+            skin.SetFloat("_BackStrapMinDepth", -0.55f);
+            skin.SetFloat("_BackStrapMaxDepth", -0.08f);
+            skin.SetFloat("_BackStrapEnabled", 1f);
             skin.SetFloat("_MaskEnabled", 1f);
         }
 
@@ -712,24 +629,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (skin == null) return;
             if (skin.HasProperty("_MaskEnabled")) skin.SetFloat("_MaskEnabled", 0f);
-        }
-    }
-
-    private sealed class GarmentPreviewResources : MonoBehaviour
-    {
-        public Mesh Mesh;
-        public Mesh[] Meshes;
-        public Material Material;
-
-        private void OnDestroy()
-        {
-            if (Mesh != null) UnityEngine.Object.Destroy(Mesh);
-            if (Meshes != null)
-            {
-                for (int i = 0; i < Meshes.Length; i++)
-                    if (Meshes[i] != null) UnityEngine.Object.Destroy(Meshes[i]);
-            }
-            if (Material != null) UnityEngine.Object.Destroy(Material);
+            if (skin.HasProperty("_BackStrapEnabled")) skin.SetFloat("_BackStrapEnabled", 0f);
         }
     }
 
