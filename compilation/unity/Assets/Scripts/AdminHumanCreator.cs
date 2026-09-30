@@ -303,10 +303,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
             Vector3[] deformed = (Vector3[])obj.vertices.Clone();
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
+            Vector3[] maleChest = values.female ? (Vector3[])obj.vertices.Clone() : null;
+            if (maleChest != null)
+                Add(maleChest, Target("universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            // Pas de poitrine nue : la zone du torse est aplatie plus bas
-            // pour recevoir directement la forme du soutien-gorge.
+            if (maleChest != null)
+            {
+                Signed(maleChest, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
+                Signed(maleChest, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
+                ReplaceFemaleChestWithMaleChest(deformed, maleChest);
+            }
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -336,9 +343,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
-            RemoveNippleTips(vertices, values.garmentScale, values.garmentOffsetX,
-                values.garmentOffsetY);
-
             BuildBones(deformed, min.y);
             Func<Vector3, bool> underwearCoverage = values.female
                 ? (Func<Vector3, bool>)(point => UnderwearCoverage.IsCovered(point,
@@ -386,45 +390,18 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Animate(false, false, 0f);
         }
 
-        private static void RemoveNippleTips(Vector3[] vertices, float scale,
-            float offsetX, float offsetY)
+        private static void ReplaceFemaleChestWithMaleChest(Vector3[] vertices,
+            Vector3[] maleChest)
         {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            // Les deux points du mesh MakeHuman sont un peu plus bas que
-            // le centre graphique du bonnet.
-            float centerY = 1.61f + offsetY - height * 0.33f;
-            float centerX = width * 0.23f;
-            for (int side = -1; side <= 1; side += 2)
+            // Le torse feminin garde exactement la cage thoracique male dans
+            // cette zone : aucun volume de sein ni point de teton ne peut donc
+            // rester sous le soutien-gorge.
+            for (int i = 0; i < vertices.Length; i++)
             {
-                float x = offsetX + side * centerX;
-                float ringDepth = 0f;
-                int ringCount = 0;
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                    Vector3 point = vertices[i];
-                    float distance = Vector2.Distance(
-                        new Vector2(point.x, point.y), new Vector2(x, centerY));
-                    if (point.z > 0f && distance >= width * 0.10f
-                        && distance <= width * 0.20f)
-                    {
-                        ringDepth += point.z;
-                        ringCount++;
-                    }
-                }
-                if (ringCount == 0) continue;
-                float smoothDepth = ringDepth / ringCount;
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                    Vector3 point = vertices[i];
-                    float distance = Vector2.Distance(
-                        new Vector2(point.x, point.y), new Vector2(x, centerY));
-                    if (point.z <= 0f || distance >= width * 0.10f) continue;
-                    float amount = 1f - Mathf.Clamp01(distance / (width * 0.10f));
-                    vertices[i].z = Mathf.Lerp(point.z,
-                        Mathf.Min(point.z, smoothDepth), amount);
-                }
+                Vector3 point = vertices[i];
+                if (point.y < 2.7f || point.y > 4.9f
+                    || point.z < 0.25f || Mathf.Abs(point.x) > 1.20f) continue;
+                vertices[i] = maleChest[i];
             }
         }
 
