@@ -12,8 +12,30 @@ vetements du jeu.
 Installation manuelle :
 
 ```text
+python update_vetement.py
 python -m pip install -r requirements.txt
 python atelier3d.py
+```
+
+## Mise a jour automatique
+
+`lancer_vetement.bat` lance d'abord `update_vetement.py`. Celui-ci consulte le
+manifeste publie sur GitHub pour la branche `arena/01a0b32c-librevies`, compare
+les empreintes SHA-256 et telecharge uniquement les fichiers de code modifies.
+Les fichiers sont verifies puis remplaces de maniere atomique.
+
+L'actualisation ne touche pas aux projets et exports de l'utilisateur dans
+`export/`. En cas de probleme Internet, la version locale continue de se
+lancer. Pour verifier sans rien modifier :
+
+```text
+python update_vetement.py --check
+```
+
+Apres avoir modifie l'atelier, le manifeste se regenere avec :
+
+```text
+python generer_manifest.py 2026.09.30.2
 ```
 
 ## Fonctionnement actuel
