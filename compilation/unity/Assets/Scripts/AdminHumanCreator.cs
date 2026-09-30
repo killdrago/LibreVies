@@ -303,17 +303,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
             Vector3[] deformed = (Vector3[])obj.vertices.Clone();
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
-            Vector3[] maleChest = values.female ? (Vector3[])obj.vertices.Clone() : null;
-            if (maleChest != null)
-                Add(maleChest, Target("universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            if (maleChest != null)
-            {
-                Signed(maleChest, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
-                Signed(maleChest, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-                ReplaceFemaleChestWithMaleChest(deformed, maleChest);
-            }
+            // Pas de poitrine nue : la zone du torse est aplatie plus bas
+            // pour recevoir directement la forme du soutien-gorge.
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -343,8 +336,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
-            RemoveNippleTips(vertices, values.garmentScale, values.garmentOffsetX,
-                values.garmentOffsetY);
+
             BuildBones(deformed, min.y);
             Func<Vector3, bool> underwearCoverage = values.female
                 ? (Func<Vector3, bool>)(point => UnderwearCoverage.IsCovered(point,
@@ -390,63 +382,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
-        }
-
-        private static void RemoveNippleTips(Vector3[] vertices, float scale,
-            float offsetX, float offsetY)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerX = width * 0.23f;
-            float centerY = 1.61f + offsetY - height * 0.33f;
-            for (int side = -1; side <= 1; side += 2)
-            {
-                float x = offsetX + side * centerX;
-                float ringDepth = 0f;
-                int ringCount = 0;
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                    Vector3 point = vertices[i];
-                    float distance = Vector2.Distance(
-                        new Vector2(point.x, point.y), new Vector2(x, centerY));
-                    if (point.z > 0f && distance >= width * 0.12f
-                        && distance <= width * 0.24f)
-                    {
-                        ringDepth += point.z;
-                        ringCount++;
-                    }
-                }
-                if (ringCount == 0) continue;
-                float smoothDepth = ringDepth / ringCount;
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                    Vector3 point = vertices[i];
-                    float distance = Vector2.Distance(
-                        new Vector2(point.x, point.y), new Vector2(x, centerY));
-                    if (point.z <= 0f || distance >= width * 0.12f) continue;
-                    float amount = 1f - Mathf.Clamp01(distance / (width * 0.12f));
-                    // On repousse le sommet sous la surface voisine : aucun
-                    // point ne peut donc rester visible sous le soutien-gorge.
-                    vertices[i].z = Mathf.Min(point.z,
-                        smoothDepth - 0.045f * amount);
-                }
-            }
-        }
-
-        private static void ReplaceFemaleChestWithMaleChest(Vector3[] vertices,
-            Vector3[] maleChest)
-        {
-            // Le torse feminin garde exactement la cage thoracique male dans
-            // cette zone : aucun volume de sein ni point de teton ne peut donc
-            // rester sous le soutien-gorge.
-            for (int i = 0; i < vertices.Length; i++)
-            {
-                Vector3 point = vertices[i];
-                if (point.y < 2.7f || point.y > 4.9f
-                    || point.z < 0.25f || Mathf.Abs(point.x) > 1.20f) continue;
-                vertices[i] = maleChest[i];
-            }
         }
 
         public void Animate(bool moving, bool running, float clock)
@@ -660,31 +595,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     && SampleAlpha(imageU, imageV)) return true;
                 float cupY = -height * 0.14f;
                 float cupX = width * 0.29f;
-                // Petite marge continue pour englober les points de la
-                // poitrine sans laisser de peau entre deux triangles.
-                float cupRadiusX = width * 0.38f * 1.15f;
-                float cupRadiusY = height * 0.38f * 1.15f;
+                float cupRadiusX = width * 0.34f * 1.15f;
+                float cupRadiusY = height * 0.34f * 1.15f;
                 if (InsideEllipse(p, new Vector2(-cupX, cupY), cupRadiusX, cupRadiusY)
                     || InsideEllipse(p, new Vector2(cupX, cupY), cupRadiusX, cupRadiusY)) return true;
-                // Deux petites zones de recouvrement suppriment les points
-                // de peau qui depassent parfois la limite du bonnet.
-                float upperCupY = cupY + height * 0.18f;
-                float upperRadiusX = width * 0.16f;
-                float upperRadiusY = height * 0.18f;
-                if (InsideEllipse(p, new Vector2(-cupX, upperCupY),
-                        upperRadiusX, upperRadiusY)
-                    || InsideEllipse(p, new Vector2(cupX, upperCupY),
-                        upperRadiusX, upperRadiusY)) return true;
-                float pointY = cupY - height * 0.19f;
-                float pointX = width * 0.23f;
-                if (InsideEllipse(p, new Vector2(-pointX, pointY),
-                        width * 0.14f, height * 0.14f)
-                    || InsideEllipse(p, new Vector2(pointX, pointY),
-                        width * 0.14f, height * 0.14f)) return true;
-                if ((Mathf.Abs(p.x - pointX) <= width * 0.18f
-                        && Mathf.Abs(p.y - pointY) <= height * 0.20f)
-                    || (Mathf.Abs(p.x + pointX) <= width * 0.18f
-                        && Mathf.Abs(p.y - pointY) <= height * 0.20f)) return true;
                 if (Mathf.Abs(p.x) <= width * 0.20f
                     && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
                 if (StrapDistance(p, -cupX, cupY + height * 0.02f,
@@ -989,12 +903,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             {
                 Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
                     + vertices[triangle.c]) / 3f;
-                bool garment = garmentTriangle != null
-                    && (garmentTriangle(centre)
-                        || garmentTriangle(vertices[triangle.a])
-                        || garmentTriangle(vertices[triangle.b])
-                        || garmentTriangle(vertices[triangle.c]));
-                List<int> destination = garment ? garmentIndices : bodyIndices;
+                List<int> destination = garmentTriangle != null && garmentTriangle(centre)
+                    ? garmentIndices : bodyIndices;
                 destination.Add(triangle.a);
                 destination.Add(triangle.b);
                 destination.Add(triangle.c);
