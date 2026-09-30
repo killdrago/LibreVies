@@ -219,6 +219,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Material skin;
         private Material underwearMaterial;
         private Material hairMaterial;
+        private Texture2D skinTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -229,7 +230,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
-            Texture2D skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
+            skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
             underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
             if (underwearMaterial.HasProperty("_Cull"))
@@ -301,7 +302,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            BreastVolume(deformed, values.chestShape, values.female);
+            // Pas de poitrine nue : la zone du torse est aplatie plus bas
+            // pour recevoir directement la forme du soutien-gorge.
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -348,7 +350,23 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.sharedMesh = mesh;
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
-            skin.color = SkinColor(values.skinTone);
+            if (values.female)
+            {
+                // Premiere etape volontairement neutre : le corps, le
+                // soutien-gorge et la culotte sont des surfaces blanches.
+                // Les UV restent presents pour recevoir les textures ensuite.
+                skin.mainTexture = null;
+                skin.color = Color.white;
+                underwearMaterial.color = Color.white;
+                hairMaterial.color = Color.white;
+            }
+            else
+            {
+                skin.mainTexture = skinTexture;
+                skin.color = SkinColor(values.skinTone);
+                underwearMaterial.color = new Color(0.80f, 0.71f, 0.62f);
+                hairMaterial.color = new Color(0.06f, 0.025f, 0.012f);
+            }
             renderer.sharedMaterials = values.female
                 ? new[] { skin, underwearMaterial }
                 : new[] { skin };
@@ -553,29 +571,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         { foreach (KeyValuePair<int, Vector3> item in target) if (item.Key >= 0 && item.Key < vertices.Length) vertices[item.Key] += item.Value * amount; }
         private void Signed(Vector3[] vertices, float amount, string positive, string negative, float strength)
         { Add(vertices, Target(amount >= 0f ? positive : negative), Mathf.Abs(amount) * strength); }
-
-        private static void BreastVolume(Vector3[] vertices, float amount, bool female)
-        {
-            if (!female) return;
-            // Une poitrine naturelle existe aussi a la valeur neutre. Le
-            // curseur ne remplace donc pas la poitrine : il ajoute ou retire
-            // seulement du volume a deux zones gauche/droite localisees.
-            float volume = Mathf.Clamp(0.34f + amount, 0.10f, 1.10f);
-            for (int i = 0; i < vertices.Length; i++)
-            {
-                Vector3 v = vertices[i];
-                if (v.y < 2.7f || v.y > 4.9f || v.z < 0.25f || Mathf.Abs(v.x) > 1.35f) continue;
-                float side = 1f - Mathf.Clamp01(Mathf.Abs(Mathf.Abs(v.x) - 0.68f) / 0.62f);
-                float vertical = 1f - Mathf.Clamp01(Mathf.Abs(v.y - 3.75f) / 1.1f);
-                float front = Mathf.Clamp01((v.z - 0.25f) / 1.2f);
-                float weight = side * vertical * front;
-                // Le slider agit sur la profondeur de chaque sein, pas sur
-                // toute la cage thoracique.
-                v.z += volume * 0.82f * weight;
-                v.x += Mathf.Sign(v.x) * volume * 0.025f * weight;
-                vertices[i] = v;
-            }
-        }
 
         private static void ScaleRegion(Vector3[] vertices, float amount, float bottom, float top,
             float halfWidth, float widthFactor, float depthFactor)

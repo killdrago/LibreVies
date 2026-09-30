@@ -84,15 +84,15 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 transmettre avec le modele.
 
 Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
-corps et les sous-vêtements. Les triangles correspondant aux bonnets, aux
-bretelles et a la culotte sont envoyes dans le second sous-maillage avec le
-materiau opaque des sous-vêtements ; ils ne sont donc plus dessines avec le
-materiau peau. La zone pectorale est aplatie avant le rendu pour ne pas laisser
-apparaitre les tetons ou le relief des seins sous le vetement. C'est un rendu de
-type tatouage/texture integree : aucune peau ne reste sous ces zones, et aucun
-quad ou mesh de vetement n'est ajoute devant le corps. La culotte est placee en
-taille basse sur les hanches. Les os, les poids et les curseurs ADMIN restent
-ceux du personnage.
+corps et les sous-vêtements. Les triangles correspondant aux bonnets, au
+pont central, aux bretelles et a la culotte sont envoyes dans le second
+sous-maillage avec un matériau opaque. La première étape affiche volontairement
+le corps, le soutien-gorge et la culotte en blanc, comme un modèle neutre prêt a
+recevoir ses textures UV. La zone du torse est aplatie avant le rendu : on ne
+fabrique pas de poitrine nue sous le soutien-gorge et aucun téton ou relief de
+sein ne doit apparaitre. Aucun quad ou mesh de vêtement n'est ajouté devant le
+corps, et la culotte reste basse sur les hanches. Les os, les poids et les
+curseurs ADMIN restent ceux du personnage.
 
 ## Limite importante, franchement
 
