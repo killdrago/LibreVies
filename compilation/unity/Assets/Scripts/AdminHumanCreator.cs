@@ -336,6 +336,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
+            RemoveNippleTips(vertices, values.garmentScale, values.garmentOffsetX,
+                values.garmentOffsetY);
 
             BuildBones(deformed, min.y);
             Func<Vector3, bool> underwearCoverage = values.female
@@ -382,6 +384,46 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
+        }
+
+        private static void RemoveNippleTips(Vector3[] vertices, float scale,
+            float offsetX, float offsetY)
+        {
+            float factor = Mathf.Clamp(scale, 0.25f, 3f);
+            float width = 0.36f * factor;
+            float height = width * 300f / 322f;
+            float centerY = 1.61f + offsetY - height * 0.14f;
+            float centerX = width * 0.29f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float x = offsetX + side * centerX;
+                float ringDepth = 0f;
+                int ringCount = 0;
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    Vector3 point = vertices[i];
+                    float distance = Vector2.Distance(
+                        new Vector2(point.x, point.y), new Vector2(x, centerY));
+                    if (point.z > 0f && distance >= width * 0.10f
+                        && distance <= width * 0.20f)
+                    {
+                        ringDepth += point.z;
+                        ringCount++;
+                    }
+                }
+                if (ringCount == 0) continue;
+                float smoothDepth = ringDepth / ringCount;
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    Vector3 point = vertices[i];
+                    float distance = Vector2.Distance(
+                        new Vector2(point.x, point.y), new Vector2(x, centerY));
+                    if (point.z <= 0f || distance >= width * 0.10f) continue;
+                    float amount = 1f - Mathf.Clamp01(distance / (width * 0.10f));
+                    vertices[i].z = Mathf.Lerp(point.z,
+                        Mathf.Min(point.z, smoothDepth), amount);
+                }
+            }
         }
 
         public void Animate(bool moving, bool running, float clock)
