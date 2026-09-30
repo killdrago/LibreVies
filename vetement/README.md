@@ -86,13 +86,13 @@ transmettre avec le modele.
 Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
 corps et les sous-vêtements. Les triangles correspondant aux bonnets, au
 pont central, aux bretelles et a la culotte sont envoyes dans le second
-sous-maillage avec un matériau opaque. La première étape affiche volontairement
-le corps, le soutien-gorge et la culotte en blanc, comme un modèle neutre prêt a
-recevoir ses textures UV. La zone du torse est aplatie avant le rendu : on ne
-fabrique pas de poitrine nue sous le soutien-gorge et aucun téton ou relief de
-sein ne doit apparaitre. Aucun quad ou mesh de vêtement n'est ajouté devant le
-corps, et la culotte reste basse sur les hanches. Les os, les poids et les
-curseurs ADMIN restent ceux du personnage.
+sous-maillage avec un matériau opaque. Le mesh féminin conserve sa forme et
+reçoit maintenant SkinBase.png sur la peau ainsi qu'une texture UV de soutien-
+gorge construite à partir du PNG fourni. La forme n'est plus aplatie ni
+enfoncée : le vêtement suit directement le volume du torse, sans quad ou mesh
+séparé devant le corps. Aucun téton n'est dessiné par la texture de peau sur
+les triangles du soutien-gorge, et la culotte reste basse sur les hanches. Les
+os, les poids et les curseurs ADMIN restent ceux du personnage.
 
 ## Limite importante, franchement
 

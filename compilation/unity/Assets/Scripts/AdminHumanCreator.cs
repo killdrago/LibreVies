@@ -220,6 +220,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Material underwearMaterial;
         private Material hairMaterial;
         private Texture2D skinTexture;
+        private Texture2D underwearTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -232,7 +233,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
+            underwearTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge_uv");
+            underwearMaterial = NewMaterial(Color.white, 0f, 0.45f);
+            if (underwearTexture != null) underwearMaterial.mainTexture = underwearTexture;
             if (underwearMaterial.HasProperty("_Cull"))
                 underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
             // La coiffure procedurale reste volontairement brune et mate :
@@ -333,9 +336,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = new Vector3[deformed.Length];
             for (int i = 0; i < deformed.Length; i++)
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
-            if (values.female)
-                FlattenChestForBra(vertices, values.garmentScale,
-                    values.garmentOffsetX, values.garmentOffsetY);
 
             BuildBones(deformed, min.y);
             Func<Vector3, bool> underwearCoverage = values.female
@@ -352,10 +352,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             if (values.female)
             {
-                // Premiere etape volontairement neutre : le corps, le
-                // soutien-gorge et la culotte sont des surfaces blanches.
-                // Les UV restent presents pour recevoir les textures ensuite.
-                skin.mainTexture = null;
+                // La forme reste celle du mesh feminin, sans l'enfoncer.
+                // La peau et la texture UV du soutien-gorge sont maintenant
+                // visibles directement sur les deux sous-maillages.
+                skin.mainTexture = skinTexture;
                 skin.color = Color.white;
                 underwearMaterial.color = Color.white;
                 hairMaterial.color = Color.white;
@@ -382,32 +382,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
-        }
-
-        private static void FlattenChestForBra(Vector3[] vertices, float scale,
-            float offsetX, float offsetY)
-        {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY;
-            float halfWidth = width * 0.40f;
-            float bottom = centerY - height * 0.50f;
-            float top = centerY + height * 0.32f;
-            // On aplatit uniquement l'avant de la cage thoracique couverte
-            // par le soutien-gorge. Les seins et les tetons ne peuvent donc
-            // plus former une bosse sous le materiau du vetement.
-            for (int i = 0; i < vertices.Length; i++)
-            {
-                Vector3 point = vertices[i];
-                if (point.z <= 0f || point.x < offsetX - halfWidth
-                    || point.x > offsetX + halfWidth
-                    || point.y < bottom || point.y > top) continue;
-                float side = Mathf.Abs(point.x - offsetX) / Mathf.Max(halfWidth, 0.001f);
-                float vertical = Mathf.InverseLerp(bottom, top, point.y);
-                float targetDepth = 0.135f + vertical * 0.010f - side * 0.008f;
-                vertices[i].z = Mathf.Min(vertices[i].z, targetDepth);
-            }
         }
 
         public void Animate(bool moving, bool running, float clock)
