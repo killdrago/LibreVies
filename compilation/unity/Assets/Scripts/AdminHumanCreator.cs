@@ -220,7 +220,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Material underwearMaterial;
         private Material hairMaterial;
         private Texture2D skinTexture;
-        private Texture2D underwearTexture;
+        private Texture2D femaleBodyTexture;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -233,9 +233,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            underwearTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge_uv");
+            femaleBodyTexture = Resources.Load<Texture2D>("Characters/Clothing/female_body_uv");
             underwearMaterial = NewMaterial(Color.white, 0f, 0.45f);
-            if (underwearTexture != null) underwearMaterial.mainTexture = underwearTexture;
             if (underwearMaterial.HasProperty("_Cull"))
                 underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
             // La coiffure procedurale reste volontairement brune et mate :
@@ -353,9 +352,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (values.female)
             {
                 // La forme reste celle du mesh feminin, sans l'enfoncer.
-                // La peau et la texture UV du soutien-gorge sont maintenant
-                // visibles directement sur les deux sous-maillages.
-                skin.mainTexture = skinTexture;
+                // La meme texture UV complete est utilisee sur les deux
+                // sous-maillages : la limite du vetement ne depend plus des
+                // bords des triangles.
+                Texture2D texture = femaleBodyTexture ?? skinTexture;
+                skin.mainTexture = texture;
+                underwearMaterial.mainTexture = texture;
                 skin.color = Color.white;
                 underwearMaterial.color = Color.white;
                 hairMaterial.color = Color.white;

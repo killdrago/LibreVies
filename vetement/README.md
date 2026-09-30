@@ -87,12 +87,13 @@ Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
 corps et les sous-vêtements. Les triangles correspondant aux bonnets, au
 pont central, aux bretelles et a la culotte sont envoyes dans le second
 sous-maillage avec un matériau opaque. Le mesh féminin conserve sa forme et
-reçoit maintenant SkinBase.png sur la peau ainsi qu'une texture UV de soutien-
-gorge construite à partir du PNG fourni. La forme n'est plus aplatie ni
-enfoncée : le vêtement suit directement le volume du torse, sans quad ou mesh
-séparé devant le corps. Aucun téton n'est dessiné par la texture de peau sur
-les triangles du soutien-gorge, et la culotte reste basse sur les hanches. Les
-os, les poids et les curseurs ADMIN restent ceux du personnage.
+reçoit une texture UV complète `female_body_uv.png` : la peau, le soutien-gorge
+et la culotte sont donc dessinés par les pixels de la texture, et non par la
+limite visible des triangles. La ligne du vêtement n'a plus de trous ni de
+pointes liées au découpage du mesh, et aucun téton n'est présent dans la zone
+recouverte. La forme du torse n'est plus aplatie ni enfoncée. Aucun quad ou
+mesh séparé n'est ajouté devant le corps, et la culotte reste basse sur les
+hanches. Les os, les poids et les curseurs ADMIN restent ceux du personnage.
 
 ## Limite importante, franchement
 
