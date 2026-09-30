@@ -7,13 +7,13 @@ vetements du jeu.
 
 1. Installer Python 3.10 ou plus recent depuis python.org.
 2. Double-cliquer sur `lancer_vetement.bat`.
-3. Le script installe Pillow puis ouvre l'atelier.
+3. Le script installe Pillow puis ouvre l'atelier 3D leger, sans Blender.
 
 Installation manuelle :
 
 ```text
 python -m pip install -r requirements.txt
-python vetement.py
+python atelier3d.py
 ```
 
 ## Fonctionnement actuel
@@ -22,9 +22,11 @@ python vetement.py
 
 - `Importer une image` charge un PNG, JPG ou WEBP.
 - `Decouper le fond` rend transparent le fond connecte aux bords de l'image.
-- L'image transparente est exportee dans un GLB avec son motif.
-- Le GLB est un panneau 3D epais, utile pour une image decoupee, un logo, un
-  motif ou une piece plane.
+- Le choix `Image decoupee` exporte une surface 3D fine avec cette image.
+- Le choix `Soutien-gorge`, `Culotte`, `Pull`, etc. crée une geometrie 3D
+  parametrique et utilise la photo comme texture.
+- La zone de droite est un viewport 3D logiciel : glisser avec le bouton gauche
+  pour tourner et utiliser la molette pour zoomer.
 
 ### Depuis un modele parametrique
 
@@ -45,7 +47,8 @@ On peut modifier largeur, hauteur, epaisseur, echelle, rotation et position.
 L'export produit :
 
 - `nom.glb` : modele 3D importable dans Unity, Blender ou Godot ;
-- `nom.json` : position, zone d'attache et zone de couverture du corps.
+- `nom.png` : texture conservee lorsqu'une photo a ete chargee ;
+- `nom.json` : position, zone d'attache, texture et informations de skinning.
 
 Les images avec alpha sont exportees avec `alphaMode: BLEND` dans le GLB. Le
 fond noir d'un visionneur qui ne gere pas l'alpha ne fait donc pas partie du
@@ -95,16 +98,22 @@ personnage.
 
 ## Limite importante, franchement
 
-La decoupe d'une image ne peut pas deviner seule la vraie profondeur d'un
-vetement, ses coutures, ses bretelles 3D et son adaptation a tous les os. La
-premiere version fabrique donc un objet image epais ou une forme parametrique.
-Pour un vrai vetement deformable sur un personnage, il faudra ensuite :
+Une seule photo ne peut pas deviner seule le dos, la vraie profondeur, les
+coutures ou les poids d'animation d'un vetement. L'atelier 3D leger fabrique
+une forme parametrique editable, affichee en 3D, et utilise la photo comme
+texture. Il permet donc de travailler sans Blender, mais il ne remplace pas
+encore une modelisation 3D complete.
 
-1. positionner le GLB sur le personnage ;
-2. ajuster les points d'attache ;
-3. ajouter un skinning sur le squelette ;
-4. definir les zones de peau a cacher.
+Pour un vrai vetement deformable sur le personnage, le GLB exporte doit encore
+etre branche au rig MakeHuman dans Unity :
+
+1. charger le mesh du vetement ;
+2. l'attacher aux memes os que le corps ;
+3. transferer les poids depuis le body ;
+4. definir les zones de peau a cacher ;
+5. tester les poses et les animations.
 
 Le format GLB est utilise en priorite car son export est possible directement
 en Python. L'export FBX depend d'un logiciel externe comme Blender et n'est pas
-fabrique par ce script.
+fabrique par ce script. Le nouvel atelier evite toutefois Blender pour la
+creation parametrique et la premiere mise en forme.
