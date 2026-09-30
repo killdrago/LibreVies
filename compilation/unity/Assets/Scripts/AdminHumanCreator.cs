@@ -601,6 +601,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 float cupRadiusY = height * 0.38f * 1.15f;
                 if (InsideEllipse(p, new Vector2(-cupX, cupY), cupRadiusX, cupRadiusY)
                     || InsideEllipse(p, new Vector2(cupX, cupY), cupRadiusX, cupRadiusY)) return true;
+                // Deux petites zones de recouvrement suppriment les points
+                // de peau qui depassent parfois la limite du bonnet.
+                float upperCupY = cupY + height * 0.18f;
+                float upperRadiusX = width * 0.16f;
+                float upperRadiusY = height * 0.18f;
+                if (InsideEllipse(p, new Vector2(-cupX, upperCupY),
+                        upperRadiusX, upperRadiusY)
+                    || InsideEllipse(p, new Vector2(cupX, upperCupY),
+                        upperRadiusX, upperRadiusY)) return true;
                 if (Mathf.Abs(p.x) <= width * 0.20f
                     && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
                 if (StrapDistance(p, -cupX, cupY + height * 0.02f,
@@ -905,8 +914,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             {
                 Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
                     + vertices[triangle.c]) / 3f;
-                List<int> destination = garmentTriangle != null && garmentTriangle(centre)
-                    ? garmentIndices : bodyIndices;
+                bool garment = garmentTriangle != null
+                    && (garmentTriangle(centre)
+                        || garmentTriangle(vertices[triangle.a])
+                        || garmentTriangle(vertices[triangle.b])
+                        || garmentTriangle(vertices[triangle.c]));
+                List<int> destination = garment ? garmentIndices : bodyIndices;
                 destination.Add(triangle.a);
                 destination.Add(triangle.b);
                 destination.Add(triangle.c);
