@@ -392,8 +392,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float factor = Mathf.Clamp(scale, 0.25f, 3f);
             float width = 0.36f * factor;
             float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY - height * 0.14f;
-            float centerX = width * 0.29f;
+            // Les deux points du mesh MakeHuman sont un peu plus bas que
+            // le centre graphique du bonnet.
+            float centerY = 1.61f + offsetY - height * 0.33f;
+            float centerX = width * 0.23f;
             for (int side = -1; side <= 1; side += 2)
             {
                 float x = offsetX + side * centerX;
@@ -652,6 +654,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                         upperRadiusX, upperRadiusY)
                     || InsideEllipse(p, new Vector2(cupX, upperCupY),
                         upperRadiusX, upperRadiusY)) return true;
+                float pointY = cupY - height * 0.19f;
+                float pointX = width * 0.23f;
+                if (InsideEllipse(p, new Vector2(-pointX, pointY),
+                        width * 0.14f, height * 0.14f)
+                    || InsideEllipse(p, new Vector2(pointX, pointY),
+                        width * 0.14f, height * 0.14f)) return true;
                 if (Mathf.Abs(p.x) <= width * 0.20f
                     && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
                 if (StrapDistance(p, -cupX, cupY + height * 0.02f,
