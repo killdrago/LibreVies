@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using UnityEngine;
 
 // Createur humain reutilisable dans le jeu.
@@ -218,9 +219,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Dictionary<string, int> boneIndexes;
         private Material skin;
         private Material underwearMaterial;
+        private Material braMaterial;
         private Material hairMaterial;
         private Texture2D skinTexture;
-        private Texture2D underwearTexture;
+        private Texture2D braTexture;
+        private GameObject bra;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -233,11 +236,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            underwearTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge_uv");
-            underwearMaterial = NewMaterial(Color.white, 0f, 0.45f);
-            if (underwearTexture != null) underwearMaterial.mainTexture = underwearTexture;
+            underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
             if (underwearMaterial.HasProperty("_Cull"))
                 underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            braTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
+            braMaterial = NewGarmentMaterial(braTexture);
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -352,12 +355,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             if (values.female)
             {
-                // La forme reste celle du mesh feminin, sans l'enfoncer.
-                // La peau et la texture UV du soutien-gorge sont maintenant
-                // visibles directement sur les deux sous-maillages.
+                // Le corps garde sa forme. Le soutien-gorge est une vraie
+                // geometrie skinee sur la meme armature, avec sa texture.
                 skin.mainTexture = skinTexture;
                 skin.color = Color.white;
-                underwearMaterial.color = Color.white;
+                underwearMaterial.color = new Color(0.80f, 0.71f, 0.62f);
                 hairMaterial.color = Color.white;
             }
             else
@@ -372,6 +374,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 : new[] { skin };
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
+            if (values.female)
+                bra = CreateSkinnedBra(values, mesh, root.transform);
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
@@ -569,102 +573,200 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static Material NewMaterial(Color color, float metallic, float smoothness)
         { Shader shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Unlit/Color"); Material material = new Material(shader); material.color = color; if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", metallic); if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", smoothness); return material; }
 
+        private static Material NewGarmentMaterial(Texture2D texture)
+        {
+            Material material = NewMaterial(Color.white, 0f, 0.78f);
+            if (texture != null) material.mainTexture = texture;
+            // Le GLB contient une image decoupee : on garde ses pixels opaques
+            // et on elimine son fond sans ajouter un quad devant le corps.
+            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 1f);
+            if (material.HasProperty("_Cutoff")) material.SetFloat("_Cutoff", 0.08f);
+            material.EnableKeyword("_ALPHATEST_ON");
+            material.DisableKeyword("_ALPHABLEND_ON");
+            material.renderQueue = 2450;
+            return material;
+        }
+
+        private GameObject CreateSkinnedBra(AdminHumanCreator values,
+            Mesh bodyMesh, Transform parentTransform)
+        {
+            TextAsset glb = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge");
+            Mesh garmentMesh = GlbGarment.Load(glb == null ? null : glb.bytes);
+            if (garmentMesh == null || braMaterial == null) return null;
+            GameObject objectBra = new GameObject("Soutien-gorge - vetement skine");
+            objectBra.transform.SetParent(parentTransform, false);
+            float width = 0.36f * Mathf.Clamp(values.garmentScale, 0.25f, 3f);
+            objectBra.transform.localPosition = new Vector3(values.garmentOffsetX,
+                1.61f + values.garmentOffsetY, values.garmentOffsetZ);
+            objectBra.transform.localScale = Vector3.one * width;
+            SkinnedMeshRenderer renderer = objectBra.AddComponent<SkinnedMeshRenderer>();
+            renderer.sharedMesh = garmentMesh;
+            renderer.sharedMaterial = braMaterial;
+            renderer.bones = bones;
+            renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
+            ApplyGarmentWeights(garmentMesh, renderer, bodyMesh, objectBra.transform);
+            renderer.updateWhenOffscreen = true;
+            return objectBra;
+        }
+
+        private void ApplyGarmentWeights(Mesh garmentMesh, SkinnedMeshRenderer renderer,
+            Mesh bodyMesh, Transform garmentTransform)
+        {
+            BoneWeight[] bodyWeights = bodyMesh.boneWeights;
+            BoneWeight[] garmentWeights = new BoneWeight[garmentMesh.vertexCount];
+            Vector3[] bodyVertices = bodyMesh.vertices;
+            Vector3[] garmentVertices = garmentMesh.vertices;
+            for (int i = 0; i < garmentVertices.Length; i++)
+            {
+                Vector3 point = garmentTransform.localPosition
+                    + Vector3.Scale(garmentVertices[i], garmentTransform.localScale);
+                int nearest = 0;
+                float nearestDistance = float.MaxValue;
+                for (int j = 0; j < bodyVertices.Length; j++)
+                {
+                    float distance = (bodyVertices[j] - point).sqrMagnitude;
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearest = j;
+                    }
+                }
+                garmentWeights[i] = bodyWeights[nearest];
+            }
+            garmentMesh.boneWeights = garmentWeights;
+            Matrix4x4 meshMatrix = renderer.transform.localToWorldMatrix;
+            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
+            for (int i = 0; i < bones.Length; i++)
+                bindposes[i] = bones[i].worldToLocalMatrix * meshMatrix;
+            garmentMesh.bindposes = bindposes;
+        }
+
+        private static class GlbGarment
+        {
+            [Serializable] private sealed class RootData
+            {
+                public MeshData[] meshes;
+                public BufferView[] bufferViews;
+                public Accessor[] accessors;
+            }
+            [Serializable] private sealed class MeshData { public Primitive[] primitives; }
+            [Serializable] private sealed class Primitive
+            {
+                public Attributes attributes;
+                public int indices;
+            }
+            [Serializable] private sealed class Attributes
+            {
+                public int POSITION;
+                public int NORMAL;
+                public int TEXCOORD_0;
+            }
+            [Serializable] private sealed class BufferView
+            {
+                public int byteOffset;
+            }
+            [Serializable] private sealed class Accessor
+            {
+                public int bufferView;
+                public int byteOffset;
+                public int count;
+            }
+
+            public static Mesh Load(byte[] bytes)
+            {
+                if (bytes == null || bytes.Length < 32
+                    || Encoding.ASCII.GetString(bytes, 0, 4) != "glTF") return null;
+                int jsonLength = BitConverter.ToInt32(bytes, 12);
+                int jsonStart = 20;
+                if (jsonLength <= 0 || jsonStart + jsonLength > bytes.Length) return null;
+                string json = Encoding.UTF8.GetString(bytes, jsonStart, jsonLength).Trim('\0', ' ');
+                RootData root = JsonUtility.FromJson<RootData>(json);
+                if (root == null || root.meshes == null || root.meshes.Length == 0) return null;
+                int binHeader = jsonStart + jsonLength;
+                if (binHeader + 8 > bytes.Length) return null;
+                int binStart = binHeader + 8;
+                Primitive primitive = root.meshes[0].primitives[0];
+                Vector3[] positions = ReadVector3(bytes, binStart, root, primitive.attributes.POSITION);
+                Vector3[] normals = ReadVector3(bytes, binStart, root, primitive.attributes.NORMAL);
+                Vector2[] uv = ReadVector2(bytes, binStart, root, primitive.attributes.TEXCOORD_0);
+                int[] indices = ReadIndices(bytes, binStart, root, primitive.indices);
+                if (positions == null || indices == null) return null;
+                Mesh mesh = new Mesh { name = "Soutien-gorge GLB skine" };
+                mesh.vertices = positions;
+                if (normals != null && normals.Length == positions.Length) mesh.normals = normals;
+                else mesh.RecalculateNormals();
+                if (uv != null && uv.Length == positions.Length) mesh.uv = uv;
+                mesh.SetTriangles(indices, 0);
+                mesh.RecalculateBounds();
+                return mesh;
+            }
+
+            private static int Offset(byte[] bytes, int binStart, RootData root, int index)
+            {
+                if (index < 0 || index >= root.accessors.Length) return -1;
+                Accessor accessor = root.accessors[index];
+                if (accessor.bufferView < 0 || accessor.bufferView >= root.bufferViews.Length) return -1;
+                return binStart + root.bufferViews[accessor.bufferView].byteOffset
+                    + accessor.byteOffset;
+            }
+
+            private static Vector3[] ReadVector3(byte[] bytes, int binStart,
+                RootData root, int index)
+            {
+                if (index < 0 || index >= root.accessors.Length) return null;
+                Accessor accessor = root.accessors[index];
+                int offset = Offset(bytes, binStart, root, index);
+                if (offset < 0 || offset + accessor.count * 12 > bytes.Length) return null;
+                Vector3[] result = new Vector3[accessor.count];
+                for (int i = 0; i < result.Length; i++)
+                    result[i] = new Vector3(BitConverter.ToSingle(bytes, offset + i * 12),
+                        BitConverter.ToSingle(bytes, offset + i * 12 + 4),
+                        BitConverter.ToSingle(bytes, offset + i * 12 + 8));
+                return result;
+            }
+
+            private static Vector2[] ReadVector2(byte[] bytes, int binStart,
+                RootData root, int index)
+            {
+                if (index < 0 || index >= root.accessors.Length) return null;
+                Accessor accessor = root.accessors[index];
+                int offset = Offset(bytes, binStart, root, index);
+                if (offset < 0 || offset + accessor.count * 8 > bytes.Length) return null;
+                Vector2[] result = new Vector2[accessor.count];
+                for (int i = 0; i < result.Length; i++)
+                    result[i] = new Vector2(BitConverter.ToSingle(bytes, offset + i * 8),
+                        BitConverter.ToSingle(bytes, offset + i * 8 + 4));
+                return result;
+            }
+
+            private static int[] ReadIndices(byte[] bytes, int binStart,
+                RootData root, int index)
+            {
+                if (index < 0 || index >= root.accessors.Length) return null;
+                Accessor accessor = root.accessors[index];
+                int offset = Offset(bytes, binStart, root, index);
+                if (offset < 0 || offset + accessor.count * 4 > bytes.Length) return null;
+                int[] result = new int[accessor.count];
+                for (int i = 0; i < result.Length; i++)
+                    result[i] = (int)BitConverter.ToUInt32(bytes, offset + i * 4);
+                return result;
+            }
+        }
+
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
     private static class UnderwearCoverage
     {
-        private const int MaskWidth = 64;
-        private const int MaskHeight = 60;
-        private static string[] alphaRows;
-
         public static bool IsCovered(Vector3 point, float scale, float offsetX, float offsetY)
         {
-            float factor = Mathf.Clamp(scale, 0.25f, 3f);
-            float width = 0.36f * factor;
-            float height = width * 300f / 322f;
-            float centerY = 1.61f + offsetY;
-            Vector2 p = new Vector2(point.x - offsetX, point.y - centerY);
-
-            if (point.z >= 0f)
-            {
-                float imageU = p.x / width + 0.5f;
-                float imageV = p.y / height + 0.5f;
-                if (imageU >= 0f && imageU <= 1f && imageV >= 0f && imageV <= 1f
-                    && SampleAlpha(imageU, imageV)) return true;
-                float cupY = -height * 0.14f;
-                float cupX = width * 0.29f;
-                float cupRadiusX = width * 0.34f * 1.15f;
-                float cupRadiusY = height * 0.34f * 1.15f;
-                if (InsideEllipse(p, new Vector2(-cupX, cupY), cupRadiusX, cupRadiusY)
-                    || InsideEllipse(p, new Vector2(cupX, cupY), cupRadiusX, cupRadiusY)) return true;
-                if (Mathf.Abs(p.x) <= width * 0.20f
-                    && Mathf.Abs(p.y + 0.025f) <= 0.040f) return true;
-                if (StrapDistance(p, -cupX, cupY + height * 0.02f,
-                    -width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.035f) return true;
-                if (StrapDistance(p, cupX, cupY + height * 0.02f,
-                    width * 0.40f, cupY + height * 0.02f + width * 0.68f) <= width * 0.035f) return true;
-            }
-            else
-            {
-                if (StrapDistance(p, -0.15f, -0.28f, -0.18f, 0.19f) <= 0.025f * factor) return true;
-                if (StrapDistance(p, 0.15f, -0.28f, 0.18f, 0.19f) <= 0.025f * factor) return true;
-                if (Mathf.Abs(p.y + width * 0.38f) <= 0.050f
-                    && Mathf.Abs(p.x) <= width * 0.52f) return true;
-            }
-
-            // Les faces avant et arriere de la culotte sont colorees dans le
-            // second sous-maillage : aucune peau ne reste sous cette zone.
-            if (point.y >= 0.96f && point.y <= 1.22f)
-            {
-                float t = Mathf.InverseLerp(0.96f, 1.22f, point.y);
-                float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
-                if (Mathf.Abs(point.x - offsetX) <= halfWidth) return true;
-            }
-            return false;
-        }
-
-        private static bool SampleAlpha(float u, float v)
-        {
-            EnsureMask();
-            if (alphaRows == null || alphaRows.Length != MaskHeight) return false;
-            int x = Mathf.Clamp(Mathf.FloorToInt(u * MaskWidth), 0, MaskWidth - 1);
-            int y = Mathf.Clamp(Mathf.FloorToInt((1f - v) * MaskHeight), 0, MaskHeight - 1);
-            return alphaRows[y][x] == '1';
-        }
-
-        private static void EnsureMask()
-        {
-            if (alphaRows != null) return;
-            TextAsset mask = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge_alpha");
-            if (mask == null) { alphaRows = new string[0]; return; }
-            List<string> rows = new List<string>();
-            foreach (string line in mask.text.Split('\n'))
-            {
-                string row = line.Trim();
-                if (row.Length >= MaskWidth) rows.Add(row.Substring(0, MaskWidth));
-            }
-            alphaRows = rows.Count == MaskHeight ? rows.ToArray() : new string[0];
-        }
-
-        private static bool InsideEllipse(Vector2 point, Vector2 center,
-            float radiusX, float radiusY)
-        {
-            float x = (point.x - center.x) / Mathf.Max(radiusX, 0.001f);
-            float y = (point.y - center.y) / Mathf.Max(radiusY, 0.001f);
-            return x * x + y * y <= 1f;
-        }
-
-        private static float StrapDistance(Vector2 point, float x0, float y0,
-            float x1, float y1)
-        {
-            Vector2 start = new Vector2(x0, y0);
-            Vector2 end = new Vector2(x1, y1);
-            Vector2 segment = end - start;
-            float amount = Mathf.Clamp01(Vector2.Dot(point - start, segment)
-                / Mathf.Max(segment.sqrMagnitude, 0.0001f));
-            return Vector2.Distance(point, start + segment * amount);
+            // Le soutien-gorge est maintenant un mesh skine independant.
+            // Le second sous-maillage du corps ne conserve que la culotte.
+            float t = Mathf.InverseLerp(0.96f, 1.22f, point.y);
+            float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
+            return point.y >= 0.96f && point.y <= 1.22f
+                && Mathf.Abs(point.x - offsetX) <= halfWidth;
         }
     }
 

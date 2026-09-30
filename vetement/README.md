@@ -83,16 +83,15 @@ reglable. Les curseurs `Taille`, `Deplacement X`, `Deplacement Y` et
 `Application.persistentDataPath/LibreVies` et affiche le chemin exact a
 transmettre avec le modele.
 
-Le personnage féminin utilise maintenant un seul SkinnedMeshRenderer pour le
-corps et les sous-vêtements. Les triangles correspondant aux bonnets, au
-pont central, aux bretelles et a la culotte sont envoyes dans le second
-sous-maillage avec un matériau opaque. Le mesh féminin conserve sa forme et
-reçoit maintenant SkinBase.png sur la peau ainsi qu'une texture UV de soutien-
-gorge construite à partir du PNG fourni. La forme n'est plus aplatie ni
-enfoncée : le vêtement suit directement le volume du torse, sans quad ou mesh
-séparé devant le corps. Aucun téton n'est dessiné par la texture de peau sur
-les triangles du soutien-gorge, et la culotte reste basse sur les hanches. Les
-os, les poids et les curseurs ADMIN restent ceux du personnage.
+Le personnage féminin conserve son SkinnedMeshRenderer pour le corps et la
+culotte. Le soutien-gorge exporté dans `vetement/export/soutien gorge.glb` est
+maintenant chargé comme un vrai mesh séparé, avec sa texture PNG, puis attaché
+au même squelette. Ses poids sont transférés depuis les vertices du corps vers
+les vertices du vêtement : le soutien-gorge suit donc les os et les animations
+au lieu d'être une image ou un quad frontal. Le corps reçoit SkinBase.png, la
+culotte reste opaque sur les hanches et la forme de la poitrine n'est pas
+aplatie. Aucun vêtement n'est placé comme une image flottante devant le
+personnage.
 
 ## Limite importante, franchement
 
