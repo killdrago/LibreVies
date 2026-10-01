@@ -382,7 +382,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // devant, sans descendre sur les yeux ou le front.
                     // La bordure doit arriver juste au-dessus des sourcils.
                     // On descend le proxy sans modifier son mesh MakeHuman.
-                    hat.gameObject.transform.localPosition += Vector3.down * 0.030f;
+                    hat.gameObject.transform.localPosition += Vector3.down * 0.060f;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }

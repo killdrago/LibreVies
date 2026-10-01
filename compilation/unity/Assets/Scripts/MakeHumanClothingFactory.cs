@@ -448,19 +448,19 @@ public static class MakeHumanClothingFactory
             material.SetTexture("_OcclusionMap", ao);
         if (option.resourceFolder.StartsWith(HairFolder, StringComparison.Ordinal))
         {
-            // Les diffuse des assets hair01 contiennent une vraie couche alpha
-            // (meches et contours). Le mode transparent reproduit le
-            // transparent/backfaceCull=false des .mhmat MakeHuman, sans
-            // transformer la coiffure en silhouette pleine.
-            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 3f);
-            if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
+            // Les diffuse des assets hair01 ont une vraie couche alpha.
+            // L'alpha test supprime les grands rectangles noirs autour des
+            // meches et laisse les yeux visibles, meme avec le shader Standard.
+            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 1f);
+            if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+            if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+            if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 1);
             if (material.HasProperty("_Cull")) material.SetInt("_Cull", 0);
-            material.DisableKeyword("_ALPHATEST_ON");
-            material.EnableKeyword("_ALPHABLEND_ON");
+            if (material.HasProperty("_Cutoff")) material.SetFloat("_Cutoff", 0.25f);
+            material.EnableKeyword("_ALPHATEST_ON");
+            material.DisableKeyword("_ALPHABLEND_ON");
             material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            material.renderQueue = 3000;
+            material.renderQueue = 2450;
         }
         if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
         if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.55f);

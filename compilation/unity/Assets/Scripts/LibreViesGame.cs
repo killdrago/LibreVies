@@ -7108,6 +7108,31 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private void DessinerRepereChapeau(Rect previewRect)
+    {
+        // Repere fixe dans la preview : il permet d'indiquer une hauteur
+        // precise entre le haut du chapeau et la bouche, meme avant un rendu
+        // Unity. Les dix graduations restent lisibles apres un zoom tete.
+        float x = previewRect.xMax - 18f;
+        float haut = previewRect.y + 18f;
+        float bas = previewRect.y + 278f;
+        GUI.color = new Color(1f, 0.82f, 0.10f, 0.95f);
+        GUI.DrawTexture(new Rect(x, haut, 2f, bas - haut), Texture2D.whiteTexture);
+        for (int i = 0; i <= 10; i++)
+        {
+            float y = Mathf.Lerp(haut, bas, i / 10f);
+            GUI.DrawTexture(new Rect(x - (i % 5 == 0 ? 10f : 6f), y, 10f, 2f),
+                Texture2D.whiteTexture);
+            GUI.Label(new Rect(x - 30f, y - 9f, 20f, 18f),
+                i.ToString(CultureInfo.InvariantCulture), smallStyle);
+        }
+        GUI.Label(new Rect(x - 116f, haut - 2f, 108f, 18f),
+            "HAUT CHAPEAU", smallStyle);
+        GUI.Label(new Rect(x - 74f, bas + 2f, 66f, 18f),
+            "BOUCHE", smallStyle);
+        GUI.color = Color.white;
+    }
+
     private void DessinerCommandesCameraPreview(Rect previewRect)
     {
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
@@ -7148,6 +7173,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GererCameraPreview(previewRect);
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
             "Glisser : pivoter / voir dessus-dessous", smallStyle);
+        DessinerRepereChapeau(previewRect);
         DessinerCommandesCameraPreview(previewRect);
 
         // Les actions principales restent sous l'image, a l'horizontale,
