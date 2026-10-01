@@ -99,6 +99,20 @@ public static class MakeHumanClothingFactory
     }
 
     private const string SharedFolder = "Characters/MakeHumanClothes/Shared/";
+    private const string HairFolder = "Characters/MakeHumanHair/";
+
+    // Coiffures CC0 provenant du pack MakeHuman Community hair01. Elles sont
+    // des proxies MakeHuman complets (mesh OBJ compile + mhclo compile), pas
+    // des primitives Unity : elles suivent donc les morphs et l'armature du
+    // corps comme les autres assets MakeHuman.
+    private static readonly Option[] HairCatalog =
+    {
+        new Option("short_messy", "Court decoiffe", true, HairFolder + "short_messy"),
+        new Option("straight_bangs", "Frange droite", true, HairFolder + "straight_bangs"),
+        new Option("shaggy_green", "Shaggy vert", true, HairFolder + "shaggy_green"),
+        new Option("strawberry_cloud", "Nuage fraise", true, HairFolder + "strawberry_cloud"),
+        new Option("faydaen_hair_1", "Coupe Faydaen", true, HairFolder + "faydaen_hair_1")
+    };
 
     private static readonly Option[] FemaleOptions =
     {
@@ -134,6 +148,11 @@ public static class MakeHumanClothingFactory
     public static Option[] Options(bool female)
     {
         return female ? FemaleOptions : MaleOptions;
+    }
+
+    public static Option[] HairOptions()
+    {
+        return HairCatalog;
     }
 
     public static string SelectedLabel(bool female, int index)
@@ -395,6 +414,22 @@ public static class MakeHumanClothingFactory
         }
         if (ao != null && material.HasProperty("_OcclusionMap"))
             material.SetTexture("_OcclusionMap", ao);
+        if (option.resourceFolder.StartsWith(HairFolder, StringComparison.Ordinal))
+        {
+            // Les diffuse des assets hair01 contiennent une vraie couche alpha
+            // (meches et contours). Le mode transparent reproduit le
+            // transparent/backfaceCull=false des .mhmat MakeHuman, sans
+            // transformer la coiffure en silhouette pleine.
+            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 3f);
+            if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
+            if (material.HasProperty("_Cull")) material.SetInt("_Cull", 0);
+            material.DisableKeyword("_ALPHATEST_ON");
+            material.EnableKeyword("_ALPHABLEND_ON");
+            material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            material.renderQueue = 3000;
+        }
         if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
         if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.55f);
         return material;

@@ -7194,9 +7194,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
         GUI.Label(new Rect(gauche, contenu.y + 350f, 238f, 22f),
             adminHumanCreator.female ? "Coiffures femme" : "Coiffures homme", smallStyle);
-        string[] coiffures = adminHumanCreator.female
-            ? new[] { "Carre", "Longs", "Court", "Attache", "Boucles" }
-            : new[] { "Brosse", "Court", "Punk", "Mi-long", "Long" };
+        // Le slot cheveux est independant de la tenue et pointe vers cinq
+        // vrais assets proxy MakeHuman du pack hair01 (CC0).
+        string[] coiffures =
+            new[] { "Court decoiffe", "Frange droite", "Shaggy vert", "Nuage fraise", "Coupe Faydaen" };
         for (int i = 0; i < coiffures.Length; i++)
         {
             Rect coupe = new Rect(gauche + (i % 2) * 122f,

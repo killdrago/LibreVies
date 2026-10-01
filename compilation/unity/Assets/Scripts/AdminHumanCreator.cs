@@ -185,22 +185,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
-        private Material hairMaterial;
         private Texture2D skinTexture;
-        private GameObject hair;
-        private int hairStyle;
-        private bool hairFemale;
 
         public HumanPreview(Transform parent)
         {
             this.parent = parent;
             obj = ObjData.Load(Resources.Load<TextAsset>(Root + "MakeHumanBaseData"));
             skin = NewMaterial(new Color(0.72f, 0.42f, 0.31f), 0.02f, 0.38f);
-            hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            // La coiffure procedurale reste volontairement brune et mate :
-            // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
         }
 
@@ -322,8 +315,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             skin.mainTexture = skinTexture;
             skin.color = values.female ? Color.white : SkinColor(values.skinTone);
-            hairMaterial.color = values.female
-                ? Color.white : new Color(0.06f, 0.025f, 0.012f);
             renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
@@ -338,10 +329,27 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
-            hairStyle = values.hairStyle;
-            hairFemale = values.female;
-            hair = HairBuilder.Create(values.hairStyle, values.female, root.transform,
-                FindBone("head"), hairMaterial);
+            int hairStyle = Mathf.Clamp(values.hairStyle, 0,
+                MakeHumanClothingFactory.HairOptions().Length - 1);
+            MakeHumanClothingFactory.Option[] hairOptions =
+                MakeHumanClothingFactory.HairOptions();
+            MakeHumanClothingFactory.BuildResult hairBuild =
+                MakeHumanClothingFactory.Create(hairOptions[hairStyle], deformed,
+                    Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
+            if (hairBuild.gameObject != null)
+            {
+                // Le mesh cheveux est un vrai asset MakeHuman : son proxy,
+                // ses poids et ses textures viennent du pack hair01. Il est
+                // donc indépendant de la tenue mais partage la meme armature.
+                // L'objet est deja parenté au root par la factory.
+            }
+            else
+            {
+                // Une coiffure absente ne doit pas etre remplacee par une
+                // geometrie approximative : le personnage reste sans cheveux
+                // et l'erreur est explicite dans la console Unity.
+                Debug.LogError("MakeHuman hair indisponible: " + hairBuild.error);
+            }
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
             // bras ouverts. On le remet debout avant la premiere image.
             Animate(false, false, 0f);
@@ -368,14 +376,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             SetBoneRotation("upperarm01.R", armSwing, 30f);
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
             SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
-            HairBuilder.Animate(hair, hairStyle, hairFemale, moving, running, clock);
-        }
-
-        private Transform FindBone(string name)
-        {
-            if (boneIndexes != null && boneIndexes.ContainsKey(name))
-                return bones[boneIndexes[name]];
-            return root.transform;
         }
 
         private void SetBoneRotation(string name, float x, float z)
@@ -536,211 +536,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-
-    private static class HairBuilder
-    {
-        public static GameObject Create(int style, bool female, Transform parent, Transform head,
-            Material material)
-        {
-            style = Mathf.Clamp(style, 0, 4);
-            // Toutes les coupes ont une calotte ; l'ancien retour pour le
-            // style 0 rendait "Carre" et "Brosse" completement chauves.
-            GameObject objectHair = new GameObject("Cheveux - coupe " + style);
-            objectHair.transform.SetParent(head == null ? parent : head, false);
-            // Les coordonnees sont deja exprimees dans le repere local de l'os
-            // head. Il ne faut surtout pas reduire toute la coiffure autour de
-            // l'os : cela la rentre dans le crane. Les dimensions ci-dessous
-            // tiennent deja compte de l'echelle Unity du corps.
-            float width = female ? 0.115f : 0.105f;
-            float depth = female ? 0.105f : 0.095f;
-            CreateCap(objectHair, width, depth, material);
-
-            if (female)
-            {
-                if (style == 0)
-                {
-                    CreateLock(objectHair, "meche gauche", -width * 0.78f, 0.08f, 0.035f,
-                        0.045f, 0.055f, 0.14f, material, 0.01f);
-                    CreateLock(objectHair, "meche droite", width * 0.78f, 0.08f, 0.035f,
-                        0.045f, 0.055f, 0.14f, material, -0.01f);
-                }
-                else if (style == 1)
-                {
-                    CreateLock(objectHair, "longue gauche", -width * 0.86f, 0.08f, 0.0f,
-                        0.042f, 0.05f, 0.34f, material, 0.012f);
-                    CreateLock(objectHair, "longue droite", width * 0.86f, 0.08f, 0.0f,
-                        0.042f, 0.05f, 0.34f, material, -0.012f);
-                    CreateLock(objectHair, "longue arriere", 0f, 0.04f, -0.085f,
-                        0.075f, 0.045f, 0.34f, material, 0.015f);
-                }
-                else if (style == 2)
-                {
-                    CreateLock(objectHair, "queue gauche", -width * 0.72f, 0.05f, -0.09f,
-                        0.04f, 0.04f, 0.29f, material, 0.02f);
-                    CreateLock(objectHair, "queue droite", width * 0.72f, 0.05f, -0.09f,
-                        0.04f, 0.04f, 0.29f, material, -0.02f);
-                    CreateLock(objectHair, "frange", 0f, 0.10f, 0.085f,
-                        0.055f, 0.025f, 0.09f, material, 0f);
-                }
-                else if (style == 3)
-                {
-                    CreateLock(objectHair, "carre gauche", -width * 0.88f, 0.08f, 0.025f,
-                        0.048f, 0.05f, 0.24f, material, 0.008f);
-                    CreateLock(objectHair, "carre droite", width * 0.88f, 0.08f, 0.025f,
-                        0.048f, 0.05f, 0.24f, material, -0.008f);
-                }
-                else
-                {
-                    for (int i = 0; i < 3; i++)
-                    {
-                        float x = (i - 1) * width * 0.72f;
-                        CreateLock(objectHair, "boucle " + i, x, 0.06f, -0.07f,
-                            0.045f, 0.045f, 0.27f + i * 0.025f, material,
-                            (i - 1) * 0.025f);
-                    }
-                }
-            }
-            else
-            {
-                if (style == 0)
-                {
-                    CreateLock(objectHair, "frange courte", 0f, 0.105f, 0.07f,
-                        0.07f, 0.025f, 0.055f, material, 0f);
-                }
-                else if (style == 1)
-                {
-                    CreateLock(objectHair, "meche coiffee", -0.035f, 0.10f, 0.075f,
-                        0.065f, 0.03f, 0.09f, material, -0.012f);
-                }
-                else if (style == 2)
-                {
-                    for (int i = 0; i < 3; i++)
-                        CreateLock(objectHair, "point " + i, (i - 1) * 0.045f, 0.11f, 0.0f,
-                            0.035f, 0.035f, 0.10f + i * 0.025f, material, 0f);
-                }
-                else if (style == 3)
-                {
-                    CreateLock(objectHair, "cote gauche", -0.09f, 0.07f, 0.01f,
-                        0.035f, 0.04f, 0.19f, material, 0.01f);
-                    CreateLock(objectHair, "cote droit", 0.09f, 0.07f, 0.01f,
-                        0.035f, 0.04f, 0.19f, material, -0.01f);
-                }
-                else
-                {
-                    // La coupe Long ne doit pas etre une seule meche a l'arriere :
-                    // elle doit couvrir l'avant, les tempes et la nuque.
-                    CreateLock(objectHair, "longue avant gauche", -0.045f, 0.105f, 0.07f,
-                        0.05f, 0.038f, 0.15f, material, 0.012f);
-                    CreateLock(objectHair, "longue avant droite", 0.045f, 0.105f, 0.07f,
-                        0.05f, 0.038f, 0.15f, material, -0.012f);
-                    CreateLock(objectHair, "longue tempe gauche", -0.09f, 0.08f, 0.015f,
-                        0.04f, 0.05f, 0.22f, material, 0.012f);
-                    CreateLock(objectHair, "longue tempe droite", 0.09f, 0.08f, 0.015f,
-                        0.04f, 0.05f, 0.22f, material, -0.012f);
-                    CreateLock(objectHair, "longue nuque", 0f, 0.065f, -0.075f,
-                        0.07f, 0.045f, 0.25f, material, 0f);
-                }
-            }
-            return objectHair;
-        }
-
-        private static void CreateCap(GameObject parent, float width, float depth, Material material)
-        {
-            const int rows = 5;
-            const int columns = 24;
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            for (int row = 0; row < rows; row++)
-            {
-                float t = row / (float)(rows - 1);
-                float radius = Mathf.Sin(t * Mathf.PI * 0.5f);
-                float y = 0.18f - t * 0.16f;
-                for (int col = 0; col < columns; col++)
-                {
-                    float angle = col * Mathf.PI * 2f / columns;
-                    vertices.Add(new Vector3(Mathf.Cos(angle) * width * radius, y,
-                        Mathf.Sin(angle) * depth * radius));
-                }
-            }
-            for (int row = 0; row < rows - 1; row++)
-                for (int col = 0; col < columns; col++)
-                {
-                    int a = row * columns + col;
-                    int b = row * columns + (col + 1) % columns;
-                    int c = (row + 1) * columns + (col + 1) % columns;
-                    int d = (row + 1) * columns + col;
-                    // Face externe : l'ancien ordre orientait toute la
-                    // calotte et les meches vers l'interieur. Avec le
-                    // backface culling de Unity, les cheveux disparaissaient.
-                    triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                    triangles.Add(a); triangles.Add(c); triangles.Add(d);
-                }
-            AddMesh(parent, "calotte", vertices, triangles, material);
-        }
-
-        private static void CreateLock(GameObject parent, string name, float centerX, float startY,
-            float centerZ, float radiusX, float radiusZ, float length, Material material, float bend)
-        {
-            const int rows = 5;
-            const int columns = 10;
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            for (int row = 0; row < rows; row++)
-            {
-                float t = row / (float)(rows - 1);
-                float y = startY - length * t;
-                float x = centerX + bend * Mathf.Sin(t * Mathf.PI);
-                float taper = 1f - t * 0.28f;
-                for (int col = 0; col < columns; col++)
-                {
-                    float angle = col * Mathf.PI * 2f / columns;
-                    vertices.Add(new Vector3(x + Mathf.Cos(angle) * radiusX * taper, y,
-                        centerZ + Mathf.Sin(angle) * radiusZ * taper));
-                }
-            }
-            for (int row = 0; row < rows - 1; row++)
-                for (int col = 0; col < columns; col++)
-                {
-                    int a = row * columns + col;
-                    int b = row * columns + (col + 1) % columns;
-                    int c = (row + 1) * columns + (col + 1) % columns;
-                    int d = (row + 1) * columns + col;
-                    // Face externe : l'ancien ordre orientait toute la
-                    // calotte et les meches vers l'interieur. Avec le
-                    // backface culling de Unity, les cheveux disparaissaient.
-                    triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                    triangles.Add(a); triangles.Add(c); triangles.Add(d);
-                }
-            AddMesh(parent, name, vertices, triangles, material);
-        }
-
-        private static void AddMesh(GameObject parent, string name, List<Vector3> vertices,
-            List<int> triangles, Material material)
-        {
-            Mesh mesh = new Mesh { name = "Cheveux - " + name + " mesh" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            GameObject part = new GameObject("Cheveux - " + name);
-            part.transform.SetParent(parent.transform, false);
-            part.AddComponent<MeshFilter>().sharedMesh = mesh;
-            part.AddComponent<MeshRenderer>().sharedMaterial = material;
-        }
-
-        public static void Animate(GameObject hair, int style, bool female, bool moving,
-            bool running, float clock)
-        {
-            if (hair == null) return;
-            bool longHair = female ? style == 1 || style == 2 || style == 3 || style == 4
-                : style == 3 || style == 4;
-            float amplitude = longHair ? (running ? 5f : 3f) : 1.2f;
-            float phase = Time.time * (running ? 2.2f : 1.7f);
-            float wave = Mathf.Sin(phase + clock * 0.15f) * amplitude
-                * (moving ? 1f : (longHair ? 0.28f : 0.08f));
-            hair.transform.localRotation = Quaternion.Euler(wave * 0.45f, wave * 0.25f, wave);
-        }
-    }
 
     private sealed class ObjData
     {
