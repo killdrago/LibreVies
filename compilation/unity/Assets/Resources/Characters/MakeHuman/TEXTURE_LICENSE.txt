@@ -1,3 +1,7 @@
-SkinBase.png and HairDark.png are original LibreVies project textures,
-procedurally authored for the standalone character creator. They are included
-with the software and may be redistributed with it.
+SkinBase.png is an original LibreVies project texture, procedurally authored
+for the character creator. It is included with the software and may be
+redistributed with it.
+
+The Unity game no longer bundles the former procedural HairDark texture: its
+characters use the real MakeHuman hair proxies documented in
+../MakeHumanHair/MAKEHUMAN_HAIR_SOURCE.txt.

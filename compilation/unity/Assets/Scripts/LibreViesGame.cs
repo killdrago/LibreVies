@@ -5350,9 +5350,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void ConfigurerAnimationsHeroine(GameObject model)
     {
-        // LibreViesHeroine.obj est volontairement sans squelette. Les groupes
-        // OBJ sont donc animés par AnimerHeroine, tandis qu'un futur FBX/glTF
-        // pourra remplacer ce chemin par un Animator sans modifier le gameplay.
+        // Les groupes OBJ separes de LibreViesHeroineParts sont volontairement
+        // sans squelette. Ils sont animes par AnimerHeroine, tandis qu'un futur
+        // FBX/glTF pourra remplacer ce chemin par un Animator.
         JouerAnimationHeroine("Idle", true);
     }
 
@@ -5501,7 +5501,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // sphère ou assemblage procédural ne doit remplacer le personnage.
         if (!CreateHumanHeroine(body))
         {
-            Debug.LogError("[LV] Modèle humanoïde introuvable : LibreViesHeroine.obj doit être importé par Unity.");
+            Debug.LogError("[LV] Parties OBJ humanoides absentes : verifiez Characters/LibreViesHeroineParts.");
             brasAttaque = body;
         }
         joueurCollider = player.gameObject.AddComponent<CapsuleCollider>();
@@ -7045,6 +7045,20 @@ public sealed class LibreViesGame : MonoBehaviour
         return nouveau;
     }
 
+    private float SliderHumainVolume(Rect rect, string nom, float valeur)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        // Les controles du corps vont maintenant de -500 a +500. La valeur
+        // interne reste un multiplicateur MakeHuman (-5 a +5) afin que le
+        // maximum soit réellement plus fort, pas seulement renommé.
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, -5f, 5f);
+        GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
     private void GererCameraPreview(Rect previewRect)
     {
         if (adminHumanCreator == null) return;
@@ -7210,21 +7224,21 @@ public sealed class LibreViesGame : MonoBehaviour
         }
 
         GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "Corps et proportions", smallStyle);
-        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume", adminHumanCreator.chestShape, -0.24f, 1f);
+        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume", adminHumanCreator.chestShape, -5f, 5f);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f) { adminHumanCreator.chestShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches", adminHumanCreator.hipShape);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches", adminHumanCreator.hipShape);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f) { adminHumanCreator.hipShape = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 135f, 238f, 24f), "Ventre", adminHumanCreator.belly);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 135f, 238f, 24f), "Ventre", adminHumanCreator.belly);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.belly) > 0.001f) { adminHumanCreator.belly = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 165f, 238f, 24f), "Bras largeur", adminHumanCreator.armThickness);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 165f, 238f, 24f), "Bras largeur", adminHumanCreator.armThickness);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armThickness) > 0.001f) { adminHumanCreator.armThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 195f, 238f, 24f), "Bras longueur", adminHumanCreator.armLength);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 195f, 238f, 24f), "Bras longueur", adminHumanCreator.armLength);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armLength) > 0.001f) { adminHumanCreator.armLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 225f, 238f, 24f), "Jambes largeur", adminHumanCreator.legThickness);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 225f, 238f, 24f), "Jambes largeur", adminHumanCreator.legThickness);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legThickness) > 0.001f) { adminHumanCreator.legThickness = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 255f, 238f, 24f), "Hauteur jambe", adminHumanCreator.legLength);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 255f, 238f, 24f), "Hauteur jambe", adminHumanCreator.legLength);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legLength) > 0.001f) { adminHumanCreator.legLength = nouvelleValeur; adminHumanCreator.BuildPreview(); }
-        nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
+        nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
         MakeHumanClothingFactory.Option[] vetements =

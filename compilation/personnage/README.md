@@ -6,7 +6,8 @@ copié dans `jeu/personnage/`.
 
 Les données de `Assets/Resources/Characters/` comprennent :
 
-- `MakeHumanBase.obj` et `MakeHumanBaseData.txt`, la base humaine hm08 ;
+- `MakeHumanBaseData.txt`, la base humaine hm08 (la copie OBJ non chargee par
+  l'application a ete retiree pour eviter un doublon) ;
 - les cibles de forme ventre, bras, jambes, pieds, tête, yeux, nez, bouche et
   oreilles ;
 - `rig.csv` et `weights.csv`, construits à partir du rig `default` MakeHuman ;

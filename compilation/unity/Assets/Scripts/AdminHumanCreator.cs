@@ -259,9 +259,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            // La poitrine garde son volume MakeHuman ; le curseur ne fait
-            // qu'une variation locale, sans aplatir ni enfoncer le torse.
-            ScaleRegion(deformed, values.chestShape, 1.28f, 1.86f, 0.24f, 0.24f, 0.34f);
+            // La poitrine est deformee autour des deux vrais centres mammaires
+            // du mesh hm08. L'ancien rectangle vertical (y=1.28..1.86)
+            // touchait le nombril : il est supprime, il n'y a ni quad ajoute
+            // ni volume separe.
+            ScaleBreasts(deformed, values.chestShape);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -508,6 +510,42 @@ public sealed class AdminHumanCreator : MonoBehaviour
         { foreach (KeyValuePair<int, Vector3> item in target) if (item.Key >= 0 && item.Key < vertices.Length) vertices[item.Key] += item.Value * amount; }
         private void Signed(Vector3[] vertices, float amount, string positive, string negative, float strength)
         { Add(vertices, Target(amount >= 0f ? positive : negative), Mathf.Abs(amount) * strength); }
+
+        private static void ScaleBreasts(Vector3[] vertices, float amount)
+        {
+            if (Mathf.Abs(amount) < 0.001f) return;
+            // Centres mesures sur le mesh MakeHuman hm08 fourni par le projet.
+            // Le torse et le nombril sont volontairement hors de ces ellipsoides.
+            const float centreY = 3.82f;
+            const float centreZ = 1.58f;
+            const float centreX = 0.80f;
+            const float rayonX = 0.93f;
+            const float rayonY = 0.86f;
+            const float rayonZ = 0.88f;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 v = vertices[i];
+                if (v.y < centreY - rayonY || v.y > centreY + rayonY || v.z < 0.72f)
+                    continue;
+                float breastCentreX = v.x >= 0f ? centreX : -centreX;
+                float dx = (v.x - breastCentreX) / rayonX;
+                float dy = (v.y - centreY) / rayonY;
+                float dz = (v.z - centreZ) / rayonZ;
+                float distance = Mathf.Sqrt(dx * dx + dy * dy + dz * dz);
+                float influence = 1f - Mathf.Clamp01(distance);
+                influence *= influence;
+                if (influence <= 0.0001f) continue;
+
+                // On augmente radialement chaque sein autour de son propre
+                // centre. Le sternum et l'abdomen ne sont jamais tires depuis
+                // l'origine du personnage, ce qui supprimait le nombril avec
+                // l'ancienne ScaleRegion.
+                float scaleX = Mathf.Max(0.35f, 1f + amount * 0.16f * influence);
+                float scaleZ = Mathf.Max(0.35f, 1f + amount * 0.32f * influence);
+                vertices[i].x = breastCentreX + (v.x - breastCentreX) * scaleX;
+                vertices[i].z = centreZ + (v.z - centreZ) * scaleZ;
+            }
+        }
 
         private static void ScaleRegion(Vector3[] vertices, float amount, float bottom, float top,
             float halfWidth, float widthFactor, float depthFactor)
