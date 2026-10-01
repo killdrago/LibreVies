@@ -7241,26 +7241,78 @@ public sealed class LibreViesGame : MonoBehaviour
         nouvelleValeur = SliderHumainVolume(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
-        MakeHumanClothingFactory.Option[] vetements =
-            MakeHumanClothingFactory.Options(adminHumanCreator.female);
+        MakeHumanClothingFactory.Option[] tenues =
+            MakeHumanClothingFactory.ClothingOptions(adminHumanCreator.female);
+        MakeHumanClothingFactory.Option[] chapeaux =
+            MakeHumanClothingFactory.HatOptions(adminHumanCreator.female);
+        MakeHumanClothingFactory.Option[] chaussures =
+            MakeHumanClothingFactory.ShoeOptions(adminHumanCreator.female);
         GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
-            "VETEMENTS MAKEHUMAN", smallStyle);
-        int clothingRows = (vetements.Length + 1) / 2;
+            "EQUIPEMENT MAKEHUMAN", smallStyle);
         Rect clothingView = new Rect(droite, contenu.y + 358f, 234f, 150f);
-        Rect clothingContent = new Rect(0f, 0f, 234f,
-            Mathf.Max(150f, clothingRows * 30f));
+        Rect clothingContent = new Rect(0f, 0f, 234f, 270f);
         adminClothingScroll = GUI.BeginScrollView(clothingView, adminClothingScroll,
             clothingContent);
-        for (int i = 0; i < vetements.Length; i++)
+        float equipementY = 0f;
+        GUI.Label(new Rect(0f, equipementY, 220f, 22f), "TENUE", smallStyle);
+        equipementY += 24f;
+        for (int i = 0; i < tenues.Length; i++)
         {
-            Rect vetement = new Rect((i % 2) * 120f, (i / 2) * 30f, 116f, 27f);
-            if (BoutonChoixAdmin(vetement, vetements[i].label,
+            Rect vetement = new Rect((i % 2) * 120f,
+                equipementY + (i / 2) * 30f, 116f, 27f);
+            if (BoutonChoixAdmin(vetement, tenues[i].label,
                 adminHumanCreator.clothingStyle == i))
             {
                 adminHumanCreator.clothingStyle = i;
                 adminHumainValide = false;
                 adminHumanCreator.BuildPreview();
-                ShowInfo("Tenue MakeHuman : " + vetements[i].label);
+                ShowInfo("Tenue MakeHuman : " + tenues[i].label);
+            }
+        }
+        equipementY += ((tenues.Length + 1) / 2) * 30f + 4f;
+        GUI.Label(new Rect(0f, equipementY, 220f, 22f), "CHAPEAU", smallStyle);
+        equipementY += 24f;
+        if (BoutonChoixAdmin(new Rect(0f, equipementY, 116f, 27f), "Aucun",
+            adminHumanCreator.hatStyle < 0))
+        {
+            adminHumanCreator.hatStyle = -1;
+            adminHumainValide = false;
+            adminHumanCreator.BuildPreview();
+        }
+        for (int i = 0; i < chapeaux.Length; i++)
+        {
+            Rect chapeau = new Rect(120f + (i % 1) * 120f,
+                equipementY + (i / 1) * 30f, 116f, 27f);
+            if (BoutonChoixAdmin(chapeau, chapeaux[i].label,
+                adminHumanCreator.hatStyle == i))
+            {
+                adminHumanCreator.hatStyle = i;
+                adminHumainValide = false;
+                adminHumanCreator.BuildPreview();
+                ShowInfo("Chapeau MakeHuman : " + chapeaux[i].label);
+            }
+        }
+        equipementY += Mathf.Max(1, chapeaux.Length) * 30f + 4f;
+        GUI.Label(new Rect(0f, equipementY, 220f, 22f), "CHAUSSURES", smallStyle);
+        equipementY += 24f;
+        if (BoutonChoixAdmin(new Rect(0f, equipementY, 116f, 27f), "Aucune",
+            adminHumanCreator.shoeStyle < 0))
+        {
+            adminHumanCreator.shoeStyle = -1;
+            adminHumainValide = false;
+            adminHumanCreator.BuildPreview();
+        }
+        for (int i = 0; i < chaussures.Length; i++)
+        {
+            Rect chaussure = new Rect((i % 2) * 120f,
+                equipementY + (i / 2) * 30f, 116f, 27f);
+            if (BoutonChoixAdmin(chaussure, chaussures[i].label,
+                adminHumanCreator.shoeStyle == i))
+            {
+                adminHumanCreator.shoeStyle = i;
+                adminHumainValide = false;
+                adminHumanCreator.BuildPreview();
+                ShowInfo("Chaussures MakeHuman : " + chaussures[i].label);
             }
         }
         GUI.EndScrollView();

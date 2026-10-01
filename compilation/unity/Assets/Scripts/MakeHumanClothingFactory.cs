@@ -114,13 +114,35 @@ public static class MakeHumanClothingFactory
         new Option("faydaen_hair_1", "Coupe Faydaen", true, HairFolder + "faydaen_hair_1")
     };
 
-    private static readonly Option[] FemaleOptions =
+    private static readonly Option[] FemaleClothingOptions =
     {
         new Option("female_sportsuit01", "Tenue sport", true),
         new Option("female_casualsuit01", "Tenue casual", true),
         new Option("female_casualsuit02", "Tenue casual 2", true),
-        new Option("female_elegantsuit01", "Tenue elegante", true),
-        new Option("fedora01", "Chapeau fedora", true, SharedFolder + "fedora01"),
+        new Option("female_elegantsuit01", "Tenue elegante", true)
+    };
+
+    private static readonly Option[] MaleClothingOptions =
+    {
+        new Option("male_casualsuit04", "Tenue casual", false),
+        new Option("male_casualsuit05", "Tenue casual 2", false),
+        new Option("male_casualsuit06", "Tenue casual 3", false),
+        new Option("male_elegantsuit01", "Tenue elegante", false),
+        new Option("male_worksuit01", "Tenue travail", false)
+    };
+
+    private static readonly Option[] FemaleHatOptions =
+    {
+        new Option("fedora01", "Chapeau fedora", true, SharedFolder + "fedora01")
+    };
+
+    private static readonly Option[] MaleHatOptions =
+    {
+        new Option("fedora01", "Chapeau fedora", false, SharedFolder + "fedora01")
+    };
+
+    private static readonly Option[] FemaleShoeOptions =
+    {
         new Option("shoes01", "Chaussures 1", true, SharedFolder + "shoes01"),
         new Option("shoes02", "Chaussures 2", true, SharedFolder + "shoes02"),
         new Option("shoes03", "Chaussures 3", true, SharedFolder + "shoes03"),
@@ -129,14 +151,8 @@ public static class MakeHumanClothingFactory
         new Option("shoes06", "Chaussures 6", true, SharedFolder + "shoes06")
     };
 
-    private static readonly Option[] MaleOptions =
+    private static readonly Option[] MaleShoeOptions =
     {
-        new Option("male_casualsuit04", "Tenue casual", false),
-        new Option("male_casualsuit05", "Tenue casual 2", false),
-        new Option("male_casualsuit06", "Tenue casual 3", false),
-        new Option("male_elegantsuit01", "Tenue elegante", false),
-        new Option("male_worksuit01", "Tenue travail", false),
-        new Option("fedora01", "Chapeau fedora", false, SharedFolder + "fedora01"),
         new Option("shoes01", "Chaussures 1", false, SharedFolder + "shoes01"),
         new Option("shoes02", "Chaussures 2", false, SharedFolder + "shoes02"),
         new Option("shoes03", "Chaussures 3", false, SharedFolder + "shoes03"),
@@ -145,9 +161,25 @@ public static class MakeHumanClothingFactory
         new Option("shoes06", "Chaussures 6", false, SharedFolder + "shoes06")
     };
 
+    // Compatibilite : Options() represente maintenant uniquement les tenues.
     public static Option[] Options(bool female)
     {
-        return female ? FemaleOptions : MaleOptions;
+        return ClothingOptions(female);
+    }
+
+    public static Option[] ClothingOptions(bool female)
+    {
+        return female ? FemaleClothingOptions : MaleClothingOptions;
+    }
+
+    public static Option[] HatOptions(bool female)
+    {
+        return female ? FemaleHatOptions : MaleHatOptions;
+    }
+
+    public static Option[] ShoeOptions(bool female)
+    {
+        return female ? FemaleShoeOptions : MaleShoeOptions;
     }
 
     public static Option[] HairOptions()
@@ -157,8 +189,8 @@ public static class MakeHumanClothingFactory
 
     public static string SelectedLabel(bool female, int index)
     {
-        Option[] options = Options(female);
-        if (index < 0 || index >= options.Length) return "Aucun vetement";
+        Option[] options = ClothingOptions(female);
+        if (index < 0 || index >= options.Length) return "Aucune tenue";
         return options[index].label;
     }
 

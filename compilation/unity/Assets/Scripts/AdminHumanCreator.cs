@@ -24,8 +24,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public float mouthShape;
     public float earsShape;
     public int hairStyle;
-    // Index dans le catalogue des tenues MakeHuman Community.
+    // Chaque famille d'equipement a son propre slot. -1 signifie "aucun".
     public int clothingStyle;
+    public int hatStyle = -1;
+    public int shoeStyle = -1;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -148,7 +150,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
         chestShape = UnityEngine.Random.Range(-0.24f, 0.75f);
         hipShape = UnityEngine.Random.Range(-0.65f, 0.75f);
         hairStyle = UnityEngine.Random.Range(0, 5);
-        clothingStyle = UnityEngine.Random.Range(0, MakeHumanClothingFactory.Options(female).Length);
+        clothingStyle = UnityEngine.Random.Range(0, MakeHumanClothingFactory.ClothingOptions(female).Length);
+        hatStyle = UnityEngine.Random.Range(-1, MakeHumanClothingFactory.HatOptions(female).Length);
+        shoeStyle = UnityEngine.Random.Range(-1, MakeHumanClothingFactory.ShoeOptions(female).Length);
         armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
         armLength = UnityEngine.Random.Range(-0.65f, 0.7f);
         legThickness = UnityEngine.Random.Range(-0.65f, 0.7f);
@@ -170,6 +174,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         headShape = eyesShape = noseShape = mouthShape = earsShape = 0f;
         hairStyle = 0;
         clothingStyle = 0;
+        hatStyle = -1;
+        shoeStyle = -1;
         BuildPreview();
     }
 
@@ -294,20 +300,34 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            // Le proxy MakeHuman fournit aussi les vertices du corps a cacher
-            // sous la tenue. On retire uniquement les faces entierement
-            // couvertes : aucune classification approximative du soutien-
-            // gorge et aucune peau n'est dessinee sous le vetement.
-            MakeHumanClothingFactory.Option[] options =
-                MakeHumanClothingFactory.Options(values.female);
-            int clothingIndex = options.Length == 0 ? 0
-                : Mathf.Clamp(values.clothingStyle, 0, options.Length - 1);
-            bool[] deleteBody = options.Length == 0 ? null
-                : MakeHumanClothingFactory.LoadDeleteMask(options[clothingIndex],
-                    deformed.Length);
+            // Chaque famille d'equipement garde son propre proxy et sa propre
+            // selection. Les masques de peau sont fusionnes pour que les
+            // chaussures ou le chapeau n'annulent jamais la tenue.
+            MakeHumanClothingFactory.Option[] clothingOptions =
+                MakeHumanClothingFactory.ClothingOptions(values.female);
+            MakeHumanClothingFactory.Option[] hatOptions =
+                MakeHumanClothingFactory.HatOptions(values.female);
+            MakeHumanClothingFactory.Option[] shoeOptions =
+                MakeHumanClothingFactory.ShoeOptions(values.female);
+            int clothingIndex = clothingOptions.Length == 0 ? -1
+                : Mathf.Clamp(values.clothingStyle, 0, clothingOptions.Length - 1);
+            int hatIndex = OptionalIndex(values.hatStyle, hatOptions.Length);
+            int shoeIndex = OptionalIndex(values.shoeStyle, shoeOptions.Length);
+            bool[] deleteBody = new bool[deformed.Length];
+            if (clothingIndex >= 0)
+                MergeDeleteMask(deleteBody,
+                    MakeHumanClothingFactory.LoadDeleteMask(clothingOptions[clothingIndex],
+                        deformed.Length));
+            if (hatIndex >= 0)
+                MergeDeleteMask(deleteBody,
+                    MakeHumanClothingFactory.LoadDeleteMask(hatOptions[hatIndex],
+                        deformed.Length));
+            if (shoeIndex >= 0)
+                MergeDeleteMask(deleteBody,
+                    MakeHumanClothingFactory.LoadDeleteMask(shoeOptions[shoeIndex],
+                        deformed.Length));
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
-                deleteBody != null && a < deleteBody.Length && b < deleteBody.Length
-                && c < deleteBody.Length && deleteBody[a] && deleteBody[b] && deleteBody[c]);
+                deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
@@ -319,13 +339,35 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
-            if (options.Length > 0)
+            if (clothingIndex >= 0)
             {
                 MakeHumanClothingFactory.BuildResult clothing =
-                    MakeHumanClothingFactory.Create(options[clothingIndex], deformed,
+                    MakeHumanClothingFactory.Create(clothingOptions[clothingIndex], deformed,
                         Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
                 if (clothing.gameObject == null)
-                    Debug.LogWarning("MakeHuman clothing: " + clothing.error);
+                    Debug.LogWarning("MakeHuman tenue: " + clothing.error);
+            }
+            if (hatIndex >= 0)
+            {
+                MakeHumanClothingFactory.BuildResult hat =
+                    MakeHumanClothingFactory.Create(hatOptions[hatIndex], deformed,
+                        Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
+                if (hat.gameObject == null)
+                    Debug.LogWarning("MakeHuman chapeau: " + hat.error);
+                else if (hatOptions[hatIndex].id == "fedora01")
+                {
+                    // Le fedora doit recouvrir la calotte et non laisser les
+                    // cheveux alpha passer par-dessus sa couronne.
+                    hat.gameObject.transform.localPosition += Vector3.up * 0.035f;
+                }
+            }
+            if (shoeIndex >= 0)
+            {
+                MakeHumanClothingFactory.BuildResult shoes =
+                    MakeHumanClothingFactory.Create(shoeOptions[shoeIndex], deformed,
+                        Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
+                if (shoes.gameObject == null)
+                    Debug.LogWarning("MakeHuman chaussures: " + shoes.error);
             }
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
@@ -383,6 +425,19 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, z);
+        }
+
+        private static int OptionalIndex(int index, int length)
+        {
+            return index < 0 || index >= length ? -1 : index;
+        }
+
+        private static void MergeDeleteMask(bool[] destination, bool[] source)
+        {
+            if (destination == null || source == null) return;
+            int count = Mathf.Min(destination.Length, source.Length);
+            for (int i = 0; i < count; i++)
+                destination[i] = destination[i] || source[i];
         }
 
         private static Color SkinColor(int tone)
