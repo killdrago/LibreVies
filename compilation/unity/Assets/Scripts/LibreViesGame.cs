@@ -113,6 +113,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminObjetOutil;
     private Vector2 adminObjetCurseur;
     private Vector2 adminNpcScroll;
+    private Vector2 adminClothingScroll;
     private string adminEditionContexte = "Joueur : Joueur principal";
     private bool adminHumainValide;
     private bool adminHumainJoueurActif;
@@ -7225,13 +7226,19 @@ public sealed class LibreViesGame : MonoBehaviour
         nouvelleValeur = SliderHumain(new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds", adminHumanCreator.feetSize);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
-        GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
-            "VETEMENTS MAKEHUMAN", smallStyle);
         MakeHumanClothingFactory.Option[] vetements =
             MakeHumanClothingFactory.Options(adminHumanCreator.female);
+        GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
+            "VETEMENTS MAKEHUMAN", smallStyle);
+        int clothingRows = (vetements.Length + 1) / 2;
+        Rect clothingView = new Rect(droite, contenu.y + 358f, 234f, 150f);
+        Rect clothingContent = new Rect(0f, 0f, 234f,
+            Mathf.Max(150f, clothingRows * 30f));
+        adminClothingScroll = GUI.BeginScrollView(clothingView, adminClothingScroll,
+            clothingContent);
         for (int i = 0; i < vetements.Length; i++)
         {
-            Rect vetement = new Rect(droite, contenu.y + 358f + i * 31f, 234f, 27f);
+            Rect vetement = new Rect((i % 2) * 120f, (i / 2) * 30f, 116f, 27f);
             if (BoutonChoixAdmin(vetement, vetements[i].label,
                 adminHumanCreator.clothingStyle == i))
             {
@@ -7241,25 +7248,26 @@ public sealed class LibreViesGame : MonoBehaviour
                 ShowInfo("Tenue MakeHuman : " + vetements[i].label);
             }
         }
-        GUI.Label(new Rect(droite, contenu.y + 458f, 238f, 38f),
-            "Les vetements sont des proxies MakeHuman Community, avec leurs UV,\n"
-                + "textures et adaptation au mesh de base.", smallStyle);
-        if (GUI.Button(new Rect(droite, contenu.y + 505f, 112f, 34f), "ALEATOIRE", buttonStyle))
+        GUI.EndScrollView();
+        GUI.Label(new Rect(droite, contenu.y + 515f, 238f, 38f),
+            "Meshes MakeHuman skines sur la meme armature, avec UV,\n"
+                + "textures et adaptation au corps de base.", smallStyle);
+        if (GUI.Button(new Rect(droite, contenu.y + 555f, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
             adminHumainValide = false;
             ShowInfo("Personnage humain aleatoire genere");
         }
-        if (GUI.Button(new Rect(droite + 122f, contenu.y + 505f, 112f, 34f), "REINITIALISER", buttonStyle))
+        if (GUI.Button(new Rect(droite + 122f, contenu.y + 555f, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
             adminHumainValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
-        if (GUI.Button(new Rect(droite, contenu.y + 550f, 234f, 36f),
+        if (GUI.Button(new Rect(droite, contenu.y + 595f, 234f, 36f),
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
-        GUI.Label(new Rect(droite, contenu.y + 595f, 250f, 42f),
+        GUI.Label(new Rect(droite, contenu.y + 638f, 250f, 42f),
             "Base MakeHuman homme/femme.\nMorphologie et tenue appliquees au joueur.", smallStyle);
     }
 

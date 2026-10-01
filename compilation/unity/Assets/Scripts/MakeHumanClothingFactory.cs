@@ -20,12 +20,17 @@ public static class MakeHumanClothingFactory
         public string resourceFolder;
 
         public Option(string id, string label, bool female)
+            : this(id, label, female, null)
+        {
+        }
+
+        public Option(string id, string label, bool female, string resourceFolderOverride)
         {
             this.id = id;
             this.label = label;
             this.female = female;
-            resourceFolder = "Characters/MakeHumanClothes/"
-                + (female ? "Female/" : "Male/") + id;
+            resourceFolder = resourceFolderOverride ?? ("Characters/MakeHumanClothes/"
+                + (female ? "Female/" : "Male/") + id);
         }
     }
 
@@ -93,18 +98,37 @@ public static class MakeHumanClothingFactory
         }
     }
 
+    private const string SharedFolder = "Characters/MakeHumanClothes/Shared/";
+
     private static readonly Option[] FemaleOptions =
     {
         new Option("female_sportsuit01", "Tenue sport", true),
         new Option("female_casualsuit01", "Tenue casual", true),
-        new Option("female_elegantsuit01", "Tenue elegante", true)
+        new Option("female_casualsuit02", "Tenue casual 2", true),
+        new Option("female_elegantsuit01", "Tenue elegante", true),
+        new Option("fedora01", "Chapeau fedora", true, SharedFolder + "fedora01"),
+        new Option("shoes01", "Chaussures 1", true, SharedFolder + "shoes01"),
+        new Option("shoes02", "Chaussures 2", true, SharedFolder + "shoes02"),
+        new Option("shoes03", "Chaussures 3", true, SharedFolder + "shoes03"),
+        new Option("shoes04", "Chaussures 4", true, SharedFolder + "shoes04"),
+        new Option("shoes05", "Chaussures 5", true, SharedFolder + "shoes05"),
+        new Option("shoes06", "Chaussures 6", true, SharedFolder + "shoes06")
     };
 
     private static readonly Option[] MaleOptions =
     {
         new Option("male_casualsuit04", "Tenue casual", false),
+        new Option("male_casualsuit05", "Tenue casual 2", false),
+        new Option("male_casualsuit06", "Tenue casual 3", false),
         new Option("male_elegantsuit01", "Tenue elegante", false),
-        new Option("male_worksuit01", "Tenue travail", false)
+        new Option("male_worksuit01", "Tenue travail", false),
+        new Option("fedora01", "Chapeau fedora", false, SharedFolder + "fedora01"),
+        new Option("shoes01", "Chaussures 1", false, SharedFolder + "shoes01"),
+        new Option("shoes02", "Chaussures 2", false, SharedFolder + "shoes02"),
+        new Option("shoes03", "Chaussures 3", false, SharedFolder + "shoes03"),
+        new Option("shoes04", "Chaussures 4", false, SharedFolder + "shoes04"),
+        new Option("shoes05", "Chaussures 5", false, SharedFolder + "shoes05"),
+        new Option("shoes06", "Chaussures 6", false, SharedFolder + "shoes06")
     };
 
     public static Option[] Options(bool female)
