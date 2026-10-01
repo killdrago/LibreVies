@@ -400,7 +400,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 if (clothing.gameObject == null)
                     Debug.LogWarning("MakeHuman tenue: " + clothing.error);
             }
-            GameObject fedoraObject = null;
             if (hatIndex >= 0)
             {
                 MakeHumanClothingFactory.BuildResult hat =
