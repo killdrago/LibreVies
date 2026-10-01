@@ -517,8 +517,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             float dx = (point.x - hatBounds.center.x) / Mathf.Max(hatBounds.extents.x, 0.001f);
             float dz = (point.z - hatBounds.center.z) / Mathf.Max(hatBounds.extents.z, 0.001f);
-            bool underHat = dx * dx + dz * dz < 0.72f
-                && point.y >= hatBounds.min.y - 0.01f
+            // Le bord du fedora est plus large que sa calotte : on garde
+            // une petite marge autour de sa texture pour supprimer aussi les
+            // meches qui debordent sur les cotes.
+            bool underHat = dx * dx + dz * dz < 1.12f
+                && point.y >= hatBounds.min.y - 0.025f
                 && point.y <= hatBounds.max.y + 0.01f;
             return point.y > cutoff || underHat;
         }

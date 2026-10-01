@@ -7034,6 +7034,42 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo("Profil humain valide dans l'apercu. Ouvrez Joueur pour l'appliquer au personnage.");
     }
 
+    private float SliderHumain(Rect rect, string nom, float valeur)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, -5f, 5f);
+        GUI.Label(new Rect(rect.x + rect.width - 30f, rect.y, 30f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
+    private float SliderHumainVolume(Rect rect, string nom, float valeur)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        // Les controles du corps vont de -500 a +500. La valeur interne reste
+        // un multiplicateur MakeHuman (-5 a +5).
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, -5f, 5f);
+        GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
+    private float SliderHumainBornes(Rect rect, string nom, float valeur,
+        float minimum, float maximum)
+    {
+        GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        float nouveau = GUI.HorizontalSlider(
+            new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
+            valeur, minimum, maximum);
+        GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
+            Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
+        return nouveau;
+    }
+
     private void GererCameraPreview(Rect previewRect)
     {
         if (adminHumanCreator == null) return;
@@ -7182,17 +7218,57 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        // Les curseurs de morphologie ont ete retires de cette vue : ils
-        // n'apportaient pas de reglage utile au personnage final. Les valeurs
-        // internes restent conservees pour ne pas casser les profils existants.
         GUI.Label(new Rect(gauche, contenu.y + 166f, 230f, 22f),
-            "COIFFURES", smallStyle);
+            "Visage", smallStyle);
+        float nouvelleValeur = SliderHumain(
+            new Rect(gauche, contenu.y + 190f, 238f, 24f), "Tete",
+            adminHumanCreator.headShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.headShape) > 0.001f)
+        {
+            adminHumanCreator.headShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumain(
+            new Rect(gauche, contenu.y + 220f, 238f, 24f), "Yeux",
+            adminHumanCreator.eyesShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.eyesShape) > 0.001f)
+        {
+            adminHumanCreator.eyesShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumain(
+            new Rect(gauche, contenu.y + 250f, 238f, 24f), "Nez",
+            adminHumanCreator.noseShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.noseShape) > 0.001f)
+        {
+            adminHumanCreator.noseShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumain(
+            new Rect(gauche, contenu.y + 280f, 238f, 24f), "Bouche",
+            adminHumanCreator.mouthShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.mouthShape) > 0.001f)
+        {
+            adminHumanCreator.mouthShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumain(
+            new Rect(gauche, contenu.y + 310f, 238f, 24f), "Oreilles",
+            adminHumanCreator.earsShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.earsShape) > 0.001f)
+        {
+            adminHumanCreator.earsShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+
+        GUI.Label(new Rect(gauche, contenu.y + 350f, 230f, 22f),
+            "Coiffures", smallStyle);
         string[] coiffures =
             new[] { "Court decoiffe", "Frange droite", "Shaggy vert", "Nuage fraise", "Coupe Faydaen" };
         for (int i = 0; i < coiffures.Length; i++)
         {
             Rect coupe = new Rect(gauche + (i % 2) * 122f,
-                contenu.y + 194f + (i / 2) * 30f, 116f, 26f);
+                contenu.y + 378f + (i / 2) * 30f, 116f, 26f);
             if (BoutonChoixAdmin(coupe, coiffures[i], adminHumanCreator.hairStyle == i))
             {
                 adminHumanCreator.hairStyle = i;
@@ -7207,11 +7283,11 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeHumanClothingFactory.Option[] chaussures =
             MakeHumanClothingFactory.ShoeOptions(adminHumanCreator.female);
 
-        // Les chaussures sont directement sous les coiffures pour rester
-        // accessibles sans faire defiler une longue colonne.
-        GUI.Label(new Rect(gauche, contenu.y + 292f, 230f, 22f),
-            "CHAUSSURES", smallStyle);
-        if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 318f, 116f, 27f), "Aucune",
+        // Les chaussures restent sous les coiffures pour eviter une colonne
+        // d'equipement cachee par defilement.
+        GUI.Label(new Rect(gauche, contenu.y + 476f, 230f, 22f),
+            "Chaussures", smallStyle);
+        if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 502f, 116f, 27f), "Aucune",
             adminHumanCreator.shoeStyle < 0))
         {
             adminHumanCreator.shoeStyle = -1;
@@ -7221,7 +7297,7 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < chaussures.Length; i++)
         {
             Rect chaussure = new Rect(gauche + (i % 2) * 122f,
-                contenu.y + 348f + (i / 2) * 30f, 116f, 27f);
+                contenu.y + 532f + (i / 2) * 30f, 116f, 27f);
             if (BoutonChoixAdmin(chaussure, chaussures[i].label,
                 adminHumanCreator.shoeStyle == i))
             {
@@ -7231,12 +7307,79 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        // Les trois familles d'equipement restent separees et visibles.
-        GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f), "TENUE", smallStyle);
+        GUI.Label(new Rect(droite, contenu.y + 45f, 230f, 22f),
+            "Corps et proportions", smallStyle);
+        nouvelleValeur = SliderHumainBornes(
+            new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume",
+            adminHumanCreator.chestShape, -5f, 5f);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f)
+        {
+            adminHumanCreator.chestShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches",
+            adminHumanCreator.hipShape);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f)
+        {
+            adminHumanCreator.hipShape = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 135f, 238f, 24f), "Ventre",
+            adminHumanCreator.belly);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.belly) > 0.001f)
+        {
+            adminHumanCreator.belly = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 165f, 238f, 24f), "Bras largeur",
+            adminHumanCreator.armThickness);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armThickness) > 0.001f)
+        {
+            adminHumanCreator.armThickness = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 195f, 238f, 24f), "Bras longueur",
+            adminHumanCreator.armLength);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armLength) > 0.001f)
+        {
+            adminHumanCreator.armLength = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 225f, 238f, 24f), "Jambes largeur",
+            adminHumanCreator.legThickness);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legThickness) > 0.001f)
+        {
+            adminHumanCreator.legThickness = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 255f, 238f, 24f), "Hauteur jambe",
+            adminHumanCreator.legLength);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legLength) > 0.001f)
+        {
+            adminHumanCreator.legLength = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+        nouvelleValeur = SliderHumainVolume(
+            new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds",
+            adminHumanCreator.feetSize);
+        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f)
+        {
+            adminHumanCreator.feetSize = nouvelleValeur;
+            adminHumanCreator.BuildPreview();
+        }
+
+        GUI.Label(new Rect(droite, contenu.y + 330f, 230f, 22f),
+            "Tenue", smallStyle);
         for (int i = 0; i < tenues.Length; i++)
         {
             Rect vetement = new Rect(droite + (i % 2) * 120f,
-                contenu.y + 68f + (i / 2) * 30f, 116f, 27f);
+                contenu.y + 353f + (i / 2) * 30f, 116f, 27f);
             if (BoutonChoixAdmin(vetement, tenues[i].label,
                 adminHumanCreator.clothingStyle == i))
             {
@@ -7246,8 +7389,8 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        float chapeauY = contenu.y + 166f;
-        GUI.Label(new Rect(droite, chapeauY, 230f, 22f), "CHAPEAU", smallStyle);
+        float chapeauY = contenu.y + 460f;
+        GUI.Label(new Rect(droite, chapeauY, 230f, 22f), "Chapeau", smallStyle);
         if (BoutonChoixAdmin(new Rect(droite, chapeauY + 24f, 116f, 27f), "Aucun",
             adminHumanCreator.hatStyle < 0))
         {
