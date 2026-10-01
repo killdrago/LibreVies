@@ -116,17 +116,17 @@ public static class MakeHumanClothingFactory
 
     private static readonly Option[] FemaleClothingOptions =
     {
-        new Option("female_sportsuit01", "Tenue sport", true),
-        new Option("female_casualsuit01", "Tenue casual", true),
-        new Option("female_casualsuit02", "Tenue casual 2", true),
+        new Option("female_sportsuit01", "Maire", true),
+        new Option("female_casualsuit01", "Forgeron", true),
+        new Option("female_casualsuit02", "Marchand", true),
         new Option("female_elegantsuit01", "Tenue elegante", true)
     };
 
     private static readonly Option[] MaleClothingOptions =
     {
-        new Option("male_casualsuit04", "Tenue casual", false),
-        new Option("male_casualsuit05", "Tenue casual 2", false),
-        new Option("male_casualsuit06", "Tenue casual 3", false),
+        new Option("male_casualsuit04", "Maire", false),
+        new Option("male_casualsuit05", "Forgeron", false),
+        new Option("male_casualsuit06", "Marchand", false),
         new Option("male_elegantsuit01", "Tenue elegante", false),
         new Option("male_worksuit01", "Tenue travail", false)
     };

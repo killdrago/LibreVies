@@ -364,6 +364,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 if (clothing.gameObject == null)
                     Debug.LogWarning("MakeHuman tenue: " + clothing.error);
             }
+            GameObject fedoraObject = null;
             if (hatIndex >= 0)
             {
                 MakeHumanClothingFactory.BuildResult hat =
@@ -373,6 +374,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     Debug.LogWarning("MakeHuman chapeau: " + hat.error);
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
+                    fedoraObject = hat.gameObject;
                     // Le proxy MakeHuman reste intact : on ajuste seulement
                     // son placement pour que le bord recouvre les cheveux au
                     // lieu de les couper ou de les laisser passer a travers.
@@ -387,6 +389,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
                         Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
                 if (shoes.gameObject == null)
                     Debug.LogWarning("MakeHuman chaussures: " + shoes.error);
+                else if (shoeOptions[shoeIndex].id == "shoes01")
+                {
+                    // Ce proxy partage la forme du pied avec shoes04. Un
+                    // tres leger elargissement le sort de la peau lorsque le
+                    // corps et la chaussure occupent exactement la meme
+                    // surface, sans modifier le mesh source MakeHuman.
+                    shoes.gameObject.transform.localScale =
+                        new Vector3(1.025f, 1f, 1.025f);
+                }
             }
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
@@ -405,9 +416,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // donc indépendant de la tenue mais partage la meme armature.
                 // L'objet est deja parenté au root par la factory.
                 // Avec le fedora, on rentre legerement la coiffure sous la
-                // calotte pour supprimer les meches qui intersectent le proxy.
-                if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
+                // calotte puis on retire les triangles qui depassent au-dessus
+                // de sa surface. Le mesh de cheveux reste celui de MakeHuman.
+                if (fedoraObject != null)
+                {
                     hairBuild.gameObject.transform.localPosition += Vector3.down * 0.045f;
+                    SupprimerCheveuxAuDessusDuChapeau(hairBuild.gameObject, fedoraObject);
+                }
             }
             else
             {
@@ -448,6 +463,64 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, z);
+        }
+
+        private static void SupprimerCheveuxAuDessusDuChapeau(GameObject hairObject,
+            GameObject hatObject)
+        {
+            if (hairObject == null || hatObject == null) return;
+            SkinnedMeshRenderer hairRenderer = hairObject.GetComponent<SkinnedMeshRenderer>();
+            SkinnedMeshRenderer hatRenderer = hatObject.GetComponent<SkinnedMeshRenderer>();
+            if (hairRenderer == null || hatRenderer == null || hairRenderer.sharedMesh == null) return;
+
+            Mesh hairMesh = hairRenderer.sharedMesh;
+            int[] triangles = hairMesh.GetTriangles(0);
+            Vector3[] vertices = hairMesh.vertices;
+            if (triangles == null || triangles.Length == 0 || vertices == null) return;
+
+            // On ne reconstruit pas le fedora : sa boite monde sert seulement
+            // de limite pour couper les faces de cheveux qui passent au-dessus
+            // ou a l'interieur de la calotte. Les cheveux situes hors du bord
+            // restent visibles.
+            Bounds hatBounds = hatRenderer.bounds;
+            float cutoff = hatBounds.max.y - hatBounds.size.y * 0.40f;
+            Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
+            List<int> kept = new List<int>(triangles.Length);
+            for (int i = 0; i + 2 < triangles.Length; i += 3)
+            {
+                int a = triangles[i];
+                int b = triangles[i + 1];
+                int c = triangles[i + 2];
+                if (a < 0 || b < 0 || c < 0 || a >= vertices.Length
+                    || b >= vertices.Length || c >= vertices.Length) continue;
+                Vector3 pa = hairMatrix.MultiplyPoint3x4(vertices[a]);
+                Vector3 pb = hairMatrix.MultiplyPoint3x4(vertices[b]);
+                Vector3 pc = hairMatrix.MultiplyPoint3x4(vertices[c]);
+                bool protrudes = EstSousLaCalotte(pa, hatBounds, cutoff)
+                    || EstSousLaCalotte(pb, hatBounds, cutoff)
+                    || EstSousLaCalotte(pc, hatBounds, cutoff);
+                if (!protrudes)
+                {
+                    kept.Add(a);
+                    kept.Add(b);
+                    kept.Add(c);
+                }
+            }
+            if (kept.Count != triangles.Length)
+            {
+                hairMesh.SetTriangles(kept, 0);
+                hairMesh.RecalculateBounds();
+            }
+        }
+
+        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds, float cutoff)
+        {
+            float dx = (point.x - hatBounds.center.x) / Mathf.Max(hatBounds.extents.x, 0.001f);
+            float dz = (point.z - hatBounds.center.z) / Mathf.Max(hatBounds.extents.z, 0.001f);
+            bool underHat = dx * dx + dz * dz < 0.72f
+                && point.y >= hatBounds.min.y - 0.01f
+                && point.y <= hatBounds.max.y + 0.01f;
+            return point.y > cutoff || underHat;
         }
 
         private static int OptionalIndex(int index, int length)
