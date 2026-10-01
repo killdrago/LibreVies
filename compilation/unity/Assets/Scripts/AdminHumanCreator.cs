@@ -30,7 +30,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int shoeStyle = -1;
     // Hauteur manuelle du fedora dans la preview et sur le personnage applique.
     // Le joueur peut la regler par SHIFT + glisser verticalement.
-    public float hatVerticalOffset = -0.060f;
+    public float hatVerticalOffset = -0.145f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -217,7 +217,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
-        hatVerticalOffset = -0.060f;
+        hatVerticalOffset = -0.145f;
         BuildPreview();
     }
 
