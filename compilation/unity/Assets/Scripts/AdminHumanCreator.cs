@@ -81,8 +81,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     public void MoveHatVertically(float worldDelta)
     {
+        SetHatVerticalOffset(hatVerticalOffset + worldDelta);
+    }
+
+    public void SetHatVerticalOffset(float value)
+    {
         if (hatStyle < 0) return;
-        hatVerticalOffset = Mathf.Clamp(hatVerticalOffset + worldDelta, -0.30f, 0.20f);
+        float nouveau = Mathf.Clamp(value, -0.30f, 0.20f);
+        if (Mathf.Abs(nouveau - hatVerticalOffset) < 0.0001f) return;
+        hatVerticalOffset = nouveau;
         Debug.Log("ADMIN_FEDORA_HEIGHT="
             + hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture));
         BuildPreview();

@@ -7072,15 +7072,22 @@ public sealed class LibreViesGame : MonoBehaviour
         return nouveau;
     }
 
+    private Rect HatHeightSliderRect(Rect previewRect)
+    {
+        return new Rect(previewRect.xMax - 74f, previewRect.y + 40f, 18f, 230f);
+    }
+
     private void GererCameraPreview(Rect previewRect)
     {
         if (adminHumanCreator == null) return;
         Event evenement = Event.current;
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
+        Rect hatSlider = HatHeightSliderRect(previewRect);
         bool dansPreview = previewRect.Contains(evenement.mousePosition);
         bool dansCommandes = commandes.Contains(evenement.mousePosition);
+        bool dansHatSlider = hatSlider.Contains(evenement.mousePosition);
         if (evenement.type == EventType.MouseDown && evenement.button == 0
-            && dansPreview && !dansCommandes)
+            && dansPreview && !dansCommandes && !dansHatSlider)
         {
             adminPreviewSourisActive = true;
             adminHatSourisActive = evenement.shift && adminHumanCreator.hatStyle >= 0;
@@ -7107,7 +7114,8 @@ public sealed class LibreViesGame : MonoBehaviour
             GUIUtility.hotControl = 0;
             evenement.Use();
         }
-        else if (evenement.type == EventType.ScrollWheel && dansPreview && !dansCommandes)
+        else if (evenement.type == EventType.ScrollWheel && dansPreview
+            && !dansCommandes && !dansHatSlider)
         {
             adminHumanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
             evenement.Use();
@@ -7136,6 +7144,22 @@ public sealed class LibreViesGame : MonoBehaviour
             "HAUT CHAPEAU", smallStyle);
         GUI.Label(new Rect(x - 74f, bas + 2f, 66f, 18f),
             "BOUCHE", smallStyle);
+
+        // Curseur dedie : contrairement au glisser de la camera, celui-ci
+        // permet de placer le fedora avec une vraie precision verticale.
+        Rect hatSlider = HatHeightSliderRect(previewRect);
+        GUI.color = new Color(0.04f, 0.06f, 0.08f, 0.82f);
+        GUI.Box(hatSlider, "", boxStyle);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(hatSlider.x - 6f, hatSlider.y - 20f, 30f, 18f),
+            "Y", smallStyle);
+        if (adminHumanCreator.hatStyle >= 0)
+        {
+            float nouvelleHauteur = GUI.VerticalSlider(
+                hatSlider, adminHumanCreator.hatVerticalOffset, 0.20f, -0.30f);
+            if (Mathf.Abs(nouvelleHauteur - adminHumanCreator.hatVerticalOffset) > 0.0001f)
+                adminHumanCreator.SetHatVerticalOffset(nouvelleHauteur);
+        }
         GUI.color = Color.white;
     }
 
@@ -7178,7 +7202,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Apercu en preparation...", smallStyle);
         GererCameraPreview(previewRect);
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
-            "Glisser : pivoter | SHIFT + glisser : hauteur chapeau", smallStyle);
+            "Glisser : pivoter | SHIFT + glisser ou curseur Y : chapeau", smallStyle);
         DessinerRepereChapeau(previewRect);
         if (adminHumanCreator.hatStyle >= 0)
             GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 32f, 210f, 18f),
