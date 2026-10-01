@@ -380,9 +380,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // lieu de les couper ou de les laisser passer a travers.
                     // Le bord doit arriver juste au-dessus des cheveux de
                     // devant, sans descendre sur les yeux ou le front.
-                    // Position intermediaire : le chapeau descend legerement
-                    // tout en restant juste au-dessus de la frange.
-                    hat.gameObject.transform.localPosition += Vector3.up * 0.015f;
+                    // La bordure doit descendre jusqu'a la ligne noire de
+                    // reference, juste au-dessus des cheveux de devant.
+                    hat.gameObject.transform.localPosition += Vector3.down * 0.010f;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
