@@ -30,7 +30,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int shoeStyle = -1;
     // Hauteur manuelle du fedora dans la preview et sur le personnage applique.
     // Le joueur peut la regler par SHIFT + glisser verticalement.
-    public float hatVerticalOffset = -0.145f;
+    public float hatVerticalOffset = -0.177f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -219,7 +219,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
-        hatVerticalOffset = -0.145f;
+        hatVerticalOffset = -0.177f;
         BuildPreview();
     }
 
@@ -393,6 +393,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 MergeDeleteMask(deleteBody,
                     MakeHumanClothingFactory.LoadDeleteMask(shoeOptions[shoeIndex],
                         deformed.Length));
+            if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
+                MaskHeadUnderFedora(deleteBody, deformed, values.hatVerticalOffset);
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
                 deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
@@ -594,6 +596,26 @@ public sealed class AdminHumanCreator : MonoBehaviour
             int count = Mathf.Min(destination.Length, source.Length);
             for (int i = 0; i < count; i++)
                 destination[i] = destination[i] || source[i];
+        }
+
+        private static void MaskHeadUnderFedora(bool[] deleteBody, Vector3[] deformed,
+            float hatOffset)
+        {
+            if (deleteBody == null || deformed == null) return;
+            // Le proxy fedora ne fournit pas de deleteVerts : quand on descend
+            // le chapeau, le haut du crane peut donc traverser sa calotte.
+            // Cette limite suit la hauteur du fedora et retire seulement la
+            // calotte du mesh humain, jamais un objet ou un quad independant.
+            float fedoraTopRaw = 8.68f + hatOffset / 0.13f;
+            float hideAbove = fedoraTopRaw - 0.18f;
+            for (int i = 0; i < deformed.Length && i < deleteBody.Length; i++)
+            {
+                Vector3 vertex = deformed[i];
+                bool headRegion = Mathf.Abs(vertex.x) < 2.1f
+                    && vertex.z > -1.5f && vertex.z < 2.0f;
+                if (headRegion && vertex.y > hideAbove)
+                    deleteBody[i] = true;
+            }
         }
 
         private static Color SkinColor(int tone)
