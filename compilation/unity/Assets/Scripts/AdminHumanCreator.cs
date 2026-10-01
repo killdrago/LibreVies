@@ -259,11 +259,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            // La poitrine est deformee autour des deux vrais centres mammaires
-            // du mesh hm08. L'ancien rectangle vertical (y=1.28..1.86)
-            // touchait le nombril : il est supprime, il n'y a ni quad ajoute
-            // ni volume separe.
-            ScaleBreasts(deformed, values.chestShape);
+            // Retour au morph MakeHuman qui cible uniquement les deux seins
+            // sur la face avant. L'ancien rectangle abdominal est supprime :
+            // aucun quad ajoute et aucun volume separe.
+            BreastVolume(deformed, values.chestShape, values.female);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -509,41 +508,35 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static void Add(Vector3[] vertices, Dictionary<int, Vector3> target, float amount)
         { foreach (KeyValuePair<int, Vector3> item in target) if (item.Key >= 0 && item.Key < vertices.Length) vertices[item.Key] += item.Value * amount; }
         private void Signed(Vector3[] vertices, float amount, string positive, string negative, float strength)
-        { Add(vertices, Target(amount >= 0f ? positive : negative), Mathf.Abs(amount) * strength); }
-
-        private static void ScaleBreasts(Vector3[] vertices, float amount)
         {
-            if (Mathf.Abs(amount) < 0.001f) return;
-            // Centres mesures sur le mesh MakeHuman hm08 fourni par le projet.
-            // Le torse et le nombril sont volontairement hors de ces ellipsoides.
-            const float centreY = 3.82f;
-            const float centreZ = 1.58f;
-            const float centreX = 0.80f;
-            const float rayonX = 0.93f;
-            const float rayonY = 0.86f;
-            const float rayonZ = 0.88f;
+            float effectiveAmount = Mathf.Sign(amount)
+                * Mathf.Pow(Mathf.Abs(amount), 0.70f);
+            Add(vertices, Target(amount >= 0f ? positive : negative),
+                Mathf.Abs(effectiveAmount) * strength);
+        }
+
+        private static void BreastVolume(Vector3[] vertices, float amount, bool female)
+        {
+            if (!female || Mathf.Abs(amount) < 0.001f) return;
+            // Cette zone correspond aux deux seins du mesh hm08 : elle ne
+            // descend pas jusqu'au nombril et ne remonte pas sur le haut du
+            // torse. Le déplacement se fait vers l'avant, comme une vraie
+            // augmentation mammaire, avec une petite ouverture latérale.
+            float effectiveAmount = Mathf.Sign(amount)
+                * Mathf.Pow(Mathf.Abs(amount), 0.70f);
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 v = vertices[i];
-                if (v.y < centreY - rayonY || v.y > centreY + rayonY || v.z < 0.72f)
-                    continue;
-                float breastCentreX = v.x >= 0f ? centreX : -centreX;
-                float dx = (v.x - breastCentreX) / rayonX;
-                float dy = (v.y - centreY) / rayonY;
-                float dz = (v.z - centreZ) / rayonZ;
-                float distance = Mathf.Sqrt(dx * dx + dy * dy + dz * dz);
-                float influence = 1f - Mathf.Clamp01(distance);
-                influence *= influence;
-                if (influence <= 0.0001f) continue;
-
-                // On augmente radialement chaque sein autour de son propre
-                // centre. Le sternum et l'abdomen ne sont jamais tires depuis
-                // l'origine du personnage, ce qui supprimait le nombril avec
-                // l'ancienne ScaleRegion.
-                float scaleX = Mathf.Max(0.35f, 1f + amount * 0.16f * influence);
-                float scaleZ = Mathf.Max(0.35f, 1f + amount * 0.32f * influence);
-                vertices[i].x = breastCentreX + (v.x - breastCentreX) * scaleX;
-                vertices[i].z = centreZ + (v.z - centreZ) * scaleZ;
+                if (v.y < 2.7f || v.y > 4.9f || v.z < 0.25f
+                    || Mathf.Abs(v.x) > 1.35f) continue;
+                float side = 1f - Mathf.Clamp01(Mathf.Abs(Mathf.Abs(v.x) - 0.68f) / 0.62f);
+                float vertical = 1f - Mathf.Clamp01(Mathf.Abs(v.y - 3.75f) / 1.1f);
+                float front = Mathf.Clamp01((v.z - 0.25f) / 1.2f);
+                float weight = side * vertical * front;
+                if (weight <= 0.0001f) continue;
+                v.z += effectiveAmount * 0.82f * weight;
+                v.x += Mathf.Sign(v.x) * effectiveAmount * 0.08f * weight;
+                vertices[i] = v;
             }
         }
 
@@ -551,6 +544,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float halfWidth, float widthFactor, float depthFactor)
         {
             if (Mathf.Abs(amount) < 0.001f) return;
+            float effectiveAmount = Mathf.Sign(amount)
+                * Mathf.Pow(Mathf.Abs(amount), 0.70f);
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 v = vertices[i];
@@ -560,8 +555,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 float vertical = 1f - Mathf.Clamp01(Mathf.Abs(v.y - centre) / radius);
                 float side = 1f - Mathf.Clamp01(Mathf.Abs(v.x) / halfWidth);
                 float weight = vertical * side;
-                vertices[i].x *= 1f + amount * widthFactor * weight;
-                vertices[i].z *= 1f + amount * depthFactor * weight;
+                vertices[i].x *= 1f + effectiveAmount * widthFactor * weight;
+                vertices[i].z *= 1f + effectiveAmount * depthFactor * weight;
             }
         }
 

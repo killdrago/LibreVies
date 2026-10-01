@@ -7039,7 +7039,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
         float nouveau = GUI.HorizontalSlider(
             new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
-            valeur, -1f, 1f);
+            valeur, -5f, 5f);
         GUI.Label(new Rect(rect.x + rect.width - 30f, rect.y, 30f, 22f),
             Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
         return nouveau;
