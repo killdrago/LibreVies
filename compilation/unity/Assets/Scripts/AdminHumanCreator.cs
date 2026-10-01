@@ -378,8 +378,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // Le proxy MakeHuman reste intact : on ajuste seulement
                     // son placement pour que le bord recouvre les cheveux au
                     // lieu de les couper ou de les laisser passer a travers.
-                    // Aucun decalage vertical : le fedora retrouve la hauteur
-                    // de son proxy MakeHuman avant les anciens essais.
+                    // Le bord doit arriver juste au-dessus des cheveux de
+                    // devant, sans descendre sur les yeux ou le front.
+                    hat.gameObject.transform.localPosition += Vector3.up * 0.035f;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
