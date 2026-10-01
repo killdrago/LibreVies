@@ -233,6 +233,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private ObjData obj;
         private GameObject root;
         private GameObject fedoraObject;
+        private Mesh fedoraMesh;
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
@@ -283,8 +284,20 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         public bool MoveFedora(float deltaY)
         {
-            if (fedoraObject == null) return false;
-            fedoraObject.transform.localPosition += Vector3.up * deltaY;
+            if (fedoraMesh == null)
+            {
+                if (fedoraObject == null) return false;
+                fedoraObject.transform.localPosition += Vector3.up * deltaY;
+                return true;
+            }
+            // Le déplacement se fait directement dans le mesh généré. Ainsi
+            // le changement reste visible même avec le bindpose du renderer
+            // skinné, qui pouvait neutraliser un simple localPosition.
+            Vector3[] vertices = fedoraMesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] += Vector3.up * deltaY;
+            fedoraMesh.vertices = vertices;
+            fedoraMesh.RecalculateBounds();
             return true;
         }
 
@@ -311,6 +324,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
             fedoraObject = null;
+            fedoraMesh = null;
             root = new GameObject("ADMIN - apercu humain");
             root.transform.SetParent(parent, false);
 
@@ -410,6 +424,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
                     fedoraObject = hat.gameObject;
+                    SkinnedMeshRenderer fedoraRenderer =
+                        fedoraObject.GetComponent<SkinnedMeshRenderer>();
+                    fedoraMesh = fedoraRenderer == null ? null : fedoraRenderer.sharedMesh;
                     // Le proxy MakeHuman reste intact : on ajuste seulement
                     // son placement pour que le bord recouvre les cheveux au
                     // lieu de les couper ou de les laisser passer a travers.

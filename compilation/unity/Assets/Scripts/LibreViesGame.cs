@@ -7177,6 +7177,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(previewRect.x + 2f, previewActionsY, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
+            adminHatMoveMode = adminHumanCreator.hatStyle >= 0;
             adminHumainValide = false;
             ShowInfo("Personnage humain aleatoire genere");
         }
@@ -7430,6 +7431,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 adminHumanCreator.hatStyle == i))
             {
                 adminHumanCreator.hatStyle = i;
+                adminHatMoveMode = true;
                 adminHumainValide = false;
                 adminHumanCreator.BuildPreview();
             }
