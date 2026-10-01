@@ -89,10 +89,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
         if (hatStyle < 0) return;
         float nouveau = Mathf.Clamp(value, -0.30f, 0.20f);
         if (Mathf.Abs(nouveau - hatVerticalOffset) < 0.0001f) return;
+        float delta = nouveau - hatVerticalOffset;
         hatVerticalOffset = nouveau;
         Debug.Log("ADMIN_FEDORA_HEIGHT="
             + hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture));
-        BuildPreview();
+        if (preview == null || !preview.MoveFedora(delta))
+            BuildPreview();
     }
 
     public string HatHeightLogValue
@@ -230,6 +232,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private readonly Dictionary<string, Dictionary<int, Vector3>> targets = new Dictionary<string, Dictionary<int, Vector3>>();
         private ObjData obj;
         private GameObject root;
+        private GameObject fedoraObject;
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
@@ -278,6 +281,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 targetTexts[name] = Resources.Load<TextAsset>(Root + "MakeHumanTargets/" + name);
         }
 
+        public bool MoveFedora(float deltaY)
+        {
+            if (fedoraObject == null) return false;
+            fedoraObject.transform.localPosition += Vector3.up * deltaY;
+            return true;
+        }
+
         public void SetPresentationLayer(int layer)
         {
             if (root == null) return;
@@ -300,6 +310,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
+            fedoraObject = null;
             root = new GameObject("ADMIN - apercu humain");
             root.transform.SetParent(parent, false);
 

@@ -118,6 +118,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool adminHumainJoueurActif;
     private bool adminPreviewSourisActive;
     private bool adminHatSourisActive;
+    private bool adminHatMoveMode;
     private Vector2 adminPreviewDerniereSouris;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
@@ -7072,25 +7073,21 @@ public sealed class LibreViesGame : MonoBehaviour
         return nouveau;
     }
 
-    private Rect HatHeightSliderRect(Rect previewRect)
-    {
-        return new Rect(previewRect.xMax - 74f, previewRect.y + 40f, 18f, 230f);
-    }
-
     private void GererCameraPreview(Rect previewRect)
     {
         if (adminHumanCreator == null) return;
         Event evenement = Event.current;
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
-        Rect hatSlider = HatHeightSliderRect(previewRect);
+        Rect hatModeButton = new Rect(previewRect.x + 10f, previewRect.y + 32f, 140f, 24f);
         bool dansPreview = previewRect.Contains(evenement.mousePosition);
         bool dansCommandes = commandes.Contains(evenement.mousePosition);
-        bool dansHatSlider = hatSlider.Contains(evenement.mousePosition);
+        bool dansHatModeButton = hatModeButton.Contains(evenement.mousePosition);
         if (evenement.type == EventType.MouseDown && evenement.button == 0
-            && dansPreview && !dansCommandes && !dansHatSlider)
+            && dansPreview && !dansCommandes && !dansHatModeButton)
         {
             adminPreviewSourisActive = true;
-            adminHatSourisActive = evenement.shift && adminHumanCreator.hatStyle >= 0;
+            adminHatSourisActive = (adminHatMoveMode || evenement.shift)
+                && adminHumanCreator.hatStyle >= 0;
             adminPreviewDerniereSouris = evenement.mousePosition;
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
             evenement.Use();
@@ -7115,52 +7112,11 @@ public sealed class LibreViesGame : MonoBehaviour
             evenement.Use();
         }
         else if (evenement.type == EventType.ScrollWheel && dansPreview
-            && !dansCommandes && !dansHatSlider)
+            && !dansCommandes && !dansHatModeButton)
         {
             adminHumanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
             evenement.Use();
         }
-    }
-
-    private void DessinerRepereChapeau(Rect previewRect)
-    {
-        // Repere fixe dans la preview : il permet d'indiquer une hauteur
-        // precise entre le haut du chapeau et la bouche, meme avant un rendu
-        // Unity. Les dix graduations restent lisibles apres un zoom tete.
-        float x = previewRect.xMax - 18f;
-        float haut = previewRect.y + 18f;
-        float bas = previewRect.y + 278f;
-        GUI.color = new Color(1f, 0.82f, 0.10f, 0.95f);
-        GUI.DrawTexture(new Rect(x, haut, 2f, bas - haut), Texture2D.whiteTexture);
-        for (int i = 0; i <= 10; i++)
-        {
-            float y = Mathf.Lerp(haut, bas, i / 10f);
-            GUI.DrawTexture(new Rect(x - (i % 5 == 0 ? 10f : 6f), y, 10f, 2f),
-                Texture2D.whiteTexture);
-            GUI.Label(new Rect(x - 30f, y - 9f, 20f, 18f),
-                i.ToString(CultureInfo.InvariantCulture), smallStyle);
-        }
-        GUI.Label(new Rect(x - 116f, haut - 2f, 108f, 18f),
-            "HAUT CHAPEAU", smallStyle);
-        GUI.Label(new Rect(x - 74f, bas + 2f, 66f, 18f),
-            "BOUCHE", smallStyle);
-
-        // Curseur dedie : contrairement au glisser de la camera, celui-ci
-        // permet de placer le fedora avec une vraie precision verticale.
-        Rect hatSlider = HatHeightSliderRect(previewRect);
-        GUI.color = new Color(0.04f, 0.06f, 0.08f, 0.82f);
-        GUI.Box(hatSlider, "", boxStyle);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(hatSlider.x - 6f, hatSlider.y - 20f, 30f, 18f),
-            "Y", smallStyle);
-        if (adminHumanCreator.hatStyle >= 0)
-        {
-            float nouvelleHauteur = GUI.VerticalSlider(
-                hatSlider, adminHumanCreator.hatVerticalOffset, 0.20f, -0.30f);
-            if (Mathf.Abs(nouvelleHauteur - adminHumanCreator.hatVerticalOffset) > 0.0001f)
-                adminHumanCreator.SetHatVerticalOffset(nouvelleHauteur);
-        }
-        GUI.color = Color.white;
     }
 
     private void DessinerCommandesCameraPreview(Rect previewRect)
@@ -7202,11 +7158,17 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Apercu en preparation...", smallStyle);
         GererCameraPreview(previewRect);
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
-            "Glisser : pivoter | SHIFT + glisser ou curseur Y : chapeau", smallStyle);
-        DessinerRepereChapeau(previewRect);
+            adminHatMoveMode ? "Glisser verticalement : chapeau"
+                : "Glisser : pivoter | bouton PLACER CHAPEAU", smallStyle);
         if (adminHumanCreator.hatStyle >= 0)
-            GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 32f, 210f, 18f),
+        {
+            Rect hatModeButton = new Rect(previewRect.x + 10f, previewRect.y + 32f, 140f, 24f);
+            if (GUI.Button(hatModeButton,
+                adminHatMoveMode ? "FIN CHAPEAU" : "PLACER CHAPEAU", adminActionLongButtonStyle))
+                adminHatMoveMode = !adminHatMoveMode;
+            GUI.Label(new Rect(previewRect.x + 158f, previewRect.y + 35f, 190f, 18f),
                 "FEDORA Y = " + adminHumanCreator.HatHeightLogValue, smallStyle);
+        }
         DessinerCommandesCameraPreview(previewRect);
 
         // Les actions principales restent sous l'image, a l'horizontale,
@@ -7221,6 +7183,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(previewRect.x + 116f, previewActionsY, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
+            adminHatMoveMode = false;
             adminHumainValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
@@ -7455,6 +7418,7 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumanCreator.hatStyle < 0))
         {
             adminHumanCreator.hatStyle = -1;
+            adminHatMoveMode = false;
             adminHumainValide = false;
             adminHumanCreator.BuildPreview();
         }
