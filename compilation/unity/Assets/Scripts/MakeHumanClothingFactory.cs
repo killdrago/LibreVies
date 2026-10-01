@@ -191,9 +191,13 @@ public static class MakeHumanClothingFactory
                 {
                     int id = AddCorner(d, uvD, scaled, source.texcoords, proxy, bodyWeights,
                         vertices, uvs, weights, sourceIndexes, cornerLookup);
+                    // Le quad MakeHuman est dans l'ordre a-b-c-d :
+                    // le second triangle doit rester dans le meme sens.
+                    // a-d-c inversait sa face et la rendait transparente
+                    // avec le backface culling de Unity.
                     triangles.Add(ia);
-                    triangles.Add(id);
                     triangles.Add(ic);
+                    triangles.Add(id);
                 }
             }
 
