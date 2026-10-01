@@ -235,7 +235,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private string conversationInput = "";
     private readonly List<string> conversationMessages = new List<string>();
     private string infoMessage = "";
-    private string garmentPlacementPath = "";
     private float infoTimer;
     private float brightness = 0.5f;
     private float contrast = 1f;
@@ -7137,12 +7136,16 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             adminHumanCreator.female = false;
             adminHumanCreator.hairStyle = 0;
+            adminHumanCreator.clothingStyle = 0;
+            adminHumainValide = false;
             adminHumanCreator.BuildPreview();
         }
         if (BoutonChoixAdmin(new Rect(gauche + 100f, contenu.y + 68f, 92f, 28f), "Femme", adminHumanCreator.female))
         {
             adminHumanCreator.female = true;
             adminHumanCreator.hairStyle = 0;
+            adminHumanCreator.clothingStyle = 0;
+            adminHumainValide = false;
             adminHumanCreator.BuildPreview();
         }
 
@@ -7223,59 +7226,41 @@ public sealed class LibreViesGame : MonoBehaviour
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f) { adminHumanCreator.feetSize = nouvelleValeur; adminHumanCreator.BuildPreview(); }
 
         GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
-            "Placement soutien-gorge", smallStyle);
-        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 355f, 238f, 24f),
-            "Taille", adminHumanCreator.garmentScale, 0.40f, 1.80f);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentScale) > 0.001f)
+            "VETEMENTS MAKEHUMAN", smallStyle);
+        MakeHumanClothingFactory.Option[] vetements =
+            MakeHumanClothingFactory.Options(adminHumanCreator.female);
+        for (int i = 0; i < vetements.Length; i++)
         {
-            adminHumanCreator.garmentScale = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            Rect vetement = new Rect(droite, contenu.y + 358f + i * 31f, 234f, 27f);
+            if (BoutonChoixAdmin(vetement, vetements[i].label,
+                adminHumanCreator.clothingStyle == i))
+            {
+                adminHumanCreator.clothingStyle = i;
+                adminHumainValide = false;
+                adminHumanCreator.BuildPreview();
+                ShowInfo("Tenue MakeHuman : " + vetements[i].label);
+            }
         }
-        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 385f, 238f, 24f),
-            "Deplacement X", adminHumanCreator.garmentOffsetX, -0.40f, 0.40f);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetX) > 0.001f)
-        {
-            adminHumanCreator.garmentOffsetX = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
-        }
-        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 415f, 238f, 24f),
-            "Deplacement Y", adminHumanCreator.garmentOffsetY, -0.40f, 0.40f);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetY) > 0.001f)
-        {
-            adminHumanCreator.garmentOffsetY = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
-        }
-        nouvelleValeur = SliderHumainBornes(new Rect(droite, contenu.y + 445f, 238f, 24f),
-            "Profondeur Z", adminHumanCreator.garmentOffsetZ, 0.05f, 0.50f);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.garmentOffsetZ) > 0.001f)
-        {
-            adminHumanCreator.garmentOffsetZ = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
-        }
-        if (GUI.Button(new Rect(droite, contenu.y + 475f, 234f, 30f),
-            "SAUVER POSITION", buttonStyle))
-        {
-            garmentPlacementPath = adminHumanCreator.SaveGarmentPlacement();
-            ShowInfo("Position sauvee : " + garmentPlacementPath);
-        }
-        if (!string.IsNullOrEmpty(garmentPlacementPath))
-            GUI.Label(new Rect(droite, contenu.y + 508f, 234f, 42f),
-                "Fichier a transmettre :\n" + garmentPlacementPath, smallStyle);
-        if (GUI.Button(new Rect(droite, contenu.y + 555f, 112f, 34f), "ALEATOIRE", buttonStyle))
+        GUI.Label(new Rect(droite, contenu.y + 458f, 238f, 38f),
+            "Les vetements sont des proxies MakeHuman Community, avec leurs UV,\n"
+                + "textures et adaptation au mesh de base.", smallStyle);
+        if (GUI.Button(new Rect(droite, contenu.y + 505f, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
+            adminHumainValide = false;
             ShowInfo("Personnage humain aleatoire genere");
         }
-        if (GUI.Button(new Rect(droite + 122f, contenu.y + 555f, 112f, 34f), "REINITIALISER", buttonStyle))
+        if (GUI.Button(new Rect(droite + 122f, contenu.y + 505f, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
+            adminHumainValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
-        if (GUI.Button(new Rect(droite, contenu.y + 595f, 234f, 36f),
+        if (GUI.Button(new Rect(droite, contenu.y + 550f, 234f, 36f),
             adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
             ValiderEditionHumaine();
-        GUI.Label(new Rect(droite, contenu.y + 635f, 250f, 34f),
-            "Peau Standard conservee.\nSoutien devant + bretelles dos.", smallStyle);
+        GUI.Label(new Rect(droite, contenu.y + 595f, 250f, 42f),
+            "Base MakeHuman homme/femme.\nMorphologie et tenue appliquees au joueur.", smallStyle);
     }
 
     private void DessinerAdmin()

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Text;
 using UnityEngine;
 
 // Createur humain reutilisable dans le jeu.
@@ -26,25 +24,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public float mouthShape;
     public float earsShape;
     public int hairStyle;
-
-    // Placement de l'image de soutien-gorge dans le preview ADMIN.
-    public float garmentScale = 1f;
-    public float garmentOffsetX;
-    public float garmentOffsetY = 0.0509090908f;
-    public float garmentOffsetZ = 0.24318181f;
-
-    [Serializable]
-    private sealed class GarmentPlacementData
-    {
-        public string asset = "soutien_gorge.png";
-        public string anchor = "torse";
-        public string coordinateSpace = "preview_human_local";
-        public int version = 1;
-        public float scale;
-        public float offsetX;
-        public float offsetY;
-        public float offsetZ;
-    }
+    // Index dans le catalogue des tenues MakeHuman Community.
+    public int clothingStyle;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -167,6 +148,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         chestShape = UnityEngine.Random.Range(-0.24f, 0.75f);
         hipShape = UnityEngine.Random.Range(-0.65f, 0.75f);
         hairStyle = UnityEngine.Random.Range(0, 5);
+        clothingStyle = UnityEngine.Random.Range(0, MakeHumanClothingFactory.Options(female).Length);
         armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
         armLength = UnityEngine.Random.Range(-0.65f, 0.7f);
         legThickness = UnityEngine.Random.Range(-0.65f, 0.7f);
@@ -187,23 +169,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         belly = chestShape = hipShape = armThickness = armLength = legThickness = legLength = feetSize = 0f;
         headShape = eyesShape = noseShape = mouthShape = earsShape = 0f;
         hairStyle = 0;
+        clothingStyle = 0;
         BuildPreview();
-    }
-
-    public string SaveGarmentPlacement()
-    {
-        string directory = Path.Combine(Application.persistentDataPath, "LibreVies");
-        Directory.CreateDirectory(directory);
-        string path = Path.Combine(directory, "soutien_gorge_placement.json");
-        GarmentPlacementData data = new GarmentPlacementData
-        {
-            scale = garmentScale,
-            offsetX = garmentOffsetX,
-            offsetY = garmentOffsetY,
-            offsetZ = garmentOffsetZ
-        };
-        File.WriteAllText(path, JsonUtility.ToJson(data, true));
-        return path;
     }
 
     private sealed class HumanPreview
@@ -218,12 +185,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
-        private Material underwearMaterial;
-        private Material braMaterial;
         private Material hairMaterial;
         private Texture2D skinTexture;
-        private Texture2D braTexture;
-        private GameObject bra;
         private GameObject hair;
         private int hairStyle;
         private bool hairFemale;
@@ -236,11 +199,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             hairMaterial = NewMaterial(new Color(0.06f, 0.025f, 0.012f), 0f, 0.22f);
             skinTexture = Resources.Load<Texture2D>(Root + "SkinBase");
             if (skinTexture != null) skin.mainTexture = skinTexture;
-            underwearMaterial = NewMaterial(new Color(0.80f, 0.71f, 0.62f), 0f, 0.45f);
-            if (underwearMaterial.HasProperty("_Cull"))
-                underwearMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            braTexture = Resources.Load<Texture2D>("Characters/Clothing/soutien_gorge");
-            braMaterial = NewGarmentMaterial(braTexture);
             // La coiffure procedurale reste volontairement brune et mate :
             // la texture plate HairDark formait un bandeau noir dans le preview.
             LoadTargets();
@@ -308,8 +266,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Add(deformed, Target(values.female ? "universal-female-young-averagemuscle-averageweight" : "universal-male-young-averagemuscle-averageweight"), 1f);
             Signed(deformed, values.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, values.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            // Pas de poitrine nue : la zone du torse est aplatie plus bas
-            // pour recevoir directement la forme du soutien-gorge.
+            // La poitrine garde son volume MakeHuman ; le curseur ne fait
+            // qu'une variation locale, sans aplatir ni enfoncer le torse.
+            ScaleRegion(deformed, values.chestShape, 1.28f, 1.86f, 0.24f, 0.24f, 0.34f);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
@@ -341,41 +300,41 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 vertices[i] = new Vector3(deformed[i].x * Scale, (deformed[i].y - min.y) * Scale, deformed[i].z * Scale);
 
             BuildBones(deformed, min.y);
-            Func<Vector3, bool> underwearCoverage = values.female
-                ? (Func<Vector3, bool>)(point => UnderwearCoverage.IsCovered(point,
-                    values.garmentScale, values.garmentOffsetX,
-                    values.garmentOffsetY))
-                : null;
-            Mesh mesh = obj.CreateMesh(vertices, underwearCoverage);
+            // Le proxy MakeHuman fournit aussi les vertices du corps a cacher
+            // sous la tenue. On retire uniquement les faces entierement
+            // couvertes : aucune classification approximative du soutien-
+            // gorge et aucune peau n'est dessinee sous le vetement.
+            MakeHumanClothingFactory.Option[] options =
+                MakeHumanClothingFactory.Options(values.female);
+            int clothingIndex = options.Length == 0 ? 0
+                : Mathf.Clamp(values.clothingStyle, 0, options.Length - 1);
+            bool[] deleteBody = options.Length == 0 ? null
+                : MakeHumanClothingFactory.LoadDeleteMask(options[clothingIndex],
+                    deformed.Length);
+            Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
+                deleteBody != null && a < deleteBody.Length && b < deleteBody.Length
+                && c < deleteBody.Length && deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = mesh;
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
-            if (values.female)
-            {
-                // Le corps garde sa forme. Le soutien-gorge est une vraie
-                // geometrie skinee sur la meme armature, avec sa texture.
-                skin.mainTexture = skinTexture;
-                skin.color = Color.white;
-                underwearMaterial.color = new Color(0.80f, 0.71f, 0.62f);
-                hairMaterial.color = Color.white;
-            }
-            else
-            {
-                skin.mainTexture = skinTexture;
-                skin.color = SkinColor(values.skinTone);
-                underwearMaterial.color = new Color(0.80f, 0.71f, 0.62f);
-                hairMaterial.color = new Color(0.06f, 0.025f, 0.012f);
-            }
-            renderer.sharedMaterials = values.female
-                ? new[] { skin, underwearMaterial }
-                : new[] { skin };
+            skin.mainTexture = skinTexture;
+            skin.color = values.female ? Color.white : SkinColor(values.skinTone);
+            hairMaterial.color = values.female
+                ? Color.white : new Color(0.06f, 0.025f, 0.012f);
+            renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
-            if (values.female)
-                bra = CreateSkinnedBra(values, mesh, root.transform);
+            if (options.Length > 0)
+            {
+                MakeHumanClothingFactory.BuildResult clothing =
+                    MakeHumanClothingFactory.Create(options[clothingIndex], deformed,
+                        Scale, min.y, mesh.boneWeights, root.transform, bones, boneIndexes);
+                if (clothing.gameObject == null)
+                    Debug.LogWarning("MakeHuman clothing: " + clothing.error);
+            }
             root.transform.localRotation = facePreviewCamera
                 ? Quaternion.Euler(0f, 180f, 0f)
                 : Quaternion.identity;
@@ -573,202 +532,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private static Material NewMaterial(Color color, float metallic, float smoothness)
         { Shader shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Unlit/Color"); Material material = new Material(shader); material.color = color; if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", metallic); if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", smoothness); return material; }
 
-        private static Material NewGarmentMaterial(Texture2D texture)
-        {
-            Material material = NewMaterial(Color.white, 0f, 0.78f);
-            if (texture != null) material.mainTexture = texture;
-            // Le GLB contient une image decoupee : on garde ses pixels opaques
-            // et on elimine son fond sans ajouter un quad devant le corps.
-            if (material.HasProperty("_Mode")) material.SetFloat("_Mode", 1f);
-            if (material.HasProperty("_Cutoff")) material.SetFloat("_Cutoff", 0.08f);
-            material.EnableKeyword("_ALPHATEST_ON");
-            material.DisableKeyword("_ALPHABLEND_ON");
-            material.renderQueue = 2450;
-            return material;
-        }
-
-        private GameObject CreateSkinnedBra(AdminHumanCreator values,
-            Mesh bodyMesh, Transform parentTransform)
-        {
-            TextAsset glb = Resources.Load<TextAsset>("Characters/Clothing/soutien_gorge");
-            Mesh garmentMesh = GlbGarment.Load(glb == null ? null : glb.bytes);
-            if (garmentMesh == null || braMaterial == null) return null;
-            GameObject objectBra = new GameObject("Soutien-gorge - vetement skine");
-            objectBra.transform.SetParent(parentTransform, false);
-            float width = 0.36f * Mathf.Clamp(values.garmentScale, 0.25f, 3f);
-            objectBra.transform.localPosition = new Vector3(values.garmentOffsetX,
-                1.61f + values.garmentOffsetY, values.garmentOffsetZ);
-            objectBra.transform.localScale = Vector3.one * width;
-            SkinnedMeshRenderer renderer = objectBra.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = garmentMesh;
-            renderer.sharedMaterial = braMaterial;
-            renderer.bones = bones;
-            renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
-            ApplyGarmentWeights(garmentMesh, renderer, bodyMesh, objectBra.transform);
-            renderer.updateWhenOffscreen = true;
-            return objectBra;
-        }
-
-        private void ApplyGarmentWeights(Mesh garmentMesh, SkinnedMeshRenderer renderer,
-            Mesh bodyMesh, Transform garmentTransform)
-        {
-            BoneWeight[] bodyWeights = bodyMesh.boneWeights;
-            BoneWeight[] garmentWeights = new BoneWeight[garmentMesh.vertexCount];
-            Vector3[] bodyVertices = bodyMesh.vertices;
-            Vector3[] garmentVertices = garmentMesh.vertices;
-            for (int i = 0; i < garmentVertices.Length; i++)
-            {
-                Vector3 point = garmentTransform.localPosition
-                    + Vector3.Scale(garmentVertices[i], garmentTransform.localScale);
-                int nearest = 0;
-                float nearestDistance = float.MaxValue;
-                for (int j = 0; j < bodyVertices.Length; j++)
-                {
-                    float distance = (bodyVertices[j] - point).sqrMagnitude;
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearest = j;
-                    }
-                }
-                garmentWeights[i] = bodyWeights[nearest];
-            }
-            garmentMesh.boneWeights = garmentWeights;
-            Matrix4x4 meshMatrix = renderer.transform.localToWorldMatrix;
-            Matrix4x4[] bindposes = new Matrix4x4[bones.Length];
-            for (int i = 0; i < bones.Length; i++)
-                bindposes[i] = bones[i].worldToLocalMatrix * meshMatrix;
-            garmentMesh.bindposes = bindposes;
-        }
-
-        private static class GlbGarment
-        {
-            [Serializable] private sealed class RootData
-            {
-                public MeshData[] meshes;
-                public BufferView[] bufferViews;
-                public Accessor[] accessors;
-            }
-            [Serializable] private sealed class MeshData { public Primitive[] primitives; }
-            [Serializable] private sealed class Primitive
-            {
-                public Attributes attributes;
-                public int indices;
-            }
-            [Serializable] private sealed class Attributes
-            {
-                public int POSITION;
-                public int NORMAL;
-                public int TEXCOORD_0;
-            }
-            [Serializable] private sealed class BufferView
-            {
-                public int byteOffset;
-            }
-            [Serializable] private sealed class Accessor
-            {
-                public int bufferView;
-                public int byteOffset;
-                public int count;
-            }
-
-            public static Mesh Load(byte[] bytes)
-            {
-                if (bytes == null || bytes.Length < 32
-                    || Encoding.ASCII.GetString(bytes, 0, 4) != "glTF") return null;
-                int jsonLength = BitConverter.ToInt32(bytes, 12);
-                int jsonStart = 20;
-                if (jsonLength <= 0 || jsonStart + jsonLength > bytes.Length) return null;
-                string json = Encoding.UTF8.GetString(bytes, jsonStart, jsonLength).Trim('\0', ' ');
-                RootData root = JsonUtility.FromJson<RootData>(json);
-                if (root == null || root.meshes == null || root.meshes.Length == 0) return null;
-                int binHeader = jsonStart + jsonLength;
-                if (binHeader + 8 > bytes.Length) return null;
-                int binStart = binHeader + 8;
-                Primitive primitive = root.meshes[0].primitives[0];
-                Vector3[] positions = ReadVector3(bytes, binStart, root, primitive.attributes.POSITION);
-                Vector3[] normals = ReadVector3(bytes, binStart, root, primitive.attributes.NORMAL);
-                Vector2[] uv = ReadVector2(bytes, binStart, root, primitive.attributes.TEXCOORD_0);
-                int[] indices = ReadIndices(bytes, binStart, root, primitive.indices);
-                if (positions == null || indices == null) return null;
-                Mesh mesh = new Mesh { name = "Soutien-gorge GLB skine" };
-                mesh.vertices = positions;
-                if (normals != null && normals.Length == positions.Length) mesh.normals = normals;
-                else mesh.RecalculateNormals();
-                if (uv != null && uv.Length == positions.Length) mesh.uv = uv;
-                mesh.SetTriangles(indices, 0);
-                mesh.RecalculateBounds();
-                return mesh;
-            }
-
-            private static int Offset(byte[] bytes, int binStart, RootData root, int index)
-            {
-                if (index < 0 || index >= root.accessors.Length) return -1;
-                Accessor accessor = root.accessors[index];
-                if (accessor.bufferView < 0 || accessor.bufferView >= root.bufferViews.Length) return -1;
-                return binStart + root.bufferViews[accessor.bufferView].byteOffset
-                    + accessor.byteOffset;
-            }
-
-            private static Vector3[] ReadVector3(byte[] bytes, int binStart,
-                RootData root, int index)
-            {
-                if (index < 0 || index >= root.accessors.Length) return null;
-                Accessor accessor = root.accessors[index];
-                int offset = Offset(bytes, binStart, root, index);
-                if (offset < 0 || offset + accessor.count * 12 > bytes.Length) return null;
-                Vector3[] result = new Vector3[accessor.count];
-                for (int i = 0; i < result.Length; i++)
-                    result[i] = new Vector3(BitConverter.ToSingle(bytes, offset + i * 12),
-                        BitConverter.ToSingle(bytes, offset + i * 12 + 4),
-                        BitConverter.ToSingle(bytes, offset + i * 12 + 8));
-                return result;
-            }
-
-            private static Vector2[] ReadVector2(byte[] bytes, int binStart,
-                RootData root, int index)
-            {
-                if (index < 0 || index >= root.accessors.Length) return null;
-                Accessor accessor = root.accessors[index];
-                int offset = Offset(bytes, binStart, root, index);
-                if (offset < 0 || offset + accessor.count * 8 > bytes.Length) return null;
-                Vector2[] result = new Vector2[accessor.count];
-                for (int i = 0; i < result.Length; i++)
-                    result[i] = new Vector2(BitConverter.ToSingle(bytes, offset + i * 8),
-                        BitConverter.ToSingle(bytes, offset + i * 8 + 4));
-                return result;
-            }
-
-            private static int[] ReadIndices(byte[] bytes, int binStart,
-                RootData root, int index)
-            {
-                if (index < 0 || index >= root.accessors.Length) return null;
-                Accessor accessor = root.accessors[index];
-                int offset = Offset(bytes, binStart, root, index);
-                if (offset < 0 || offset + accessor.count * 4 > bytes.Length) return null;
-                int[] result = new int[accessor.count];
-                for (int i = 0; i < result.Length; i++)
-                    result[i] = (int)BitConverter.ToUInt32(bytes, offset + i * 4);
-                return result;
-            }
-        }
-
         private sealed class RigDefinition { public string name, parent; public List<int> head; public RigDefinition(string name, string parent, List<int> head) { this.name = name; this.parent = parent; this.head = head; } }
         private sealed class Influence { public int bone; public float weight; public Influence(int bone, float weight) { this.bone = bone; this.weight = weight; } }
     }
 
-    private static class UnderwearCoverage
-    {
-        public static bool IsCovered(Vector3 point, float scale, float offsetX, float offsetY)
-        {
-            // Le soutien-gorge est maintenant un mesh skine independant.
-            // Le second sous-maillage du corps ne conserve que la culotte.
-            float t = Mathf.InverseLerp(0.96f, 1.22f, point.y);
-            float halfWidth = Mathf.Lerp(0.205f, 0.27f, t);
-            return point.y >= 0.96f && point.y <= 1.22f
-                && Mathf.Abs(point.x - offsetX) <= halfWidth;
-        }
-    }
 
     private static class HairBuilder
     {
@@ -987,10 +754,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             return CreateMesh(vertices, null);
         }
 
-        // Les triangles vetement restent dans le meme SkinnedMeshRenderer que
-        // le corps, mais utilisent le second materiau. Il n'y a donc ni peau
-        // dessinee sous le vetement ni objet vetement ajoute devant le corps.
-        public Mesh CreateMesh(Vector3[] vertices, Func<Vector3, bool> garmentTriangle)
+        // Le masque est celui fourni par le proxy MakeHuman : seules les
+        // faces dont les trois sommets sont sous le vetement sont retirees.
+        public Mesh CreateMesh(Vector3[] vertices, Func<int, int, int, bool> hideTriangle)
         {
             Mesh mesh = new Mesh
             {
@@ -999,28 +765,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
             };
             mesh.vertices = vertices;
             mesh.uv = uv;
-            List<int> bodyIndices = new List<int>();
-            List<int> garmentIndices = new List<int>();
+            List<int> indices = new List<int>();
             foreach (ObjTriangle triangle in triangles)
             {
-                Vector3 centre = (vertices[triangle.a] + vertices[triangle.b]
-                    + vertices[triangle.c]) / 3f;
-                List<int> destination = garmentTriangle != null && garmentTriangle(centre)
-                    ? garmentIndices : bodyIndices;
-                destination.Add(triangle.a);
-                destination.Add(triangle.b);
-                destination.Add(triangle.c);
+                if (hideTriangle != null && hideTriangle(triangle.a, triangle.b, triangle.c))
+                    continue;
+                indices.Add(triangle.a);
+                indices.Add(triangle.b);
+                indices.Add(triangle.c);
             }
-            if (garmentTriangle == null)
-            {
-                mesh.SetTriangles(bodyIndices, 0);
-            }
-            else
-            {
-                mesh.subMeshCount = 2;
-                mesh.SetTriangles(bodyIndices, 0);
-                mesh.SetTriangles(garmentIndices, 1);
-            }
+            mesh.SetTriangles(indices, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;

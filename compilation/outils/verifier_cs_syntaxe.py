@@ -63,8 +63,9 @@ GetKeyUp GetMouseButton GetMouseButtonDown GetMouseButtonUp GetAxis GetAxisRaw
 IsInstanceOfType Equals GetType ToString GetHashCode DestroyImmediate FindObjectsOfType
 Combine GetInstanceID CompareTag Invoke CancelInvoke StartCoroutine StopCoroutine
 QuaternionIdentity Normalize SetResolution RunInBackground targetFrameRate deltaTime
-DllImport
+DllImport BoneWeight MemoryStream InvalidDataException ZipArchive ZipArchiveEntry ZipArchiveMode
 unscaledDeltaTime fixedDeltaTime timeScale frameCount realtimeSinceStartup
+CopyTo Open GetEntry SetVertices SetUVs
 """.split())
 
 RACINE_IF = None

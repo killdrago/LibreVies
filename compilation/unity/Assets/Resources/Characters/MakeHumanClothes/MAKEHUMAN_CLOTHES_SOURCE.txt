@@ -1,0 +1,10 @@
+LibreVies utilise des meshes de vetements MakeHuman Community.
+
+Source : https://github.com/killdrago/LibreVies/tree/main/makehuman-1.3.0/makehuman/data/clothes
+Projet source : https://github.com/makehumancommunity/makehuman
+
+Les vetements female_casualsuit01, female_sportsuit01, female_elegantsuit01,
+male_casualsuit04, male_elegantsuit01 et male_worksuit01 proviennent des assets
+MakeHuman Community ajoutes au depot LibreVies. Les fichiers .npz et .mhpxy
+sont les meshes et proxies binaires MakeHuman ; les textures sont conservees.
+Consulter les fichiers .mhmat de la source pour la licence propre a chaque asset.
