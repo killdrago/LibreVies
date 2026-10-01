@@ -36,6 +36,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private float previewDistance = 5.00f;
     private float previewYaw;
     private float previewPitch;
+    private bool previewHeadZoom;
 
     public float PreviewDistance
     {
@@ -70,16 +71,30 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
     public void ZoomPreview(float amount)
     {
-        previewDistance = Mathf.Clamp(previewDistance + amount, 2.25f, 9.00f);
+        // La molette reste active apres le passage en cadrage tete.
+        previewDistance = Mathf.Clamp(previewDistance + amount, 1.00f, 9.00f);
+        PositionPreviewCamera();
+    }
+
+    public void ZoomHeadPreview()
+    {
+        previewHeadZoom = true;
+        previewDistance = 2.15f;
+        PositionPreviewCamera();
+    }
+
+    public void ResetHeadPreview()
+    {
+        previewHeadZoom = false;
+        previewDistance = 5.00f;
+        previewYaw = 0f;
+        previewPitch = 0f;
         PositionPreviewCamera();
     }
 
     public void ResetPreviewCamera()
     {
-        previewDistance = 5.00f;
-        previewYaw = 0f;
-        previewPitch = 0f;
-        PositionPreviewCamera();
+        ResetHeadPreview();
     }
 
     // Applique le meme maillage humain rigge et les memes morphs au personnage
@@ -122,9 +137,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private void PositionPreviewCamera()
     {
         if (previewCamera == null) return;
-        Vector3 cible = transform.position + Vector3.up * 1.08f;
+        Vector3 cible = transform.position + Vector3.up
+            * (previewHeadZoom ? 1.82f : 1.08f);
         // Le recul laisse toujours entrer les pieds et le sommet de la tete
-        // dans le cadre, meme lorsque les proportions sont modifiees.
+        // dans le cadre, meme lorsque les proportions sont modifiees. En mode
+        // tete, la cible monte sur le visage et la molette garde son effet.
         Quaternion orbite = Quaternion.Euler(previewPitch, previewYaw, 0f);
         Vector3 direction = orbite * Vector3.back;
         previewCamera.transform.position = cible + direction * previewDistance;
@@ -356,9 +373,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     Debug.LogWarning("MakeHuman chapeau: " + hat.error);
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
-                    // Le fedora doit recouvrir la calotte et non laisser les
-                    // cheveux alpha passer par-dessus sa couronne.
-                    hat.gameObject.transform.localPosition += Vector3.up * 0.035f;
+                    // Le proxy MakeHuman reste intact : on ajuste seulement
+                    // son placement pour que le bord recouvre les cheveux au
+                    // lieu de les couper ou de les laisser passer a travers.
+                    hat.gameObject.transform.localPosition += Vector3.down * 0.012f;
+                    hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
             if (shoeIndex >= 0)
@@ -385,6 +404,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // ses poids et ses textures viennent du pack hair01. Il est
                 // donc indépendant de la tenue mais partage la meme armature.
                 // L'objet est deja parenté au root par la factory.
+                // Avec le fedora, on rentre legerement la coiffure sous la
+                // calotte pour supprimer les meches qui intersectent le proxy.
+                if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
+                    hairBuild.gameObject.transform.localPosition += Vector3.down * 0.045f;
             }
             else
             {

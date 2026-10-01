@@ -143,22 +143,22 @@ public static class MakeHumanClothingFactory
 
     private static readonly Option[] FemaleShoeOptions =
     {
-        new Option("shoes01", "Chaussures 1", true, SharedFolder + "shoes01"),
-        new Option("shoes02", "Chaussures 2", true, SharedFolder + "shoes02"),
-        new Option("shoes03", "Chaussures 3", true, SharedFolder + "shoes03"),
-        new Option("shoes04", "Chaussures 4", true, SharedFolder + "shoes04"),
-        new Option("shoes05", "Chaussures 5", true, SharedFolder + "shoes05"),
-        new Option("shoes06", "Chaussures 6", true, SharedFolder + "shoes06")
+        new Option("shoes01", "Bottes cuir", true, SharedFolder + "shoes01"),
+        new Option("shoes02", "Baskets marron", true, SharedFolder + "shoes02"),
+        new Option("shoes03", "Mocassins noirs", true, SharedFolder + "shoes03"),
+        new Option("shoes04", "Cuir marron", true, SharedFolder + "shoes04"),
+        new Option("shoes05", "Baskets blanches", true, SharedFolder + "shoes05"),
+        new Option("shoes06", "Baskets bleues", true, SharedFolder + "shoes06")
     };
 
     private static readonly Option[] MaleShoeOptions =
     {
-        new Option("shoes01", "Chaussures 1", false, SharedFolder + "shoes01"),
-        new Option("shoes02", "Chaussures 2", false, SharedFolder + "shoes02"),
-        new Option("shoes03", "Chaussures 3", false, SharedFolder + "shoes03"),
-        new Option("shoes04", "Chaussures 4", false, SharedFolder + "shoes04"),
-        new Option("shoes05", "Chaussures 5", false, SharedFolder + "shoes05"),
-        new Option("shoes06", "Chaussures 6", false, SharedFolder + "shoes06")
+        new Option("shoes01", "Bottes cuir", false, SharedFolder + "shoes01"),
+        new Option("shoes02", "Baskets marron", false, SharedFolder + "shoes02"),
+        new Option("shoes03", "Mocassins noirs", false, SharedFolder + "shoes03"),
+        new Option("shoes04", "Cuir marron", false, SharedFolder + "shoes04"),
+        new Option("shoes05", "Baskets blanches", false, SharedFolder + "shoes05"),
+        new Option("shoes06", "Baskets bleues", false, SharedFolder + "shoes06")
     };
 
     // Compatibilite : Options() represente maintenant uniquement les tenues.

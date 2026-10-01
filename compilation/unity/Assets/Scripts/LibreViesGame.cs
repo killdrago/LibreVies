@@ -7063,7 +7063,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (adminHumanCreator == null) return;
         Event evenement = Event.current;
-        Rect commandes = new Rect(previewRect.x + 8f, previewRect.yMax - 42f, 238f, 34f);
+        Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
         bool dansPreview = previewRect.Contains(evenement.mousePosition);
         bool dansCommandes = commandes.Contains(evenement.mousePosition);
         if (evenement.type == EventType.MouseDown && evenement.button == 0
@@ -7098,16 +7098,18 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerCommandesCameraPreview(Rect previewRect)
     {
-        Rect commandes = new Rect(previewRect.x + 8f, previewRect.yMax - 42f, 238f, 34f);
+        Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
         GUI.Box(commandes, "", boxStyle);
         if (GUI.Button(new Rect(commandes.x + 4f, commandes.y + 3f, 32f, 28f), "-", buttonStyle))
             adminHumanCreator.ZoomPreview(0.45f);
         if (GUI.Button(new Rect(commandes.x + 40f, commandes.y + 3f, 32f, 28f), "+", buttonStyle))
             adminHumanCreator.ZoomPreview(-0.45f);
-        if (GUI.Button(new Rect(commandes.x + 78f, commandes.y + 3f, 96f, 28f), "CAMERA", buttonStyle))
+        if (GUI.Button(new Rect(commandes.x + 78f, commandes.y + 3f, 86f, 28f), "ZOOM TETE", buttonStyle))
+            adminHumanCreator.ZoomHeadPreview();
+        if (GUI.Button(new Rect(commandes.x + 168f, commandes.y + 3f, 86f, 28f), "DEZOOM", buttonStyle))
+            adminHumanCreator.ResetHeadPreview();
+        if (GUI.Button(new Rect(commandes.x + 258f, commandes.y + 3f, 84f, 28f), "CAMERA", buttonStyle))
             adminHumanCreator.ResetPreviewCamera();
-        GUI.Label(new Rect(commandes.x + 178f, commandes.y + 5f, 55f, 22f),
-            adminHumanCreator.PreviewDistance.ToString("0.0"), smallStyle);
     }
 
     private float SliderHumainBornes(Rect rect, string nom, float valeur, float minimum, float maximum)
@@ -7143,6 +7145,25 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
             "Glisser : pivoter / voir dessus-dessous", smallStyle);
         DessinerCommandesCameraPreview(previewRect);
+
+        // Les actions principales restent sous l'image, a l'horizontale,
+        // pour liberer toute la colonne droite aux trois equipements.
+        float previewActionsY = previewRect.yMax + 8f;
+        if (GUI.Button(new Rect(previewRect.x, previewActionsY, 112f, 34f), "ALEATOIRE", buttonStyle))
+        {
+            adminHumanCreator.Randomize();
+            adminHumainValide = false;
+            ShowInfo("Personnage humain aleatoire genere");
+        }
+        if (GUI.Button(new Rect(previewRect.x + 122f, previewActionsY, 112f, 34f), "REINITIALISER", buttonStyle))
+        {
+            adminHumanCreator.ResetPreview();
+            adminHumainValide = false;
+            ShowInfo("Reglages humains reinitialises");
+        }
+        if (GUI.Button(new Rect(previewRect.x + 244f, previewActionsY, 116f, 34f),
+            adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
+            ValiderEditionHumaine();
 
         float gauche = contenu.x + 400f;
         float droite = contenu.x + 660f;
@@ -7249,8 +7270,8 @@ public sealed class LibreViesGame : MonoBehaviour
             MakeHumanClothingFactory.ShoeOptions(adminHumanCreator.female);
         GUI.Label(new Rect(droite, contenu.y + 330f, 250f, 22f),
             "EQUIPEMENT MAKEHUMAN", smallStyle);
-        Rect clothingView = new Rect(droite, contenu.y + 358f, 234f, 150f);
-        Rect clothingContent = new Rect(0f, 0f, 234f, 270f);
+        Rect clothingView = new Rect(droite, contenu.y + 358f, 260f, 280f);
+        Rect clothingContent = new Rect(0f, 0f, 250f, 304f);
         adminClothingScroll = GUI.BeginScrollView(clothingView, adminClothingScroll,
             clothingContent);
         float equipementY = 0f;
@@ -7316,26 +7337,6 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         GUI.EndScrollView();
-        GUI.Label(new Rect(droite, contenu.y + 515f, 238f, 38f),
-            "Meshes MakeHuman skines sur la meme armature, avec UV,\n"
-                + "textures et adaptation au corps de base.", smallStyle);
-        if (GUI.Button(new Rect(droite, contenu.y + 555f, 112f, 34f), "ALEATOIRE", buttonStyle))
-        {
-            adminHumanCreator.Randomize();
-            adminHumainValide = false;
-            ShowInfo("Personnage humain aleatoire genere");
-        }
-        if (GUI.Button(new Rect(droite + 122f, contenu.y + 555f, 112f, 34f), "REINITIALISER", buttonStyle))
-        {
-            adminHumanCreator.ResetPreview();
-            adminHumainValide = false;
-            ShowInfo("Reglages humains reinitialises");
-        }
-        if (GUI.Button(new Rect(droite, contenu.y + 595f, 234f, 36f),
-            adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", buttonStyle))
-            ValiderEditionHumaine();
-        GUI.Label(new Rect(droite, contenu.y + 638f, 250f, 42f),
-            "Base MakeHuman homme/femme.\nMorphologie et tenue appliquees au joueur.", smallStyle);
     }
 
     private void DessinerAdmin()
