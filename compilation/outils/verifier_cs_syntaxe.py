@@ -48,7 +48,7 @@ def charger_parseur():
 API_CONNUES = set("""
 GameObject Vector2 Vector3 Vector4 Quaternion Mathf Color Material Shader Resources Debug
 Texture2D Font Input Time Application Screen PlayerPrefs RenderSettings QualitySettings
-PrimitiveType Camera CameraClearFlags Light LightType LightShadows Mesh MeshFilter
+PrimitiveType Camera CameraClearFlags Light LightType LightShadows Mesh RenderTexture MeshFilter
 MeshRenderer MeshCollider CapsuleCollider BoxCollider SphereCollider Collider Destroy
 Object System String StringComparison Convert Random TextMesh TextAnchor Rect GUI GUIStyle
 GUIContent GUISkin Texture Sprite SpriteRenderer Bounds Ray RaycastHit Physics JsonUtility

@@ -165,6 +165,7 @@ public static class MakeHumanClothingFactory
             List<Vector2> uvs = new List<Vector2>();
             List<BoneWeight> weights = new List<BoneWeight>();
             List<int> triangles = new List<int>();
+            Dictionary<ulong, int> cornerLookup = new Dictionary<ulong, int>();
             for (int face = 0; face < source.faceCount; face++)
             {
                 int a = source.faceVertices[face * source.faceWidth];
@@ -176,24 +177,22 @@ public static class MakeHumanClothingFactory
                 int uvB = source.faceUvs[face * source.faceWidth + 1];
                 int uvC = source.faceUvs[face * source.faceWidth + 2];
                 int uvD = source.faceUvs[face * source.faceWidth + 3];
-                AddCorner(a, uvA, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, triangles);
-                AddCorner(b, uvB, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, triangles);
-                AddCorner(c, uvC, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, triangles);
-                int baseIndex = vertices.Count - 3;
-                triangles.Add(baseIndex);
-                triangles.Add(baseIndex + 1);
-                triangles.Add(baseIndex + 2);
+                int ia = AddCorner(a, uvA, scaled, source.texcoords, proxy, bodyWeights,
+                    vertices, uvs, weights, cornerLookup);
+                int ib = AddCorner(b, uvB, scaled, source.texcoords, proxy, bodyWeights,
+                    vertices, uvs, weights, cornerLookup);
+                int ic = AddCorner(c, uvC, scaled, source.texcoords, proxy, bodyWeights,
+                    vertices, uvs, weights, cornerLookup);
+                triangles.Add(ia);
+                triangles.Add(ib);
+                triangles.Add(ic);
                 if (quad)
                 {
-                    AddCorner(d, uvD, scaled, source.texcoords, proxy, bodyWeights,
-                        vertices, uvs, weights, triangles);
-                    int quadIndex = vertices.Count - 1;
-                    triangles.Add(baseIndex);
-                    triangles.Add(quadIndex);
-                    triangles.Add(baseIndex + 2);
+                    int id = AddCorner(d, uvD, scaled, source.texcoords, proxy, bodyWeights,
+                        vertices, uvs, weights, cornerLookup);
+                    triangles.Add(ia);
+                    triangles.Add(id);
+                    triangles.Add(ic);
                 }
             }
 
@@ -231,16 +230,22 @@ public static class MakeHumanClothingFactory
         }
     }
 
-    private static void AddCorner(int sourceIndex, int uvIndex, Vector3[] verticesSource,
+    private static int AddCorner(int sourceIndex, int uvIndex, Vector3[] verticesSource,
         Vector2[] texcoords, ProxyData proxy, BoneWeight[] bodyWeights,
         List<Vector3> vertices, List<Vector2> uvs, List<BoneWeight> weights,
-        List<int> triangles)
+        Dictionary<ulong, int> cornerLookup)
     {
-        if (sourceIndex < 0 || sourceIndex >= verticesSource.Length) return;
+        if (sourceIndex < 0 || sourceIndex >= verticesSource.Length) return 0;
+        ulong key = ((ulong)(uint)sourceIndex << 32) | (uint)Mathf.Max(uvIndex, 0);
+        int existing;
+        if (cornerLookup.TryGetValue(key, out existing)) return existing;
+        int index = vertices.Count;
+        cornerLookup[key] = index;
         vertices.Add(verticesSource[sourceIndex]);
         uvs.Add(uvIndex >= 0 && uvIndex < texcoords.Length
             ? texcoords[uvIndex] : Vector2.zero);
         weights.Add(CombineBoneWeights(sourceIndex, proxy, bodyWeights));
+        return index;
     }
 
     private static BoneWeight CombineBoneWeights(int vertex, ProxyData proxy,
