@@ -28,6 +28,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int clothingStyle;
     public int hatStyle = -1;
     public int shoeStyle = -1;
+    // Hauteur manuelle du fedora dans la preview et sur le personnage applique.
+    // Le joueur peut la regler par SHIFT + glisser verticalement.
+    public float hatVerticalOffset = -0.060f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -74,6 +77,20 @@ public sealed class AdminHumanCreator : MonoBehaviour
         // La molette reste active apres le passage en cadrage tete.
         previewDistance = Mathf.Clamp(previewDistance + amount, 1.00f, 9.00f);
         PositionPreviewCamera();
+    }
+
+    public void MoveHatVertically(float worldDelta)
+    {
+        if (hatStyle < 0) return;
+        hatVerticalOffset = Mathf.Clamp(hatVerticalOffset + worldDelta, -0.30f, 0.20f);
+        Debug.Log("ADMIN_FEDORA_HEIGHT="
+            + hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture));
+        BuildPreview();
+    }
+
+    public string HatHeightLogValue
+    {
+        get { return hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture); }
     }
 
     public void ZoomHeadPreview()
@@ -193,6 +210,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
+        hatVerticalOffset = -0.060f;
         BuildPreview();
     }
 
@@ -382,7 +400,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // devant, sans descendre sur les yeux ou le front.
                     // La bordure doit arriver juste au-dessus des sourcils.
                     // On descend le proxy sans modifier son mesh MakeHuman.
-                    hat.gameObject.transform.localPosition += Vector3.down * 0.060f;
+                    hat.gameObject.transform.localPosition +=
+                        Vector3.up * values.hatVerticalOffset;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }

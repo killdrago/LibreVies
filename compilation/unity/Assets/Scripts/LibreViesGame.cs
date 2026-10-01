@@ -117,6 +117,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool adminHumainValide;
     private bool adminHumainJoueurActif;
     private bool adminPreviewSourisActive;
+    private bool adminHatSourisActive;
     private Vector2 adminPreviewDerniereSouris;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
@@ -7082,6 +7083,7 @@ public sealed class LibreViesGame : MonoBehaviour
             && dansPreview && !dansCommandes)
         {
             adminPreviewSourisActive = true;
+            adminHatSourisActive = evenement.shift && adminHumanCreator.hatStyle >= 0;
             adminPreviewDerniereSouris = evenement.mousePosition;
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
             evenement.Use();
@@ -7091,13 +7093,17 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Vector2 delta = evenement.mousePosition - adminPreviewDerniereSouris;
             adminPreviewDerniereSouris = evenement.mousePosition;
-            adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
+            if (adminHatSourisActive)
+                adminHumanCreator.MoveHatVertically(-delta.y * 0.0025f);
+            else
+                adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
             evenement.Use();
         }
         else if (adminPreviewSourisActive && evenement.type == EventType.MouseUp
             && evenement.button == 0)
         {
             adminPreviewSourisActive = false;
+            adminHatSourisActive = false;
             GUIUtility.hotControl = 0;
             evenement.Use();
         }
@@ -7172,8 +7178,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Apercu en preparation...", smallStyle);
         GererCameraPreview(previewRect);
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
-            "Glisser : pivoter / voir dessus-dessous", smallStyle);
+            "Glisser : pivoter | SHIFT + glisser : hauteur chapeau", smallStyle);
         DessinerRepereChapeau(previewRect);
+        if (adminHumanCreator.hatStyle >= 0)
+            GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 32f, 210f, 18f),
+                "FEDORA Y = " + adminHumanCreator.HatHeightLogValue, smallStyle);
         DessinerCommandesCameraPreview(previewRect);
 
         // Les actions principales restent sous l'image, a l'horizontale,

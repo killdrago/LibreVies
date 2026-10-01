@@ -432,9 +432,20 @@ public static class MakeHumanClothingFactory
 
     private static Material BuildMaterial(Option option)
     {
-        Material material = new Material(Shader.Find("Standard")
+        bool isHair = option.resourceFolder.StartsWith(HairFolder, StringComparison.Ordinal);
+        Shader shader = Shader.Find("Standard")
             ?? Shader.Find("Universal Render Pipeline/Lit")
-            ?? Shader.Find("Unlit/Color"));
+            ?? Shader.Find("Unlit/Color");
+        if (isHair)
+        {
+            // Preferer le shader cutout historique de Unity pour que l'alpha
+            // des PNG hair01 soit traite comme une transparence de meches,
+            // et non comme des rectangles noirs opaques.
+            shader = Shader.Find("Legacy Shaders/Transparent/Cutout/Diffuse")
+                ?? Shader.Find("Unlit/Transparent Cutout")
+                ?? shader;
+        }
+        Material material = new Material(shader);
         Texture2D diffuse = Resources.Load<Texture2D>(option.resourceFolder + "/diffuse");
         Texture2D normal = Resources.Load<Texture2D>(option.resourceFolder + "/normal");
         Texture2D ao = Resources.Load<Texture2D>(option.resourceFolder + "/ao");
@@ -446,7 +457,7 @@ public static class MakeHumanClothingFactory
         }
         if (ao != null && material.HasProperty("_OcclusionMap"))
             material.SetTexture("_OcclusionMap", ao);
-        if (option.resourceFolder.StartsWith(HairFolder, StringComparison.Ordinal))
+        if (isHair)
         {
             // Les diffuse des assets hair01 ont une vraie couche alpha.
             // L'alpha test supprime les grands rectangles noirs autour des
