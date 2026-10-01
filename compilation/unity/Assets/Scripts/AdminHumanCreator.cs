@@ -547,9 +547,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // style 0 rendait "Carre" et "Brosse" completement chauves.
             GameObject objectHair = new GameObject("Cheveux - coupe " + style);
             objectHair.transform.SetParent(head == null ? parent : head, false);
-            // Les dimensions historiques etaient dans une echelle quatre fois
-            // trop grande par rapport au mesh MakeHuman deja reduit dans Unity.
-            objectHair.transform.localScale = Vector3.one * 0.35f;
+            // Les coordonnees sont deja exprimees dans le repere local de l'os
+            // head. Il ne faut surtout pas reduire toute la coiffure autour de
+            // l'os : cela la rentre dans le crane. Les dimensions ci-dessous
+            // tiennent deja compte de l'echelle Unity du corps.
             float width = female ? 0.115f : 0.105f;
             float depth = female ? 0.105f : 0.095f;
             CreateCap(objectHair, width, depth, material);
@@ -668,8 +669,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     int b = row * columns + (col + 1) % columns;
                     int c = (row + 1) * columns + (col + 1) % columns;
                     int d = (row + 1) * columns + col;
-                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                    // Face externe : l'ancien ordre orientait toute la
+                    // calotte et les meches vers l'interieur. Avec le
+                    // backface culling de Unity, les cheveux disparaissaient.
+                    triangles.Add(a); triangles.Add(b); triangles.Add(c);
+                    triangles.Add(a); triangles.Add(c); triangles.Add(d);
                 }
             AddMesh(parent, "calotte", vertices, triangles, material);
         }
@@ -701,8 +705,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     int b = row * columns + (col + 1) % columns;
                     int c = (row + 1) * columns + (col + 1) % columns;
                     int d = (row + 1) * columns + col;
-                    triangles.Add(a); triangles.Add(c); triangles.Add(b);
-                    triangles.Add(a); triangles.Add(d); triangles.Add(c);
+                    // Face externe : l'ancien ordre orientait toute la
+                    // calotte et les meches vers l'interieur. Avec le
+                    // backface culling de Unity, les cheveux disparaissaient.
+                    triangles.Add(a); triangles.Add(b); triangles.Add(c);
+                    triangles.Add(a); triangles.Add(c); triangles.Add(d);
                 }
             AddMesh(parent, name, vertices, triangles, material);
         }

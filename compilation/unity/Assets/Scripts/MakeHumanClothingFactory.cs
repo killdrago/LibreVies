@@ -164,6 +164,7 @@ public static class MakeHumanClothingFactory
             List<Vector3> vertices = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
             List<BoneWeight> weights = new List<BoneWeight>();
+            List<int> sourceIndexes = new List<int>();
             List<int> triangles = new List<int>();
             Dictionary<ulong, int> cornerLookup = new Dictionary<ulong, int>();
             for (int face = 0; face < source.faceCount; face++)
@@ -178,18 +179,18 @@ public static class MakeHumanClothingFactory
                 int uvC = source.faceUvs[face * source.faceWidth + 2];
                 int uvD = source.faceUvs[face * source.faceWidth + 3];
                 int ia = AddCorner(a, uvA, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, cornerLookup);
+                    vertices, uvs, weights, sourceIndexes, cornerLookup);
                 int ib = AddCorner(b, uvB, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, cornerLookup);
+                    vertices, uvs, weights, sourceIndexes, cornerLookup);
                 int ic = AddCorner(c, uvC, scaled, source.texcoords, proxy, bodyWeights,
-                    vertices, uvs, weights, cornerLookup);
+                    vertices, uvs, weights, sourceIndexes, cornerLookup);
                 triangles.Add(ia);
                 triangles.Add(ib);
                 triangles.Add(ic);
                 if (quad)
                 {
                     int id = AddCorner(d, uvD, scaled, source.texcoords, proxy, bodyWeights,
-                        vertices, uvs, weights, cornerLookup);
+                        vertices, uvs, weights, sourceIndexes, cornerLookup);
                     triangles.Add(ia);
                     triangles.Add(id);
                     triangles.Add(ic);
@@ -203,7 +204,13 @@ public static class MakeHumanClothingFactory
             mesh.SetUVs(0, uvs);
             mesh.SetTriangles(triangles, 0);
             mesh.boneWeights = weights.ToArray();
-            mesh.RecalculateNormals();
+            // MakeHuman calcule une normale par sommet source, meme quand
+            // les UV dupliquent ce sommet sur une couture. Unity ne le fait
+            // pas automatiquement avec les duplicatas UV : sans ce calcul,
+            // chaque couture devient une facette sombre.
+            mesh.normals = BuildSmoothNormals(scaled, source.faceVertices,
+                source.faceCount, source.faceWidth, sourceIndexes);
+            mesh.RecalculateTangents();
             mesh.RecalculateBounds();
 
             GameObject objectClothing = new GameObject("MakeHuman - " + option.label);
@@ -233,7 +240,7 @@ public static class MakeHumanClothingFactory
     private static int AddCorner(int sourceIndex, int uvIndex, Vector3[] verticesSource,
         Vector2[] texcoords, ProxyData proxy, BoneWeight[] bodyWeights,
         List<Vector3> vertices, List<Vector2> uvs, List<BoneWeight> weights,
-        Dictionary<ulong, int> cornerLookup)
+        List<int> sourceIndexes, Dictionary<ulong, int> cornerLookup)
     {
         if (sourceIndex < 0 || sourceIndex >= verticesSource.Length) return 0;
         ulong key = ((ulong)(uint)sourceIndex << 32) | (uint)Mathf.Max(uvIndex, 0);
@@ -242,10 +249,49 @@ public static class MakeHumanClothingFactory
         int index = vertices.Count;
         cornerLookup[key] = index;
         vertices.Add(verticesSource[sourceIndex]);
+        sourceIndexes.Add(sourceIndex);
         uvs.Add(uvIndex >= 0 && uvIndex < texcoords.Length
             ? texcoords[uvIndex] : Vector2.zero);
         weights.Add(CombineBoneWeights(sourceIndex, proxy, bodyWeights));
         return index;
+    }
+
+    private static Vector3[] BuildSmoothNormals(Vector3[] positions,
+        int[] faceVertices, int faceCount, int faceWidth, List<int> sourceIndexes)
+    {
+        Vector3[] sums = new Vector3[positions.Length];
+        for (int face = 0; face < faceCount; face++)
+        {
+            int offset = face * faceWidth;
+            if (offset + 2 >= faceVertices.Length) continue;
+            int a = faceVertices[offset];
+            int b = faceVertices[offset + 1];
+            int c = faceVertices[offset + 2];
+            if (a < 0 || b < 0 || c < 0 || a >= positions.Length
+                || b >= positions.Length || c >= positions.Length) continue;
+            // Un seul plan par quad, comme le fait MakeHuman avant son
+            // triangulage OpenGL. Cela evite la cassure de la diagonale.
+            Vector3 normal = Vector3.Cross(positions[b] - positions[a],
+                positions[c] - positions[a]);
+            if (normal.sqrMagnitude < 0.00000001f) continue;
+            sums[a] += normal;
+            sums[b] += normal;
+            sums[c] += normal;
+            if (faceWidth > 3)
+            {
+                int d = faceVertices[offset + 3];
+                if (d >= 0 && d < positions.Length) sums[d] += normal;
+            }
+        }
+        Vector3[] result = new Vector3[sourceIndexes.Count];
+        for (int i = 0; i < sourceIndexes.Count; i++)
+        {
+            int source = sourceIndexes[i];
+            result[i] = source >= 0 && source < sums.Length
+                && sums[source].sqrMagnitude > 0.00000001f
+                ? sums[source].normalized : Vector3.up;
+        }
+        return result;
     }
 
     private static BoneWeight CombineBoneWeights(int vertex, ProxyData proxy,
