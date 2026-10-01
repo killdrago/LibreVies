@@ -163,23 +163,23 @@ public sealed class AdminHumanCreator : MonoBehaviour
     {
         female = UnityEngine.Random.value > 0.5f;
         skinTone = UnityEngine.Random.Range(0, 7);
-        belly = UnityEngine.Random.Range(-0.65f, 0.75f);
-        chestShape = UnityEngine.Random.Range(-0.24f, 0.75f);
-        hipShape = UnityEngine.Random.Range(-0.65f, 0.75f);
+        belly = UnityEngine.Random.Range(0f, 0.75f);
+        chestShape = UnityEngine.Random.Range(0f, 0.75f);
+        hipShape = UnityEngine.Random.Range(0f, 0.75f);
         hairStyle = UnityEngine.Random.Range(0, 5);
         clothingStyle = UnityEngine.Random.Range(0, MakeHumanClothingFactory.ClothingOptions(female).Length);
         hatStyle = UnityEngine.Random.Range(-1, MakeHumanClothingFactory.HatOptions(female).Length);
         shoeStyle = UnityEngine.Random.Range(-1, MakeHumanClothingFactory.ShoeOptions(female).Length);
-        armThickness = UnityEngine.Random.Range(-0.7f, 0.75f);
-        armLength = UnityEngine.Random.Range(-0.65f, 0.7f);
-        legThickness = UnityEngine.Random.Range(-0.65f, 0.7f);
-        legLength = UnityEngine.Random.Range(-0.65f, 0.7f);
-        feetSize = UnityEngine.Random.Range(-0.65f, 0.7f);
-        headShape = UnityEngine.Random.Range(-0.75f, 0.75f);
-        eyesShape = UnityEngine.Random.Range(-0.65f, 0.75f);
-        noseShape = UnityEngine.Random.Range(-0.7f, 0.75f);
-        mouthShape = UnityEngine.Random.Range(-0.7f, 0.75f);
-        earsShape = UnityEngine.Random.Range(-0.65f, 0.7f);
+        armThickness = UnityEngine.Random.Range(0f, 0.75f);
+        armLength = UnityEngine.Random.Range(0f, 0.7f);
+        legThickness = UnityEngine.Random.Range(0f, 0.7f);
+        legLength = UnityEngine.Random.Range(0f, 0.7f);
+        feetSize = UnityEngine.Random.Range(0f, 0.7f);
+        headShape = UnityEngine.Random.Range(0f, 0.75f);
+        eyesShape = UnityEngine.Random.Range(0f, 0.75f);
+        noseShape = UnityEngine.Random.Range(0f, 0.75f);
+        mouthShape = UnityEngine.Random.Range(0f, 0.75f);
+        earsShape = UnityEngine.Random.Range(0f, 0.7f);
         BuildPreview();
     }
 
@@ -378,7 +378,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // Le proxy MakeHuman reste intact : on ajuste seulement
                     // son placement pour que le bord recouvre les cheveux au
                     // lieu de les couper ou de les laisser passer a travers.
-                    hat.gameObject.transform.localPosition += Vector3.down * 0.012f;
+                    // Aucun decalage vertical : le fedora retrouve la hauteur
+                    // de son proxy MakeHuman avant les anciens essais.
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }

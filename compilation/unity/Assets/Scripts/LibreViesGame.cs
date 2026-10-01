@@ -7039,7 +7039,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
         float nouveau = GUI.HorizontalSlider(
             new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
-            valeur, -5f, 5f);
+            Mathf.Clamp(valeur, 0f, 5f), 0f, 5f);
         GUI.Label(new Rect(rect.x + rect.width - 30f, rect.y, 30f, 22f),
             Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
         return nouveau;
@@ -7048,11 +7048,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private float SliderHumainVolume(Rect rect, string nom, float valeur)
     {
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
-        // Les controles du corps vont de -500 a +500. La valeur interne reste
-        // un multiplicateur MakeHuman (-5 a +5).
+        // Les controles vont de 0 a +500. La valeur interne reste
+        // un multiplicateur MakeHuman (0 a +5).
         float nouveau = GUI.HorizontalSlider(
             new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
-            valeur, -5f, 5f);
+            Mathf.Clamp(valeur, 0f, 5f), 0f, 5f);
         GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
             Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
         return nouveau;
@@ -7062,9 +7062,10 @@ public sealed class LibreViesGame : MonoBehaviour
         float minimum, float maximum)
     {
         GUI.Label(new Rect(rect.x, rect.y, 82f, 22f), nom, smallStyle);
+        minimum = Mathf.Max(0f, minimum);
         float nouveau = GUI.HorizontalSlider(
             new Rect(rect.x + 82f, rect.y + 5f, rect.width - 116f, 18f),
-            valeur, minimum, maximum);
+            Mathf.Clamp(valeur, minimum, maximum), minimum, maximum);
         GUI.Label(new Rect(rect.x + rect.width - 38f, rect.y, 38f, 22f),
             Mathf.RoundToInt(nouveau * 100f).ToString(CultureInfo.InvariantCulture), smallStyle);
         return nouveau;
@@ -7311,7 +7312,7 @@ public sealed class LibreViesGame : MonoBehaviour
             "Corps et proportions", smallStyle);
         nouvelleValeur = SliderHumainBornes(
             new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume",
-            adminHumanCreator.chestShape, -5f, 5f);
+            adminHumanCreator.chestShape, 0f, 5f);
         if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f)
         {
             adminHumanCreator.chestShape = nouvelleValeur;
