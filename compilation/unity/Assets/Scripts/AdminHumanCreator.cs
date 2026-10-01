@@ -626,8 +626,18 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 }
                 else
                 {
-                    CreateLock(objectHair, "arriere homme", 0f, 0.06f, -0.075f,
-                        0.065f, 0.045f, 0.25f, material, 0f);
+                    // La coupe Long ne doit pas etre une seule meche a l'arriere :
+                    // elle doit couvrir l'avant, les tempes et la nuque.
+                    CreateLock(objectHair, "longue avant gauche", -0.045f, 0.105f, 0.07f,
+                        0.05f, 0.038f, 0.15f, material, 0.012f);
+                    CreateLock(objectHair, "longue avant droite", 0.045f, 0.105f, 0.07f,
+                        0.05f, 0.038f, 0.15f, material, -0.012f);
+                    CreateLock(objectHair, "longue tempe gauche", -0.09f, 0.08f, 0.015f,
+                        0.04f, 0.05f, 0.22f, material, 0.012f);
+                    CreateLock(objectHair, "longue tempe droite", 0.09f, 0.08f, 0.015f,
+                        0.04f, 0.05f, 0.22f, material, -0.012f);
+                    CreateLock(objectHair, "longue nuque", 0f, 0.065f, -0.075f,
+                        0.07f, 0.045f, 0.25f, material, 0f);
                 }
             }
             return objectHair;
