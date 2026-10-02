@@ -484,6 +484,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             SetBoneRotation("upperleg01.R", -legSwing, 5f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
+            // Le haut de la jambe est corrige vers l'axe ; les pivots des
+            // pieds compensent cette rotation pour que les chaussures restent
+            // droites au sol.
+            SetBoneRotation("foot.L", 0f, 5f);
+            SetBoneRotation("foot.R", 0f, -5f);
             SetBoneRotation("upperarm01.L", -armSwing, -30f);
             SetBoneRotation("upperarm01.R", armSwing, 30f);
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
@@ -562,19 +567,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds, float cutoff)
         {
-            float dx = (point.x - hatBounds.center.x) / Mathf.Max(hatBounds.extents.x, 0.001f);
-            float dz = (point.z - hatBounds.center.z) / Mathf.Max(hatBounds.extents.z, 0.001f);
-            // Le bord du fedora est plus large que sa calotte : on garde
-            // une petite marge autour de sa texture pour supprimer aussi les
-            // meches qui debordent sur les cotes.
-            bool underHat = dx * dx + dz * dz < 0.72f
-                && point.y >= hatBounds.min.y - 0.01f
+            // Tout ce qui depasse au-dessus de la calotte est retire, y
+            // compris les meches sur les cotes et a l'arriere. La zone du
+            // front reste intacte sous le bord avant du fedora : le visage
+            // est a l'avant du mesh, en +Z, pour les deux morphologies.
+            float frontLimit = hatBounds.center.z + hatBounds.extents.z * 0.25f;
+            bool frontForehead = point.z > frontLimit
                 && point.y <= hatBounds.max.y + 0.01f;
-            // Ne retire pas globalement les cheveux situes au-dessus de la
-            // hauteur du fedora : cette ancienne regle supprimait aussi la
-            // frange feminine devant le front. On coupe seulement la partie
-            // haute qui est réellement dans la calotte.
-            return underHat && point.y > cutoff;
+            return point.y > cutoff && !frontForehead;
         }
 
         private static int OptionalIndex(int index, int length)
