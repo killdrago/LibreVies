@@ -435,7 +435,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // calotte ou le bord du fedora chez la femme non plus.
                     hairBuild.gameObject.transform.localPosition +=
                         Vector3.down * 0.045f;
-                    SupprimerCheveuxAuDessusDuChapeau(hairBuild.gameObject, fedoraObject);
+                    SupprimerCheveuxSousLeChapeau(hairBuild.gameObject, fedoraObject);
                 }
             }
             else
@@ -507,7 +507,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, z);
         }
 
-        private static void SupprimerCheveuxAuDessusDuChapeau(GameObject hairObject,
+        private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
             GameObject hatObject)
         {
             if (hairObject == null || hatObject == null) return;
@@ -525,9 +525,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // calotte. Les meches sous le bord et sur le front restent visibles
             // chez l'homme comme chez la femme.
             Bounds hatBounds = hatRenderer.bounds;
-            // On ne retire que la partie haute de la coiffure. Le front
-            // situe sous le bord inferieur reste donc entierement visible.
-            float cutoff = hatBounds.max.y - hatBounds.size.y * 0.40f;
+            // La coupe est maintenant uniquement spatiale : on retire les
+            // cheveux qui se trouvent sous le fedora, sans toucher aux meches
+            // qui depassent sur le front ou sur le visage.
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
             for (int i = 0; i + 2 < triangles.Length; i += 3)
@@ -540,9 +540,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Vector3 pa = hairMatrix.MultiplyPoint3x4(vertices[a]);
                 Vector3 pb = hairMatrix.MultiplyPoint3x4(vertices[b]);
                 Vector3 pc = hairMatrix.MultiplyPoint3x4(vertices[c]);
-                bool protrudes = EstSousLaCalotte(pa, cutoff)
-                    || EstSousLaCalotte(pb, cutoff)
-                    || EstSousLaCalotte(pc, cutoff);
+                bool protrudes = EstSousLaCalotte(pa, hatBounds)
+                    || EstSousLaCalotte(pb, hatBounds)
+                    || EstSousLaCalotte(pc, hatBounds);
                 if (!protrudes)
                 {
                     kept.Add(a);
@@ -557,12 +557,19 @@ public sealed class AdminHumanCreator : MonoBehaviour
             }
         }
 
-        private static bool EstSousLaCalotte(Vector3 point, float cutoff)
+        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds)
         {
-            // Une meche qui monte au-dessus de la calotte est toujours retiree.
-            // Les cheveux du front restent sous le bord du chapeau, donc sous
-            // cette limite, pour l'homme comme pour la femme.
-            return point.y > cutoff;
+            float dx = (point.x - hatBounds.center.x)
+                / Mathf.Max(hatBounds.extents.x, 0.001f);
+            float dz = (point.z - hatBounds.center.z)
+                / Mathf.Max(hatBounds.extents.z, 0.001f);
+            // On supprime tout ce qui est vraiment sous le volume du fedora,
+            // mais uniquement dans son empreinte X/Z. Les cheveux qui sortent
+            // devant le bord et descendent sur le front restent intacts.
+            bool underHat = dx * dx + dz * dz < 1.0f
+                && point.y >= hatBounds.min.y - 0.015f
+                && point.y <= hatBounds.max.y + 0.015f;
+            return underHat;
         }
 
         private static int OptionalIndex(int index, int length)
