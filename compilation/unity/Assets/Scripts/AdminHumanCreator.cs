@@ -348,7 +348,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     MakeHumanClothingFactory.LoadDeleteMask(shoeOptions[shoeIndex],
                         deformed.Length));
             if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
-                MaskHeadUnderFedora(deleteBody, deformed, FedoraPlacementOffset);
+            {
+                float hatOffset = FedoraPlacementOffset
+                    + (values.female ? -0.035f : 0f);
+                MaskHeadUnderFedora(deleteBody, deformed, hatOffset);
+            }
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
                 deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
@@ -380,10 +384,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
                     fedoraObject = hat.gameObject;
-                    // Le proxy, le mesh, la texture et l'armature MakeHuman
-                    // restent intacts. Le placement est fixe, sans editeur.
+                    // La tete feminine est un peu plus basse dans le proxy
+                    // MakeHuman. On descend uniquement son fedora pour que
+                    // son bord rejoigne les cheveux comme chez l'homme.
+                    float hatOffset = FedoraPlacementOffset
+                        + (values.female ? -0.035f : 0f);
                     hat.gameObject.transform.localPosition +=
-                        Vector3.up * FedoraPlacementOffset;
+                        Vector3.up * hatOffset;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
@@ -456,10 +463,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
             // Z rapproche les bras et les jambes du tronc ; X conserve le
             // balancement avant-arriere de la marche et de la course.
-            SetBoneRotation("pelvis.L", 0f, -32f);
-            SetBoneRotation("pelvis.R", 0f, 32f);
-            SetBoneRotation("upperleg01.L", legSwing, 28f);
-            SetBoneRotation("upperleg01.R", -legSwing, -28f);
+            // Les genoux restent dans l'axe des hanches et des pieds :
+            // aucune rotation laterale ne doit les faire se croiser.
+            SetBoneRotation("pelvis.L", 0f, 0f);
+            SetBoneRotation("pelvis.R", 0f, 0f);
+            SetBoneRotation("upperleg01.L", legSwing, 0f);
+            SetBoneRotation("upperleg01.R", -legSwing, 0f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
             SetBoneRotation("upperarm01.L", -armSwing, -30f);
