@@ -455,8 +455,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // l'exterieur dans la pose MakeHuman. Une rotation fixe en Z les
             // remet proches du corps ; l'animation elle-meme reste uniquement
             // sur X pour faire avancer et reculer les membres.
-            SetBoneRotation("pelvis.L", 0f, -12f);
-            SetBoneRotation("pelvis.R", 0f, 12f);
+            SetBoneRotation("pelvis.L", 0f, -5f);
+            SetBoneRotation("pelvis.R", 0f, 5f);
             SetBoneRotation("upperleg01.L", legSwing, 0f);
             SetBoneRotation("upperleg01.R", -legSwing, 0f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
