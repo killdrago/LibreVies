@@ -542,7 +542,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // ou a l'interieur de la calotte. Les cheveux situes hors du bord
             // restent visibles.
             Bounds hatBounds = hatRenderer.bounds;
-            float cutoff = hatBounds.max.y - hatBounds.size.y * 0.40f;
+            float cutoff = hatBounds.max.y - hatBounds.size.y * 0.10f;
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
             for (int i = 0; i + 2 < triangles.Length; i += 3)
