@@ -425,7 +425,15 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // de sa surface. Le mesh de cheveux reste celui de MakeHuman.
                 if (fedoraObject != null)
                 {
-                    hairBuild.gameObject.transform.localPosition += Vector3.down * 0.045f;
+                    // Le proxy court feminin remonte un peu plus haut sur la
+                    // tete que la version masculine. On le descend davantage
+                    // pour que ses meches arrivent sous le bord du fedora et
+                    // ferment l'espace visible entre le chapeau et les yeux.
+                    bool courteFeminine = values.female
+                        && hairOptions[hairStyle].id == "short_messy";
+                    float hairDrop = courteFeminine ? 0.095f : 0.045f;
+                    hairBuild.gameObject.transform.localPosition +=
+                        Vector3.down * hairDrop;
                     SupprimerCheveuxAuDessusDuChapeau(hairBuild.gameObject, fedoraObject);
                 }
             }
