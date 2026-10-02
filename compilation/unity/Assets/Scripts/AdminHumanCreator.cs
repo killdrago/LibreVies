@@ -30,7 +30,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int shoeStyle = -1;
     // Placement fixe du proxy MakeHuman, sans editeur de position.
     private const float FedoraPlacementOffset = -0.177f;
-    private const float FedoraWidthScale = 1.16f;
+    private const float DefaultFedoraWidthScale = 1.16f;
+    // Valeur modifiable depuis l'editeur ADMIN ; elle s'applique en X et Z.
+    public float fedoraWidthScale = DefaultFedoraWidthScale;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -196,6 +198,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
+        fedoraWidthScale = DefaultFedoraWidthScale;
         BuildPreview();
     }
 
@@ -388,8 +391,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                         Vector3.up * FedoraPlacementOffset;
                     // Le bord plus large recouvre les meches qui depassent
                     // autour de la calotte, sans changer sa hauteur fixe.
+                    float widthScale = Mathf.Clamp(values.fedoraWidthScale, 0.10f, 5f);
                     hat.gameObject.transform.localScale =
-                        new Vector3(FedoraWidthScale, 1f, FedoraWidthScale);
+                        new Vector3(widthScale, 1f, widthScale);
                 }
             }
             if (shoeIndex >= 0)
@@ -465,10 +469,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // dans l'axe des pieds.
             SetBoneRotation("pelvis.L", 0f, 0f);
             SetBoneRotation("pelvis.R", 0f, 0f);
-            // Les cuisses restent verticales sous les hanches : aucune
-            // ouverture en V ni rotation laterale des genoux.
-            SetBoneRotation("upperleg01.L", legSwing, 0f);
-            SetBoneRotation("upperleg01.R", -legSwing, 0f);
+            // La correction suit le trajet reel depuis chaque pivot de hanche
+            // jusqu'au pied : les cuisses rentrent legerement vers l'axe,
+            // puis descendent verticalement sans ouvrir les genoux en V.
+            SetBoneRotation("upperleg01.L", legSwing, -5f);
+            SetBoneRotation("upperleg01.R", -legSwing, 5f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
             SetBoneRotation("upperarm01.L", -armSwing, -30f);
