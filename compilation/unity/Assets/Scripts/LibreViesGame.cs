@@ -2094,6 +2094,24 @@ public sealed class LibreViesGame : MonoBehaviour
             float bordRoute = Mathf.InverseLerp(3.55f, 2.75f, dr);
             sol += Mathf.Lerp(0.025f, 0.15f, bordRoute);
         }
+        // Le sol en bois interieur est plus haut que le gazon. Le joueur
+        // doit monter dessus en franchissant la porte, sinon ses chevilles
+        // restent au niveau du terrain et disparaissent sous la dalle.
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment batiment = batiments[i];
+            if (batiment == null || batiment.Root == null) continue;
+            float dx = x - batiment.Root.position.x;
+            float dz = z - batiment.Root.position.z;
+            float margeX = 0.25f * Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.x), 0.001f);
+            float margeZ = 0.25f * Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.z), 0.001f);
+            bool dansSolInterieur = Mathf.Abs(dx) < batiment.Largeur * 0.5f - margeX
+                && Mathf.Abs(dz) < batiment.Profondeur * 0.5f - margeZ;
+            if (!dansSolInterieur) continue;
+            float hauteurSolInterieur = batiment.SolY
+                + 0.35f * Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.y), 0.001f);
+            if (hauteurSolInterieur > sol) sol = hauteurSolInterieur;
+        }
         for (int i = 0; i < obstacles.Count; i++)
         {
             Obstacle c = obstacles[i];
