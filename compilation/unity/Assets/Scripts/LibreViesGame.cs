@@ -7042,7 +7042,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (heroineModel != null) heroineModel.gameObject.SetActive(false);
                 adminHumainJoueurActif = true;
                 adminHumainValide = true;
-                ShowInfo("Profil humain applique au personnage joueur");
                 return;
             }
             ShowInfo("Application impossible : maillage humain indisponible");

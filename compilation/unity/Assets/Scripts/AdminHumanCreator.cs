@@ -461,8 +461,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // aucune rotation laterale ne doit les faire se croiser.
             SetBoneRotation("pelvis.L", 0f, 0f);
             SetBoneRotation("pelvis.R", 0f, 0f);
-            SetBoneRotation("upperleg01.L", legSwing, 0f);
-            SetBoneRotation("upperleg01.R", -legSwing, 0f);
+            // Un tres leger angle rapproche les cuisses sans recreer le
+            // depart lateral ni desaligner les genoux.
+            SetBoneRotation("upperleg01.L", legSwing, 5f);
+            SetBoneRotation("upperleg01.R", -legSwing, -5f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
             SetBoneRotation("upperarm01.L", -armSwing, -30f);
@@ -491,9 +493,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (triangles == null || triangles.Length == 0 || vertices == null) return;
 
             // On ne reconstruit pas le fedora : sa boite monde sert seulement
-            // de limite pour couper les faces de cheveux qui passent au-dessus
-            // ou a l'interieur de la calotte. Les cheveux situes hors du bord
-            // restent visibles.
+            // de limite pour couper les faces de cheveux qui passent dans la
+            // calotte. Les meches sous le bord et sur le front restent visibles
+            // chez l'homme comme chez la femme.
             Bounds hatBounds = hatRenderer.bounds;
             float cutoff = hatBounds.max.y - hatBounds.size.y * 0.40f;
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
@@ -532,10 +534,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le bord du fedora est plus large que sa calotte : on garde
             // une petite marge autour de sa texture pour supprimer aussi les
             // meches qui debordent sur les cotes.
-            bool underHat = dx * dx + dz * dz < 1.12f
-                && point.y >= hatBounds.min.y - 0.025f
+            bool underHat = dx * dx + dz * dz < 0.72f
+                && point.y >= hatBounds.min.y - 0.01f
                 && point.y <= hatBounds.max.y + 0.01f;
-            return point.y > cutoff || underHat;
+            // Ne retire pas globalement les cheveux situes au-dessus de la
+            // hauteur du fedora : cette ancienne regle supprimait aussi la
+            // frange feminine devant le front. On coupe seulement la partie
+            // haute qui est réellement dans la calotte.
+            return underHat && point.y > cutoff;
         }
 
         private static int OptionalIndex(int index, int length)
@@ -572,7 +578,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // calotte ne masque qu'une bande centrale du scalp.
                 // La limite avant reste avant le visage et vaut pour les deux
                 // morphologies MakeHuman.
-                bool headRegion = Mathf.Abs(vertex.x) < 2.1f
+                bool headRegion = Mathf.Abs(vertex.x) < 0.55f
                     && vertex.z > 0.20f && vertex.z < 0.75f;
                 if (headRegion && vertex.y > hideAbove)
                     deleteBody[i] = true;
