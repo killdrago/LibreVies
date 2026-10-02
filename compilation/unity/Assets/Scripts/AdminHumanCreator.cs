@@ -578,7 +578,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // calotte ne masque qu'une bande centrale du scalp.
                 // La limite avant reste avant le visage et vaut pour les deux
                 // morphologies MakeHuman.
-                bool headRegion = Mathf.Abs(vertex.x) < 0.55f
+                bool headRegion = Mathf.Abs(vertex.x) < 0.40f
                     && vertex.z > 0.20f && vertex.z < 0.75f;
                 if (headRegion && vertex.y > hideAbove)
                     deleteBody[i] = true;
