@@ -449,28 +449,23 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!IsBuilt || bones == null || boneIndexes == null) return;
             float cycle = moving ? Mathf.Sin(clock) : 0f;
-            float legSwing = (running ? 34f : 24f) * cycle;
-            float armSwing = (running ? 28f : 19f) * cycle;
-            float kneeAmplitude = running ? 34f : 22f;
+            float legSwing = (running ? 38f : 30f) * cycle;
+            float armSwing = (running ? 32f : 24f) * cycle;
+            float kneeAmplitude = running ? 48f : 36f;
             float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
-            float elbowBend = running ? 24f : 15f;
-            // Les hanches et les epaules partent naturellement un peu vers
-            // l'exterieur dans la pose MakeHuman. Une rotation fixe en Z les
-            // remet proches du corps ; l'animation elle-meme reste uniquement
-            // sur X pour faire avancer et reculer les membres.
-            SetBoneRotation("pelvis.L", 0f, -5f);
-            SetBoneRotation("pelvis.R", 0f, 5f);
-            SetBoneRotation("upperleg01.L", legSwing, 0f);
-            SetBoneRotation("upperleg01.R", -legSwing, 0f);
+            // Z rapproche les bras et les jambes du tronc ; X conserve le
+            // balancement avant-arriere de la marche et de la course.
+            SetBoneRotation("pelvis.L", 0f, -32f);
+            SetBoneRotation("pelvis.R", 0f, 32f);
+            SetBoneRotation("upperleg01.L", legSwing, 28f);
+            SetBoneRotation("upperleg01.R", -legSwing, -28f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
-            SetBoneRotation("upperarm01.L", -armSwing, -22f);
-            SetBoneRotation("upperarm01.R", armSwing, 22f);
-            SetBoneRotation("lowerarm01.L",
-                elbowBend + (moving ? Mathf.Max(0f, cycle) * (running ? 10f : 6f) : 0f), 0f);
-            SetBoneRotation("lowerarm01.R",
-                elbowBend + (moving ? Mathf.Max(0f, -cycle) * (running ? 10f : 6f) : 0f), 0f);
+            SetBoneRotation("upperarm01.L", -armSwing, -30f);
+            SetBoneRotation("upperarm01.R", armSwing, 30f);
+            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
         }
 
         private void SetBoneRotation(string name, float x, float z)
@@ -572,8 +567,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // Le visage masculin est a l'avant du mesh (+Z). On ne
                 // masque que le scalp et l'arriere du crane pour que le
                 // fedora ne fasse jamais disparaitre le visage.
+                // L'arriere du crane reste visible sous la calotte : le
+                // masque ne concerne que la bande centrale du sommet.
                 bool headRegion = Mathf.Abs(vertex.x) < 2.1f
-                    && vertex.z > -1.5f && vertex.z < 0.75f;
+                    && vertex.z > -0.25f && vertex.z < 0.75f;
                 if (headRegion && vertex.y > hideAbove)
                     deleteBody[i] = true;
             }
