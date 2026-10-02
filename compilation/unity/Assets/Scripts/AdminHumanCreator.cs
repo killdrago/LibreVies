@@ -348,11 +348,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     MakeHumanClothingFactory.LoadDeleteMask(shoeOptions[shoeIndex],
                         deformed.Length));
             if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
-            {
-                float hatOffset = FedoraPlacementOffset
-                    + (values.female ? -0.035f : 0f);
-                MaskHeadUnderFedora(deleteBody, deformed, hatOffset);
-            }
+                MaskHeadUnderFedora(deleteBody, deformed, FedoraPlacementOffset);
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
                 deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
@@ -384,13 +380,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
                     fedoraObject = hat.gameObject;
-                    // La tete feminine est un peu plus basse dans le proxy
-                    // MakeHuman. On descend uniquement son fedora pour que
-                    // son bord rejoigne les cheveux comme chez l'homme.
-                    float hatOffset = FedoraPlacementOffset
-                        + (values.female ? -0.035f : 0f);
+                    // Le fedora et les cheveux gardent exactement le meme
+                    // placement pour les deux sexes ; seule la tete MakeHuman
+                    // reste differente.
                     hat.gameObject.transform.localPosition +=
-                        Vector3.up * hatOffset;
+                        Vector3.up * FedoraPlacementOffset;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
@@ -573,13 +567,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
             for (int i = 0; i < deformed.Length && i < deleteBody.Length; i++)
             {
                 Vector3 vertex = deformed[i];
-                // Le visage masculin est a l'avant du mesh (+Z). On ne
-                // masque que le scalp et l'arriere du crane pour que le
-                // fedora ne fasse jamais disparaitre le visage.
-                // L'arriere du crane reste visible sous la calotte : le
-                // masque ne concerne que la bande centrale du sommet.
+                // Le visage est a l'avant du mesh (+Z). L'arriere du crane
+                // est negatif en Z et ne doit jamais etre supprime : la
+                // calotte ne masque qu'une bande centrale du scalp.
+                // La limite avant reste avant le visage et vaut pour les deux
+                // morphologies MakeHuman.
                 bool headRegion = Mathf.Abs(vertex.x) < 2.1f
-                    && vertex.z > -0.25f && vertex.z < 0.75f;
+                    && vertex.z > 0.20f && vertex.z < 0.75f;
                 if (headRegion && vertex.y > hideAbove)
                     deleteBody[i] = true;
             }
