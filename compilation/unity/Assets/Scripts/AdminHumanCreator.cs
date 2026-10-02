@@ -28,9 +28,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int clothingStyle;
     public int hatStyle = -1;
     public int shoeStyle = -1;
-    // Hauteur manuelle du fedora dans la preview et sur le personnage applique.
-    // Le joueur peut la regler par SHIFT + glisser verticalement.
-    public float hatVerticalOffset = -0.177f;
+    // Placement fixe du proxy MakeHuman, sans editeur de position.
+    private const float FedoraPlacementOffset = -0.177f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -77,29 +76,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         // La molette reste active apres le passage en cadrage tete.
         previewDistance = Mathf.Clamp(previewDistance + amount, 1.00f, 9.00f);
         PositionPreviewCamera();
-    }
-
-    public void MoveHatVertically(float worldDelta)
-    {
-        SetHatVerticalOffset(hatVerticalOffset + worldDelta);
-    }
-
-    public void SetHatVerticalOffset(float value)
-    {
-        if (hatStyle < 0) return;
-        float nouveau = Mathf.Clamp(value, -0.30f, 0.20f);
-        if (Mathf.Abs(nouveau - hatVerticalOffset) < 0.0001f) return;
-        float delta = nouveau - hatVerticalOffset;
-        hatVerticalOffset = nouveau;
-        Debug.Log("ADMIN_FEDORA_HEIGHT="
-            + hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture));
-        if (preview == null || !preview.MoveFedora(delta))
-            BuildPreview();
-    }
-
-    public string HatHeightLogValue
-    {
-        get { return hatVerticalOffset.ToString("0.000", CultureInfo.InvariantCulture); }
     }
 
     public void ZoomHeadPreview()
@@ -219,7 +195,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
-        hatVerticalOffset = -0.177f;
         BuildPreview();
     }
 
@@ -233,7 +208,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         private ObjData obj;
         private GameObject root;
         private GameObject fedoraObject;
-        private Mesh fedoraMesh;
         private Transform[] bones;
         private Dictionary<string, int> boneIndexes;
         private Material skin;
@@ -282,25 +256,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 targetTexts[name] = Resources.Load<TextAsset>(Root + "MakeHumanTargets/" + name);
         }
 
-        public bool MoveFedora(float deltaY)
-        {
-            if (fedoraMesh == null)
-            {
-                if (fedoraObject == null) return false;
-                fedoraObject.transform.localPosition += Vector3.up * deltaY;
-                return true;
-            }
-            // Le déplacement se fait directement dans le mesh généré. Ainsi
-            // le changement reste visible même avec le bindpose du renderer
-            // skinné, qui pouvait neutraliser un simple localPosition.
-            Vector3[] vertices = fedoraMesh.vertices;
-            for (int i = 0; i < vertices.Length; i++)
-                vertices[i] += Vector3.up * deltaY;
-            fedoraMesh.vertices = vertices;
-            fedoraMesh.RecalculateBounds();
-            return true;
-        }
-
         public void SetPresentationLayer(int layer)
         {
             if (root == null) return;
@@ -324,7 +279,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
             fedoraObject = null;
-            fedoraMesh = null;
             root = new GameObject("ADMIN - apercu humain");
             root.transform.SetParent(parent, false);
 
@@ -394,7 +348,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     MakeHumanClothingFactory.LoadDeleteMask(shoeOptions[shoeIndex],
                         deformed.Length));
             if (hatIndex >= 0 && hatOptions[hatIndex].id == "fedora01")
-                MaskHeadUnderFedora(deleteBody, deformed, values.hatVerticalOffset);
+                MaskHeadUnderFedora(deleteBody, deformed, FedoraPlacementOffset);
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
                 deleteBody[a] && deleteBody[b] && deleteBody[c]);
             GameObject meshObject = new GameObject("Humain - apercu ADMIN");
@@ -426,18 +380,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
                     fedoraObject = hat.gameObject;
-                    SkinnedMeshRenderer fedoraRenderer =
-                        fedoraObject.GetComponent<SkinnedMeshRenderer>();
-                    fedoraMesh = fedoraRenderer == null ? null : fedoraRenderer.sharedMesh;
-                    // Le proxy MakeHuman reste intact : on ajuste seulement
-                    // son placement pour que le bord recouvre les cheveux au
-                    // lieu de les couper ou de les laisser passer a travers.
-                    // Le bord doit arriver juste au-dessus des cheveux de
-                    // devant, sans descendre sur les yeux ou le front.
-                    // La bordure doit arriver juste au-dessus des sourcils.
-                    // On descend le proxy sans modifier son mesh MakeHuman.
+                    // Le proxy, le mesh, la texture et l'armature MakeHuman
+                    // restent intacts. Le placement est fixe, sans editeur.
                     hat.gameObject.transform.localPosition +=
-                        Vector3.up * values.hatVerticalOffset;
+                        Vector3.up * FedoraPlacementOffset;
                     hat.gameObject.transform.localScale = new Vector3(1.04f, 1f, 1.04f);
                 }
             }
@@ -509,8 +455,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // l'exterieur dans la pose MakeHuman. Une rotation fixe en Z les
             // remet proches du corps ; l'animation elle-meme reste uniquement
             // sur X pour faire avancer et reculer les membres.
-            SetBoneRotation("pelvis.L", 0f, -28f);
-            SetBoneRotation("pelvis.R", 0f, 28f);
+            SetBoneRotation("pelvis.L", 0f, -12f);
+            SetBoneRotation("pelvis.R", 0f, 12f);
             SetBoneRotation("upperleg01.L", legSwing, 0f);
             SetBoneRotation("upperleg01.R", -legSwing, 0f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);

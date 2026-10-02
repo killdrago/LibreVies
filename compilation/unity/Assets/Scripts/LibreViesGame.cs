@@ -117,8 +117,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool adminHumainValide;
     private bool adminHumainJoueurActif;
     private bool adminPreviewSourisActive;
-    private bool adminHatSourisActive;
-    private bool adminHatMoveMode;
     private Vector2 adminPreviewDerniereSouris;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
@@ -7078,16 +7076,12 @@ public sealed class LibreViesGame : MonoBehaviour
         if (adminHumanCreator == null) return;
         Event evenement = Event.current;
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
-        Rect hatModeButton = new Rect(previewRect.x + 10f, previewRect.y + 32f, 140f, 24f);
         bool dansPreview = previewRect.Contains(evenement.mousePosition);
         bool dansCommandes = commandes.Contains(evenement.mousePosition);
-        bool dansHatModeButton = hatModeButton.Contains(evenement.mousePosition);
         if (evenement.type == EventType.MouseDown && evenement.button == 0
-            && dansPreview && !dansCommandes && !dansHatModeButton)
+            && dansPreview && !dansCommandes)
         {
             adminPreviewSourisActive = true;
-            adminHatSourisActive = (adminHatMoveMode || evenement.shift)
-                && adminHumanCreator.hatStyle >= 0;
             adminPreviewDerniereSouris = evenement.mousePosition;
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
             evenement.Use();
@@ -7097,22 +7091,18 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Vector2 delta = evenement.mousePosition - adminPreviewDerniereSouris;
             adminPreviewDerniereSouris = evenement.mousePosition;
-            if (adminHatSourisActive)
-                adminHumanCreator.MoveHatVertically(-delta.y * 0.0025f);
-            else
-                adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
+            adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
             evenement.Use();
         }
         else if (adminPreviewSourisActive && evenement.type == EventType.MouseUp
             && evenement.button == 0)
         {
             adminPreviewSourisActive = false;
-            adminHatSourisActive = false;
             GUIUtility.hotControl = 0;
             evenement.Use();
         }
         else if (evenement.type == EventType.ScrollWheel && dansPreview
-            && !dansCommandes && !dansHatModeButton)
+            && !dansCommandes)
         {
             adminHumanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
             evenement.Use();
@@ -7158,17 +7148,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Apercu en preparation...", smallStyle);
         GererCameraPreview(previewRect);
         GUI.Label(new Rect(previewRect.x + 10f, previewRect.y + 10f, 320f, 24f),
-            adminHatMoveMode ? "Glisser verticalement : chapeau"
-                : "Glisser : pivoter | bouton PLACER CHAPEAU", smallStyle);
-        if (adminHumanCreator.hatStyle >= 0)
-        {
-            Rect hatModeButton = new Rect(previewRect.x + 10f, previewRect.y + 32f, 140f, 24f);
-            if (GUI.Button(hatModeButton,
-                adminHatMoveMode ? "FIN CHAPEAU" : "PLACER CHAPEAU", adminActionLongButtonStyle))
-                adminHatMoveMode = !adminHatMoveMode;
-            GUI.Label(new Rect(previewRect.x + 158f, previewRect.y + 35f, 190f, 18f),
-                "FEDORA Y = " + adminHumanCreator.HatHeightLogValue, smallStyle);
-        }
+            "Glisser : pivoter | molette : zoomer", smallStyle);
         DessinerCommandesCameraPreview(previewRect);
 
         // Les actions principales restent sous l'image, a l'horizontale,
@@ -7177,14 +7157,12 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(previewRect.x + 2f, previewActionsY, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
             adminHumanCreator.Randomize();
-            adminHatMoveMode = adminHumanCreator.hatStyle >= 0;
             adminHumainValide = false;
             ShowInfo("Personnage humain aleatoire genere");
         }
         if (GUI.Button(new Rect(previewRect.x + 116f, previewActionsY, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
-            adminHatMoveMode = false;
             adminHumainValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
@@ -7419,7 +7397,6 @@ public sealed class LibreViesGame : MonoBehaviour
             adminHumanCreator.hatStyle < 0))
         {
             adminHumanCreator.hatStyle = -1;
-            adminHatMoveMode = false;
             adminHumainValide = false;
             adminHumanCreator.BuildPreview();
         }
@@ -7431,7 +7408,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 adminHumanCreator.hatStyle == i))
             {
                 adminHumanCreator.hatStyle = i;
-                adminHatMoveMode = true;
                 adminHumainValide = false;
                 adminHumanCreator.BuildPreview();
             }
