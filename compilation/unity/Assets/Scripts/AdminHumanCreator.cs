@@ -30,9 +30,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public int shoeStyle = -1;
     // Placement fixe du proxy MakeHuman, sans editeur de position.
     private const float FedoraPlacementOffset = -0.177f;
-    private const float DefaultFedoraWidthScale = 1.16f;
-    // Valeur modifiable depuis l'editeur ADMIN ; elle s'applique en X et Z.
-    public float fedoraWidthScale = DefaultFedoraWidthScale;
+    private const float FedoraWidthScale = 1.16f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -119,12 +117,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         if (appliedHuman != null) appliedHuman.Animate(moving, running, clock);
     }
 
-    public void SetFedoraWidthScale(float value)
-    {
-        fedoraWidthScale = Mathf.Clamp(value, 0.10f, 5f);
-        BuildPreview();
-    }
-
     private void EnsurePreviewCamera()
     {
         if (previewCamera != null) return;
@@ -204,7 +196,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         clothingStyle = 0;
         hatStyle = -1;
         shoeStyle = -1;
-        fedoraWidthScale = DefaultFedoraWidthScale;
         BuildPreview();
     }
 
@@ -397,9 +388,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                         Vector3.up * FedoraPlacementOffset;
                     // Le bord plus large recouvre les meches qui depassent
                     // autour de la calotte, sans changer sa hauteur fixe.
-                    float widthScale = Mathf.Clamp(values.fedoraWidthScale, 0.10f, 5f);
                     hat.gameObject.transform.localScale =
-                        new Vector3(widthScale, 1f, widthScale);
+                        new Vector3(FedoraWidthScale, 1f, FedoraWidthScale);
                 }
             }
             if (shoeIndex >= 0)
@@ -535,6 +525,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // calotte. Les meches sous le bord et sur le front restent visibles
             // chez l'homme comme chez la femme.
             Bounds hatBounds = hatRenderer.bounds;
+            // On ne retire que la partie haute de la coiffure. Le front
+            // situe sous le bord inferieur reste donc entierement visible.
             float cutoff = hatBounds.max.y - hatBounds.size.y * 0.40f;
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
@@ -548,9 +540,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Vector3 pa = hairMatrix.MultiplyPoint3x4(vertices[a]);
                 Vector3 pb = hairMatrix.MultiplyPoint3x4(vertices[b]);
                 Vector3 pc = hairMatrix.MultiplyPoint3x4(vertices[c]);
-                bool protrudes = EstSousLaCalotte(pa, hatBounds, cutoff)
-                    || EstSousLaCalotte(pb, hatBounds, cutoff)
-                    || EstSousLaCalotte(pc, hatBounds, cutoff);
+                bool protrudes = EstSousLaCalotte(pa, cutoff)
+                    || EstSousLaCalotte(pb, cutoff)
+                    || EstSousLaCalotte(pc, cutoff);
                 if (!protrudes)
                 {
                     kept.Add(a);
@@ -565,16 +557,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             }
         }
 
-        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds, float cutoff)
+        private static bool EstSousLaCalotte(Vector3 point, float cutoff)
         {
-            // Tout ce qui depasse au-dessus de la calotte est retire, y
-            // compris les meches sur les cotes et a l'arriere. La zone du
-            // front reste intacte sous le bord avant du fedora : le visage
-            // est a l'avant du mesh, en +Z, pour les deux morphologies.
-            float frontLimit = hatBounds.center.z + hatBounds.extents.z * 0.25f;
-            bool frontForehead = point.z > frontLimit
-                && point.y <= hatBounds.max.y + 0.01f;
-            return point.y > cutoff && !frontForehead;
+            // Une meche qui monte au-dessus de la calotte est toujours retiree.
+            // Les cheveux du front restent sous le bord du chapeau, donc sous
+            // cette limite, pour l'homme comme pour la femme.
+            return point.y > cutoff;
         }
 
         private static int OptionalIndex(int index, int length)

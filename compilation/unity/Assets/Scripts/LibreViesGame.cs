@@ -114,7 +114,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private Vector2 adminObjetCurseur;
     private Vector2 adminNpcScroll;
     private string adminEditionContexte = "Joueur : Joueur principal";
-    private string adminFedoraScaleTexte = "1.16";
     private bool adminHumainValide;
     private bool adminHumainJoueurActif;
     private bool adminPreviewSourisActive;
@@ -7181,8 +7180,6 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(previewRect.x + 116f, previewActionsY, 112f, 34f), "REINITIALISER", buttonStyle))
         {
             adminHumanCreator.ResetPreview();
-            adminFedoraScaleTexte = adminHumanCreator.fedoraWidthScale
-                .ToString("0.##", CultureInfo.InvariantCulture);
             adminHumainValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
@@ -7433,31 +7430,6 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        // La taille du fedora reste editable pendant l'aperçu : chaque
-        // chiffre valide reconstruit immédiatement le personnage.
-        GUI.Label(new Rect(droite, chapeauY + 58f, 230f, 22f),
-            "Largeur fedora X / Z", smallStyle);
-        string fedoraScaleSaisie = GUI.TextField(
-            new Rect(droite, chapeauY + 82f, 92f, 28f),
-            adminFedoraScaleTexte, 8, buttonStyle);
-        if (fedoraScaleSaisie != adminFedoraScaleTexte)
-        {
-            adminFedoraScaleTexte = fedoraScaleSaisie;
-            float fedoraScale;
-            string texteNormalise = fedoraScaleSaisie.Replace(',', '.');
-            if (float.TryParse(texteNormalise, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out fedoraScale))
-            {
-                fedoraScale = Mathf.Clamp(fedoraScale, 0.10f, 5f);
-                if (Mathf.Abs(fedoraScale - adminHumanCreator.fedoraWidthScale) > 0.0001f)
-                {
-                    adminHumainValide = false;
-                    adminHumanCreator.SetFedoraWidthScale(fedoraScale);
-                }
-            }
-        }
-        GUI.Label(new Rect(droite + 98f, chapeauY + 85f, 130f, 22f),
-            "ex. 1.16", smallStyle);
     }
 
     private void DessinerAdmin()
