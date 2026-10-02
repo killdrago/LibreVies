@@ -7451,9 +7451,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 fedoraScale = Mathf.Clamp(fedoraScale, 0.10f, 5f);
                 if (Mathf.Abs(fedoraScale - adminHumanCreator.fedoraWidthScale) > 0.0001f)
                 {
-                    adminHumanCreator.fedoraWidthScale = fedoraScale;
                     adminHumainValide = false;
-                    adminHumanCreator.BuildPreview();
+                    adminHumanCreator.SetFedoraWidthScale(fedoraScale);
                 }
             }
         }

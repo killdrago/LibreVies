@@ -119,6 +119,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
         if (appliedHuman != null) appliedHuman.Animate(moving, running, clock);
     }
 
+    public void SetFedoraWidthScale(float value)
+    {
+        fedoraWidthScale = Mathf.Clamp(value, 0.10f, 5f);
+        BuildPreview();
+    }
+
     private void EnsurePreviewCamera()
     {
         if (previewCamera != null) return;
@@ -450,8 +456,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Debug.LogError("MakeHuman hair indisponible: " + hairBuild.error);
             }
             // Le fichier MakeHuman est fourni en pose de travail, jambes et
-            // bras ouverts. On le remet debout avant la premiere image.
-            Animate(false, false, 0f);
+            // bras ouverts. On remet tous les renderers sur la meme pose et
+            // la meme armature avant la premiere image, quelle que soit la
+            // tenue, la paire de chaussures ou le chapeau selectionne.
+            ReappliquerPoseCommune();
         }
 
         public void Animate(bool moving, bool running, float clock)
@@ -480,6 +488,22 @@ public sealed class AdminHumanCreator : MonoBehaviour
             SetBoneRotation("upperarm01.R", armSwing, 30f);
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
             SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
+        }
+
+        private void ReappliquerPoseCommune()
+        {
+            Animate(false, false, 0f);
+            if (root == null || bones == null || bones.Length == 0 || boneIndexes == null) return;
+            Transform rootBone = boneIndexes.ContainsKey("root")
+                ? bones[boneIndexes["root"]] : bones[0];
+            SkinnedMeshRenderer[] renderers =
+                root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            foreach (SkinnedMeshRenderer renderer in renderers)
+            {
+                renderer.bones = bones;
+                renderer.rootBone = rootBone;
+                renderer.updateWhenOffscreen = true;
+            }
         }
 
         private void SetBoneRotation(string name, float x, float z)
