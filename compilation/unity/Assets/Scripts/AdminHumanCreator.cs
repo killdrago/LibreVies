@@ -505,18 +505,18 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
             float elbowBend = running ? 24f : 15f;
-            // Le mouvement avant-arriere se fait sur X uniquement. Les
-            // anciennes rotations en Z ecartaient les cuisses et les bras
-            // sur les cotes avant de les ramener, ce qui ne ressemble pas a
-            // une marche humaine.
-            SetBoneRotation("pelvis.L", 0f, 0f);
-            SetBoneRotation("pelvis.R", 0f, 0f);
+            // Les hanches et les epaules partent naturellement un peu vers
+            // l'exterieur dans la pose MakeHuman. Une rotation fixe en Z les
+            // remet proches du corps ; l'animation elle-meme reste uniquement
+            // sur X pour faire avancer et reculer les membres.
+            SetBoneRotation("pelvis.L", 0f, -28f);
+            SetBoneRotation("pelvis.R", 0f, 28f);
             SetBoneRotation("upperleg01.L", legSwing, 0f);
             SetBoneRotation("upperleg01.R", -legSwing, 0f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
-            SetBoneRotation("upperarm01.L", -armSwing, 0f);
-            SetBoneRotation("upperarm01.R", armSwing, 0f);
+            SetBoneRotation("upperarm01.L", -armSwing, -22f);
+            SetBoneRotation("upperarm01.R", armSwing, 22f);
             SetBoneRotation("lowerarm01.L",
                 elbowBend + (moving ? Mathf.Max(0f, cycle) * (running ? 10f : 6f) : 0f), 0f);
             SetBoneRotation("lowerarm01.R",
@@ -619,8 +619,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             for (int i = 0; i < deformed.Length && i < deleteBody.Length; i++)
             {
                 Vector3 vertex = deformed[i];
+                // Le visage masculin est a l'avant du mesh (+Z). On ne
+                // masque que le scalp et l'arriere du crane pour que le
+                // fedora ne fasse jamais disparaitre le visage.
                 bool headRegion = Mathf.Abs(vertex.x) < 2.1f
-                    && vertex.z > -1.5f && vertex.z < 2.0f;
+                    && vertex.z > -1.5f && vertex.z < 0.75f;
                 if (headRegion && vertex.y > hideAbove)
                     deleteBody[i] = true;
             }
