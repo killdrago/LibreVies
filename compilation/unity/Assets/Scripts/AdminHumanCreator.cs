@@ -499,23 +499,28 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!IsBuilt || bones == null || boneIndexes == null) return;
             float cycle = moving ? Mathf.Sin(clock) : 0f;
-            float legSwing = (running ? 38f : 30f) * cycle;
-            float armSwing = (running ? 32f : 24f) * cycle;
-            float kneeAmplitude = running ? 48f : 36f;
+            float legSwing = (running ? 34f : 24f) * cycle;
+            float armSwing = (running ? 28f : 19f) * cycle;
+            float kneeAmplitude = running ? 34f : 22f;
             float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
-            // Z rapproche les bras et les jambes du tronc ; X conserve le
-            // balancement avant-arriere de la marche et de la course.
-            SetBoneRotation("pelvis.L", 0f, -32f);
-            SetBoneRotation("pelvis.R", 0f, 32f);
-            SetBoneRotation("upperleg01.L", legSwing, 28f);
-            SetBoneRotation("upperleg01.R", -legSwing, -28f);
+            float elbowBend = running ? 24f : 15f;
+            // Le mouvement avant-arriere se fait sur X uniquement. Les
+            // anciennes rotations en Z ecartaient les cuisses et les bras
+            // sur les cotes avant de les ramener, ce qui ne ressemble pas a
+            // une marche humaine.
+            SetBoneRotation("pelvis.L", 0f, 0f);
+            SetBoneRotation("pelvis.R", 0f, 0f);
+            SetBoneRotation("upperleg01.L", legSwing, 0f);
+            SetBoneRotation("upperleg01.R", -legSwing, 0f);
             SetBoneRotation("lowerleg01.L", leftKnee, 0f);
             SetBoneRotation("lowerleg01.R", rightKnee, 0f);
-            SetBoneRotation("upperarm01.L", -armSwing, -30f);
-            SetBoneRotation("upperarm01.R", armSwing, 30f);
-            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
-            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("upperarm01.L", -armSwing, 0f);
+            SetBoneRotation("upperarm01.R", armSwing, 0f);
+            SetBoneRotation("lowerarm01.L",
+                elbowBend + (moving ? Mathf.Max(0f, cycle) * (running ? 10f : 6f) : 0f), 0f);
+            SetBoneRotation("lowerarm01.R",
+                elbowBend + (moving ? Mathf.Max(0f, -cycle) * (running ? 10f : 6f) : 0f), 0f);
         }
 
         private void SetBoneRotation(string name, float x, float z)
@@ -607,7 +612,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Cette limite suit la hauteur du fedora et retire seulement la
             // calotte du mesh humain, jamais un objet ou un quad independant.
             float fedoraTopRaw = 8.68f + hatOffset / 0.13f;
-            float hideAbove = fedoraTopRaw - 0.18f;
+            // On ne retire que la calotte vraiment cachee par le fedora.
+            // Garder davantage de sommet de crane evite le vide transparent
+            // visible sous le bord inferieur du chapeau.
+            float hideAbove = fedoraTopRaw - 0.05f;
             for (int i = 0; i < deformed.Length && i < deleteBody.Length; i++)
             {
                 Vector3 vertex = deformed[i];
