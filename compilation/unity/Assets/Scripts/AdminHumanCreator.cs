@@ -498,41 +498,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            if (moving)
-            {
-                // En mouvement, on garde exactement le fonctionnement de
-                // base de la pose de 7 h 13 : le balancement existant des
-                // bras et des avant-bras n'est pas modifie.
-                SetBoneRotation("shoulder01.L", 0f, 0f);
-                SetBoneRotation("shoulder01.R", 0f, 0f);
-                SetBoneRotation("upperarm01.L", -armSwing, -30f);
-                SetBoneRotation("upperarm01.R", armSwing, 30f);
-                SetBoneRotation("lowerarm01.L", Mathf.Max(0f, cycle)
-                    * (running ? 22f : 14f), 0f);
-                SetBoneRotation("lowerarm01.R", Mathf.Max(0f, -cycle)
-                    * (running ? 22f : 14f), 0f);
-            }
-            else
-            {
-                // A l'arret, toute la chaine part du pivot de l'epaule et
-                // descend verticalement : epaule, bras superieur, coude,
-                // avant-bras puis main. Les mains restent hors des hanches.
-                SetBoneRotation("shoulder01.L", 0f, -60f);
-                SetBoneRotation("shoulder01.R", 0f, 60f);
-                SetBoneRotation("upperarm01.L", 0f, 20f);
-                SetBoneRotation("upperarm01.R", 0f, -20f);
-                SetBoneRotation("lowerarm01.L", 68f, 17f);
-                SetBoneRotation("lowerarm01.R", 68f, -17f);
-            }
-            // Cette orientation locale garde les mains verticales tout en
-            // les faisant suivre naturellement le pivot de l'epaule pendant
-            // le mouvement de toute la chaine du bras.
-            const float mainVerticale = 43f;
-            SetBoneRotation("wrist.L", mainVerticale, 0f);
-            SetBoneRotation("wrist.R", mainVerticale, 0f);
-            // Les doigts restent naturellement detendus : ils sont legerement
-            // replies, comme autour d'une balle de tennis, sans objet ajoute.
-            SetHandCurl(moving ? 12f : 18f);
+            // Pose des bras exactement comme a 7 h 05 : le meme angle au
+            // repos et le meme balancement des bras et des avant-bras en
+            // marche ou en course. Aucun autre comportement n'est applique
+            // a cette chaine.
+            SetBoneRotation("upperarm01.L", -armSwing, -30f);
+            SetBoneRotation("upperarm01.R", armSwing, 30f);
+            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
+                * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
+                * (running ? 22f : 14f) : 0f, 0f);
         }
 
         private void ReappliquerPoseCommune()
@@ -560,43 +535,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, y, z);
-        }
-
-        private void SetHandCurl(float amount)
-        {
-            SetHandCurl("L", amount);
-            SetHandCurl("R", amount);
-        }
-
-        private void SetHandCurl(string side, float amount)
-        {
-            // Les phalanges se ferment progressivement, au lieu de plier toute
-            // la main en poing. Le pouce reste un peu moins ferme que les
-            // quatre doigts qui entoureraient une petite balle.
-            float thumb = amount * 0.55f;
-            float first = amount * 0.55f;
-            float second = amount * 0.78f;
-            float third = amount;
-            SetBoneRotation("metacarpal1." + side, thumb * 0.20f, 0f);
-            SetBoneRotation("finger1-1." + side, first, 0f);
-            SetBoneRotation("finger1-2." + side, second, 0f);
-            SetBoneRotation("finger1-3." + side, third, 0f);
-            SetBoneRotation("metacarpal2." + side, amount * 0.12f, 0f);
-            SetBoneRotation("finger2-1." + side, first, 0f);
-            SetBoneRotation("finger2-2." + side, second, 0f);
-            SetBoneRotation("finger2-3." + side, third, 0f);
-            SetBoneRotation("metacarpal3." + side, amount * 0.12f, 0f);
-            SetBoneRotation("finger3-1." + side, first, 0f);
-            SetBoneRotation("finger3-2." + side, second, 0f);
-            SetBoneRotation("finger3-3." + side, third, 0f);
-            SetBoneRotation("metacarpal4." + side, amount * 0.12f, 0f);
-            SetBoneRotation("finger4-1." + side, first, 0f);
-            SetBoneRotation("finger4-2." + side, second, 0f);
-            SetBoneRotation("finger4-3." + side, third, 0f);
-            SetBoneRotation("metacarpal5." + side, amount * 0.12f, 0f);
-            SetBoneRotation("finger5-1." + side, first, 0f);
-            SetBoneRotation("finger5-2." + side, second, 0f);
-            SetBoneRotation("finger5-3." + side, third, 0f);
         }
 
         private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
