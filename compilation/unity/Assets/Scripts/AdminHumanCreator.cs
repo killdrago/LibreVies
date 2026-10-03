@@ -498,16 +498,21 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            // Pose des bras exactement comme a 7 h 05 : le meme angle au
-            // repos et le meme balancement des bras et des avant-bras en
-            // marche ou en course. Aucun autre comportement n'est applique
-            // a cette chaine.
-            SetBoneRotation("upperarm01.L", -armSwing, -30f);
-            SetBoneRotation("upperarm01.R", armSwing, 30f);
+            // L'ouverture laterale reste celle de 7 h 05, mais le bras
+            // superieur part aussi a 30 degres au repos : il prolonge ainsi
+            // naturellement l'avant-bras au lieu de partir d'une rotation 0.
+            const float angleBrasSuperieur = 30f;
+            SetBoneRotation("upperarm01.L", -angleBrasSuperieur - armSwing, -30f);
+            SetBoneRotation("upperarm01.R", angleBrasSuperieur + armSwing, 30f);
+            // En mouvement, le balancement existant est conserve par-dessus
+            // cette pose de base.
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
                 * (running ? 22f : 14f) : 0f, 0f);
             SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
                 * (running ? 22f : 14f) : 0f, 0f);
+            // Les mains restent legerement fermees comme autour d'une balle
+            // de tennis, sans ajouter de balle au personnage.
+            SetHandCurl(moving ? 12f : 18f);
         }
 
         private void ReappliquerPoseCommune()
@@ -535,6 +540,42 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, y, z);
+        }
+
+        private void SetHandCurl(float amount)
+        {
+            SetHandCurl("L", amount);
+            SetHandCurl("R", amount);
+        }
+
+        private void SetHandCurl(string side, float amount)
+        {
+            // Les phalanges se ferment progressivement, sans transformer la
+            // main en poing. Le pouce reste plus ouvert que les doigts.
+            float thumb = amount * 0.55f;
+            float first = amount * 0.55f;
+            float second = amount * 0.78f;
+            float third = amount;
+            SetBoneRotation("metacarpal1." + side, thumb * 0.20f, 0f);
+            SetBoneRotation("finger1-1." + side, first, 0f);
+            SetBoneRotation("finger1-2." + side, second, 0f);
+            SetBoneRotation("finger1-3." + side, third, 0f);
+            SetBoneRotation("metacarpal2." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger2-1." + side, first, 0f);
+            SetBoneRotation("finger2-2." + side, second, 0f);
+            SetBoneRotation("finger2-3." + side, third, 0f);
+            SetBoneRotation("metacarpal3." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger3-1." + side, first, 0f);
+            SetBoneRotation("finger3-2." + side, second, 0f);
+            SetBoneRotation("finger3-3." + side, third, 0f);
+            SetBoneRotation("metacarpal4." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger4-1." + side, first, 0f);
+            SetBoneRotation("finger4-2." + side, second, 0f);
+            SetBoneRotation("finger4-3." + side, third, 0f);
+            SetBoneRotation("metacarpal5." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger5-1." + side, first, 0f);
+            SetBoneRotation("finger5-2." + side, second, 0f);
+            SetBoneRotation("finger5-3." + side, third, 0f);
         }
 
         private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
