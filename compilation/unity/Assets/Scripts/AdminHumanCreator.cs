@@ -31,7 +31,6 @@ public sealed class AdminHumanCreator : MonoBehaviour
     // Placement fixe du proxy MakeHuman, sans editeur de position.
     private const float FedoraPlacementOffset = -0.177f;
     private const float FedoraWidthScale = 1.16f;
-    private const float FedoraMaleWidthScale = 1.30f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -386,19 +385,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 else if (hatOptions[hatIndex].id == "fedora01")
                 {
                     fedoraObject = hat.gameObject;
-                    // Le fedora et les cheveux gardent exactement le meme
-                    // placement pour les deux sexes ; seule la tete MakeHuman
-                    // reste differente.
+                    // Le fedora, son placement et ses proportions sont
+                    // exactement les memes pour l'homme et la femme.
                     hat.gameObject.transform.localPosition +=
                         Vector3.up * FedoraPlacementOffset;
-                    // Le bord plus large recouvre les meches qui depassent
-                    // autour de la calotte, sans changer sa hauteur fixe.
-                    float widthScale = values.female
-                        ? FedoraWidthScale : FedoraMaleWidthScale;
-                    // Le fedora masculin est legerement plus large pour
-                    // recouvrir les meches, sans changer la hauteur fixe.
                     hat.gameObject.transform.localScale =
-                        new Vector3(widthScale, 1f, widthScale);
+                        new Vector3(FedoraWidthScale, 1f, FedoraWidthScale);
                 }
             }
             if (shoeIndex >= 0)
@@ -470,10 +462,28 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float kneeAmplitude = running ? 48f : 36f;
             float leftKnee = moving ? kneeAmplitude * Mathf.Max(0f, -cycle) : 0f;
             float rightKnee = moving ? kneeAmplitude * Mathf.Max(0f, cycle) : 0f;
-            // Le Z garde les bras proches du tronc ; X conserve le
-            // balancement avant-arriere de la marche et de la course.
+            // Le buste suit la foulee avec une tres petite torsion opposee au
+            // balancement des membres et un roulis lateral discret. La
+            // flexion en cosinus accompagne chaque pas sans faire osciller la
+            // tete au hasard ; a l'arret, le torse revient a la pose neutre.
+            float torsoTwist = moving ? (running ? 4.5f : 3.0f) * cycle : 0f;
+            float torsoRoll = moving ? (running ? 2.2f : 1.4f) * cycle : 0f;
+            float torsoPitch = moving ? (running ? 1.8f : 1.2f)
+                * Mathf.Cos(clock) : 0f;
             // Les jambes restent verticales sous les hanches, avec les genoux
             // dans l'axe des pieds.
+            SetBoneRotation("spine05", torsoPitch * 0.10f,
+                torsoTwist * 0.12f, torsoRoll * 0.12f);
+            SetBoneRotation("spine04", torsoPitch * 0.18f,
+                torsoTwist * 0.20f, torsoRoll * 0.18f);
+            SetBoneRotation("spine03", torsoPitch * 0.24f,
+                torsoTwist * 0.25f, torsoRoll * 0.24f);
+            SetBoneRotation("spine02", torsoPitch * 0.25f,
+                torsoTwist * 0.25f, torsoRoll * 0.25f);
+            SetBoneRotation("spine01", torsoPitch * 0.23f,
+                torsoTwist * 0.18f, torsoRoll * 0.21f);
+            SetBoneRotation("clavicle.L", 0f, -torsoTwist * 0.08f, 0f);
+            SetBoneRotation("clavicle.R", 0f, -torsoTwist * 0.08f, 0f);
             SetBoneRotation("pelvis.L", 0f, 0f);
             SetBoneRotation("pelvis.R", 0f, 0f);
             // La correction suit le trajet reel depuis chaque pivot de hanche
@@ -488,10 +498,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
+            // A l'arret, les bras descendent le long du corps. En marche et
+            // en course, on conserve exactement le balancement existant.
             SetBoneRotation("upperarm01.L", -armSwing, -30f);
             SetBoneRotation("upperarm01.R", armSwing, 30f);
-            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle) * (running ? 22f : 14f) : 0f, 0f);
-            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle) * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
+                * (running ? 22f : 14f) : 0f, 0f);
+            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
+                * (running ? 22f : 14f) : 0f, 0f);
+            // Les doigts restent naturellement detendus : ils sont legerement
+            // replies, comme autour d'une balle de tennis, sans objet ajoute.
+            SetHandCurl(moving ? 12f : 18f);
         }
 
         private void ReappliquerPoseCommune()
@@ -512,8 +529,50 @@ public sealed class AdminHumanCreator : MonoBehaviour
 
         private void SetBoneRotation(string name, float x, float z)
         {
+            SetBoneRotation(name, x, 0f, z);
+        }
+
+        private void SetBoneRotation(string name, float x, float y, float z)
+        {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
-            bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, 0f, z);
+            bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, y, z);
+        }
+
+        private void SetHandCurl(float amount)
+        {
+            SetHandCurl("L", amount);
+            SetHandCurl("R", amount);
+        }
+
+        private void SetHandCurl(string side, float amount)
+        {
+            // Les phalanges se ferment progressivement, au lieu de plier toute
+            // la main en poing. Le pouce reste un peu moins ferme que les
+            // quatre doigts qui entoureraient une petite balle.
+            float thumb = amount * 0.55f;
+            float first = amount * 0.55f;
+            float second = amount * 0.78f;
+            float third = amount;
+            SetBoneRotation("metacarpal1." + side, thumb * 0.20f, 0f);
+            SetBoneRotation("finger1-1." + side, first, 0f);
+            SetBoneRotation("finger1-2." + side, second, 0f);
+            SetBoneRotation("finger1-3." + side, third, 0f);
+            SetBoneRotation("metacarpal2." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger2-1." + side, first, 0f);
+            SetBoneRotation("finger2-2." + side, second, 0f);
+            SetBoneRotation("finger2-3." + side, third, 0f);
+            SetBoneRotation("metacarpal3." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger3-1." + side, first, 0f);
+            SetBoneRotation("finger3-2." + side, second, 0f);
+            SetBoneRotation("finger3-3." + side, third, 0f);
+            SetBoneRotation("metacarpal4." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger4-1." + side, first, 0f);
+            SetBoneRotation("finger4-2." + side, second, 0f);
+            SetBoneRotation("finger4-3." + side, third, 0f);
+            SetBoneRotation("metacarpal5." + side, amount * 0.12f, 0f);
+            SetBoneRotation("finger5-1." + side, first, 0f);
+            SetBoneRotation("finger5-2." + side, second, 0f);
+            SetBoneRotation("finger5-3." + side, third, 0f);
         }
 
         private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
