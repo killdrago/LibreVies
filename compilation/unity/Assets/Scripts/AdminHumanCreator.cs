@@ -563,22 +563,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
             float dz = (point.z - hatBounds.center.z)
                 / Mathf.Max(hatBounds.extents.z, 0.001f);
             float distanceCarree = dx * dx + dz * dz;
-            // Cette condition reste exactement la meme pour la femme.
-            bool underHat = distanceCarree < 1.0f
+            // La femme garde exactement le filtre precedent. Pour l'homme,
+            // on elargit seulement de 10 % l'empreinte et d'une petite bande
+            // verticale d'environ 10 px : pas de suppression massive.
+            float empreinte = coupeHommeRenforcee ? 1.10f : 1.0f;
+            float margeHaute = coupeHommeRenforcee ? 0.02f : 0.015f;
+            return distanceCarree < empreinte
                 && point.y >= hatBounds.min.y - 0.015f
-                && point.y <= hatBounds.max.y + 0.015f;
-            if (underHat) return true;
-            if (!coupeHommeRenforcee) return false;
-
-            // Homme uniquement : on elargit legerement l'empreinte du bord
-            // et on retire aussi les meches qui remontent juste au-dessus de
-            // la calotte. Le mesh et le placement de la femme ne changent pas.
-            bool bordFedoraHomme = distanceCarree < 1.32f
-                && point.y >= hatBounds.min.y - 0.08f
-                && point.y <= hatBounds.max.y + 0.08f;
-            bool dessusFedoraHomme = distanceCarree < 1.50f
-                && point.y > hatBounds.max.y - 0.015f;
-            return bordFedoraHomme || dessusFedoraHomme;
+                && point.y <= hatBounds.max.y + margeHaute;
         }
 
         private static int OptionalIndex(int index, int length)
