@@ -498,21 +498,35 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            // Retour a la pose de 7 h 13 : ouverture des bras a 30 degres,
-            // sans rotation supplementaire du pivot d'epaule ni de
-            // l'avant-bras au repos.
-            const float ouvertureBras = 30f;
-            SetBoneRotation("shoulder01.L", 0f, 0f);
-            SetBoneRotation("shoulder01.R", 0f, 0f);
-            SetBoneRotation("upperarm01.L", -armSwing, -ouvertureBras);
-            SetBoneRotation("upperarm01.R", armSwing, ouvertureBras);
-            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
-                * (running ? 22f : 14f) : 0f, 0f);
-            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
-                * (running ? 22f : 14f) : 0f, 0f);
-            // La main garde une orientation verticale fixe dans son propre
-            // pivot ; elle suit ainsi naturellement le pivot de l'epaule par
-            // toute la chaine du bras, sans rentrer dans la hanche.
+            if (moving)
+            {
+                // En mouvement, on garde exactement le fonctionnement de
+                // base de la pose de 7 h 13 : le balancement existant des
+                // bras et des avant-bras n'est pas modifie.
+                SetBoneRotation("shoulder01.L", 0f, 0f);
+                SetBoneRotation("shoulder01.R", 0f, 0f);
+                SetBoneRotation("upperarm01.L", -armSwing, -30f);
+                SetBoneRotation("upperarm01.R", armSwing, 30f);
+                SetBoneRotation("lowerarm01.L", Mathf.Max(0f, cycle)
+                    * (running ? 22f : 14f), 0f);
+                SetBoneRotation("lowerarm01.R", Mathf.Max(0f, -cycle)
+                    * (running ? 22f : 14f), 0f);
+            }
+            else
+            {
+                // A l'arret, toute la chaine part du pivot de l'epaule et
+                // descend verticalement : epaule, bras superieur, coude,
+                // avant-bras puis main. Les mains restent hors des hanches.
+                SetBoneRotation("shoulder01.L", 0f, -60f);
+                SetBoneRotation("shoulder01.R", 0f, 60f);
+                SetBoneRotation("upperarm01.L", 0f, 20f);
+                SetBoneRotation("upperarm01.R", 0f, -20f);
+                SetBoneRotation("lowerarm01.L", 68f, 17f);
+                SetBoneRotation("lowerarm01.R", 68f, -17f);
+            }
+            // Cette orientation locale garde les mains verticales tout en
+            // les faisant suivre naturellement le pivot de l'epaule pendant
+            // le mouvement de toute la chaine du bras.
             const float mainVerticale = 43f;
             SetBoneRotation("wrist.L", mainVerticale, 0f);
             SetBoneRotation("wrist.R", mainVerticale, 0f);
