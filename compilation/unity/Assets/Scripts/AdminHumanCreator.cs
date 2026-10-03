@@ -564,9 +564,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 / Mathf.Max(hatBounds.extents.z, 0.001f);
             float distanceCarree = dx * dx + dz * dz;
             // La femme garde exactement le filtre precedent. Pour l'homme,
-            // on elargit seulement de 10 % l'empreinte et d'une petite bande
-            // verticale d'environ 10 px : pas de suppression massive.
-            float empreinte = coupeHommeRenforcee ? 1.10f : 1.0f;
+            // on elargit seulement l'empreinte horizontale pour couvrir le
+            // rebord du fedora et une petite bande verticale d'environ 10 px.
+            // Le bord horizontal du fedora depasse un peu la calotte :
+            // l'homme prend une marge supplementaire, sans changer la hauteur.
+            float empreinte = coupeHommeRenforcee ? 1.22f : 1.0f;
             float margeHaute = coupeHommeRenforcee ? 0.02f : 0.015f;
             return distanceCarree < empreinte
                 && point.y >= hatBounds.min.y - 0.015f
