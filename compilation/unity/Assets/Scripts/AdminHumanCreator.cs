@@ -525,6 +525,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // La femme conserve exactement la coupe actuelle ; pour l'homme,
             // une seconde marge retire aussi les quelques meches qui depassent
             // encore autour du bord.
+            Bounds hatBounds = hatRenderer.bounds;
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
             for (int i = 0; i + 2 < triangles.Length; i += 3)
