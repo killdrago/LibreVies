@@ -524,10 +524,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // s'ecartant tres legerement du bassin. Cette petite ouverture
                 // laterale suit la ligne jaune et empeche les mains de passer
                 // derriere les fesses ou de rentrer dans les hanches.
-                Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.22f;
-                Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.22f;
-                AlignerEnfantVersLeBas("shoulder01.L", "upperarm01.L", ouvertureGauche);
-                AlignerEnfantVersLeBas("shoulder01.R", "upperarm01.R", ouvertureDroite);
+                Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.28f;
+                Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.28f;
+                // Le pivot d'epaule reste dans sa pose d'origine pour
+                // conserver le volume naturel des epaules.
+                SetBoneRotation("shoulder01.L", 0f, 0f);
+                SetBoneRotation("shoulder01.R", 0f, 0f);
                 AlignerEnfantVersLeBas("upperarm01.L", "upperarm02.L", ouvertureGauche);
                 AlignerEnfantVersLeBas("upperarm01.R", "upperarm02.R", ouvertureDroite);
                 AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L", ouvertureGauche);
