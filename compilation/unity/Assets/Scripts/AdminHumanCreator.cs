@@ -498,21 +498,24 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            // On revient a l'ouverture precedente de 45 degres pour les
-            // bras superieurs. Le pivot d'epaule reste neutre : aucun coude
-            // ne doit etre ramene vers le corps ou vers le bassin.
-            const float ouvertureBras = 45f;
+            // Retour a la pose de 7 h 13 : ouverture des bras a 30 degres,
+            // sans rotation supplementaire du pivot d'epaule ni de
+            // l'avant-bras au repos.
+            const float ouvertureBras = 30f;
             SetBoneRotation("shoulder01.L", 0f, 0f);
             SetBoneRotation("shoulder01.R", 0f, 0f);
             SetBoneRotation("upperarm01.L", -armSwing, -ouvertureBras);
             SetBoneRotation("upperarm01.R", armSwing, ouvertureBras);
-            // Au repos, l'avant-bras n'est pas replie : sa rotation reste
-            // neutre et il tombe avec le bras. Pendant la marche et la course,
-            // on conserve seulement le balancement deja present.
             SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
                 * (running ? 22f : 14f) : 0f, 0f);
             SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
                 * (running ? 22f : 14f) : 0f, 0f);
+            // La main garde une orientation verticale fixe dans son propre
+            // pivot ; elle suit ainsi naturellement le pivot de l'epaule par
+            // toute la chaine du bras, sans rentrer dans la hanche.
+            const float mainVerticale = 43f;
+            SetBoneRotation("wrist.L", mainVerticale, 0f);
+            SetBoneRotation("wrist.R", mainVerticale, 0f);
             // Les doigts restent naturellement detendus : ils sont legerement
             // replies, comme autour d'une balle de tennis, sans objet ajoute.
             SetHandCurl(moving ? 12f : 18f);
