@@ -7019,6 +7019,9 @@ public sealed class LibreViesGame : MonoBehaviour
             "OUVRIR L'EDITION HUMAINE", buttonStyle))
         {
             adminEditionContexte = "Joueur : " + joueurs[adminJoueurSelection];
+            // Chaque ouverture de l'editeur revient au cadrage corps entier,
+            // meme si le dernier apercu etait reste en zoom tete.
+            adminHumanCreator.ResetPreviewCamera();
             adminTab = 5;
             ShowInfo("Edition du personnage joueur");
         }

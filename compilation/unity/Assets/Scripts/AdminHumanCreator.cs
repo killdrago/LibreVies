@@ -31,6 +31,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     // Placement fixe du proxy MakeHuman, sans editeur de position.
     private const float FedoraPlacementOffset = -0.177f;
     private const float FedoraWidthScale = 1.16f;
+    private const float FedoraMaleWidthScale = 1.30f;
 
     private HumanPreview preview;
     private Camera previewCamera;
@@ -392,8 +393,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
                         Vector3.up * FedoraPlacementOffset;
                     // Le bord plus large recouvre les meches qui depassent
                     // autour de la calotte, sans changer sa hauteur fixe.
+                    float widthScale = values.female
+                        ? FedoraWidthScale : FedoraMaleWidthScale;
+                    // Le fedora masculin est legerement plus large pour
+                    // recouvrir les meches, sans changer la hauteur fixe.
                     hat.gameObject.transform.localScale =
-                        new Vector3(FedoraWidthScale, 1f, FedoraWidthScale);
+                        new Vector3(widthScale, 1f, widthScale);
                 }
             }
             if (shoeIndex >= 0)
@@ -439,8 +444,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
                     // le traitement actuel de la femme reste inchangé.
                     hairBuild.gameObject.transform.localPosition +=
                         Vector3.down * 0.045f;
-                    SupprimerCheveuxSousLeChapeau(hairBuild.gameObject, fedoraObject,
-                        !values.female);
+                    SupprimerCheveuxSousLeChapeau(hairBuild.gameObject, fedoraObject);
                 }
             }
             else
@@ -513,7 +517,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
 
         private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
-            GameObject hatObject, bool coupeHommeRenforcee)
+            GameObject hatObject)
         {
             if (hairObject == null || hatObject == null) return;
             SkinnedMeshRenderer hairRenderer = hairObject.GetComponent<SkinnedMeshRenderer>();
@@ -526,9 +530,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (triangles == null || triangles.Length == 0 || vertices == null) return;
 
             // La boite monde du fedora sert uniquement de limite spatiale.
-            // La femme conserve exactement la coupe actuelle ; pour l'homme,
-            // une seconde marge retire aussi les quelques meches qui depassent
-            // encore autour du bord.
+            // Le meme filtre est utilise pour l'homme et la femme.
             Bounds hatBounds = hatRenderer.bounds;
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
@@ -542,9 +544,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Vector3 pa = hairMatrix.MultiplyPoint3x4(vertices[a]);
                 Vector3 pb = hairMatrix.MultiplyPoint3x4(vertices[b]);
                 Vector3 pc = hairMatrix.MultiplyPoint3x4(vertices[c]);
-                bool protrudes = EstSousLaCalotte(pa, hatBounds, coupeHommeRenforcee)
-                    || EstSousLaCalotte(pb, hatBounds, coupeHommeRenforcee)
-                    || EstSousLaCalotte(pc, hatBounds, coupeHommeRenforcee);
+                bool protrudes = EstSousLaCalotte(pa, hatBounds)
+                    || EstSousLaCalotte(pb, hatBounds)
+                    || EstSousLaCalotte(pc, hatBounds);
                 if (!protrudes)
                 {
                     kept.Add(a);
@@ -559,26 +561,18 @@ public sealed class AdminHumanCreator : MonoBehaviour
             }
         }
 
-        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds,
-            bool coupeHommeRenforcee)
+        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds)
         {
             float dx = (point.x - hatBounds.center.x)
                 / Mathf.Max(hatBounds.extents.x, 0.001f);
             float dz = (point.z - hatBounds.center.z)
                 / Mathf.Max(hatBounds.extents.z, 0.001f);
             float distanceCarree = dx * dx + dz * dz;
-            // La femme garde exactement le filtre precedent. Pour l'homme,
-            // on elargit seulement l'empreinte horizontale pour couvrir le
-            // rebord du fedora et une petite bande verticale d'environ 10 px.
-            // Le bord horizontal du fedora depasse de la calotte :
-            // l'homme prend une marge supplementaire, sans changer la hauteur.
-            float empreinte = coupeHommeRenforcee ? 1.40f : 1.0f;
-            // Reglage d'essai demande pour l'homme uniquement. La femme
-            // conserve exactement son filtre precedent.
-            float margeHaute = coupeHommeRenforcee ? 0.5f : 0.015f;
-            return distanceCarree < empreinte
+            // Reglage identique pour les deux morphologies : seule la taille
+            // du fedora masculin change pour mieux couvrir ses cheveux.
+            return distanceCarree < 1.0f
                 && point.y >= hatBounds.min.y - 0.015f
-                && point.y <= hatBounds.max.y + margeHaute;
+                && point.y <= hatBounds.max.y + 0.015f;
         }
 
         private static int OptionalIndex(int index, int length)
