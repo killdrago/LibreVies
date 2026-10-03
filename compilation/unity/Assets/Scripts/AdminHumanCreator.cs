@@ -140,10 +140,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private void PositionPreviewCamera()
     {
         if (previewCamera == null) return;
-        // Le centre du zoom tete doit rester sur le visage : 1.82 m
-        // tombait trop bas vers les pectoraux lorsque la molette bougeait.
+        // L'homme est centre sur ses cheveux, tandis que le nez de la
+        // morphologie feminine est un peu plus bas. La molette conserve ce
+        // point de visee pendant tout le zoom.
+        float hauteurCibleTete = female ? 1.98f : 2.15f;
         Vector3 cible = transform.position + Vector3.up
-            * (previewHeadZoom ? 2.15f : 1.08f);
+            * (previewHeadZoom ? hauteurCibleTete : 1.08f);
         // Le recul laisse toujours entrer les pieds et le sommet de la tete
         // dans le cadre, meme lorsque les proportions sont modifiees. En mode
         // tete, la cible monte sur le visage et la molette garde son effet.
@@ -571,7 +573,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // Le bord horizontal du fedora depasse de la calotte :
             // l'homme prend une marge supplementaire, sans changer la hauteur.
             float empreinte = coupeHommeRenforcee ? 1.45f : 1.0f;
-            float margeHaute = coupeHommeRenforcee ? 0.02f : 0.015f;
+            // La marge verticale est la correction utile pour l'homme :
+            // certaines meches sont au-dessus du volume du fedora, pas dehors
+            // sur les cotes. La femme conserve exactement 0.015f.
+            float margeHaute = coupeHommeRenforcee ? 0.08f : 0.015f;
             return distanceCarree < empreinte
                 && point.y >= hatBounds.min.y - 0.015f
                 && point.y <= hatBounds.max.y + margeHaute;
