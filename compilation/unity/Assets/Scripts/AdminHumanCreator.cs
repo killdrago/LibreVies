@@ -506,10 +506,27 @@ public sealed class AdminHumanCreator : MonoBehaviour
             SetBoneRotation("upperarm01.R", angleBrasSuperieur + armSwing, 30f);
             // En mouvement, le balancement existant est conserve par-dessus
             // cette pose de base.
-            SetBoneRotation("lowerarm01.L", moving ? Mathf.Max(0f, cycle)
-                * (running ? 22f : 14f) : 0f, 0f);
-            SetBoneRotation("lowerarm01.R", moving ? Mathf.Max(0f, -cycle)
-                * (running ? 22f : 14f) : 0f, 0f);
+            if (moving)
+            {
+                SetBoneRotation("lowerarm01.L", Mathf.Max(0f, cycle)
+                    * (running ? 22f : 14f), 0f);
+                SetBoneRotation("lowerarm01.R", Mathf.Max(0f, -cycle)
+                    * (running ? 22f : 14f), 0f);
+                // La marche reprend aussi l'orientation de base du poignet.
+                SetBoneRotation("wrist.L", 0f, 0f);
+                SetBoneRotation("wrist.R", 0f, 0f);
+            }
+            else
+            {
+                // On garde le haut du bras tel quel et on aligne uniquement
+                // l'avant-bras puis la main sur la verticale du monde. La
+                // direction est calculee depuis les vrais pivots : elle reste
+                // donc symetrique et ne rentre pas dans les hanches.
+                AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L");
+                AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R");
+                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L");
+                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R");
+            }
             // Les mains restent legerement fermees comme autour d'une balle
             // de tennis, sans ajouter de balle au personnage.
             SetHandCurl(moving ? 12f : 18f);
@@ -540,6 +557,19 @@ public sealed class AdminHumanCreator : MonoBehaviour
         {
             if (!boneIndexes.ContainsKey(name) || bones[boneIndexes[name]] == null) return;
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, y, z);
+        }
+
+        private void AlignerEnfantVersLeBas(string boneName, string childName)
+        {
+            if (!boneIndexes.ContainsKey(boneName) || !boneIndexes.ContainsKey(childName)) return;
+            Transform bone = bones[boneIndexes[boneName]];
+            Transform child = bones[boneIndexes[childName]];
+            if (bone == null || child == null || bone.parent == null) return;
+            Vector3 childDirection = child.localPosition;
+            if (childDirection.sqrMagnitude < 0.000001f) return;
+            Vector3 downInParent = bone.parent.InverseTransformDirection(Vector3.down);
+            bone.localRotation = Quaternion.FromToRotation(
+                childDirection.normalized, downInParent.normalized);
         }
 
         private void SetHandCurl(float amount)
