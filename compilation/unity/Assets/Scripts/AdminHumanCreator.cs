@@ -498,22 +498,29 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            // A l'arret, les bras descendent vraiment le long du corps :
-            // une rotation plus forte de l'avant-bras evite le coude projete
-            // vers l'avant et place les mains a hauteur des hanches.
-            const float brasLeLongDuCorps = 45f;
-            const float avantBrasVertical = 55f;
-            SetBoneRotation("upperarm01.L", -armSwing, -brasLeLongDuCorps);
-            SetBoneRotation("upperarm01.R", armSwing, brasLeLongDuCorps);
+            // Pose immobile : chaque morceau de bras est aligne depuis son
+            // propre pivot. L'os d'epaule descend vers le haut du bras, puis
+            // l'os du bras superieur rejoint le coude sans partir en biais.
+            // Les deux avant-bras sont ensuite redresses vers le bas. La main
+            // reste ainsi dans l'axe de l'epaule, a l'exterieur des hanches,
+            // plutot que de rentrer dans le bassin.
+            const float epauleVerticale = 60f;
+            const float brasSuperieurAligne = 20f;
+            const float avantBrasVertical = 68f;
+            const float avantBrasEcarte = 17f;
+            SetBoneRotation("shoulder01.L", 0f, -epauleVerticale);
+            SetBoneRotation("shoulder01.R", 0f, epauleVerticale);
+            SetBoneRotation("upperarm01.L", -armSwing, brasSuperieurAligne);
+            SetBoneRotation("upperarm01.R", armSwing, -brasSuperieurAligne);
             // La base verticale reste presente pendant la marche et la course;
-            // le balancement actuel est ajoute par-dessus, sans rabattre les
-            // mains vers l'avant a chaque changement de pose.
+            // le balancement actuel est ajoute par-dessus sans avancer les
+            // mains ni changer leur distance avec les hanches.
             SetBoneRotation("lowerarm01.L", avantBrasVertical
                 + (moving ? Mathf.Max(0f, cycle)
-                * (running ? 22f : 14f) : 0f), 0f);
+                * (running ? 22f : 14f) : 0f), avantBrasEcarte);
             SetBoneRotation("lowerarm01.R", avantBrasVertical
                 + (moving ? Mathf.Max(0f, -cycle)
-                * (running ? 22f : 14f) : 0f), 0f);
+                * (running ? 22f : 14f) : 0f), -avantBrasEcarte);
             // Les doigts restent naturellement detendus : ils sont legerement
             // replies, comme autour d'une balle de tennis, sans objet ajoute.
             SetHandCurl(moving ? 12f : 18f);
