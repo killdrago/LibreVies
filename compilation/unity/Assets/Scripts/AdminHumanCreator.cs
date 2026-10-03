@@ -524,22 +524,28 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // s'ecartant tres legerement du bassin. Cette petite ouverture
                 // laterale suit la ligne jaune et empeche les mains de passer
                 // derriere les fesses ou de rentrer dans les hanches.
-                Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.28f;
-                Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.28f;
+                Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.25f;
+                Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.25f;
+                // Le haut du bras garde son ecartement lateral. A partir du
+                // coude, on ajoute une petite composante vers l'avant du
+                // personnage pour sortir les mains de l'arriere du bassin.
+                Vector3 versAvant = root.transform.forward * 0.22f;
+                Vector3 mainGauche = ouvertureGauche + versAvant;
+                Vector3 mainDroite = ouvertureDroite + versAvant;
                 // Le pivot d'epaule reste dans sa pose d'origine pour
                 // conserver le volume naturel des epaules.
                 SetBoneRotation("shoulder01.L", 0f, 0f);
                 SetBoneRotation("shoulder01.R", 0f, 0f);
                 AlignerEnfantVersLeBas("upperarm01.L", "upperarm02.L", ouvertureGauche);
                 AlignerEnfantVersLeBas("upperarm01.R", "upperarm02.R", ouvertureDroite);
-                AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L", ouvertureGauche);
-                AlignerEnfantVersLeBas("upperarm02.R", "lowerarm01.R", ouvertureDroite);
-                AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L", ouvertureGauche);
-                AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R", ouvertureDroite);
-                AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L", ouvertureGauche);
-                AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R", ouvertureDroite);
-                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L", ouvertureGauche);
-                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L", mainGauche);
+                AlignerEnfantVersLeBas("upperarm02.R", "lowerarm01.R", mainDroite);
+                AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L", mainGauche);
+                AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R", mainDroite);
+                AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L", mainGauche);
+                AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R", mainDroite);
+                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L", mainGauche);
+                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R", mainDroite);
             }
             // Les mains restent legerement fermees comme autour d'une balle
             // de tennis, sans ajouter de balle au personnage.
