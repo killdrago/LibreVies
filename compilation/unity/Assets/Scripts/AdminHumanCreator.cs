@@ -498,32 +498,41 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // droites au sol.
             SetBoneRotation("foot.L", 0f, 5f);
             SetBoneRotation("foot.R", 0f, -5f);
-            // L'ouverture laterale reste celle de 7 h 05, mais le bras
-            // superieur part aussi a 30 degres au repos : il prolonge ainsi
-            // naturellement l'avant-bras au lieu de partir d'une rotation 0.
-            const float angleBrasSuperieur = 30f;
-            SetBoneRotation("upperarm01.L", -angleBrasSuperieur - armSwing, -30f);
-            SetBoneRotation("upperarm01.R", angleBrasSuperieur + armSwing, 30f);
-            // En mouvement, le balancement existant est conserve par-dessus
-            // cette pose de base.
             if (moving)
             {
+                // En marche et en course, on reprend exactement la chaine
+                // d'origine : le balancement des bras reste celui d'avant les
+                // changements de pose, avec ses pivots intermediaires neutres.
+                SetBoneRotation("shoulder01.L", 0f, 0f);
+                SetBoneRotation("shoulder01.R", 0f, 0f);
+                SetBoneRotation("upperarm01.L", -armSwing, -30f);
+                SetBoneRotation("upperarm01.R", armSwing, 30f);
+                SetBoneRotation("upperarm02.L", 0f, 0f);
+                SetBoneRotation("upperarm02.R", 0f, 0f);
                 SetBoneRotation("lowerarm01.L", Mathf.Max(0f, cycle)
                     * (running ? 22f : 14f), 0f);
                 SetBoneRotation("lowerarm01.R", Mathf.Max(0f, -cycle)
                     * (running ? 22f : 14f), 0f);
-                // La marche reprend aussi l'orientation de base du poignet.
+                SetBoneRotation("lowerarm02.L", 0f, 0f);
+                SetBoneRotation("lowerarm02.R", 0f, 0f);
                 SetBoneRotation("wrist.L", 0f, 0f);
                 SetBoneRotation("wrist.R", 0f, 0f);
             }
             else
             {
-                // On garde le haut du bras tel quel et on aligne uniquement
-                // l'avant-bras puis la main sur la verticale du monde. La
-                // direction est calculee depuis les vrais pivots : elle reste
-                // donc symetrique et ne rentre pas dans les hanches.
+                // A l'arret, chaque segment est aligne depuis le pivot de
+                // l'epaule jusqu'a la main : haut du bras, coude, avant-bras
+                // et main restent sur une seule verticale, hors des hanches.
+                AlignerEnfantVersLeBas("shoulder01.L", "upperarm01.L");
+                AlignerEnfantVersLeBas("shoulder01.R", "upperarm01.R");
+                AlignerEnfantVersLeBas("upperarm01.L", "upperarm02.L");
+                AlignerEnfantVersLeBas("upperarm01.R", "upperarm02.R");
+                AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L");
+                AlignerEnfantVersLeBas("upperarm02.R", "lowerarm01.R");
                 AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L");
                 AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R");
+                AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L");
+                AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R");
                 AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L");
                 AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R");
             }
