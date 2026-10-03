@@ -520,21 +520,24 @@ public sealed class AdminHumanCreator : MonoBehaviour
             }
             else
             {
-                // A l'arret, chaque segment est aligne depuis le pivot de
-                // l'epaule jusqu'a la main : haut du bras, coude, avant-bras
-                // et main restent sur une seule verticale, hors des hanches.
-                AlignerEnfantVersLeBas("shoulder01.L", "upperarm01.L");
-                AlignerEnfantVersLeBas("shoulder01.R", "upperarm01.R");
-                AlignerEnfantVersLeBas("upperarm01.L", "upperarm02.L");
-                AlignerEnfantVersLeBas("upperarm01.R", "upperarm02.R");
-                AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L");
-                AlignerEnfantVersLeBas("upperarm02.R", "lowerarm01.R");
-                AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L");
-                AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R");
-                AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L");
-                AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R");
-                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L");
-                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R");
+                // A l'arret, chaque segment descend depuis l'epaule en
+                // s'ecartant tres legerement du bassin. Cette petite ouverture
+                // laterale suit la ligne jaune et empeche les mains de passer
+                // derriere les fesses ou de rentrer dans les hanches.
+                Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.22f;
+                Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.22f;
+                AlignerEnfantVersLeBas("shoulder01.L", "upperarm01.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("shoulder01.R", "upperarm01.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("upperarm01.L", "upperarm02.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("upperarm01.R", "upperarm02.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("upperarm02.L", "lowerarm01.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("upperarm02.R", "lowerarm01.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("lowerarm01.L", "lowerarm02.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R", ouvertureDroite);
+                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L", ouvertureGauche);
+                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R", ouvertureDroite);
             }
             // Les mains restent legerement fermees comme autour d'une balle
             // de tennis, sans ajouter de balle au personnage.
@@ -568,7 +571,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
             bones[boneIndexes[name]].localRotation = Quaternion.Euler(x, y, z);
         }
 
-        private void AlignerEnfantVersLeBas(string boneName, string childName)
+        private void AlignerEnfantVersLeBas(string boneName, string childName,
+            Vector3 targetWorldDirection)
         {
             if (!boneIndexes.ContainsKey(boneName) || !boneIndexes.ContainsKey(childName)) return;
             Transform bone = bones[boneIndexes[boneName]];
@@ -576,9 +580,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (bone == null || child == null || bone.parent == null) return;
             Vector3 childDirection = child.localPosition;
             if (childDirection.sqrMagnitude < 0.000001f) return;
-            Vector3 downInParent = bone.parent.InverseTransformDirection(Vector3.down);
+            Vector3 targetInParent = bone.parent.InverseTransformDirection(
+                targetWorldDirection);
+            if (targetInParent.sqrMagnitude < 0.000001f) return;
             bone.localRotation = Quaternion.FromToRotation(
-                childDirection.normalized, downInParent.normalized);
+                childDirection.normalized, targetInParent.normalized);
         }
 
         private void SetHandCurl(float amount)
