@@ -430,12 +430,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // de sa surface. Le mesh de cheveux reste celui de MakeHuman.
                 if (fedoraObject != null)
                 {
-                    // Le meme retrait et le meme decalage sont appliques aux
-                    // deux sexes : les cheveux ne doivent pas traverser la
-                    // calotte ou le bord du fedora chez la femme non plus.
+                    // Le decalage reste commun. La coupe de depassement
+                    // supplementaire est volontairement reservee a l'homme ;
+                    // le traitement actuel de la femme reste inchangé.
                     hairBuild.gameObject.transform.localPosition +=
                         Vector3.down * 0.045f;
-                    SupprimerCheveuxSousLeChapeau(hairBuild.gameObject, fedoraObject);
+                    SupprimerCheveuxSousLeChapeau(hairBuild.gameObject, fedoraObject,
+                        !values.female);
                 }
             }
             else
@@ -508,7 +509,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
         }
 
         private static void SupprimerCheveuxSousLeChapeau(GameObject hairObject,
-            GameObject hatObject)
+            GameObject hatObject, bool coupeHommeRenforcee)
         {
             if (hairObject == null || hatObject == null) return;
             SkinnedMeshRenderer hairRenderer = hairObject.GetComponent<SkinnedMeshRenderer>();
@@ -520,14 +521,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             Vector3[] vertices = hairMesh.vertices;
             if (triangles == null || triangles.Length == 0 || vertices == null) return;
 
-            // On ne reconstruit pas le fedora : sa boite monde sert seulement
-            // de limite pour couper les faces de cheveux qui passent dans la
-            // calotte. Les meches sous le bord et sur le front restent visibles
-            // chez l'homme comme chez la femme.
-            Bounds hatBounds = hatRenderer.bounds;
-            // La coupe est maintenant uniquement spatiale : on retire les
-            // cheveux qui se trouvent sous le fedora, sans toucher aux meches
-            // qui depassent sur le front ou sur le visage.
+            // La boite monde du fedora sert uniquement de limite spatiale.
+            // La femme conserve exactement la coupe actuelle ; pour l'homme,
+            // une seconde marge retire aussi les quelques meches qui depassent
+            // encore autour du bord.
             Matrix4x4 hairMatrix = hairObject.transform.localToWorldMatrix;
             List<int> kept = new List<int>(triangles.Length);
             for (int i = 0; i + 2 < triangles.Length; i += 3)
@@ -540,9 +537,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 Vector3 pa = hairMatrix.MultiplyPoint3x4(vertices[a]);
                 Vector3 pb = hairMatrix.MultiplyPoint3x4(vertices[b]);
                 Vector3 pc = hairMatrix.MultiplyPoint3x4(vertices[c]);
-                bool protrudes = EstSousLaCalotte(pa, hatBounds)
-                    || EstSousLaCalotte(pb, hatBounds)
-                    || EstSousLaCalotte(pc, hatBounds);
+                bool protrudes = EstSousLaCalotte(pa, hatBounds, coupeHommeRenforcee)
+                    || EstSousLaCalotte(pb, hatBounds, coupeHommeRenforcee)
+                    || EstSousLaCalotte(pc, hatBounds, coupeHommeRenforcee);
                 if (!protrudes)
                 {
                     kept.Add(a);
@@ -557,19 +554,30 @@ public sealed class AdminHumanCreator : MonoBehaviour
             }
         }
 
-        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds)
+        private static bool EstSousLaCalotte(Vector3 point, Bounds hatBounds,
+            bool coupeHommeRenforcee)
         {
             float dx = (point.x - hatBounds.center.x)
                 / Mathf.Max(hatBounds.extents.x, 0.001f);
             float dz = (point.z - hatBounds.center.z)
                 / Mathf.Max(hatBounds.extents.z, 0.001f);
-            // On supprime tout ce qui est vraiment sous le volume du fedora,
-            // mais uniquement dans son empreinte X/Z. Les cheveux qui sortent
-            // devant le bord et descendent sur le front restent intacts.
-            bool underHat = dx * dx + dz * dz < 1.0f
+            float distanceCarree = dx * dx + dz * dz;
+            // Cette condition reste exactement la meme pour la femme.
+            bool underHat = distanceCarree < 1.0f
                 && point.y >= hatBounds.min.y - 0.015f
                 && point.y <= hatBounds.max.y + 0.015f;
-            return underHat;
+            if (underHat) return true;
+            if (!coupeHommeRenforcee) return false;
+
+            // Homme uniquement : on elargit legerement l'empreinte du bord
+            // et on retire aussi les meches qui remontent juste au-dessus de
+            // la calotte. Le mesh et le placement de la femme ne changent pas.
+            bool bordFedoraHomme = distanceCarree < 1.32f
+                && point.y >= hatBounds.min.y - 0.08f
+                && point.y <= hatBounds.max.y + 0.08f;
+            bool dessusFedoraHomme = distanceCarree < 1.50f
+                && point.y > hatBounds.max.y - 0.015f;
+            return bordFedoraHomme || dessusFedoraHomme;
         }
 
         private static int OptionalIndex(int index, int length)
