@@ -531,6 +531,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // La fermeture est reservee aux doigts de la main plus bas.
                 Vector3 mainGauche = ouvertureGauche;
                 Vector3 mainDroite = ouvertureDroite;
+                // Seules les mains pivotent vers l'avant du personnage. Le
+                // bras et l'avant-bras gardent leur ligne laterale actuelle.
+                Vector3 doigtsGauche = ouvertureGauche + root.transform.forward * 0.45f;
+                Vector3 doigtsDroite = ouvertureDroite + root.transform.forward * 0.45f;
                 // Le pivot d'epaule reste dans sa pose d'origine pour
                 // conserver le volume naturel des epaules.
                 SetBoneRotation("shoulder01.L", 0f, 0f);
@@ -543,8 +547,8 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 AlignerEnfantVersLeBas("lowerarm01.R", "lowerarm02.R", mainDroite);
                 AlignerEnfantVersLeBas("lowerarm02.L", "wrist.L", mainGauche);
                 AlignerEnfantVersLeBas("lowerarm02.R", "wrist.R", mainDroite);
-                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L", mainGauche);
-                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R", mainDroite);
+                AlignerEnfantVersLeBas("wrist.L", "metacarpal1.L", doigtsGauche);
+                AlignerEnfantVersLeBas("wrist.R", "metacarpal1.R", doigtsDroite);
             }
             // Les mains restent legerement fermees comme autour d'une balle
             // de tennis, sans ajouter de balle au personnage.
