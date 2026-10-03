@@ -526,12 +526,11 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 // derriere les fesses ou de rentrer dans les hanches.
                 Vector3 ouvertureGauche = Vector3.down + root.transform.right * 0.25f;
                 Vector3 ouvertureDroite = Vector3.down - root.transform.right * 0.25f;
-                // Le haut du bras garde son ecartement lateral. A partir du
-                // coude, on ajoute une petite composante vers l'avant du
-                // personnage pour sortir les mains de l'arriere du bassin.
-                Vector3 versAvant = root.transform.forward * 0.22f;
-                Vector3 mainGauche = ouvertureGauche + versAvant;
-                Vector3 mainDroite = ouvertureDroite + versAvant;
+                // Le bras garde la meme ligne laterale qu'avant : aucune
+                // courbure vers l'avant ou l'arriere n'est ajoutee au bras.
+                // La fermeture est reservee aux doigts de la main plus bas.
+                Vector3 mainGauche = ouvertureGauche;
+                Vector3 mainDroite = ouvertureDroite;
                 // Le pivot d'epaule reste dans sa pose d'origine pour
                 // conserver le volume naturel des epaules.
                 SetBoneRotation("shoulder01.L", 0f, 0f);
