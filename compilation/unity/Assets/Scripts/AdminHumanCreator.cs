@@ -572,11 +572,10 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // rebord du fedora et une petite bande verticale d'environ 10 px.
             // Le bord horizontal du fedora depasse de la calotte :
             // l'homme prend une marge supplementaire, sans changer la hauteur.
-            float empreinte = coupeHommeRenforcee ? 1.45f : 1.0f;
-            // La marge verticale est la correction utile pour l'homme :
-            // certaines meches sont au-dessus du volume du fedora, pas dehors
-            // sur les cotes. La femme conserve exactement 0.015f.
-            float margeHaute = coupeHommeRenforcee ? 0.08f : 0.015f;
+            float empreinte = coupeHommeRenforcee ? 1.40f : 1.0f;
+            // Reglage d'essai demande pour l'homme uniquement. La femme
+            // conserve exactement son filtre precedent.
+            float margeHaute = coupeHommeRenforcee ? 0.5f : 0.015f;
             return distanceCarree < empreinte
                 && point.y >= hatBounds.min.y - 0.015f
                 && point.y <= hatBounds.max.y + margeHaute;
