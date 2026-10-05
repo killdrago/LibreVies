@@ -469,14 +469,17 @@ public sealed class CharacterCreatorApp : MonoBehaviour
 
             Signed(deformed, preset.belly, "stomach-pregnant-incr", "stomach-pregnant-decr", 0.55f);
             Signed(deformed, preset.belly, "torso-scale-horiz-incr", "torso-scale-horiz-decr", 0.28f);
-            Signed(deformed, preset.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, preset.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, preset.armThickness, "l-lowerarm-scale-horiz-incr", "l-lowerarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, preset.armThickness, "r-lowerarm-scale-horiz-incr", "r-lowerarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, preset.armLength, "l-upperarm-scale-vert-incr", "l-upperarm-scale-vert-decr", 0.55f);
-            Signed(deformed, preset.armLength, "r-upperarm-scale-vert-incr", "r-upperarm-scale-vert-decr", 0.55f);
-            Signed(deformed, preset.armLength, "l-lowerarm-scale-vert-incr", "l-lowerarm-scale-vert-decr", 0.55f);
-            Signed(deformed, preset.armLength, "r-lowerarm-scale-vert-incr", "r-lowerarm-scale-vert-decr", 0.55f);
+            // Les axes horiz/vert des cibles MakeHuman sont inverses par
+            // rapport aux libelles de l'editeur : vert = epaisseur, horiz =
+            // longueur pour les bras.
+            Signed(deformed, preset.armThickness, "l-upperarm-scale-vert-incr", "l-upperarm-scale-vert-decr", 0.55f);
+            Signed(deformed, preset.armThickness, "r-upperarm-scale-vert-incr", "r-upperarm-scale-vert-decr", 0.55f);
+            Signed(deformed, preset.armThickness, "l-lowerarm-scale-vert-incr", "l-lowerarm-scale-vert-decr", 0.55f);
+            Signed(deformed, preset.armThickness, "r-lowerarm-scale-vert-incr", "r-lowerarm-scale-vert-decr", 0.55f);
+            Signed(deformed, preset.armLength, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, preset.armLength, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, preset.armLength, "l-lowerarm-scale-horiz-incr", "l-lowerarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, preset.armLength, "r-lowerarm-scale-horiz-incr", "r-lowerarm-scale-horiz-decr", 0.5f);
             Signed(deformed, preset.legThickness, "l-upperleg-scale-horiz-incr", "l-upperleg-scale-horiz-decr", 0.52f);
             Signed(deformed, preset.legThickness, "r-upperleg-scale-horiz-incr", "r-upperleg-scale-horiz-decr", 0.52f);
             Signed(deformed, preset.legThickness, "l-lowerleg-scale-horiz-incr", "l-lowerleg-scale-horiz-decr", 0.52f);

@@ -296,14 +296,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
             // aucun quad ajoute et aucun volume separe.
             BreastVolume(deformed, values.chestShape, values.female);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
-            Signed(deformed, values.armThickness, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, values.armThickness, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, values.armThickness, "l-lowerarm-scale-horiz-incr", "l-lowerarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, values.armThickness, "r-lowerarm-scale-horiz-incr", "r-lowerarm-scale-horiz-decr", 0.5f);
-            Signed(deformed, values.armLength, "l-upperarm-scale-vert-incr", "l-upperarm-scale-vert-decr", 0.55f);
-            Signed(deformed, values.armLength, "r-upperarm-scale-vert-incr", "r-upperarm-scale-vert-decr", 0.55f);
-            Signed(deformed, values.armLength, "l-lowerarm-scale-vert-incr", "l-lowerarm-scale-vert-decr", 0.55f);
-            Signed(deformed, values.armLength, "r-lowerarm-scale-vert-incr", "r-lowerarm-scale-vert-decr", 0.55f);
+            // Les axes horiz/vert des cibles MakeHuman sont inverses par
+            // rapport aux libelles de l'ADMIN : vert = epaisseur, horiz =
+            // longueur pour les bras.
+            Signed(deformed, values.armThickness, "l-upperarm-scale-vert-incr", "l-upperarm-scale-vert-decr", 0.55f);
+            Signed(deformed, values.armThickness, "r-upperarm-scale-vert-incr", "r-upperarm-scale-vert-decr", 0.55f);
+            Signed(deformed, values.armThickness, "l-lowerarm-scale-vert-incr", "l-lowerarm-scale-vert-decr", 0.55f);
+            Signed(deformed, values.armThickness, "r-lowerarm-scale-vert-incr", "r-lowerarm-scale-vert-decr", 0.55f);
+            Signed(deformed, values.armLength, "l-upperarm-scale-horiz-incr", "l-upperarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, values.armLength, "r-upperarm-scale-horiz-incr", "r-upperarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, values.armLength, "l-lowerarm-scale-horiz-incr", "l-lowerarm-scale-horiz-decr", 0.5f);
+            Signed(deformed, values.armLength, "r-lowerarm-scale-horiz-incr", "r-lowerarm-scale-horiz-decr", 0.5f);
             Signed(deformed, values.legThickness, "l-upperleg-scale-horiz-incr", "l-upperleg-scale-horiz-decr", 0.52f);
             Signed(deformed, values.legThickness, "r-upperleg-scale-horiz-incr", "r-upperleg-scale-horiz-decr", 0.52f);
             Signed(deformed, values.legThickness, "l-lowerleg-scale-horiz-incr", "l-lowerleg-scale-horiz-decr", 0.52f);
@@ -362,8 +365,12 @@ public sealed class AdminHumanCreator : MonoBehaviour
             renderer.sharedMesh = mesh;
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
+            // La texture MakeHuman reste la base, mais sa couleur doit
+            // toujours etre multipliee par la teinte choisie dans l'ADMIN.
+            // L'ancienne condition forcait les femmes a blanc et annulait
+            // donc le choix de teinte pour le personnage le plus teste.
             skin.mainTexture = skinTexture;
-            skin.color = values.female ? Color.white : SkinColor(values.skinTone);
+            skin.color = SkinColor(values.skinTone);
             renderer.sharedMaterial = skin;
             renderer.updateWhenOffscreen = true;
             ApplyWeights(mesh, renderer);
