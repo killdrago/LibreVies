@@ -40,7 +40,7 @@ TEXT_EXTS = {
 }
 IGNORER_NOMS = {
     "__pycache__", ".git", "Library", "Temp", "Logs", "obj", "Build",
-    "build", "game.install", "game.ancien", "sauvegarde_locale"
+    "build", "game.install", "game.ancien", "sauvegarde_locale", "logs", "Logs"
 }
 IGNORER_SUFFIXES = (".download", ".download.part", ".new", ".part", ".tmp")
 

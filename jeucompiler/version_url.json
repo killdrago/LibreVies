@@ -6,20 +6,12 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler",
   "files": {
     "LIS-MOI.txt": {
-      "hash": "f7d7cb83fc1d34f050da8f3de276a153",
-      "size": 2058
+      "hash": "f3a89b4945b6cb2db775d140321970ba",
+      "size": 1677
     },
     "LibreVies.exe": {
       "hash": "d7cfed03abe41255e47d54f556b43a34",
       "size": 12215120
-    },
-    "LibreViesGame - Raccourci.lnk": {
-      "hash": "e558fc259c9ac35b7b41339eabac0be9",
-      "size": 1701
-    },
-    "build_launcher - Raccourci.lnk": {
-      "hash": "d50cbe199df7c7147798410195f9799c",
-      "size": 1707
     },
     "edition/coordonee": {
       "hash": "9bc272f2ebdf5bd05c7e1842f0668cb9",
@@ -259,7 +251,7 @@
     },
     "game/LibreViesGame_Data/RuntimeInitializeOnLoads.json": {
       "hash": "a176f1cb4b7ad146e8019f72dcf520c0",
-      "size": 13
+      "size": 12
     },
     "game/LibreViesGame_Data/ScriptingAssemblies.json": {
       "hash": "efc8cf700f74e9171b082a49520e928d",
@@ -306,8 +298,8 @@
       "size": 7834544
     },
     "game/MonoBleedingEdge/etc/mono/2.0/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "game/MonoBleedingEdge/etc/mono/2.0/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -326,8 +318,8 @@
       "size": 11635
     },
     "game/MonoBleedingEdge/etc/mono/4.0/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "game/MonoBleedingEdge/etc/mono/4.0/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -346,8 +338,8 @@
       "size": 18802
     },
     "game/MonoBleedingEdge/etc/mono/4.5/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "game/MonoBleedingEdge/etc/mono/4.5/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -393,13 +385,9 @@
       "hash": "0b4f419dce596a34a7f8bdeaa06287fe",
       "size": 1482784
     },
-    "game/logs/LibreViesRuntime.log": {
-      "hash": "692df64bc55114fd4909d0cd60357c49",
-      "size": 5711
-    },
     "launcher.pyw": {
-      "hash": "f3bd83715dbbae13a31521a9c118797c",
-      "size": 658439
+      "hash": "9b9a2cbfba71ffb2287fe663285ccd47",
+      "size": 652790
     },
     "personnage/D3D12/D3D12Core.dll": {
       "hash": "8bed03240b764906c937c0d6ccd560ac",
@@ -631,7 +619,7 @@
     },
     "personnage/LibreViesPersonnage_Data/RuntimeInitializeOnLoads.json": {
       "hash": "a176f1cb4b7ad146e8019f72dcf520c0",
-      "size": 13
+      "size": 12
     },
     "personnage/LibreViesPersonnage_Data/ScriptingAssemblies.json": {
       "hash": "efc8cf700f74e9171b082a49520e928d",
@@ -678,8 +666,8 @@
       "size": 7834544
     },
     "personnage/MonoBleedingEdge/etc/mono/2.0/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "personnage/MonoBleedingEdge/etc/mono/2.0/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -698,8 +686,8 @@
       "size": 11635
     },
     "personnage/MonoBleedingEdge/etc/mono/4.0/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "personnage/MonoBleedingEdge/etc/mono/4.0/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -718,8 +706,8 @@
       "size": 18802
     },
     "personnage/MonoBleedingEdge/etc/mono/4.5/Browsers/Compat.browser": {
-      "hash": "0d831c1264b5b32a39fa347de368fe48",
-      "size": 1605
+      "hash": "51f339a4877cf56181cda08f6975640d",
+      "size": 1586
     },
     "personnage/MonoBleedingEdge/etc/mono/4.5/DefaultWsdlHelpGenerator.aspx": {
       "hash": "f7be9f1841ff92f9d4040aed832e0c79",
@@ -776,7 +764,7 @@
     "version": "0.5.79",
     "dossier": "game",
     "exe": "LibreViesGame.exe",
-    "hash": "31ebf6b8ee429995b6e0230e08c6f30d",
-    "files": 93
+    "hash": "609a1ab57c79d8c717ec623b9dfb4bd5",
+    "files": 92
   }
 }

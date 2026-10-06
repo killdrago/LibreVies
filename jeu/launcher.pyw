@@ -120,8 +120,6 @@ GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 NEWS = [
     {"date": "18/09/2026", "t": "Launcher 4.1.0 — mise a jour sans rien recompiler",
      "d": "LibreVies.exe n'est plus qu'une petite amorce : tout le launcher est dans launcher.pyw. Des que ce fichier change, son hash change dans version_url.json : le launcher le telecharge et redemarre tout seul. Plus jamais besoin de reconstruire le launcher."},
-    {"date": "18/09/2026", "t": "Launcher 4.1.0 — bouton RAPPORT (plantages)",
-     "d": "Le jeu est lance avec son journal dans jeu\\game\\logs\\LibreVies.log. Le bouton RAPPORT ouvre le dossier des journaux et celui des rapports de plantage Unity : un plantage devient un fichier a envoyer, plus une devinette."},
     {"date": "18/09/2026", "t": "Launcher 4.0.0 — le jeu complet se telecharge tout seul",
      "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unity publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
     {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
@@ -255,6 +253,17 @@ def _safe_local_path(fname):
     return path
 
 
+def _fichier_volatile(nom):
+    """Ignore les fichiers generes pendant l'execution du jeu.
+
+    Un journal Unity ne fait pas partie de la compilation et change apres
+    chaque lancement : il ne doit ni bloquer JOUER ni provoquer une mise a
+    jour infinie du jeu distribue.
+    """
+    normalise = (nom or '').replace('\\', '/').strip('/').lower()
+    return '/logs/' in '/' + normalise + '/'
+
+
 def _manifest_files(cfg):
     """Fichiers unitaires declares par le manifeste distant.
 
@@ -268,6 +277,8 @@ def _manifest_files(cfg):
     resultat = {}
     for nom, info in files.items():
         if not isinstance(info, dict) or not info.get('hash'):
+            continue
+        if _fichier_volatile(nom):
             continue
         if nom == 'launcher.pyw' and not getattr(sys, 'frozen', False):
             # Le launcher en cours de developpement se met a jour avec git.
@@ -536,6 +547,7 @@ def _fichiers_jeu_manifest(cfg, build=None):
         nom: info for nom, info in fichiers.items()
         if isinstance(nom, str) and isinstance(info, dict)
         and nom.replace('\\', '/').lower().startswith(prefixe)
+        and not _fichier_volatile(nom)
         and info.get('hash')
     }
 
@@ -543,11 +555,10 @@ def _fichiers_jeu_manifest(cfg, build=None):
 def build_a_installer(build):
     """Le jeu doit-il etre telecharge ? Renvoie (bool, raison lisible)."""
     if _build_est_fichiers(build):
-        # Les fichiers individuels sont deja traites par apply_updates().
-        # Il ne faut donc surtout pas essayer de chercher une archive.
-        if _fichiers_jeu_manifest(load_local_config(), build):
-            return False, 'jeu distribue par fichiers individuels'
-        return False, 'aucune compilation Unity publiee pour le moment'
+        # Les fichiers individuels sont traites par apply_updates(). Il n'y a
+        # donc aucune archive a installer et aucun message d'attente a laisser
+        # dans la barre : find_game() indiquera ensuite si le jeu est pret.
+        return False, ''
     if not isinstance(build, dict) or not build.get('url') or not build.get('hash'):
         return False, 'aucune compilation Unity publiee pour le moment'
     etat = lire_etat_jeu()
@@ -963,13 +974,6 @@ class App(tk.Tk):
                   fg=TEXT, bg="#aa3333", relief="flat", cursor="hand2",
                   width=10, command=self.destroy).place(x=886, y=698, height=42)
 
-        # ====== AIDE : journaux et dossier du jeu ======
-        tk.Button(self, text="RAPPORT", font=("Segoe UI", 10, "bold"),
-                  fg=TEXT, bg="#2f6fa8", relief="flat", cursor="hand2",
-                  width=11, command=self.rapport).place(x=750, y=744, height=20)
-        tk.Button(self, text="DOSSIER DU JEU", font=("Segoe UI", 10, "bold"),
-                  fg=TEXT, bg="#3d6b52", relief="flat", cursor="hand2",
-                  width=16, command=self.ouvrir_dossier_jeu).place(x=850, y=744, height=20)
 
     # ============================================================
     # ACTUALITES — rotation auto
@@ -1139,7 +1143,8 @@ class App(tk.Tk):
                 10, 'Mise a jour de %d fichier(s)...' % len(modified)))
             _, erreurs, pending = apply_updates(modified, remote_cfg, self.upd)
 
-        # 2) Le jeu complet : une seule archive, telechargee une fois.
+        # 2) Le jeu compile : les fichiers individuels sont deja traites
+        #    par apply_updates() ; le mode archive reste compatible.
         a_installer, raison = build_a_installer(result['build'])
         if a_installer:
             self.upd(16, 'Jeu : %s' % raison)
@@ -1219,98 +1224,8 @@ class App(tk.Tk):
             self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
 
     # ============================================================
-    # JOURNAUX — comprendre un plantage en un clic
+    # LANCEMENT DU JEU
     # ============================================================
-
-    def _dossiers_journaux(self):
-        """Dossiers ou chercher le journal du jeu et les rapports de plantage.
-
-        L'ordre compte : les premiers trouves sont ceux qu'on ouvre.
-        """
-        dossiers = []
-        if self.game:
-            dossier = dossier_journaux_jeu(self.game)
-            if dossier:
-                dossiers.append(dossier)
-        profil = os.environ.get('USERPROFILE') or os.path.expanduser('~')
-        if profil:
-            # Emplacement standard d'Unity pour companyName/productName.
-            dossiers.append(os.path.join(profil, 'AppData', 'LocalLow',
-                                         'LibreVies', 'LibreVies'))
-        temp = os.environ.get('TEMP') or os.environ.get('TMP')
-        if temp:
-            dossiers.append(os.path.join(temp, 'LibreVies', 'LibreVies', 'Crashes'))
-        return dossiers
-
-    def _ouvrir_dossier(self, path):
-        try:
-            if os.path.isdir(path):
-                if hasattr(os, 'startfile'):
-                    os.startfile(path)
-                else:
-                    subprocess.Popen(['explorer', os.path.normpath(path)])
-                return True
-        except Exception:
-            pass
-        return False
-
-    def ouvrir_dossier_jeu(self):
-        if self.game and self._ouvrir_dossier(os.path.dirname(self.game)):
-            self._upd_bar(100, 'Dossier du jeu ouvert')
-            return
-        self._upd_bar(0, 'Dossier du jeu introuvable : installez le jeu d abord')
-
-    def rapport(self):
-        """Ouvre les journaux : un plantage devient un fichier a envoyer."""
-        dossiers = self._dossiers_journaux()
-        ouverts = 0
-        for dossier in dossiers:
-            if os.path.isdir(dossier) and self._ouvrir_dossier(dossier):
-                ouverts += 1
-                if ouverts >= 2:
-                    break
-        if ouverts:
-            self._upd_bar(100, 'Journaux ouverts : envoyez LibreVies.log si le jeu a plante')
-            return
-        self._montrer_chemins(dossiers)
-
-    def _montrer_chemins(self, dossiers):
-        """Aucun journal trouve : on affiche les chemins, prets a copier."""
-        fenetre = tk.Toplevel(self)
-        fenetre.title("Rapport de plantage")
-        fenetre.configure(bg=BG)
-        fenetre.geometry("680x330")
-        fenetre.resizable(False, False)
-        tk.Label(fenetre, text="Aucun journal trouve pour le moment.",
-                 font=("Segoe UI", 11, "bold"), fg=ACCENT, bg=BG).pack(
-                     anchor="w", padx=14, pady=(14, 2))
-        tk.Label(fenetre, text="Lancez le jeu une fois (meme s'il plante), puis recliquez\n"
-                              "sur RAPPORT. Chemins a verifier :",
-                 font=("Segoe UI", 9), fg=TEXT2, bg=BG, justify="left").pack(
-                     anchor="w", padx=14, pady=(0, 8))
-        zone = tk.Text(fenetre, height=8, bg="#111122", fg=TEXT, relief="flat",
-                       font=("Consolas", 9), wrap="none")
-        zone.pack(fill="both", expand=True, padx=14, pady=(0, 8))
-        zone.insert("1.0", "\n".join(dossiers))
-        zone.configure(state="disabled")
-        barre = tk.Frame(fenetre, bg=BG)
-        barre.pack(fill="x", padx=14, pady=(0, 14))
-
-        def copier():
-            try:
-                self.clipboard_clear()
-                self.clipboard_append("\n".join(dossiers))
-                self._upd_bar(100, 'Chemins copies dans le presse-papiers')
-            except Exception:
-                pass
-            fenetre.destroy()
-
-        tk.Button(barre, text="COPIER", font=("Segoe UI", 10, "bold"),
-                  fg=TEXT, bg="#2f6fa8", relief="flat", cursor="hand2",
-                  width=12, command=copier).pack(side="left")
-        tk.Button(barre, text="FERMER", font=("Segoe UI", 10, "bold"),
-                  fg=TEXT, bg="#555555", relief="flat", cursor="hand2",
-                  width=12, command=fenetre.destroy).pack(side="right")
 
     def play(self):
         if not (self.ready and self.game):
