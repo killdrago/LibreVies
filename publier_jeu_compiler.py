@@ -77,6 +77,65 @@ def depot_github() -> str:
     return match.group(1) if match else DEPOT_DEFAUT
 
 
+def normaliser_cible_github(depot: str, branche: str, dossier: str):
+    """Accepte aussi une URL GitHub collee dans l'un des champs.
+
+    L'interface attend normalement ``killdrago/LibreVies`` et ``jeucompiler``
+    (ou ``jeu compiler``), mais un copier-coller d'une URL /tree/... ne doit
+    pas fabriquer une URL raw invalide.
+    """
+    depot = (depot or '').strip().rstrip('/')
+    branche = (branche or '').strip().strip('/')
+    dossier = (dossier or '').strip().strip('/')
+    for valeur in (depot, dossier):
+        match = re.search(
+            r"github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/(?:tree|blob)/([^/]+)(?:/(.*))?)?$",
+            valeur)
+        if not match:
+            continue
+        depot = "%s/%s" % (match.group(1), match.group(2))
+        if match.group(3):
+            branche = match.group(3)
+        if match.group(4):
+            dossier = match.group(4).strip('/')
+        break
+    if depot.startswith('http://') or depot.startswith('https://'):
+        depot = DEPOT_DEFAUT
+    if not dossier or dossier.startswith('http://') or dossier.startswith('https://'):
+        dossier = DOSSIER_DISTANT_DEFAUT
+    return depot, branche, dossier
+
+
+def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
+    """Pousse un lot et resynchronise automatiquement si GitHub a avance.
+
+    Plusieurs publications peuvent arriver en parallele, ou un fichier peut
+    avoir ete ajoute depuis GitHub. Dans ce cas, le premier push renvoie
+    « fetch first ». On recupere la branche distante, on rebase le commit du
+    lot dessus et on retente.
+    """
+    journal = journal or (lambda _message: None)
+    try:
+        commande("git", "push", "origin", branche, cwd=racine_git)
+        return
+    except PublicationError as erreur:
+        texte = str(erreur).lower()
+        if not any(mot in texte for mot in
+                   ("fetch first", "non-fast-forward", "rejected")):
+            raise
+        journal("GitHub contient une publication plus recente : synchronisation automatique...")
+    try:
+        commande("git", "fetch", "origin", branche, cwd=racine_git)
+        commande("git", "rebase", "FETCH_HEAD", cwd=racine_git)
+        commande("git", "push", "origin", branche, cwd=racine_git)
+        journal("Branche distante integree, lot republie.")
+    except (OSError, PublicationError) as erreur:
+        commande("git", "rebase", "--abort", cwd=racine_git, check=False)
+        raise PublicationError(
+            "GitHub a avance et le rebase automatique a rencontre un conflit. "
+            "Aucun rebase n'est laisse en cours. Detail : %s" % erreur)
+
+
 def branche_courante() -> str:
     try:
         valeur = commande("git", "branch", "--show-current", check=False).strip()
@@ -267,6 +326,7 @@ class App(tk.Tk):
         self.configure(bg="#172033")
         self.operations: list[Operation] = []
         self.lots: list[list[Operation]] = []
+        self.commits_en_attente = False
         self.manifeste = b""
         self.construction_en_cours = False
         self._creer_interface()
@@ -366,9 +426,11 @@ class App(tk.Tk):
                 raise ValueError
             source = Path(self.source_var.get()).expanduser().resolve()
             cible = Path(self.cible_var.get()).expanduser().resolve()
-            depot = self.depot_var.get().strip()
-            branche = self.branche_var.get().strip()
-            distant = self.distant_var.get().strip().strip("/")
+            depot, branche, distant = normaliser_cible_github(
+                self.depot_var.get(), self.branche_var.get(), self.distant_var.get())
+            self.depot_var.set(depot)
+            self.branche_var.set(branche)
+            self.distant_var.set(distant)
             version = self.version_var.get().strip()
             if not depot or not branche or not distant or not version:
                 raise PublicationError("Depot, branche, dossier distant et version sont obligatoires.")
@@ -378,14 +440,22 @@ class App(tk.Tk):
             self.operations = construire_operations(source, cible, self.manifeste,
                                                      self.tout_var.get(), self.supprimer_var.get())
             self.lots = grouper_operations(self.operations, int(limite * 1048576))
+            try:
+                racine_git = Path(commande("git", "rev-parse", "--show-toplevel")).resolve()
+                self.commits_en_attente = self._nombre_commits_en_attente(
+                    racine_git, branche, actualiser=False) > 0
+            except (OSError, PublicationError):
+                self.commits_en_attente = False
             self.sortie.delete("1.0", "end")
             self.log("Source : %s" % source)
             self.log("Cible   : %s" % cible)
             self.log("Depot   : %s / %s / %s" % (depot, branche, distant))
             self.log("Fichiers source analyses : %d" % len(files))
             self.log("Fichiers a envoyer : %d" % len(self.operations))
+            if self.commits_en_attente:
+                self.log("Commit(s) local(aux) en attente : ils seront pousse(s) avant la fin.")
             if not self.operations:
-                self.log("Aucun changement a envoyer.")
+                self.log("Aucun changement de fichier a envoyer.")
             for numero, lot in enumerate(self.lots, 1):
                 poids = sum(operation.taille for operation in lot)
                 noms = [operation.relatif for operation in lot[:4]]
@@ -393,11 +463,23 @@ class App(tk.Tk):
                 self.log("Lot %d/%d : %d fichier(s), %s : %s%s" % (
                     numero, len(self.lots), len(lot), taille_lisible(poids),
                     ", ".join(noms), suffixe))
-            self.envoyer_btn.configure(state="normal" if self.operations else "disabled")
+            self.envoyer_btn.configure(state="normal" if (self.operations or self.commits_en_attente) else "disabled")
             self.status_var.set("Analyse terminee : %d lot(s)." % len(self.lots))
         except (OSError, ValueError, PublicationError) as erreur:
             self.envoyer_btn.configure(state="disabled")
             messagebox.showerror("Analyse impossible", str(erreur))
+
+    def _nombre_commits_en_attente(self, racine_git: Path, branche: str, actualiser=False) -> int:
+        """Compte les commits locaux pas encore presents sur origin/branche."""
+        if actualiser:
+            commande("git", "fetch", "origin", branche, cwd=racine_git)
+        valeur = commande("git", "rev-list", "--count",
+                         "origin/%s..HEAD" % branche, cwd=racine_git)
+        try:
+            return int(valeur.strip() or "0")
+        except ValueError:
+            return 0
+
 
     def _verifier_depot(self):
         racine_git = Path(commande("git", "rev-parse", "--show-toplevel")).resolve()
@@ -421,10 +503,16 @@ class App(tk.Tk):
             return
         if not self.operations:
             self.analyser()
-            if not self.operations:
-                return
         try:
             racine_git, cible = self._verifier_depot()
+            if not self.operations:
+                self.commits_en_attente = self._nombre_commits_en_attente(
+                    racine_git, self.branche_var.get().strip(), actualiser=True) > 0
+                if not self.commits_en_attente:
+                    return
+                # Le lot a deja ete commite avant un ancien push refuse : il
+                # faut seulement le rebase/pousser, pas recopier les fichiers.
+                self.lots = [[]]
         except (OSError, PublicationError) as erreur:
             messagebox.showerror("Publication impossible", str(erreur))
             return
@@ -445,24 +533,32 @@ class App(tk.Tk):
                 self._interface(lambda n=numero, t=total: self.status_var.set(
                     "Envoi du lot %d/%d..." % (n, t)))
                 poids = sum(operation.taille for operation in lot)
-                for operation in lot:
-                    chemin = cible / operation.relatif
-                    if operation.suppression:
-                        if chemin.is_file():
-                            chemin.unlink()
-                        continue
-                    chemin.parent.mkdir(parents=True, exist_ok=True)
-                    if operation.relatif == "version_url.json":
-                        chemin.write_bytes(self.manifeste)
-                    else:
-                        assert operation.source is not None
-                        shutil.copy2(operation.source, chemin)
-                chemins_git = [str((cible / operation.relatif).relative_to(racine_git))
-                               for operation in lot]
-                commande("git", "add", "--all", "--", *chemins_git, cwd=racine_git)
-                message = "Publication jeu compiler - lot %d/%d" % (numero, total)
-                commande("git", "commit", "-m", message, cwd=racine_git)
-                commande("git", "push", "origin", self.branche_var.get().strip(), cwd=racine_git)
+                if lot:
+                    for operation in lot:
+                        chemin = cible / operation.relatif
+                        if operation.suppression:
+                            if chemin.is_file():
+                                chemin.unlink()
+                            continue
+                        chemin.parent.mkdir(parents=True, exist_ok=True)
+                        if operation.relatif == "version_url.json":
+                            chemin.write_bytes(self.manifeste)
+                        else:
+                            assert operation.source is not None
+                            shutil.copy2(operation.source, chemin)
+                    chemins_git = [str((cible / operation.relatif).relative_to(racine_git))
+                                   for operation in lot]
+                    commande("git", "add", "--all", "--", *chemins_git, cwd=racine_git)
+                    message = "Publication jeu compiler - lot %d/%d" % (numero, total)
+                    commande("git", "commit", "-m", message, cwd=racine_git)
+                else:
+                    self._interface(lambda: self.log("Push d'un commit local deja prepare..."))
+                messages = []
+                pousser_avec_rebase(racine_git, self.branche_var.get().strip(), messages.append)
+                for message_git in messages:
+                    self._interface(lambda message_git=message_git: self.log(message_git))
+                if not lot:
+                    self.commits_en_attente = False
                 self._interface(lambda n=numero, t=total, p=poids: self.log(
                     "Lot %d/%d envoye : %s" % (n, t, taille_lisible(p))))
                 self._interface(lambda n=numero, t=total: self.progress.configure(
@@ -480,7 +576,7 @@ class App(tk.Tk):
 
     def construction_en_cours_set_false(self):
         self.construction_en_cours = False
-        self.envoyer_btn.configure(state="normal" if self.operations else "disabled")
+        self.envoyer_btn.configure(state="normal" if (self.operations or self.commits_en_attente) else "disabled")
 
     def _interface(self, callback):
         self.after(0, callback)
