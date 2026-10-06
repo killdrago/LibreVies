@@ -5,14 +5,14 @@ Deux dossiers, deux rôles bien séparés :
 | Dossier | Pour qui | Contenu |
 |---|---|---|
 | **`jeu/`** | l'auteur et le joueur local | sortie locale de compilation : launcher, `game/` et `personnage/`. |
-| **`jeu compiler/`** | la distribution GitHub | copie publiée de `jeu/`, déjà compilée, surveillée par le launcher. Elle ne contient jamais le projet Unity source. |
+| **`jeucompiler/`** | la distribution GitHub | copie publiée de `jeu/`, déjà compilée, surveillée par le launcher. Elle ne contient jamais le projet Unity source. |
 | **`compilation/`** | l'auteur seul | projet Unity du jeu, projet Unity séparé du créateur humain, scripts de build Windows, images de travail et outils de publication. Il **compile** puis dépose le résultat dans `jeu/`. **Jamais téléchargé par le joueur.** |
 
 ## Le parcours du joueur
 
 1. Il reçoit **un seul fichier** : `LibreVies.exe`.
 2. Il double-clique : le launcher vérifie le manifeste publié dans
-   `jeu compiler/version_url.json`, compare les hashes et télécharge seulement
+   `jeucompiler/version_url.json`, compare les hashes et télécharge seulement
    les fichiers modifies (jeu déjà compilé, sans Unity chez le joueur).
 3. Il clique sur **JOUER**.
 
@@ -28,13 +28,13 @@ Un jeu déjà installé se lance même hors ligne.
    (le launcher), `jeu\game\` (le jeu exporté) et
    `jeu\personnage\LibreViesPersonnage.exe` (le créateur humain autonome).
 2. `publier_jeu_compiler.bat` — ouvre l'application de
-   publication : elle compare `jeu/` avec `jeu compiler/`, regroupe les fichiers
+   publication : elle compare `jeu/` avec `jeucompiler/`, regroupe les fichiers
    modifies selon la limite de Mo choisie, met à jour le manifeste et pousse
    chaque lot sur GitHub.
 3. Les joueurs reçoivent les fichiers déjà compilés au prochain lancement.
 
 L'ancien `outils\publier_jeu.bat` reste disponible pour les publications par
-archive GitHub Release, mais le flux courant utilise `jeu compiler/` et le
+archive GitHub Release, mais le flux courant utilise `jeucompiler/` et le
 publieur graphique.
 
 La **première** publication est obligatoire : avant elle, le launcher affiche

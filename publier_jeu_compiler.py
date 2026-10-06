@@ -1,12 +1,12 @@
 """Publieur graphique de la version compilee de LibreVies.
 
 Le programme synchronise le contenu local de ``jeu`` vers le dossier Git
-``jeu compiler`` puis pousse les changements sur GitHub. Les fichiers sont
+``jeucompiler`` puis pousse les changements sur GitHub. Les fichiers sont
 regroupes en lots dont la taille maximale est choisie dans l'interface. Un
 fichier individuel plus grand que cette limite est envoye seul : la limite
 concerne un lot, elle ne decoupe pas un binaire.
 
-Le launcher des joueurs lit ensuite ``jeu compiler/version_url.json`` et
+Le launcher des joueurs lit ensuite ``jeucompiler/version_url.json`` et
 telecharge les fichiers deja compiles. Il ne compile jamais le jeu chez le
 joueur.
 """
@@ -27,9 +27,9 @@ from urllib.parse import quote
 
 RACINE = Path(__file__).resolve().parent
 SOURCE_DEFAUT = RACINE / "jeu"
-CIBLE_DEFAUT = RACINE / "jeu compiler"
+CIBLE_DEFAUT = RACINE / "jeucompiler"
 DEPOT_DEFAUT = "killdrago/LibreVies"
-DOSSIER_DISTANT_DEFAUT = "jeu compiler"
+DOSSIER_DISTANT_DEFAUT = "jeucompiler"
 BRANCHE_DEFAUT = "arena/01a0b32c-librevies"
 
 TEXT_EXTS = {
@@ -81,7 +81,7 @@ def normaliser_cible_github(depot: str, branche: str, dossier: str):
     """Accepte aussi une URL GitHub collee dans l'un des champs.
 
     L'interface attend normalement ``killdrago/LibreVies`` et ``jeucompiler``
-    (ou ``jeu compiler``), mais un copier-coller d'une URL /tree/... ne doit
+    (ou ``jeucompiler``), mais un copier-coller d'une URL /tree/... ne doit
     pas fabriquer une URL raw invalide.
     """
     depot = (depot or '').strip().rstrip('/')
@@ -320,7 +320,7 @@ def taille_lisible(valeur: int) -> str:
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LibreVies - publication vers jeu compiler")
+        self.title("LibreVies - publication vers jeucompiler")
         self.geometry("920x720")
         self.minsize(820, 620)
         self.configure(bg="#172033")
@@ -346,7 +346,7 @@ class App(tk.Tk):
         titre = tk.Label(self, text="PUBLICATION DU JEU COMPILE", font=("Segoe UI", 18, "bold"),
                          bg="#172033", fg="#f1c40f")
         titre.pack(anchor="w", padx=18, pady=(14, 3))
-        tk.Label(self, text="Les fichiers sont regroupes par lots puis envoyes dans le dossier GitHub jeu compiler.",
+        tk.Label(self, text="Les fichiers sont regroupes par lots puis envoyes dans le dossier GitHub jeucompiler.",
                  bg="#172033", fg="#b9c7d8").pack(anchor="w", padx=20, pady=(0, 12))
 
         cadre = ttk.LabelFrame(self, text="Parametres de publication")
@@ -380,7 +380,7 @@ class App(tk.Tk):
         cadre.columnconfigure(1, weight=1)
         ttk.Checkbutton(cadre, text="Renvoyer tous les fichiers, meme ceux deja identiques",
                         variable=self.tout_var).grid(row=8, column=1, sticky="w", padx=6, pady=(7, 2))
-        ttk.Checkbutton(cadre, text="Supprimer de jeu compiler les fichiers absents de jeu",
+        ttk.Checkbutton(cadre, text="Supprimer de jeucompiler les fichiers absents de jeu",
                         variable=self.supprimer_var).grid(row=9, column=1, sticky="w", padx=6, pady=(2, 8))
 
         barre = tk.Frame(self, bg="#172033")
@@ -565,7 +565,7 @@ class App(tk.Tk):
                     value=int(n * 100 / max(1, t))))
             self._interface(lambda: self.status_var.set("Publication terminee. Le launcher verra la prochaine version."))
             self._interface(lambda: messagebox.showinfo("Publication terminee",
-                                                          "Les fichiers ont ete envoyes vers jeu compiler."))
+                                                          "Les fichiers ont ete envoyes vers jeucompiler."))
         except (OSError, PublicationError, AssertionError) as erreur:
             self._interface(lambda e=str(erreur): self.log("ERREUR : " + e))
             self._interface(lambda e=str(erreur): self.status_var.set("Publication interrompue."))

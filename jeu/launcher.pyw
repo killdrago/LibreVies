@@ -2,7 +2,7 @@
 LibreVies — Launcher joueur (version 4.1.0)
 
 Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
-  1. il lit version_url.json dans le dossier GitHub jeu compiler ;
+  1. il lit version_url.json dans le dossier GitHub jeucompiler ;
   2. il compare les hashes et telecharge les fichiers modifies ;
   3. il installe les fichiers deja compiles dans game/ (ou conserve la
      compatibilite avec les anciennes archives GitHub) ;
@@ -104,7 +104,7 @@ GAME_VERSION = "0.5.79"
 # Les fichiers publies pour les joueurs sont dans ce dossier distinct du
 # projet source. L'espace du nom GitHub est encode pour l'URL raw.
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
-                   "arena/01a0b32c-librevies/jeu%20compiler")
+                   "arena/01a0b32c-librevies/jeucompiler")
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
@@ -258,7 +258,7 @@ def _safe_local_path(fname):
 def _manifest_files(cfg):
     """Fichiers unitaires declares par le manifeste distant.
 
-    Le depot ``jeu compiler`` peut contenir aussi bien les petits fichiers que
+    Le depot ``jeucompiler`` peut contenir aussi bien les petits fichiers que
     le build Unity deja compile. Le champ ``game_build`` reste reserve au
     mode archive historique.
     """
@@ -434,7 +434,7 @@ def schedule_launcher_restart(target, staged):
 # JEU COMPLET — INSTALLATION
 #
 # Le flux courant recupere les fichiers deja compiles depuis le dossier
-# GitHub « jeu compiler ». Le mode archive ci-dessous reste disponible pour
+# GitHub « jeucompiler ». Le mode archive ci-dessous reste disponible pour
 # les anciennes installations et les anciennes releases.
 # ============================================================
 
@@ -516,7 +516,7 @@ def _trouver_exe_jeu(dossier, profondeur=2):
 def _build_est_fichiers(build):
     """Indique qu'une compilation est publiee fichier par fichier.
 
-    Ce mode est utilise par le depot ``jeu compiler`` : le launcher recupere
+    Ce mode est utilise par le depot ``jeucompiler`` : le launcher recupere
     directement les fichiers modifies depuis l'URL raw, sans archive ni
     recompilation chez le joueur.
     """
@@ -736,7 +736,7 @@ def find_game():
     cfg = load_local_config()
     build = cfg.get('game_build') if isinstance(cfg.get('game_build'), dict) else {}
 
-    # Nouveau mode : le depot « jeu compiler » contient les fichiers deja
+    # Nouveau mode : le depot « jeucompiler » contient les fichiers deja
     # compiles. On verifie leurs hashes locaux avant d'activer JOUER, sans
     # demander une archive ni une recompilation au joueur.
     if _build_est_fichiers(build):

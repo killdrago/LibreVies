@@ -2,10 +2,10 @@
 LibreVies — Launcher joueur (version 4.1.0)
 
 Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
-  1. il lit version_url.json publie sur GitHub ;
-  2. il met a jour le launcher et les petits fichiers si besoin ;
-  3. il telecharge le jeu complet en une archive, verifie son md5 et
-     l'installe dans game/ (avec reprise si la connexion coupe) ;
+  1. il lit version_url.json dans le dossier GitHub jeucompiler ;
+  2. il compare les hashes et telecharge les fichiers modifies ;
+  3. il installe les fichiers deja compiles dans game/ (ou conserve la
+     compatibilite avec les anciennes archives GitHub) ;
   4. il active JOUER.
 
 Ce fichier CONTIENT le launcher : LibreVies.exe n'est qu'une petite amorce
@@ -101,8 +101,10 @@ ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.1.0"
 GAME_VERSION = "0.5.79"
+# Les fichiers publies pour les joueurs sont dans ce dossier distinct du
+# projet source. L'espace du nom GitHub est encode pour l'URL raw.
 DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
-                   "arena/01a0b32c-librevies/jeu")
+                   "arena/01a0b32c-librevies/jeucompiler")
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
@@ -254,10 +256,11 @@ def _safe_local_path(fname):
 
 
 def _manifest_files(cfg):
-    """Fichiers unitaires a mettre a jour (petits fichiers texte).
+    """Fichiers unitaires declares par le manifeste distant.
 
-    Le jeu lui-meme n'est pas dans cette liste : il arrive en une seule
-    archive (cle ``game_build``). Seul le launcher compile s'y ajoute.
+    Le depot ``jeucompiler`` peut contenir aussi bien les petits fichiers que
+    le build Unity deja compile. Le champ ``game_build`` reste reserve au
+    mode archive historique.
     """
     files = cfg.get('files')
     if not isinstance(files, dict):
@@ -428,13 +431,11 @@ def schedule_launcher_restart(target, staged):
 
 
 # ============================================================
-# JEU COMPLET — TELECHARGEMENT ET INSTALLATION
+# JEU COMPLET — INSTALLATION
 #
-# Le jeu est publie en UNE archive .zip dans la release GitHub.
-# Le launcher la telecharge (avec reprise si la connexion coupe),
-# verifie son md5, l'extrait dans un dossier temporaire, cherche
-# l'executable, puis remplace l'ancienne installation. Une coupure
-# a n'importe quel moment laisse donc toujours un jeu utilisable.
+# Le flux courant recupere les fichiers deja compiles depuis le dossier
+# GitHub « jeucompiler ». Le mode archive ci-dessous reste disponible pour
+# les anciennes installations et les anciennes releases.
 # ============================================================
 
 def lire_etat_jeu():
@@ -512,8 +513,41 @@ def _trouver_exe_jeu(dossier, profondeur=2):
     return None
 
 
+def _build_est_fichiers(build):
+    """Indique qu'une compilation est publiee fichier par fichier.
+
+    Ce mode est utilise par le depot ``jeucompiler`` : le launcher recupere
+    directement les fichiers modifies depuis l'URL raw, sans archive ni
+    recompilation chez le joueur.
+    """
+    return (isinstance(build, dict)
+            and build.get('mode') in ('fichiers', 'files'))
+
+
+def _fichiers_jeu_manifest(cfg, build=None):
+    """Retourne les fichiers game/ declares dans un manifeste direct."""
+    build = build if isinstance(build, dict) else {}
+    dossier = (build.get('dossier') or DOSSIER_JEU_DEFAUT).replace('\\', '/').strip('/')
+    prefixe = dossier.lower() + '/'
+    fichiers = cfg.get('files') if isinstance(cfg, dict) else None
+    if not isinstance(fichiers, dict):
+        return {}
+    return {
+        nom: info for nom, info in fichiers.items()
+        if isinstance(nom, str) and isinstance(info, dict)
+        and nom.replace('\\', '/').lower().startswith(prefixe)
+        and info.get('hash')
+    }
+
+
 def build_a_installer(build):
-    """Le jeu doit-il etre (re)telecharge ? Renvoie (bool, raison lisible)."""
+    """Le jeu doit-il etre telecharge ? Renvoie (bool, raison lisible)."""
+    if _build_est_fichiers(build):
+        # Les fichiers individuels sont deja traites par apply_updates().
+        # Il ne faut donc surtout pas essayer de chercher une archive.
+        if _fichiers_jeu_manifest(load_local_config(), build):
+            return False, 'jeu distribue par fichiers individuels'
+        return False, 'aucune compilation Unity publiee pour le moment'
     if not isinstance(build, dict) or not build.get('url') or not build.get('hash'):
         return False, 'aucune compilation Unity publiee pour le moment'
     etat = lire_etat_jeu()
@@ -702,10 +736,32 @@ def find_game():
     cfg = load_local_config()
     build = cfg.get('game_build') if isinstance(cfg.get('game_build'), dict) else {}
 
-    # Ne jamais lancer silencieusement une ancienne compilation presente dans
-    # game/. Avant cette verification, un manifeste avec game_build={} laissait
-    # le bouton JOUER actif sur un vieux export : l'utilisateur croyait avoir
-    # recu la MAJ alors qu'il executait encore l'ancien monde.
+    # Nouveau mode : le depot « jeucompiler » contient les fichiers deja
+    # compiles. On verifie leurs hashes locaux avant d'activer JOUER, sans
+    # demander une archive ni une recompilation au joueur.
+    if _build_est_fichiers(build):
+        fichiers = _fichiers_jeu_manifest(cfg, build)
+        if not fichiers:
+            return None
+        for nom, info in fichiers.items():
+            try:
+                chemin = _safe_local_path(nom)
+            except ValueError:
+                return None
+            if not os.path.isfile(chemin):
+                return None
+            normalise = nom.lower().endswith(TEXT_EXTS)
+            if file_hash(chemin, normalize=normalise) != info.get('hash'):
+                return None
+        try:
+            chemin_exe = _chemin_exe(build, build.get('exe'))
+        except ValueError:
+            return None
+        return (os.path.abspath(chemin_exe)
+                if chemin_exe and os.path.isfile(chemin_exe) else None)
+
+    # Ancien mode archive : conserver la compatibilite avec les installations
+    # deja publiees dans les releases GitHub.
     if not build.get('url') or not build.get('hash'):
         return None
     if etat.get('hash') != build.get('hash'):

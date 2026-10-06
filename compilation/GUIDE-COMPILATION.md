@@ -9,7 +9,7 @@ jeu/                       sortie locale de compilation
   version_url.json         le manifeste de secours
   game/                    le build Unity
 
-jeu compiler/              copie publiee sur GitHub
+jeucompiler/              copie publiee sur GitHub
   version_url.json         le manifeste surveille par le launcher
   game/                    fichiers Unity deja compiles
 
@@ -29,7 +29,7 @@ compilation/               reserve a l'auteur
     tester_launcher.bat/.py recette : telechargement, md5, reprise, securite
     creer_icone.bat/.py    reextrait l'icone du launcher (utilise par le build)
   publier_jeu_compiler.bat/.py
-                           publie les fichiers modifies par lots vers jeu compiler/
+                           publie les fichiers modifies par lots vers jeucompiler/
   release/                 (cree au build, ignore par git)
 ```
 
@@ -93,15 +93,15 @@ build_launcher.bat
 ou en ligne de commande : `build_launcher.bat main`.
 (`outils\definir_url_publication.py` met aussi cette branche à jour tout seul.)
 
-## 2. Publier la compilation vers `jeu compiler/`
+## 2. Publier la compilation vers `jeucompiler/`
 
 Le flux courant publie les fichiers déjà compilés dans le dossier GitHub
-`jeu compiler/`. Le joueur ne reçoit jamais le projet Unity ni Python.
+`jeucompiler/`. Le joueur ne reçoit jamais le projet Unity ni Python.
 
 Double-clic sur `publier_jeu_compiler.bat` à la racine du dépôt. L'application graphique :
 
-1. compare le contenu local de `jeu/` avec `jeu compiler/` ;
-2. fabrique `jeu compiler/version_url.json` avec le hash de chaque fichier ;
+1. compare le contenu local de `jeu/` avec `jeucompiler/` ;
+2. fabrique `jeucompiler/version_url.json` avec le hash de chaque fichier ;
 3. repère le build Unity dans `jeu/game/` ;
 4. regroupe les nouveaux fichiers et fichiers modifiés selon la limite en Mo ;
 5. pousse chaque lot sur la branche GitHub choisie ;
@@ -113,7 +113,7 @@ limite est envoyé seul : il n'est pas découpé. Les fichiers de plus de 100 Mo
 peuvent être refusés par GitHub classique ; dans ce cas il faudra utiliser Git
 LFS ou une GitHub Release.
 
-Le launcher lit ensuite `jeu compiler/version_url.json`, télécharge seulement les
+Le launcher lit ensuite `jeucompiler/version_url.json`, télécharge seulement les
 fichiers dont le hash local ne correspond pas et active **JOUER** après leur
 vérification. Il ne compile jamais chez le joueur.
 
@@ -121,7 +121,7 @@ La compilation doit donc être faite avant la publication :
 
 ```text
 compilation/ -> build Unity -> jeu/ -> application de publication
-                                      -> jeu compiler/ -> launcher joueur
+                                      -> jeucompiler/ -> launcher joueur
 ```
 
 L'ancien `outils\publier_jeu.bat` reste disponible pour le flux historique par
@@ -130,7 +130,7 @@ archive GitHub Release.
 ## 3. Ce que fait le joueur
 
 1. Il double-clique sur `LibreVies.exe`.
-2. Le launcher lit le manifeste distant `jeu compiler/version_url.json`,
+2. Le launcher lit le manifeste distant `jeucompiler/version_url.json`,
    compare les hashs et télécharge uniquement les fichiers modifies. Les
    fichiers sont déjà compiles : aucune compilation n'est faite chez le joueur.
 3. Il clique sur **JOUER** — le jeu démarre.
