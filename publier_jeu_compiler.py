@@ -163,7 +163,48 @@ def _restaurer_conflits_non_suivis(racine_git: Path, sauvegarde: Path, deplaces)
     shutil.rmtree(sauvegarde, ignore_errors=True)
 
 
-def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
+def _rebase_avec_conflits_de_publication(racine_git: Path, dossier_cible: Path | None):
+    """Rejoue le rebase et privilegie le lot local pour les fichiers publies.
+
+    Un conflit add/add dans jeucompiler est attendu lorsqu'un ancien clone
+    contient deja une copie locale et que GitHub vient d'ajouter la meme
+    destination. Le lot construit depuis ``jeu`` est la source de verite : on
+    garde donc ``--theirs`` pendant un rebase (theirs = commit rejoue). Les
+    conflits hors du dossier publie restent manuels par securite.
+    """
+    prefixe = ''
+    if dossier_cible is not None:
+        try:
+            prefixe = dossier_cible.resolve().relative_to(racine_git.resolve()).as_posix().strip('/')
+        except ValueError:
+            prefixe = ''
+    environnement = dict(os.environ)
+    environnement['GIT_EDITOR'] = ':'
+    commande_rebase = ['git', 'rebase', '--autostash', 'FETCH_HEAD']
+    for _ in range(32):
+        resultat = subprocess.run(
+            commande_rebase, cwd=str(racine_git), capture_output=True, text=True,
+            encoding='utf-8', errors='replace', env=environnement)
+        sortie = (resultat.stdout or '') + (resultat.stderr or '')
+        if resultat.returncode == 0:
+            return
+        conflits = commande('git', 'diff', '--name-only', '--diff-filter=U',
+                            cwd=racine_git, check=False).splitlines()
+        conflits = [chemin.strip().replace('\\', '/') for chemin in conflits if chemin.strip()]
+        if not conflits or not prefixe or not all(
+                chemin == prefixe or chemin.startswith(prefixe + '/')
+                for chemin in conflits):
+            raise PublicationError(sortie.strip() or 'rebase impossible')
+        for chemin in conflits:
+            commande('git', 'checkout', '--theirs', '--', chemin, cwd=racine_git)
+            commande('git', 'add', '--', chemin, cwd=racine_git)
+        # Le rebase est deja en cours apres le premier tour : il faut le
+        # continuer, pas lancer un second rebase sur FETCH_HEAD.
+        commande_rebase = ['git', 'rebase', '--continue']
+    raise PublicationError('trop de conflits pendant le rebase automatique')
+
+
+def pousser_avec_rebase(racine_git: Path, branche: str, journal=None, dossier_cible: Path | None = None):
     """Pousse un lot et resynchronise automatiquement si GitHub a avance.
 
     Plusieurs publications peuvent arriver en parallele, ou un fichier peut
@@ -191,7 +232,7 @@ def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
         # non suivis que la branche distante va ajouter sont deplaces dans une
         # sauvegarde temporaire, car autostash ne les prend pas en charge.
         sauvegarde = _mettre_de_cote_conflits_non_suivis(racine_git, journal)
-        commande("git", "rebase", "--autostash", "FETCH_HEAD", cwd=racine_git)
+        _rebase_avec_conflits_de_publication(racine_git, dossier_cible)
         if sauvegarde:
             _restaurer_conflits_non_suivis(racine_git, *sauvegarde)
             sauvegarde = None
@@ -624,7 +665,8 @@ class App(tk.Tk):
                 else:
                     self._interface(lambda: self.log("Push d'un commit local deja prepare..."))
                 messages = []
-                pousser_avec_rebase(racine_git, self.branche_var.get().strip(), messages.append)
+                pousser_avec_rebase(racine_git, self.branche_var.get().strip(),
+                                    messages.append, cible)
                 for message_git in messages:
                     self._interface(lambda message_git=message_git: self.log(message_git))
                 if not lot:
