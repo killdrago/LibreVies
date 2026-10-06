@@ -4,10 +4,14 @@ Ce dossier ne part **jamais** chez le joueur. Il contient tout ce qu'il faut
 pour fabriquer le launcher et publier le jeu.
 
 ```
-jeu/                       ce que le joueur utilise
+jeu/                       sortie locale de compilation
   launcher.pyw             le launcher (source)
-  version_url.json         le manifeste lu par le launcher
-  LIS-MOI.txt              explication envoyee au joueur
+  version_url.json         le manifeste de secours
+  game/                    le build Unity
+
+jeu compiler/              copie publiee sur GitHub
+  version_url.json         le manifeste surveille par le launcher
+  game/                    fichiers Unity deja compiles
 
 compilation/               reserve a l'auteur
   unity/                   projet Unity (le jeu)
@@ -19,7 +23,9 @@ compilation/               reserve a l'auteur
                            installation automatique d'Unity
   image/                   images de travail (bannieres, chapitres, logos)
   outils/
-    publier_jeu.bat/.py    met le jeu en ligne pour tous les joueurs
+    publier_jeu_compiler.bat/.py
+                           publie les fichiers modifies par lots vers jeu compiler/
+    publier_jeu.bat/.py    ancien mode de publication par archive GitHub Release
     definir_url_publication.bat/.py
                            change la branche surveillee par le launcher
     tester_launcher.bat/.py recette : telechargement, md5, reprise, securite
@@ -87,44 +93,46 @@ build_launcher.bat
 ou en ligne de commande : `build_launcher.bat main`.
 (`outils\definir_url_publication.py` met aussi cette branche à jour tout seul.)
 
-## 2. Publier la compilation (les joueurs la reçoivent)
+## 2. Publier la compilation vers `jeu compiler/`
 
-> **Première fois : cette étape est obligatoire.** Tant qu'aucune compilation
-> n'a été publiée, le manifeste contient `"game_build": {}` et le launcher
-> affiche « aucune compilation Unity publiee » (le bouton JOUER reste grisé).
-> Dès la première publication, tout s'enchaîne : le launcher télécharge le jeu,
-> puis se met à jour tout seul à chaque nouvelle publication.
+Le flux courant publie les fichiers déjà compilés dans le dossier GitHub
+`jeu compiler/`. Le joueur ne reçoit jamais le projet Unity ni Python.
 
-Double-clic sur `outils\publier_jeu.bat` (ou lance-le avec la version en
-paramètre). Par défaut il travaille sur `jeu\game` et `jeu\LibreVies.exe`.
-Le script :
+Double-clic sur `outils\publier_jeu_compiler.bat`. L'application graphique :
 
-1. rassemble `jeu\game\` en **une seule archive** `LibreVies_jeu_<md5>.zip` ;
-2. l'envoie dans la release GitHub `derniere` (via `gh`) ;
-3. met à jour `jeu/version_url.json` : `url`, `size`, `hash` (md5), `moteur`, `exe` ;
-4. publie aussi `jeu\LibreVies.exe` : le launcher des joueurs se met à jour
-   tout seul ;
-5. note l'installation locale dans `jeu/etat_jeu.json` : le launcher installé
-   ici affiche « jeu à jour » au lieu de retélécharger ce qu'il vient de compiler ;
-6. avec `--pousser` (utilisé par le `.bat`), il envoie le manifeste dans git.
+1. compare le contenu local de `jeu/` avec `jeu compiler/` ;
+2. fabrique `jeu compiler/version_url.json` avec le hash de chaque fichier ;
+3. repère le build Unity dans `jeu/game/` ;
+4. regroupe les nouveaux fichiers et fichiers modifiés selon la limite en Mo ;
+5. pousse chaque lot sur la branche GitHub choisie ;
+6. conserve les fichiers déjà identiques et peut supprimer les fichiers absents
+   si la case correspondante est cochée.
 
-Sans GitHub CLI (`gh`) sur la machine, le script fabrique quand même l'archive
-et met le manifeste à jour : il indique alors l'URL exacte où déposer le `.zip`
-à la main (release → *Edit* → *Attach binaries*).
+La limite concerne la taille d'un lot. Un fichier individuel plus gros que cette
+limite est envoyé seul : il n'est pas découpé. Les fichiers de plus de 100 Mo
+peuvent être refusés par GitHub classique ; dans ce cas il faudra utiliser Git
+LFS ou une GitHub Release.
 
-Commande équivalente en ligne de commande :
+Le launcher lit ensuite `jeu compiler/version_url.json`, télécharge seulement les
+fichiers dont le hash local ne correspond pas et active **JOUER** après leur
+vérification. Il ne compile jamais chez le joueur.
 
-```bat
-python outils\publier_jeu.py --version 0.5.0 ^
-    --notes "Village Unity, camera corrigee" --pousser
+La compilation doit donc être faite avant la publication :
+
+```text
+compilation/ -> build Unity -> jeu/ -> application de publication
+                                      -> jeu compiler/ -> launcher joueur
 ```
+
+L'ancien `outils\publier_jeu.bat` reste disponible pour le flux historique par
+archive GitHub Release.
 
 ## 3. Ce que fait le joueur
 
 1. Il double-clique sur `LibreVies.exe`.
-2. Le launcher lit `jeu/version_url.json` (branche indiquée par `raw_url`),
-   compare les hashs, télécharge l'archive du jeu **avec reprise** si la
-   connexion coupe, vérifie son md5, l'installe dans `game\`.
+2. Le launcher lit le manifeste distant `jeu compiler/version_url.json`,
+   compare les hashs et télécharge uniquement les fichiers modifies. Les
+   fichiers sont déjà compiles : aucune compilation n'est faite chez le joueur.
 3. Il clique sur **JOUER** — le jeu démarre.
 
 Rien n'est installé ailleurs que dans le dossier du launcher :

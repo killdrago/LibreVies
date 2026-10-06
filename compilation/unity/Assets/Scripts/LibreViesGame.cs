@@ -110,8 +110,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminNpcListeSelection;
     private int adminJoueurSelection;
     private bool adminJoueurMenuOuvert;
-    private int adminObjetOutil;
-    private Vector2 adminObjetCurseur;
     private Vector2 adminNpcScroll;
     private string adminEditionContexte = "Joueur : Joueur principal";
     private bool adminHumainValide;
@@ -6933,58 +6931,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
-    private void DessinerAdminObjets(Rect contenu)
-    {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 650f, 28f),
-            "ATELIER D'OBJETS", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 700f, 22f),
-            "Zone de construction sur quadrillage : choisissez un outil puis cliquez sur la grille.", smallStyle);
-
-        Rect grille = new Rect(contenu.x + 18f, contenu.y + 76f, 680f, 510f);
-        GUI.color = new Color(0.055f, 0.075f, 0.11f, 1f);
-        GUI.DrawTexture(grille, Texture2D.whiteTexture);
-        GUI.color = new Color(0.20f, 0.34f, 0.46f, 0.75f);
-        const float pas = 32f;
-        for (float x = grille.x; x <= grille.xMax; x += pas)
-            GUI.DrawTexture(new Rect(x, grille.y, 1f, grille.height), Texture2D.whiteTexture);
-        for (float y = grille.y; y <= grille.yMax; y += pas)
-            GUI.DrawTexture(new Rect(grille.x, y, grille.width, 1f), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-
-        if (Event.current.type == EventType.MouseDown && Event.current.button == 0
-            && grille.Contains(Event.current.mousePosition))
-        {
-            Vector2 local = Event.current.mousePosition - new Vector2(grille.x, grille.y);
-            adminObjetCurseur = new Vector2(
-                Mathf.Floor(local.x / pas) * pas + pas * 0.5f,
-                Mathf.Floor(local.y / pas) * pas + pas * 0.5f);
-            ShowInfo("Emplacement de creation selectionne sur la grille");
-            Event.current.Use();
-        }
-        GUI.color = new Color(0.94f, 0.69f, 0.19f, 0.85f);
-        GUI.DrawTexture(new Rect(grille.x + adminObjetCurseur.x - 12f,
-            grille.y + adminObjetCurseur.y - 12f, 24f, 24f), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-
-        GUI.Label(new Rect(contenu.x + 730f, contenu.y + 78f, 220f, 26f),
-            "OUTILS", titleStyle);
-        string[] outils = { "Bloc", "Mur", "Porte", "Fenetre", "Arbre", "Lampe", "Decor" };
-        for (int i = 0; i < outils.Length; i++)
-        {
-            if (BoutonChoixAdmin(new Rect(contenu.x + 730f, contenu.y + 116f + i * 38f,
-                210f, 32f), outils[i], adminObjetOutil == i))
-                adminObjetOutil = i;
-        }
-        GUI.Label(new Rect(contenu.x + 730f, contenu.y + 410f, 220f, 48f),
-            "Outil actif : " + outils[adminObjetOutil] + "\nCliquez une cellule pour la positionner.", smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 730f, contenu.y + 482f, 210f, 34f),
-            "REINITIALISER LA GRILLE", buttonStyle))
-        {
-            adminObjetCurseur = new Vector2(0f, 0f);
-            ShowInfo("Grille d'objet reinitialisee");
-        }
-    }
-
     private void DessinerAdminJoueur(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
@@ -7449,7 +7395,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "NPC", "Objet", "Monstre", "Personnage" };
+        string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Personnage" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -7496,10 +7442,6 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (adminTab == 2)
         {
             DessinerAdminNpc(contenu);
-        }
-        else if (adminTab == 3)
-        {
-            DessinerAdminObjets(contenu);
         }
         else if (adminTab == 4)
         {
