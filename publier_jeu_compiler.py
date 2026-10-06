@@ -68,6 +68,18 @@ def commande(*args: str, cwd: Path | None = None, check: bool = True) -> str:
     return sortie.strip()
 
 
+def index_contient_paths(racine_git: Path, chemins: list[str]) -> bool:
+    """Teste uniquement l'index du lot, jamais les autres changements locaux."""
+    resultat = subprocess.run(
+        ['git', 'diff', '--cached', '--quiet', '--', *chemins],
+        cwd=str(racine_git), capture_output=True, text=True,
+        encoding='utf-8', errors='replace')
+    if resultat.returncode > 1:
+        raise PublicationError((resultat.stderr or resultat.stdout or
+                                'verification de l index impossible').strip())
+    return resultat.returncode == 1
+
+
 def depot_github() -> str:
     try:
         distant = commande("git", "remote", "get-url", "origin", check=False)
@@ -660,8 +672,19 @@ class App(tk.Tk):
                     chemins_git = [str((cible / operation.relatif).relative_to(racine_git))
                                    for operation in lot]
                     commande("git", "add", "--all", "--", *chemins_git, cwd=racine_git)
-                    message = "Publication jeu compiler - lot %d/%d" % (numero, total)
-                    commande("git", "commit", "-m", message, cwd=racine_git)
+                    # Le depot de developpement contient parfois des
+                    # modifications Unity non liees. On ne commit jamais le
+                    # depot entier : uniquement les chemins du lot. Si le lot
+                    # est deja present dans l index apres une tentative
+                    # precedente, on passe directement au push.
+                    if index_contient_paths(racine_git, chemins_git):
+                        message = "Publication jeu compiler - lot %d/%d" % (numero, total)
+                        commande("git", "commit", "--only", "-m", message,
+                                 "--", *chemins_git, cwd=racine_git)
+                    else:
+                        self._interface(lambda: self.log(
+                            "Lot %d/%d deja enregistre localement, aucun nouveau commit."
+                            % (numero, total)))
                 else:
                     self._interface(lambda: self.log("Push d'un commit local deja prepare..."))
                 messages = []
