@@ -36,7 +36,7 @@ BRANCHE_DEFAUT = "arena/01a0b32c-librevies"
 TEXT_EXTS = {
     ".pyw", ".py", ".bat", ".cmd", ".json", ".cfg", ".txt", ".md",
     ".html", ".css", ".js", ".csv", ".cs", ".meta", ".unity",
-    ".asset", ".yaml", ".yml", ".ini"
+    ".asset", ".yaml", ".yml", ".ini", ".php", ".sql"
 }
 IGNORER_NOMS = {
     "__pycache__", ".git", "Library", "Temp", "Logs", "obj", "Build",

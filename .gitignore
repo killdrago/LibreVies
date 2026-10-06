@@ -50,5 +50,6 @@
 __pycache__/
 *.pyc
 
-# --- Serveur local : ne jamais versionner le mot de passe MySQL ---
-/serveur/config.php
+# Configuration MySQL locale du serveur (jamais versionnee)
+/jeu/serveur/config.php
+/jeucompiler/serveur/config.php

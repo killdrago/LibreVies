@@ -6,8 +6,8 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler",
   "files": {
     "LIS-MOI.txt": {
-      "hash": "16956a13dcafb8bd3134e0ed9e8ddd2c",
-      "size": 1746
+      "hash": "bcc0a680d63e8b11d5d0333d2f03c759",
+      "size": 1815
     },
     "LibreVies.exe": {
       "hash": "d7cfed03abe41255e47d54f556b43a34",
@@ -386,8 +386,8 @@
       "size": 1482784
     },
     "launcher.pyw": {
-      "hash": "daaad8f29619cce24d62bc0de87d9cd2",
-      "size": 661038
+      "hash": "589778807c8164b80b2b9f4eed888e96",
+      "size": 661067
     },
     "personnage/D3D12/D3D12Core.dll": {
       "hash": "8bed03240b764906c937c0d6ccd560ac",
@@ -756,6 +756,26 @@
     "personnage/dstoragecore.dll": {
       "hash": "0b4f419dce596a34a7f8bdeaa06287fe",
       "size": 1482784
+    },
+    "serveur/README.md": {
+      "hash": "ed980fb93259ecfb7e357819827dbceb",
+      "size": 2048
+    },
+    "serveur/api.php": {
+      "hash": "66711f8123096bc30b3c0954a0d18da8",
+      "size": 5328
+    },
+    "serveur/config.php.example": {
+      "hash": "e10b52f00f8e5159411e95f470479225",
+      "size": 462
+    },
+    "serveur/corriger_membre.sql": {
+      "hash": "3efba42d35ead58266e44c16d2f61dee",
+      "size": 510
+    },
+    "serveur/membre.sql": {
+      "hash": "f5b0387748e49774bcdfd3dda33e80a6",
+      "size": 451
     }
   },
   "game_build": {

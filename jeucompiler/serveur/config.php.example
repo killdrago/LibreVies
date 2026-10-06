@@ -1,0 +1,13 @@
+<?php
+// Copiez ce fichier sous config.php dans le dossier de l'API.
+// Ces valeurs restent sur le serveur et ne partent jamais avec le launcher.
+return [
+    'db_host' => '127.0.0.1',
+    'db_port' => 3306,
+    'db_name' => 'librevies',
+    'db_user' => 'root',
+    'db_password' => '',
+    // Passez temporairement à true pour voir l'erreur SQL dans la réponse.
+    // Remettez false ensuite si l'API est accessible depuis Internet.
+    'debug' => false,
+];

@@ -20,6 +20,7 @@ Où sont mes fichiers ?
 Tout reste dans ce dossier :
   launcher.pyw       le launcher lui-même (il se met à jour tout seul)
   auth_config.json   l'adresse IP de l'API de connexion (modifiable)
+  serveur\           le dossier complet à envoyer chez l'hébergeur
   game\              le jeu téléchargé (LibreViesGame.exe ou LibreVies.exe)
   game\logs\         le journal du jeu (LibreVies.log) : utile en cas de plantage
   etat_jeu.json      l'état de l'installation (version, date)

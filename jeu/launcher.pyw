@@ -150,7 +150,8 @@ NEWS = [
 # ============================================================
 
 TEXT_EXTS = ('.pyw', '.py', '.bat', '.json', '.cfg', '.txt', '.md',
-             '.html', '.css', '.js', '.csv', '.cs', '.meta', '.unity')
+             '.html', '.css', '.js', '.csv', '.cs', '.meta', '.unity',
+             '.php', '.sql')
 
 USER_AGENT = 'LibreVies/%s' % LAUNCHER_VERSION
 
