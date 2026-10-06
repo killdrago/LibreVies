@@ -484,6 +484,7 @@ mkdir "%LV_SAUVE%" 2>nul
 robocopy "%ROOT%unity" "%LV_SAUVE%\unity" /E /XD Library Temp Logs obj Build build .vs /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 robocopy "%ROOT%outils" "%LV_SAUVE%\outils" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 robocopy "%ROOT%amorce" "%LV_SAUVE%\amorce" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+if exist "%ROOT%..\serveur" robocopy "%ROOT%..\serveur" "%LV_SAUVE%\serveur" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 robocopy "%JEU%" "%LV_SAUVE%\jeu" /E /XF *.exe /XD game game.ancien game.install /R:1 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 for %%F in (build_launcher.bat build_unity_game.bat setup_unity_build_tools.bat) do if exist "%ROOT%%%F" copy /y "%ROOT%%%F" "%LV_SAUVE%\%%F" >nul 2>&1
 echo        Sauvegarde de l'ancienne version : build\sauvegarde_locale

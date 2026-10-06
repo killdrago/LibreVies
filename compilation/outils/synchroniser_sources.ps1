@@ -25,12 +25,17 @@ function Get-LocalPath([string] $remote) {
     if ($barre.StartsWith('jeu\')) {
         return Join-Path $env:LV_JEU $barre.Substring(4)
     }
+    if ($barre.StartsWith('serveur\')) {
+        # serveur/ est a la racine du depot, a cote de compilation/.
+        return Join-Path (Join-Path $env:LV_ROOT '..') $barre
+    }
     return $null
 }
 
 function Est-Source([string] $remote) {
     $p = $remote.Replace('/', '\')
-    if (!($p.StartsWith('compilation\') -or $p.StartsWith('jeu\'))) { return $false }
+    if (!($p.StartsWith('compilation\') -or $p.StartsWith('jeu\') -or
+          $p.StartsWith('serveur\'))) { return $false }
     foreach ($ignore in @('\image\', '\Library\', '\Temp\', '\Logs\', '\obj\', '\Build\', '\build\', '\game\', '\game.ancien\', '\game.install\')) {
         if ($p.Contains($ignore)) { return $false }
     }
