@@ -23,13 +23,13 @@ compilation/               reserve a l'auteur
                            installation automatique d'Unity
   image/                   images de travail (bannieres, chapitres, logos)
   outils/
-    publier_jeu_compiler.bat/.py
-                           publie les fichiers modifies par lots vers jeu compiler/
     publier_jeu.bat/.py    ancien mode de publication par archive GitHub Release
     definir_url_publication.bat/.py
                            change la branche surveillee par le launcher
     tester_launcher.bat/.py recette : telechargement, md5, reprise, securite
     creer_icone.bat/.py    reextrait l'icone du launcher (utilise par le build)
+  publier_jeu_compiler.bat/.py
+                           publie les fichiers modifies par lots vers jeu compiler/
   release/                 (cree au build, ignore par git)
 ```
 
@@ -98,7 +98,7 @@ ou en ligne de commande : `build_launcher.bat main`.
 Le flux courant publie les fichiers déjà compilés dans le dossier GitHub
 `jeu compiler/`. Le joueur ne reçoit jamais le projet Unity ni Python.
 
-Double-clic sur `outils\publier_jeu_compiler.bat`. L'application graphique :
+Double-clic sur `publier_jeu_compiler.bat` à la racine du dépôt. L'application graphique :
 
 1. compare le contenu local de `jeu/` avec `jeu compiler/` ;
 2. fabrique `jeu compiler/version_url.json` avec le hash de chaque fichier ;

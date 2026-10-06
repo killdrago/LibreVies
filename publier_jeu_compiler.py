@@ -25,7 +25,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from urllib.parse import quote
 
-RACINE = Path(__file__).resolve().parents[2]
+RACINE = Path(__file__).resolve().parent
 SOURCE_DEFAUT = RACINE / "jeu"
 CIBLE_DEFAUT = RACINE / "jeu compiler"
 DEPOT_DEFAUT = "killdrago/LibreVies"

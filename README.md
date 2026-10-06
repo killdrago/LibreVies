@@ -27,7 +27,7 @@ Un jeu déjà installé se lance même hors ligne.
    compile et dépose le résultat **dans `jeu/`** : `jeu\LibreVies.exe`
    (le launcher), `jeu\game\` (le jeu exporté) et
    `jeu\personnage\LibreViesPersonnage.exe` (le créateur humain autonome).
-2. `compilation\outils\publier_jeu_compiler.bat` — ouvre l'application de
+2. `publier_jeu_compiler.bat` — ouvre l'application de
    publication : elle compare `jeu/` avec `jeu compiler/`, regroupe les fichiers
    modifies selon la limite de Mo choisie, met à jour le manifeste et pousse
    chaque lot sur GitHub.
