@@ -12,7 +12,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
 function repondre(bool $ok, string $message = '', array $extra = [], int $code = 200): void {
     http_response_code($code);
@@ -21,10 +21,17 @@ function repondre(bool $ok, string $message = '', array $extra = [], int $code =
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    repondre(true);
+function detail_erreur(Throwable $erreur, array $config): string {
+    error_log('[LibreVies API] ' . $erreur->getMessage());
+    return !empty($config['debug'])
+        ? 'Erreur serveur : ' . $erreur->getMessage()
+        : 'Connexion à la base impossible.';
 }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    repondre(true, 'Pré-requête acceptée.');
+}
+if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {
     repondre(false, 'Méthode non autorisée.', [], 405);
 }
 
@@ -34,12 +41,18 @@ if (!is_file($configPath)) {
 }
 $config = require $configPath;
 
-$corps = file_get_contents('php://input') ?: '';
-$donnees = json_decode($corps, true);
-if (!is_array($donnees)) {
-    $donnees = $_POST;
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Diagnostic sans modifier la base : ouvrir cette URL dans un navigateur.
+    $action = (string)($_GET['action'] ?? 'health');
+    $donnees = $_GET;
+} else {
+    $corps = file_get_contents('php://input') ?: '';
+    $donnees = json_decode($corps, true);
+    if (!is_array($donnees)) {
+        $donnees = $_POST;
+    }
+    $action = (string)($donnees['action'] ?? '');
 }
-$action = (string)($donnees['action'] ?? '');
 
 try {
     $dsn = sprintf(
@@ -54,7 +67,15 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
 } catch (Throwable $erreur) {
-    repondre(false, 'Connexion à la base impossible.', [], 503);
+    repondre(false, detail_erreur($erreur, $config), [], 503);
+}
+
+if ($action === 'health') {
+    repondre(true, 'API et base de données accessibles.');
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    repondre(false, 'Action GET inconnue.', [], 400);
 }
 
 if ($action === 'register') {
@@ -68,8 +89,16 @@ if ($action === 'register') {
     if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
         repondre(false, 'Pseudo invalide : 3 à 30 caractères.', [], 400);
     }
-    if (strlen($motdepasse) < 6) {
-        repondre(false, 'Le mot de passe doit contenir au moins 6 caractères.', [], 400);
+    if (strlen($motdepasse) < 8) {
+        repondre(false, 'Le mot de passe doit contenir au moins 8 caractères.', [], 400);
+    }
+
+    // Argon2id est utilisé s'il est disponible ; sinon PHP choisit son
+    // algorithme moderne par défaut (bcrypt sur les versions courantes).
+    $algorithme = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
+    $hash = password_hash($motdepasse, $algorithme);
+    if ($hash === false) {
+        repondre(false, 'Impossible de sécuriser le mot de passe.', [], 500);
     }
 
     try {
@@ -79,15 +108,15 @@ if ($action === 'register') {
         );
         $requete->execute([
             ':pseudo' => $pseudo,
-            ':motdepasse' => password_hash($motdepasse, PASSWORD_DEFAULT),
+            ':motdepasse' => $hash,
             ':email' => $email,
         ]);
     } catch (PDOException $erreur) {
-        // 23000 = contrainte UNIQUE (pseudo ou email deja utilise).
+        // 23000 = contrainte UNIQUE (pseudo ou email déjà utilisé).
         if ($erreur->getCode() === '23000') {
             repondre(false, 'Ce pseudo ou cet email est déjà utilisé.', [], 409);
         }
-        repondre(false, 'Inscription impossible.', [], 500);
+        repondre(false, detail_erreur($erreur, $config), [], 500);
     }
     repondre(true, 'Inscription réussie.');
 }
@@ -99,11 +128,15 @@ if ($action === 'login') {
         repondre(false, 'Pseudo et mot de passe obligatoires.', [], 400);
     }
 
-    $requete = $pdo->prepare(
-        'SELECT id, pseudo, motdepasse FROM membre WHERE pseudo = :pseudo LIMIT 1'
-    );
-    $requete->execute([':pseudo' => $pseudo]);
-    $membre = $requete->fetch();
+    try {
+        $requete = $pdo->prepare(
+            'SELECT id, pseudo, motdepasse FROM membre WHERE pseudo = :pseudo LIMIT 1'
+        );
+        $requete->execute([':pseudo' => $pseudo]);
+        $membre = $requete->fetch();
+    } catch (PDOException $erreur) {
+        repondre(false, detail_erreur($erreur, $config), [], 500);
+    }
     if (!$membre || !password_verify($motdepasse, (string)$membre['motdepasse'])) {
         repondre(false, 'Pseudo ou mot de passe incorrect.', [], 401);
     }

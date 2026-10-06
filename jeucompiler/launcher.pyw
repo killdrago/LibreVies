@@ -18,7 +18,8 @@ JAMAIS chez le joueur.
 """
 import tkinter as tk
 import subprocess, threading, os, sys, time
-import urllib.request, hashlib, json
+import urllib.request, urllib.error, hashlib, json
+import re
 import base64, io, tempfile
 import shutil, zipfile
 
@@ -205,6 +206,19 @@ def load_auth_config():
     return config
 
 
+def email_valide(email):
+    """Validation locale avant l'envoi : format simple mais utile."""
+    email = (email or '').strip()
+    return (len(email) <= 254
+            and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None)
+
+
+def pseudo_valide(pseudo):
+    pseudo = (pseudo or '').strip()
+    return (3 <= len(pseudo) <= 30
+            and re.fullmatch(r"[\w -]+", pseudo, re.UNICODE) is not None)
+
+
 def auth_api_request(action, payload):
     """Appelle l'API HTTP ; le launcher ne contient aucun mot de passe MySQL."""
     config = load_auth_config()
@@ -219,8 +233,19 @@ def auth_api_request(action, payload):
         headers={'Content-Type': 'application/json', 'Accept': 'application/json',
                  'User-Agent': USER_AGENT},
         method='POST')
-    with urllib.request.urlopen(req, timeout=config['timeout']) as response:
-        resultat = json.loads(response.read().decode('utf-8'))
+    try:
+        with urllib.request.urlopen(req, timeout=config['timeout']) as response:
+            resultat = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as erreur:
+        # L'API renvoie aussi son message en JSON pour les erreurs 400/401/500.
+        try:
+            resultat = json.loads(erreur.read().decode('utf-8'))
+        except (OSError, ValueError):
+            resultat = {}
+        message = resultat.get('message') if isinstance(resultat, dict) else None
+        raise ValueError(str(message or 'Serveur HTTP %s' % erreur.code))
+    except urllib.error.URLError as erreur:
+        raise ValueError('Serveur de connexion inaccessible : %s' % erreur.reason)
     if not isinstance(resultat, dict) or not resultat.get('ok'):
         message = resultat.get('message') if isinstance(resultat, dict) else None
         raise ValueError(str(message or "reponse invalide du serveur"))
@@ -1104,8 +1129,14 @@ class App(tk.Tk):
         email = self.reg_email.get().strip()
         pseudo = self.reg_pseudo.get().strip()
         mdp = self.reg_mdp.get().strip()
-        if not email or not pseudo or not mdp:
-            self._auth_failed("Email, pseudo et mot de passe obligatoires")
+        if not email_valide(email):
+            self._auth_failed("Adresse email invalide : exemple@domaine.fr")
+            return
+        if not pseudo_valide(pseudo):
+            self._auth_failed("Pseudo invalide : 3 a 30 caracteres")
+            return
+        if len(mdp) < 8:
+            self._auth_failed("Le mot de passe doit contenir au moins 8 caracteres")
             return
         self._start_auth_request(
             'register', {'email': email, 'pseudo': pseudo, 'password': mdp},
