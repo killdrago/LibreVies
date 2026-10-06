@@ -126,7 +126,11 @@ def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
         journal("GitHub contient une publication plus recente : synchronisation automatique...")
     try:
         commande("git", "fetch", "origin", branche, cwd=racine_git)
-        commande("git", "rebase", "FETCH_HEAD", cwd=racine_git)
+        # Le projet local peut contenir des reglages ou des fichiers suivis
+        # modifies en dehors de jeucompiler. Git refuse normalement le
+        # rebase dans ce cas ; autostash les met temporairement de cote puis
+        # les restaure apres l'integration de la branche distante.
+        commande("git", "rebase", "--autostash", "FETCH_HEAD", cwd=racine_git)
         commande("git", "push", "origin", branche, cwd=racine_git)
         journal("Branche distante integree, lot republie.")
     except (OSError, PublicationError) as erreur:
