@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import tkinter as tk
 from dataclasses import dataclass
@@ -106,6 +107,62 @@ def normaliser_cible_github(depot: str, branche: str, dossier: str):
     return depot, branche, dossier
 
 
+def _mettre_de_cote_conflits_non_suivis(racine_git: Path, journal):
+    """Ecarte temporairement les fichiers non suivis que FETCH_HEAD ajoutera.
+
+    Une copie manuelle de jeucompiler peut exister dans un clone ancien alors
+    que la branche distante vient seulement de recevoir ces mêmes fichiers.
+    Git refuse alors le checkout avant meme de lancer le rebase. Les fichiers
+    sont deplaces dans un dossier temporaire, puis restaures apres le rebase.
+    """
+    non_suivis = commande("git", "ls-files", "--others", "--exclude-standard",
+                         cwd=racine_git, check=False)
+    distants = set(commande("git", "ls-tree", "-r", "--name-only", "FETCH_HEAD",
+                            cwd=racine_git, check=False).splitlines())
+    conflits = [ligne.strip() for ligne in non_suivis.splitlines()
+                if ligne.strip() in distants]
+    if not conflits:
+        return None
+    sauvegarde = Path(tempfile.mkdtemp(prefix="librevies-git-"))
+    journal("Fichiers locaux non suivis mis temporairement de cote : %d" % len(conflits))
+    deplaces = []
+    try:
+        for relatif in conflits:
+            source = racine_git / Path(relatif)
+            destination = sauvegarde / Path(relatif)
+            if not source.is_file():
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(destination))
+            deplaces.append(relatif)
+    except (OSError, shutil.Error):
+        # Restaurer immédiatement ce qui a deja ete deplace si le dossier
+        # temporaire ne peut pas etre prepare completement.
+        _restaurer_conflits_non_suivis(racine_git, sauvegarde, deplaces)
+        shutil.rmtree(sauvegarde, ignore_errors=True)
+        raise
+    return sauvegarde, deplaces
+
+
+def _restaurer_conflits_non_suivis(racine_git: Path, sauvegarde: Path, deplaces):
+    """Restaure les fichiers ecartes avant le rebase, sans les perdre."""
+    for relatif in deplaces:
+        source = sauvegarde / Path(relatif)
+        destination = racine_git / Path(relatif)
+        if not source.is_file():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        # Si Git a recree exactement le meme fichier, on conserve sa version
+        # suivie et on supprime seulement la copie temporaire.
+        if destination.is_file() and destination.read_bytes() == source.read_bytes():
+            source.unlink()
+        else:
+            if destination.is_file():
+                destination.unlink()
+            shutil.move(str(source), str(destination))
+    shutil.rmtree(sauvegarde, ignore_errors=True)
+
+
 def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
     """Pousse un lot et resynchronise automatiquement si GitHub a avance.
 
@@ -124,17 +181,26 @@ def pousser_avec_rebase(racine_git: Path, branche: str, journal=None):
                    ("fetch first", "non-fast-forward", "rejected")):
             raise
         journal("GitHub contient une publication plus recente : synchronisation automatique...")
+    sauvegarde = None
     try:
         commande("git", "fetch", "origin", branche, cwd=racine_git)
         # Le projet local peut contenir des reglages ou des fichiers suivis
         # modifies en dehors de jeucompiler. Git refuse normalement le
         # rebase dans ce cas ; autostash les met temporairement de cote puis
-        # les restaure apres l'integration de la branche distante.
+        # les restaure apres l'integration de la branche distante. Les fichiers
+        # non suivis que la branche distante va ajouter sont deplaces dans une
+        # sauvegarde temporaire, car autostash ne les prend pas en charge.
+        sauvegarde = _mettre_de_cote_conflits_non_suivis(racine_git, journal)
         commande("git", "rebase", "--autostash", "FETCH_HEAD", cwd=racine_git)
+        if sauvegarde:
+            _restaurer_conflits_non_suivis(racine_git, *sauvegarde)
+            sauvegarde = None
         commande("git", "push", "origin", branche, cwd=racine_git)
         journal("Branche distante integree, lot republie.")
     except (OSError, PublicationError) as erreur:
         commande("git", "rebase", "--abort", cwd=racine_git, check=False)
+        if sauvegarde:
+            _restaurer_conflits_non_suivis(racine_git, *sauvegarde)
         raise PublicationError(
             "GitHub a avance et le rebase automatique a rencontre un conflit. "
             "Aucun rebase n'est laisse en cours. Detail : %s" % erreur)
