@@ -52,4 +52,3 @@ __pycache__/
 
 # Configuration MySQL locale du serveur (jamais versionnee)
 /jeu/serveur/config.php
-/jeucompiler/serveur/config.php

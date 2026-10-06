@@ -309,7 +309,10 @@ def fichiers_source(source: Path) -> dict[str, Path]:
         relatif = chemin.relative_to(source).as_posix()
         # Ces fichiers appartiennent a la machine de compilation et ne doivent
         # jamais etre distribues aux joueurs.
-        if relatif in {"version_url.json", "etat_jeu.json", "auth_config.json"}:
+        if (relatif in {"version_url.json", "etat_jeu.json", "auth_config.json"}
+                or relatif == "serveur" or relatif.startswith("serveur/")):
+            # Le package d'hebergement reste dans jeu/serveur ; il ne doit
+            # pas etre recopie dans la distribution du joueur.
             continue
         resultat[relatif] = chemin
     if not resultat:

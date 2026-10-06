@@ -6,8 +6,8 @@
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler",
   "files": {
     "LIS-MOI.txt": {
-      "hash": "bcc0a680d63e8b11d5d0333d2f03c759",
-      "size": 1815
+      "hash": "16956a13dcafb8bd3134e0ed9e8ddd2c",
+      "size": 1746
     },
     "LibreVies.exe": {
       "hash": "d7cfed03abe41255e47d54f556b43a34",
@@ -756,26 +756,6 @@
     "personnage/dstoragecore.dll": {
       "hash": "0b4f419dce596a34a7f8bdeaa06287fe",
       "size": 1482784
-    },
-    "serveur/README.md": {
-      "hash": "4152241e7a5aa81651e7360d57566168",
-      "size": 1840
-    },
-    "serveur/api.php": {
-      "hash": "66711f8123096bc30b3c0954a0d18da8",
-      "size": 5328
-    },
-    "serveur/config.php.example": {
-      "hash": "e10b52f00f8e5159411e95f470479225",
-      "size": 462
-    },
-    "serveur/corriger_membre.sql": {
-      "hash": "3efba42d35ead58266e44c16d2f61dee",
-      "size": 510
-    },
-    "serveur/membre.sql": {
-      "hash": "f5b0387748e49774bcdfd3dda33e80a6",
-      "size": 451
     }
   },
   "game_build": {
