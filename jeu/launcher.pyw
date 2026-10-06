@@ -101,10 +101,10 @@ ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.1.0"
 GAME_VERSION = "0.5.79"
-# Les fichiers publies pour les joueurs sont dans ce dossier distinct du
-# projet source. L'espace du nom GitHub est encode pour l'URL raw.
-DEFAULT_RAW_URL = ("https://raw.githubusercontent.com/killdrago/LibreVies/"
-                   "arena/01a0b32c-librevies/jeucompiler")
+# Les fichiers publies pour les joueurs sont dans le dossier GitHub
+# jeucompiler. Une seule chaine evite toute ambiguite lors d'une edition
+# manuelle sous Windows.
+DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler"
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
