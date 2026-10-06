@@ -1,13 +1,13 @@
 {
-  "launcher_version": "4.1.0",
+  "launcher_version": "4.2.0",
   "game_version": "0.5.79",
   "notes": "",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeucompiler",
   "raw_url": "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler",
   "files": {
     "LIS-MOI.txt": {
-      "hash": "f3a89b4945b6cb2db775d140321970ba",
-      "size": 1677
+      "hash": "16956a13dcafb8bd3134e0ed9e8ddd2c",
+      "size": 1746
     },
     "LibreVies.exe": {
       "hash": "d7cfed03abe41255e47d54f556b43a34",
@@ -386,8 +386,8 @@
       "size": 1482784
     },
     "launcher.pyw": {
-      "hash": "9b9a2cbfba71ffb2287fe663285ccd47",
-      "size": 652790
+      "hash": "fbf39f8b3e8d62e191129c2095669193",
+      "size": 659789
     },
     "personnage/D3D12/D3D12Core.dll": {
       "hash": "8bed03240b764906c937c0d6ccd560ac",

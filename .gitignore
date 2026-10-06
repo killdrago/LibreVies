@@ -49,3 +49,6 @@
 # --- Python ---
 __pycache__/
 *.pyc
+
+# --- Serveur local : ne jamais versionner le mot de passe MySQL ---
+/serveur/config.php

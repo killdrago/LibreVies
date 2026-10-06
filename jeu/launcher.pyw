@@ -1,5 +1,5 @@
 """
-LibreVies — Launcher joueur (version 4.1.0)
+LibreVies — Launcher joueur (version 4.2.0)
 
 Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
   1. il lit version_url.json dans le dossier GitHub jeucompiler ;
@@ -93,13 +93,18 @@ else:
     GAME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
+# Ce fichier est volontairement separe du manifeste : l'adresse IP du serveur
+# peut changer sans declencher une mise a jour du launcher.
+AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
+AUTH_API_URL_DEFAULT = "http://92.133.115.121/librevies/api.php"
+AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
 # le launcher telecharge la nouvelle version puis redemarre : aucune
 # reconstruction de LibreVies.exe n'est necessaire.
 CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.1.0"
+LAUNCHER_VERSION = "4.2.0"
 GAME_VERSION = "0.5.79"
 # Les fichiers publies pour les joueurs sont dans le dossier GitHub
 # jeucompiler. Une seule chaine evite toute ambiguite lors d'une edition
@@ -118,8 +123,8 @@ ACCENT = "#f1c40f"; TEXT = "#ffffff"; TEXT2 = "#aabbcc"
 GREEN = "#27ae60"; RED = "#e74c3c"; BLUE = "#3498db"
 
 NEWS = [
-    {"date": "18/09/2026", "t": "Launcher 4.1.0 — mise a jour sans rien recompiler",
-     "d": "LibreVies.exe n'est plus qu'une petite amorce : tout le launcher est dans launcher.pyw. Des que ce fichier change, son hash change dans version_url.json : le launcher le telecharge et redemarre tout seul. Plus jamais besoin de reconstruire le launcher."},
+    {"date": "06/10/2026", "t": "Launcher 4.2.0 — connexion et Autolog",
+     "d": "Le launcher se connecte au serveur, inscrit les joueurs et active Autolog. Le bouton JOUER reste bloque tant que la connexion et les mises a jour ne sont pas terminees."},
     {"date": "18/09/2026", "t": "Launcher 4.0.0 — le jeu complet se telecharge tout seul",
      "d": "Le joueur ne recoit plus que le launcher. Au premier lancement, il telecharge l'archive de la compilation Unity publiee (controlee par md5), l'installe dans game/ puis active JOUER. Les mises a jour suivantes se font toutes seules, launcher compris."},
     {"date": "17/09/2026", "t": "Launcher 3.1.0 — distribution Unity autonome",
@@ -180,6 +185,46 @@ def load_local_config():
     return {"launcher_version": LAUNCHER_VERSION, "game_version": GAME_VERSION,
             "notes": "", "game_url": "", "raw_url": DEFAULT_RAW_URL,
             "files": {}, "game_build": {}}
+
+
+def load_auth_config():
+    """Lit l'URL de l'API sans l'inclure dans le manifeste de mise a jour."""
+    config = {"api_url": AUTH_API_URL_DEFAULT, "timeout": AUTH_TIMEOUT}
+    try:
+        with open(AUTH_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            local = json.load(f)
+        if isinstance(local, dict):
+            config.update(local)
+    except (OSError, ValueError):
+        pass
+    config['api_url'] = str(config.get('api_url') or AUTH_API_URL_DEFAULT).strip()
+    try:
+        config['timeout'] = max(3, min(60, int(config.get('timeout', AUTH_TIMEOUT))))
+    except (TypeError, ValueError):
+        config['timeout'] = AUTH_TIMEOUT
+    return config
+
+
+def auth_api_request(action, payload):
+    """Appelle l'API HTTP ; le launcher ne contient aucun mot de passe MySQL."""
+    config = load_auth_config()
+    url = config['api_url']
+    if not url.lower().startswith(('http://', 'https://')):
+        raise ValueError("URL d authentification invalide")
+    donnees = dict(payload or {})
+    donnees['action'] = action
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(donnees, ensure_ascii=False).encode('utf-8'),
+        headers={'Content-Type': 'application/json', 'Accept': 'application/json',
+                 'User-Agent': USER_AGENT},
+        method='POST')
+    with urllib.request.urlopen(req, timeout=config['timeout']) as response:
+        resultat = json.loads(response.read().decode('utf-8'))
+    if not isinstance(resultat, dict) or not resultat.get('ok'):
+        message = resultat.get('message') if isinstance(resultat, dict) else None
+        raise ValueError(str(message or "reponse invalide du serveur"))
+    return resultat
 
 
 def save_local_config(cfg):
@@ -834,7 +879,7 @@ def launch(path):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LibreVies - v%s" % GAME_VERSION)
+        self.title("LibreVies")
         self.geometry("1024x768")
         self.resizable(False, False)
         self.configure(bg=BG)
@@ -848,10 +893,15 @@ class App(tk.Tk):
 
         self.game = None
         self.ready = False
+        self.updates_done = False
+        self.authenticated = False
+        self.auth_busy = False
+        self.logged_pseudo = ""
         self.derniere_raison = ""
         self.build()
         self._load_saved_login()
         self.start_update()
+        self.after(250, self._start_autolog)
 
     def frame(self, x1, y1, x2, y2, color=CARD, outline=ACCENT):
         self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline, width=2)
@@ -873,64 +923,74 @@ class App(tk.Tk):
         # --- LIBREVIES ---
         self.canvas.create_rectangle(20, 15, 250, 100, fill=CARD, outline=ACCENT, width=2)
         self.brand_item = self.canvas.create_text(
-            135, 22, text="LibreVies  v%s" % GAME_VERSION,
-            font=("Segoe UI", 25, "bold"), fill=ACCENT, anchor="n")
+            135, 22, text="LibreVies", font=("Segoe UI", 25, "bold"),
+            fill=ACCENT, anchor="n")
         self.canvas.create_text(135, 65, text="MMO Open World",
                                 font=("Segoe UI", 11), fill=TEXT2, anchor="n")
-        self.version_item = self.canvas.create_text(
-            135, 82, text="v%s" % GAME_VERSION,
-            font=("Segoe UI", 10), fill="#667788", anchor="n")
 
         # --- CONNEXION ---
-        self.canvas.create_rectangle(275, 15, 559, 100, fill=CARD, outline=ACCENT, width=2)
-        self.canvas.create_text(417, 20, text="Connexion", font=("Segoe UI", 12, "bold"),
-                                fill=ACCENT, anchor="n")
-        self.canvas.create_text(285, 48, text="Pseudo:", font=("Segoe UI", 9),
-                                fill=TEXT2, anchor="w")
+        self.login_canvas_items = []
+        self.login_canvas_items.append(self.canvas.create_rectangle(
+            275, 15, 559, 100, fill=CARD, outline=ACCENT, width=2))
+        self.login_canvas_items.append(self.canvas.create_text(
+            417, 20, text="Connexion", font=("Segoe UI", 12, "bold"),
+            fill=ACCENT, anchor="n"))
+        self.login_canvas_items.append(self.canvas.create_text(
+            285, 48, text="Pseudo:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.login_pseudo = tk.Entry(self, font=("Segoe UI", 9), width=7,
                                      bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                      relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.login_pseudo.place(x=335, y=39, width=75, height=19)
-        self.canvas.create_text(415, 48, text="MDP:", font=("Segoe UI", 9),
-                                fill=TEXT2, anchor="w")
+        self.login_canvas_items.append(self.canvas.create_text(
+            415, 48, text="MDP:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.login_mdp = tk.Entry(self, font=("Segoe UI", 9), width=7, show="\u2022",
                                   bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                   relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.login_mdp.place(x=448, y=39, width=65, height=19)
-        tk.Button(self, text="Connexion", font=("Segoe UI", 8, "bold"),
-                  fg=TEXT, bg=GREEN, relief="flat", cursor="hand2",
-                  command=self._do_login).place(x=330, y=70, width=80, height=20)
+        self.login_button = tk.Button(self, text="Connexion", font=("Segoe UI", 8, "bold"),
+                                      fg=TEXT, bg=GREEN, relief="flat", cursor="hand2",
+                                      command=self._do_login)
+        self.login_button.place(x=330, y=70, width=80, height=20)
         self.remember_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self, text="Enregistrer", font=("Segoe UI", 8),
-                       fg=TEXT2, bg=CARD, selectcolor="#111122",
-                       activebackground=CARD, activeforeground=TEXT,
-                       variable=self.remember_var, cursor="hand2").place(x=420, y=70)
+        self.autolog_check = tk.Checkbutton(
+            self, text="Autolog", font=("Segoe UI", 8), fg=TEXT2, bg=CARD,
+            selectcolor="#111122", activebackground=CARD, activeforeground=TEXT,
+            variable=self.remember_var, cursor="hand2")
+        self.autolog_check.place(x=420, y=70)
+        self.login_widgets = [self.login_pseudo, self.login_mdp,
+                              self.login_button, self.autolog_check]
 
         # --- INSCRIPTION ---
-        self.canvas.create_rectangle(584, 15, 1004, 100, fill=CARD, outline=ACCENT, width=2)
-        self.canvas.create_text(794, 20, text="Inscription", font=("Segoe UI", 13, "bold"),
-                                fill=ACCENT, anchor="n")
-        self.canvas.create_text(596, 48, text="Email:", font=("Segoe UI", 9),
-                                fill=TEXT2, anchor="w")
+        self.registration_canvas_items = []
+        self.registration_canvas_items.append(self.canvas.create_rectangle(
+            584, 15, 1004, 100, fill=CARD, outline=ACCENT, width=2))
+        self.registration_canvas_items.append(self.canvas.create_text(
+            794, 20, text="Inscription", font=("Segoe UI", 13, "bold"),
+            fill=ACCENT, anchor="n"))
+        self.registration_canvas_items.append(self.canvas.create_text(
+            596, 48, text="Email:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.reg_email = tk.Entry(self, font=("Segoe UI", 9), width=10,
                                   bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                   relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.reg_email.place(x=638, y=39, width=130, height=18)
-        self.canvas.create_text(774, 48, text="Pseudo:", font=("Segoe UI", 9),
-                                fill=TEXT2, anchor="w")
+        self.registration_canvas_items.append(self.canvas.create_text(
+            774, 48, text="Pseudo:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.reg_pseudo = tk.Entry(self, font=("Segoe UI", 9), width=7,
                                    bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                    relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.reg_pseudo.place(x=822, y=39, width=70, height=18)
-        self.canvas.create_text(898, 48, text="MDP:", font=("Segoe UI", 9),
-                                fill=TEXT2, anchor="w")
+        self.registration_canvas_items.append(self.canvas.create_text(
+            898, 48, text="MDP:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.reg_mdp = tk.Entry(self, font=("Segoe UI", 9), width=6, show="\u2022",
                                 bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                 relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.reg_mdp.place(x=930, y=39, width=62, height=18)
-        tk.Button(self, text="S'inscrire", font=("Segoe UI", 9, "bold"),
-                  fg=TEXT, bg=BLUE, relief="flat", cursor="hand2",
-                  command=self._do_register).place(x=680, y=70, width=230, height=18)
+        self.register_button = tk.Button(
+            self, text="S'inscrire", font=("Segoe UI", 9, "bold"), fg=TEXT,
+            bg=BLUE, relief="flat", cursor="hand2", command=self._do_register)
+        self.register_button.place(x=680, y=70, width=230, height=18)
+        self.registration_widgets = [self.reg_email, self.reg_pseudo,
+                                     self.reg_mdp, self.register_button]
 
         # ====== ACTUALITES + CLASSEMENT ======
         self.frame(20, 110, 510, 370, color="#1a2a4a")
@@ -1022,26 +1082,113 @@ class App(tk.Tk):
         if cfg.get("saved_mdp"):
             self.login_mdp.insert(0, cfg["saved_mdp"])
 
+    def _start_autolog(self):
+        if not self.remember_var.get():
+            return
+        pseudo = self.login_pseudo.get().strip()
+        mdp = self.login_mdp.get().strip()
+        if pseudo and mdp:
+            self._start_auth_request(
+                'login', {'pseudo': pseudo, 'password': mdp}, automatic=True)
+
     def _do_login(self):
         pseudo = self.login_pseudo.get().strip()
         mdp = self.login_mdp.get().strip()
         if not pseudo or not mdp:
+            self._auth_failed("Pseudo et mot de passe obligatoires")
             return
-        cfg = load_local_config()
-        if self.remember_var.get():
-            cfg["saved_pseudo"] = pseudo
-            cfg["saved_mdp"] = mdp
-        else:
-            cfg.pop("saved_pseudo", None)
-            cfg.pop("saved_mdp", None)
-        save_local_config(cfg)
+        self._start_auth_request(
+            'login', {'pseudo': pseudo, 'password': mdp}, automatic=False)
 
     def _do_register(self):
         email = self.reg_email.get().strip()
         pseudo = self.reg_pseudo.get().strip()
         mdp = self.reg_mdp.get().strip()
         if not email or not pseudo or not mdp:
+            self._auth_failed("Email, pseudo et mot de passe obligatoires")
             return
+        self._start_auth_request(
+            'register', {'email': email, 'pseudo': pseudo, 'password': mdp},
+            automatic=False)
+
+    def _start_auth_request(self, action, payload, automatic=False):
+        if self.auth_busy:
+            return
+        self.auth_busy = True
+        self.login_button.config(
+            state='disabled',
+            text=('Autolog...' if automatic else
+                  ('Inscription...' if action == 'register' else 'Connexion...')))
+        if action == 'register':
+            self.register_button.config(state='disabled')
+        threading.Thread(target=self._auth_worker,
+                         args=(action, payload, automatic), daemon=True).start()
+
+    def _auth_worker(self, action, payload, automatic):
+        try:
+            auth_api_request(action, payload)
+            if action == 'register':
+                self.auth_busy = False
+                # Une inscription reussie ouvre aussi la session, sans
+                # demander au joueur de saisir les identifiants une seconde fois.
+                self.after(0, lambda: self._start_auth_request(
+                    'login', {'pseudo': payload['pseudo'], 'password': payload['password']},
+                    automatic=self.remember_var.get()))
+            else:
+                self.after(0, lambda: self._auth_succeeded(
+                    payload['pseudo'], payload['password']))
+        except Exception as erreur:
+            self.after(0, lambda: self._auth_failed(str(erreur)))
+
+    def _auth_succeeded(self, pseudo, mdp):
+        self.auth_busy = False
+        self.authenticated = True
+        self.logged_pseudo = pseudo
+        self.login_button.config(state='disabled', text='Connecte')
+        self.login_pseudo.config(state='disabled')
+        self.login_mdp.config(state='disabled')
+        if self.remember_var.get():
+            cfg = load_local_config()
+            cfg['saved_pseudo'] = pseudo
+            cfg['saved_mdp'] = mdp
+            save_local_config(cfg)
+            self._hide_registration_and_center_login()
+        else:
+            self.register_button.config(state='normal')
+        if not self.remember_var.get():
+            cfg = load_local_config()
+            cfg.pop('saved_pseudo', None)
+            cfg.pop('saved_mdp', None)
+            save_local_config(cfg)
+        self._update_play_state()
+
+    def _auth_failed(self, message):
+        self.auth_busy = False
+        self.authenticated = False
+        try:
+            self.login_button.config(state='normal', text='Connexion')
+            if not getattr(self, '_auth_ui_compact', False):
+                self.register_button.config(state='normal')
+        except Exception:
+            pass
+        self._upd_bar(0, 'Connexion impossible : %s' % str(message)[:70])
+        self._update_play_state()
+
+    def _hide_registration_and_center_login(self):
+        if getattr(self, '_auth_ui_compact', False):
+            return
+        self._auth_ui_compact = True
+        for item in self.registration_canvas_items:
+            self.canvas.itemconfigure(item, state='hidden')
+        for widget in self.registration_widgets:
+            widget.place_forget()
+        decalage = 95
+        for item in self.login_canvas_items:
+            self.canvas.move(item, decalage, 0)
+        self.login_pseudo.place_configure(x=430)
+        self.login_mdp.place_configure(x=543)
+        self.login_button.place_configure(x=425)
+        self.autolog_check.place_configure(x=515)
 
     # ============================================================
     # CLASSEMENT — rotation auto
@@ -1110,11 +1257,11 @@ class App(tk.Tk):
         threading.Thread(target=self._run_update, daemon=True).start()
 
     def _set_version(self, version):
+        # La version reste dans le manifeste mais n'est plus affichee dans
+        # l'en-tete : cela laisse la place aux controles de connexion.
         try:
-            valeur = version or GAME_VERSION
-            self.canvas.itemconfig(self.version_item, text="v%s" % valeur)
-            self.canvas.itemconfig(self.brand_item, text="LibreVies  v%s" % valeur)
-            self.title("LibreVies - v%s" % valeur)
+            self.canvas.itemconfig(self.brand_item, text="LibreVies")
+            self.title("LibreVies")
         except Exception:
             pass
 
@@ -1126,7 +1273,7 @@ class App(tk.Tk):
             self.after(0, lambda: self._upd_bar(
                 100, "Hors ligne : %s" % result['error'][:70]))
             time.sleep(0.4)
-            self.after(0, self._check_game)
+            self.after(0, lambda: self._updates_finished(False))
             return
 
         remote_cfg = result['remote_cfg'] or {}
@@ -1174,7 +1321,11 @@ class App(tk.Tk):
         else:
             self.after(0, lambda: self._upd_bar(100, 'A jour !'))
         time.sleep(0.4)
-        self.after(0, self._check_game)
+        self.after(0, lambda: self._updates_finished(not erreurs))
+
+    def _updates_finished(self, ok):
+        self.updates_done = bool(ok)
+        self._check_game()
 
     def _relancer(self):
         """Relance le launcher (apres mise a jour de son code)."""
@@ -1211,24 +1362,34 @@ class App(tk.Tk):
 
     def _check_game(self):
         self.game = find_game()
-        if self.game:
-            self._ready(True)
-            return
-        self._upd_bar(0, self.derniere_raison
-                      or 'Jeu non installe : verifiez la connexion puis relancez')
+        self.ready = bool(self.game)
+        self._update_play_state()
+        if not self.game and self.updates_done:
+            self._upd_bar(0, self.derniere_raison
+                          or 'Jeu non installe : verifiez la connexion puis relancez')
 
-    def _ready(self, ok):
-        if ok:
-            self.ready = True
+    def _update_play_state(self):
+        autorise = bool(self.updates_done and self.authenticated and self.game)
+        if autorise:
             self.play_btn.config(state='normal', bg=GREEN)
             self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
+            return
+        self.play_btn.config(state='disabled', bg='#444444')
+        if not self.updates_done:
+            return
+        if not self.authenticated:
+            self._upd_bar(100, 'Connectez-vous pour jouer')
+
+    def _ready(self, ok):
+        self.ready = bool(ok)
+        self._update_play_state()
 
     # ============================================================
     # LANCEMENT DU JEU
     # ============================================================
 
     def play(self):
-        if not (self.ready and self.game):
+        if not (self.updates_done and self.authenticated and self.ready and self.game):
             return
         try:
             launch(self.game)

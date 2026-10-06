@@ -43,6 +43,7 @@ IGNORER_NOMS = {
     "build", "game.install", "game.ancien", "sauvegarde_locale", "logs", "Logs"
 }
 IGNORER_SUFFIXES = (".download", ".download.part", ".new", ".part", ".tmp")
+FICHIERS_LOCAUX_PRESERVES = {"auth_config.json"}
 
 
 @dataclass
@@ -308,7 +309,7 @@ def fichiers_source(source: Path) -> dict[str, Path]:
         relatif = chemin.relative_to(source).as_posix()
         # Ces fichiers appartiennent a la machine de compilation et ne doivent
         # jamais etre distribues aux joueurs.
-        if relatif in {"version_url.json", "etat_jeu.json"}:
+        if relatif in {"version_url.json", "etat_jeu.json", "auth_config.json"}:
             continue
         resultat[relatif] = chemin
     if not resultat:
@@ -402,7 +403,8 @@ def construire_operations(source: Path, cible: Path, manifeste: bytes,
         operations.append(Operation("version_url.json", None, len(manifeste), digest_manifest))
 
     if supprimer_absents and cible.is_dir():
-        attendus = set(source_files) | {"version_url.json"}
+        attendus = (set(source_files) | {"version_url.json"}
+                    | FICHIERS_LOCAUX_PRESERVES)
         for chemin in sorted(cible.rglob("*"), reverse=True):
             if not chemin.is_file():
                 continue
