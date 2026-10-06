@@ -97,7 +97,7 @@ CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 # Ce fichier est volontairement separe du manifeste : l'adresse IP du serveur
 # peut changer sans declencher une mise a jour du launcher.
 AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
-AUTH_API_URL_DEFAULT = "http://92.133.115.121/librevies/api.php"
+AUTH_API_URL_DEFAULT = "http://92.133.115.121/serveur/api.php"
 AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
 # le launcher telecharge la nouvelle version puis redemarre : aucune

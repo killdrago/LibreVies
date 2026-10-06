@@ -1,4 +1,4 @@
 {
-  "api_url": "http://92.133.115.121/librevies/api.php",
+  "api_url": "http://92.133.115.121/serveur/api.php",
   "timeout": 15
 }
