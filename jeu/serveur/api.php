@@ -112,13 +112,31 @@ if ($action === 'register') {
             ':motdepasse' => $hash,
             ':email' => $email,
         ));
+
+        // Verification apres insertion : l'inscription n'est validee que si
+        // la ligne est bien relisible dans la base.
+        $id = (int)$pdo->lastInsertId();
+        $verification = $pdo->prepare(
+            'SELECT id, pseudo, email FROM membre WHERE id = :id LIMIT 1'
+        );
+        $verification->execute(array(':id' => $id));
+        $membre = $verification->fetch();
+        if (!$membre) {
+            repondre(false, 'Inscription echouee, veuillez contacter un administrateur.', array(), 500);
+        }
     } catch (PDOException $erreur) {
         if ($erreur->getCode() === '23000') {
             repondre(false, 'Ce pseudo ou cet email est deja utilise.', array(), 409);
         }
         repondre(false, detail_erreur($erreur, $config), array(), 500);
     }
-    repondre(true, 'Inscription reussie.');
+    repondre(true, 'Inscription reussie.', array(
+        'membre' => array(
+            'id' => (int)$membre['id'],
+            'pseudo' => (string)$membre['pseudo'],
+            'email' => (string)$membre['email'],
+        ),
+    ));
 }
 
 if ($action === 'login') {

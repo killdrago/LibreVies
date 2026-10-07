@@ -1164,12 +1164,28 @@ class App(tk.Tk):
         try:
             auth_api_request(action, payload)
             if action == 'register':
+                # Verification reelle : l'API doit aussi accepter une
+                # connexion avec le compte qui vient d'etre cree.
+                auth_api_request('login', {
+                    'pseudo': payload['pseudo'],
+                    'password': payload['password'],
+                })
                 self.after(0, self._registration_succeeded)
             else:
                 self.after(0, lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
-            self.after(0, lambda: self._auth_failed(str(erreur)))
+            if action == 'register':
+                self.after(0, self._registration_failed)
+            else:
+                self.after(0, lambda: self._auth_failed(str(erreur)))
+
+    def _registration_failed(self):
+        self.auth_busy = False
+        self.login_button.config(state='normal', text='Connexion')
+        self.register_button.config(state='normal')
+        self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
+        self._update_play_state()
 
     def _registration_succeeded(self):
         self.auth_busy = False
