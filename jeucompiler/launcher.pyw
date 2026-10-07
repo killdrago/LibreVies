@@ -1184,8 +1184,10 @@ class App(tk.Tk):
         self.auth_busy = False
         self.login_button.config(state='normal', text='Connexion')
         self.register_button.config(state='normal')
-        self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
         self._update_play_state()
+        # Placer ce message apres _update_play_state : cette methode peut
+        # mettre a jour la barre avec l etat de connexion.
+        self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
 
     def _registration_succeeded(self):
         self.auth_busy = False
