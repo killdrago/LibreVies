@@ -303,7 +303,13 @@ def get_remote_url(fname, raw_url, info=None):
     """
     if isinstance(info, dict) and info.get('url'):
         return info['url']
-    return "%s/%s" % (raw_url, urllib.request.quote(fname))
+    url = "%s/%s" % (raw_url, urllib.request.quote(fname))
+    # Une branche GitHub peut etre servie par un cache pendant quelques
+    # instants apres une publication. Le hash force ici la recuperation du
+    # contenu correspondant au manifeste courant.
+    if isinstance(info, dict) and info.get('hash'):
+        url += ('&' if '?' in url else '?') + 'librevies_hash=' + str(info['hash'])
+    return url
 
 
 def _safe_local_path(fname):
@@ -372,7 +378,10 @@ def _is_running_launcher(path):
 
 
 def _lire_json(url, timeout=20):
-    req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+    # Evite de lire un ancien version_url.json dans le cache du CDN.
+    url += ('&' if '?' in url else '?') + 'librevies_cache=' + str(int(time.time() * 1000))
+    req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT,
+                                                'Cache-Control': 'no-cache'})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode('utf-8'))
 
