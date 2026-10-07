@@ -1162,14 +1162,10 @@ class App(tk.Tk):
 
     def _auth_worker(self, action, payload, automatic, compact_on_success):
         try:
+            # Pour une inscription, l'API ne renvoie ok=true qu'apres
+            # INSERT puis relecture de la ligne dans la base.
             auth_api_request(action, payload)
             if action == 'register':
-                # Verification reelle : l'API doit aussi accepter une
-                # connexion avec le compte qui vient d'etre cree.
-                auth_api_request('login', {
-                    'pseudo': payload['pseudo'],
-                    'password': payload['password'],
-                })
                 self.after(0, self._registration_succeeded)
             else:
                 self.after(0, lambda: self._auth_succeeded(
