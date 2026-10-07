@@ -1143,7 +1143,8 @@ class App(tk.Tk):
             'register', {'email': email, 'pseudo': pseudo, 'password': mdp},
             automatic=False)
 
-    def _start_auth_request(self, action, payload, automatic=False):
+    def _start_auth_request(self, action, payload, automatic=False,
+                            compact_on_success=False):
         if self.auth_busy:
             return
         self.auth_busy = True
@@ -1154,9 +1155,10 @@ class App(tk.Tk):
         if action == 'register':
             self.register_button.config(state='disabled')
         threading.Thread(target=self._auth_worker,
-                         args=(action, payload, automatic), daemon=True).start()
+                         args=(action, payload, automatic, compact_on_success),
+                         daemon=True).start()
 
-    def _auth_worker(self, action, payload, automatic):
+    def _auth_worker(self, action, payload, automatic, compact_on_success):
         try:
             auth_api_request(action, payload)
             if action == 'register':
@@ -1165,14 +1167,14 @@ class App(tk.Tk):
                 # demander au joueur de saisir les identifiants une seconde fois.
                 self.after(0, lambda: self._start_auth_request(
                     'login', {'pseudo': payload['pseudo'], 'password': payload['password']},
-                    automatic=self.remember_var.get()))
+                    automatic=self.remember_var.get(), compact_on_success=True))
             else:
                 self.after(0, lambda: self._auth_succeeded(
-                    payload['pseudo'], payload['password']))
+                    payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
             self.after(0, lambda: self._auth_failed(str(erreur)))
 
-    def _auth_succeeded(self, pseudo, mdp):
+    def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
         self.authenticated = True
         self.logged_pseudo = pseudo
@@ -1184,6 +1186,7 @@ class App(tk.Tk):
             cfg['saved_pseudo'] = pseudo
             cfg['saved_mdp'] = mdp
             save_local_config(cfg)
+        if compact_on_success or self.remember_var.get():
             self._hide_registration_and_center_login()
         else:
             self.register_button.config(state='normal')
