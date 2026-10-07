@@ -1197,20 +1197,16 @@ class App(tk.Tk):
         self.login_button.config(state='disabled', text='Connecte')
         self.login_pseudo.config(state='disabled')
         self.login_mdp.config(state='disabled')
+        cfg = load_local_config()
+        cfg['registration_done'] = True
         if self.remember_var.get():
-            cfg = load_local_config()
             cfg['saved_pseudo'] = pseudo
             cfg['saved_mdp'] = mdp
-            save_local_config(cfg)
-        if compact_on_success or self.remember_var.get():
-            self._hide_registration_and_center_login()
         else:
-            self.register_button.config(state='normal')
-        if not self.remember_var.get():
-            cfg = load_local_config()
             cfg.pop('saved_pseudo', None)
             cfg.pop('saved_mdp', None)
-            save_local_config(cfg)
+        save_local_config(cfg)
+        self._hide_registration_and_center_login()
         self._update_play_state()
 
     def _auth_failed(self, message):
