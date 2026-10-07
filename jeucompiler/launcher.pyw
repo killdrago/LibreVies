@@ -261,7 +261,7 @@ def save_local_config(cfg):
             previous = json.load(f)
         if isinstance(previous, dict):
             cfg = dict(cfg)
-            for key in ('saved_pseudo', 'saved_mdp'):
+            for key in ('saved_pseudo', 'saved_mdp', 'registration_done'):
                 if key not in cfg and key in previous:
                     cfg[key] = previous[key]
     except (OSError, ValueError):
@@ -926,6 +926,8 @@ class App(tk.Tk):
         self.derniere_raison = ""
         self.build()
         self._load_saved_login()
+        if load_local_config().get('registration_done'):
+            self._hide_registration_and_center_login()
         self.start_update()
         self.after(250, self._start_autolog)
 
@@ -1162,17 +1164,31 @@ class App(tk.Tk):
         try:
             auth_api_request(action, payload)
             if action == 'register':
-                self.auth_busy = False
-                # Une inscription reussie ouvre aussi la session, sans
-                # demander au joueur de saisir les identifiants une seconde fois.
-                self.after(0, lambda: self._start_auth_request(
-                    'login', {'pseudo': payload['pseudo'], 'password': payload['password']},
-                    automatic=self.remember_var.get(), compact_on_success=True))
+                self.after(0, self._registration_succeeded)
             else:
                 self.after(0, lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
             self.after(0, lambda: self._auth_failed(str(erreur)))
+
+    def _registration_succeeded(self):
+        self.auth_busy = False
+        cfg = load_local_config()
+        cfg['registration_done'] = True
+        try:
+            save_local_config(cfg)
+        except OSError as erreur:
+            self._auth_failed('inscription creee, mais sauvegarde locale impossible : %s' % erreur)
+            return
+
+        self._upd_bar(100, 'Inscription reussie, redemarrage du launcher...')
+        if self._relancer():
+            self.after(600, self.destroy)
+        else:
+            # Secours pour une execution inhabituelle : l interface est tout
+            # de meme compactee sans modifier le bouton Connexion.
+            self._hide_registration_and_center_login()
+            self._upd_bar(100, 'Inscription reussie. Connectez-vous.')
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
@@ -1363,11 +1379,13 @@ class App(tk.Tk):
         self._check_game()
 
     def _relancer(self):
-        """Relance le launcher (apres mise a jour de son code)."""
-        if not getattr(sys, 'frozen', False):
-            return False
+        """Relance le launcher apres une mise a jour ou une inscription."""
         try:
-            subprocess.Popen([sys.executable], cwd=GAME_DIR, close_fds=False)
+            if getattr(sys, 'frozen', False):
+                commande = [sys.executable]
+            else:
+                commande = [sys.executable, os.path.abspath(__file__)]
+            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=False)
             return True
         except (OSError, IOError):
             return False
