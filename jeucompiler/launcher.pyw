@@ -20,6 +20,7 @@ import tkinter as tk
 import subprocess, threading, os, sys, time
 import urllib.request, urllib.error, urllib.parse, hashlib, json
 import re
+import unicodedata
 import base64, io, tempfile
 import shutil, zipfile
 
@@ -207,15 +208,35 @@ def load_auth_config():
     return config
 
 
+def texte_saisi(value, limite):
+    """Nettoie un champ sans HTML ni caractere de controle dangereux."""
+    if not isinstance(value, str):
+        return ''
+    value = unicodedata.normalize('NFC', value).strip()
+    if len(value) > limite or any(ord(caractere) < 32 or ord(caractere) == 127
+                                  for caractere in value):
+        return ''
+    return value
+
+
+def motdepasse_saisi(value):
+    """Le mot de passe n'est jamais journalise ni echappe dans du HTML."""
+    if not isinstance(value, str) or len(value) > 128:
+        return ''
+    if any(ord(caractere) < 32 or ord(caractere) == 127 for caractere in value):
+        return ''
+    return value
+
+
 def email_valide(email):
     """Validation locale avant l'envoi : format simple mais utile."""
-    email = (email or '').strip()
+    email = texte_saisi(email, 254)
     return (len(email) <= 254
             and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None)
 
 
 def pseudo_valide(pseudo):
-    pseudo = (pseudo or '').strip()
+    pseudo = texte_saisi(pseudo, 30)
     return (3 <= len(pseudo) <= 30
             and re.fullmatch(r"[\w -]+", pseudo, re.UNICODE) is not None)
 
@@ -1153,8 +1174,8 @@ class App(tk.Tk):
     def _start_autolog(self):
         if not self.remember_var.get():
             return
-        pseudo = self.login_pseudo.get().strip()
-        mdp = self.login_mdp.get().strip()
+        pseudo = texte_saisi(self.login_pseudo.get(), 30)
+        mdp = motdepasse_saisi(self.login_mdp.get())
         if pseudo and mdp:
             self._start_auth_request(
                 'login', {'pseudo': pseudo, 'password': mdp},
@@ -1170,9 +1191,9 @@ class App(tk.Tk):
             'login', {'pseudo': pseudo, 'password': mdp}, automatic=False)
 
     def _do_register(self):
-        email = self.reg_email.get().strip()
-        pseudo = self.reg_pseudo.get().strip()
-        mdp = self.reg_mdp.get().strip()
+        email = texte_saisi(self.reg_email.get(), 254)
+        pseudo = texte_saisi(self.reg_pseudo.get(), 30)
+        mdp = motdepasse_saisi(self.reg_mdp.get())
         if not email_valide(email):
             self._auth_failed("Adresse email invalide : exemple@domaine.fr")
             return
@@ -1552,3 +1573,4 @@ class App(tk.Tk):
 
 if __name__ == "__main__":
     App().mainloop()
+()

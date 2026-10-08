@@ -23,6 +23,19 @@ function journal_api($message) {
     }
 }
 
+function texte_recu($value, $limite) {
+    if (!is_string($value)) {
+        return '';
+    }
+    $value = trim($value);
+    if ($value === '' || strlen($value) > (int)$limite
+        || preg_match('/[\\x00-\\x1F\\x7F]/', $value)
+        || @preg_match('//u', $value) !== 1) {
+        return '';
+    }
+    return $value;
+}
+
 function repondre($ok, $message = '', $extra = array(), $code = 200) {
     journal_api('REPONSE code=' . (int)$code . ' ok=' . ($ok ? 'true' : 'false')
         . ' message=' . $message);
@@ -61,7 +74,7 @@ $config = require $configPath;
 
 if ($method === 'GET') {
     // Diagnostic sans modifier la base : ouvrir api.php?action=health.
-    $action = isset($_GET['action']) ? (string)$_GET['action'] : 'health';
+    $action = isset($_GET['action']) ? texte_recu($_GET['action'], 40) : 'health';
     $donnees = $_GET;
 } else {
     $corps = file_get_contents('php://input');
@@ -72,7 +85,7 @@ if ($method === 'GET') {
     if (!is_array($donnees)) {
         $donnees = $_POST;
     }
-    $action = isset($donnees['action']) ? (string)$donnees['action'] : '';
+    $action = isset($donnees['action']) ? texte_recu($donnees['action'], 40) : '';
 }
 
 journal_api('REQUETE methode=' . $method . ' action=' . $action
