@@ -1429,11 +1429,15 @@ class App(tk.Tk):
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
             journal_auth('ECHEC action=%s erreur=%s' % (action, erreur))
+            message_erreur = str(erreur)
             if action == 'register':
-                self._ui_call(lambda: self._registration_failed(str(erreur)))
+                # Capturer le texte maintenant : Python detruit la variable
+                # d exception a la sortie du bloc except.
+                self._ui_call(lambda message=message_erreur:
+                              self._registration_failed(message))
             else:
-                self._ui_call(lambda: self._auth_failed(
-                    str(erreur), automatic=automatic))
+                self._ui_call(lambda message=message_erreur, auto=automatic:
+                              self._auth_failed(message, automatic=auto))
 
     def _registration_failed(self, message='Inscription impossible.'):
         journal_auth('INSCRIPTION ECHEC affichee au joueur message=%s' % message)
