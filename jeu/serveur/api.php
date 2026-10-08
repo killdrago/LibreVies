@@ -79,6 +79,35 @@ if ($method !== 'POST') {
     repondre(false, 'Action GET inconnue.', array(), 400);
 }
 
+if ($action === 'registration_status') {
+    $email = trim(isset($donnees['email']) ? (string)$donnees['email'] : '');
+    $pseudo = trim(isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : '');
+    if ($email === '' || $pseudo === '') {
+        repondre(false, 'Email et pseudo obligatoires.', array(), 400);
+    }
+
+    try {
+        $requete = $pdo->prepare(
+            'SELECT id, pseudo, email FROM membre '
+            . 'WHERE email = :email AND pseudo = :pseudo LIMIT 1'
+        );
+        $requete->execute(array(':email' => $email, ':pseudo' => $pseudo));
+        $membre = $requete->fetch();
+    } catch (PDOException $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    if (!$membre) {
+        repondre(false, 'Inscription encore en attente.', array(), 404);
+    }
+    repondre(true, 'Inscription verifiee.', array(
+        'membre' => array(
+            'id' => (int)$membre['id'],
+            'pseudo' => (string)$membre['pseudo'],
+            'email' => (string)$membre['email'],
+        ),
+    ));
+}
+
 if ($action === 'register') {
     $email = trim(isset($donnees['email']) ? (string)$donnees['email'] : '');
     $pseudo = trim(isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : '');

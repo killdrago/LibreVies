@@ -935,8 +935,8 @@ class App(tk.Tk):
         self.derniere_raison = ""
         self.build()
         self._load_saved_login()
-        if load_local_config().get('registration_done'):
-            self._hide_registration_and_center_login()
+        # Le cadre Inscription reste visible par defaut. Il est masque
+        # uniquement apres une authentification Autolog reussie.
         self.start_update()
         self.after(250, self._start_autolog)
 
@@ -1126,7 +1126,8 @@ class App(tk.Tk):
         mdp = self.login_mdp.get().strip()
         if pseudo and mdp:
             self._start_auth_request(
-                'login', {'pseudo': pseudo, 'password': mdp}, automatic=True)
+                'login', {'pseudo': pseudo, 'password': mdp},
+                automatic=True, compact_on_success=True)
 
     def _do_login(self):
         pseudo = self.login_pseudo.get().strip()
@@ -1171,11 +1172,26 @@ class App(tk.Tk):
 
     def _auth_worker(self, action, payload, automatic, compact_on_success):
         try:
-            # Pour une inscription, l'API ne renvoie ok=true qu'apres
-            # INSERT puis relecture de la ligne dans la base.
             auth_api_request(action, payload)
             if action == 'register':
-                self.after(0, self._registration_succeeded)
+                # Apres l INSERT, verifier la presence de la ligne jusqu a
+                # dix fois, avec une seconde entre chaque tentative.
+                for tentative in range(10):
+                    numero = tentative + 1
+                    self.after(0, lambda n=numero: self._upd_bar(
+                        10 + n * 8,
+                        'Verification de l inscription (%d/10)...' % n))
+                    try:
+                        auth_api_request('registration_status', {
+                            'email': payload['email'],
+                            'pseudo': payload['pseudo'],
+                        })
+                        self.after(0, lambda p=payload: self._registration_succeeded(p))
+                        return
+                    except Exception:
+                        if tentative < 9:
+                            time.sleep(1)
+                self.after(0, self._registration_failed)
             else:
                 self.after(0, lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
@@ -1194,10 +1210,16 @@ class App(tk.Tk):
         # mettre a jour la barre avec l etat de connexion.
         self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
 
-    def _registration_succeeded(self):
+    def _registration_succeeded(self, payload):
         self.auth_busy = False
         cfg = load_local_config()
         cfg['registration_done'] = True
+        if self.remember_var.get():
+            cfg['saved_pseudo'] = payload['pseudo']
+            cfg['saved_mdp'] = payload['password']
+        else:
+            cfg.pop('saved_pseudo', None)
+            cfg.pop('saved_mdp', None)
         try:
             save_local_config(cfg)
         except OSError as erreur:
@@ -1229,7 +1251,8 @@ class App(tk.Tk):
             cfg.pop('saved_pseudo', None)
             cfg.pop('saved_mdp', None)
         save_local_config(cfg)
-        self._hide_registration_and_center_login()
+        if compact_on_success or self.remember_var.get():
+            self._hide_registration_and_center_login()
         self._update_play_state()
 
     def _auth_failed(self, message):
