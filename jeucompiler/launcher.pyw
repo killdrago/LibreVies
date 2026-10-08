@@ -1182,18 +1182,18 @@ class App(tk.Tk):
                 automatic=True, compact_on_success=True)
 
     def _do_login(self):
-        pseudo = self.login_pseudo.get().strip()
-        mdp = self.login_mdp.get().strip()
+        pseudo = texte_saisi(self.login_pseudo.get(), 30)
+        mdp = motdepasse_saisi(self.login_mdp.get())
         if not pseudo or not mdp:
-            self._auth_failed("Pseudo et mot de passe obligatoires")
+            self._auth_failed("Pseudo et mot de passe obligatoires ou invalides")
             return
         self._start_auth_request(
             'login', {'pseudo': pseudo, 'password': mdp}, automatic=False)
 
     def _do_register(self):
-        email = texte_saisi(self.reg_email.get(), 254)
-        pseudo = texte_saisi(self.reg_pseudo.get(), 30)
-        mdp = motdepasse_saisi(self.reg_mdp.get())
+        email = self.reg_email.get().strip()
+        pseudo = self.reg_pseudo.get().strip()
+        mdp = self.reg_mdp.get().strip()
         if not email_valide(email):
             self._auth_failed("Adresse email invalide : exemple@domaine.fr")
             return
@@ -1557,4 +1557,3 @@ class App(tk.Tk):
 
 if __name__ == "__main__":
     App().mainloop()
-()
