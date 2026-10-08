@@ -158,8 +158,8 @@ if ($action === 'register') {
     try {
         journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
         $requete = $pdo->prepare(
-            'INSERT INTO membre (pseudo, motdepasse, email) '
-            . 'VALUES (:pseudo, :motdepasse, :email)'
+            'INSERT INTO membre (pseudo, motdepasse, email, valider) '
+            . 'VALUES (:pseudo, :motdepasse, :email, 0)'
         );
         $requete->execute(array(
             ':pseudo' => $pseudo,

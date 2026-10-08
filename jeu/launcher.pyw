@@ -18,7 +18,7 @@ JAMAIS chez le joueur.
 """
 import tkinter as tk
 import subprocess, threading, os, sys, time
-import urllib.request, urllib.error, hashlib, json
+import urllib.request, urllib.error, urllib.parse, hashlib, json
 import re
 import base64, io, tempfile
 import shutil, zipfile
@@ -241,11 +241,13 @@ def auth_api_request(action, payload):
     donnees['action'] = action
     journal_auth('REQUETE action=%s email=%s pseudo=%s' % (
         action, donnees.get('email', ''), donnees.get('pseudo', '')))
+    # Formulaire classique plutot que JSON : PHP 5.6 n'emet ainsi pas
+    # l'avertissement $HTTP_RAW_POST_DATA avant la reponse JSON.
     req = urllib.request.Request(
         url,
-        data=json.dumps(donnees, ensure_ascii=False).encode('utf-8'),
-        headers={'Content-Type': 'application/json', 'Accept': 'application/json',
-                 'User-Agent': USER_AGENT},
+        data=urllib.parse.urlencode(donnees).encode('utf-8'),
+        headers={'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+                 'Accept': 'application/json', 'User-Agent': USER_AGENT},
         method='POST')
     try:
         with urllib.request.urlopen(req, timeout=config['timeout']) as response:
