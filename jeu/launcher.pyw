@@ -17,7 +17,7 @@ Le dossier compilation/ (projet Unity, scripts, images de travail) ne part
 JAMAIS chez le joueur.
 """
 import tkinter as tk
-import subprocess, threading, queue, os, sys, time
+import subprocess, threading, os, sys, time
 import urllib.request, urllib.error, urllib.parse, hashlib, json
 import re
 import unicodedata
@@ -1098,7 +1098,8 @@ class App(tk.Tk):
         self.logged_pseudo = ""
         self.auth_message = ""
         self.derniere_raison = ""
-        self._ui_queue = queue.Queue()
+        self._ui_queue = []
+        self._ui_queue_lock = threading.Lock()
         self.autolog = migrate_legacy_autolog()
         self.build()
         self.after(50, self._drain_ui_queue)
@@ -1295,19 +1296,20 @@ class App(tk.Tk):
 
     def _ui_call(self, callback):
         """Planifie une action Tk depuis un thread sans appeler Tkinter hors du thread principal."""
-        self._ui_queue.put(callback)
+        with self._ui_queue_lock:
+            self._ui_queue.append(callback)
 
     def _drain_ui_queue(self):
-        try:
-            while True:
-                callback = self._ui_queue.get_nowait()
-                try:
-                    callback()
-                except Exception as erreur:
-                    journal_auth('ERREUR CALLBACK UI type=%s erreur=%s' % (
-                        type(erreur).__name__, erreur))
-        except queue.Empty:
-            pass
+        while True:
+            with self._ui_queue_lock:
+                if not self._ui_queue:
+                    break
+                callback = self._ui_queue.pop(0)
+            try:
+                callback()
+            except Exception as erreur:
+                journal_auth('ERREUR CALLBACK UI type=%s erreur=%s' % (
+                    type(erreur).__name__, erreur))
         try:
             self.after(50, self._drain_ui_queue)
         except tk.TclError:
