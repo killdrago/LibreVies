@@ -1168,17 +1168,21 @@ class App(tk.Tk):
         self.login_canvas_items = []
         self.login_canvas_items.append(self.canvas.create_rectangle(
             275, 15, 559, 100, fill=CARD, outline=ACCENT, width=2))
-        self.login_canvas_items.append(self.canvas.create_text(
+        # Conserver separement les libelles du formulaire pour les masquer
+        # apres connexion sans masquer le cadre ni la case Autolog.
+        self.login_form_canvas_items = []
+        self.login_form_canvas_items.append(self.canvas.create_text(
             417, 20, text="Connexion", font=("Segoe UI", 12, "bold"),
             fill=ACCENT, anchor="n"))
-        self.login_canvas_items.append(self.canvas.create_text(
+        self.login_form_canvas_items.append(self.canvas.create_text(
             285, 48, text="Pseudo:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
         self.login_pseudo = tk.Entry(self, font=("Segoe UI", 9), width=7,
                                      bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                      relief="flat", highlightthickness=1, highlightcolor=ACCENT)
         self.login_pseudo.place(x=335, y=39, width=75, height=19)
-        self.login_canvas_items.append(self.canvas.create_text(
+        self.login_form_canvas_items.append(self.canvas.create_text(
             415, 48, text="MDP:", font=("Segoe UI", 9), fill=TEXT2, anchor="w"))
+        self.login_canvas_items.extend(self.login_form_canvas_items)
         self.login_mdp = tk.Entry(self, font=("Segoe UI", 9), width=7, show="\u2022",
                                   bg="#111122", fg=TEXT, insertbackground=ACCENT,
                                   relief="flat", highlightthickness=1, highlightcolor=ACCENT)
@@ -1520,11 +1524,15 @@ class App(tk.Tk):
         self._finish_launcher_update((None, None))
 
     def _show_logged_greeting(self, pseudo):
+        for item in self.login_form_canvas_items:
+            self.canvas.itemconfigure(item, state='hidden')
         self.login_pseudo.place_forget()
         self.login_mdp.place_forget()
         self.login_button.place_forget()
         self.login_greeting.config(text='Bonjour %s' % pseudo)
-        self.login_greeting.place(x=330, y=39, width=180, height=22)
+        # Le bonjour commence a la place de l'ancien libelle Pseudo.
+        # Autolog reste visible et peut etre decoche apres connexion.
+        self.login_greeting.place(x=285, y=39, width=264, height=22)
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False, membre_id=0,
                         session_token='', session_expires_at=0, api_url=''):
@@ -1572,6 +1580,8 @@ class App(tk.Tk):
             self.remember_var.set(False)
         try:
             self.login_greeting.place_forget()
+            for item in self.login_form_canvas_items:
+                self.canvas.itemconfigure(item, state='normal')
             self.login_pseudo.config(state='normal')
             self.login_mdp.config(state='normal')
             self.login_pseudo.place(x=335, y=39, width=75, height=19)
