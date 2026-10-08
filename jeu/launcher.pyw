@@ -1338,6 +1338,7 @@ class App(tk.Tk):
         self.auth_busy = True
         self.auth_message = ('Verification du pseudo et de l email...'
                              if action == 'register' else '')
+        self._upd_bar(0, self.auth_message or 'Connexion en cours...')
         self.login_button.config(
             state='disabled',
             text=('Autolog...' if automatic else
@@ -1355,10 +1356,19 @@ class App(tk.Tk):
             if action == 'register':
                 # Le doublon est refuse avant de calculer le hash et avant
                 # toute tentative d INSERT en base.
-                auth_api_request('check_account', {
-                    'email': payload['email'],
-                    'pseudo': payload['pseudo'],
-                })
+                try:
+                    auth_api_request('check_account', {
+                        'email': payload['email'],
+                        'pseudo': payload['pseudo'],
+                    })
+                except ValueError as erreur_verification:
+                    # Compatibilite avec un ancien api.php deja installe :
+                    # son action register possede aussi la verification juste
+                    # avant INSERT. On continue donc avec elle si l ancienne
+                    # API ne connait pas encore check_account.
+                    if 'action inconnue' not in str(erreur_verification).lower():
+                        raise
+                    journal_auth('CHECK_ACCOUNT absent, verification register utilisee')
             auth_api_request(action, payload)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
