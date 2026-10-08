@@ -1449,10 +1449,16 @@ class App(tk.Tk):
                 commande = [sys.executable]
             else:
                 commande = [sys.executable, os.path.abspath(__file__)]
-            # Ne pas transmettre les handles du dossier _MEI au nouveau
-            # processus : cela empeche le bootloader PyInstaller de nettoyer
-            # le dossier temporaire de l'ancienne instance.
-            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=True)
+            # Le nouveau processus doit etre une instance PyInstaller
+            # independante. Sans cette variable, PyInstaller 6.10+ peut
+            # reutiliser le dossier _MEI de l'ancienne instance ; celle-ci le
+            # supprime ensuite pendant son nettoyage.
+            environnement = os.environ.copy()
+            if getattr(sys, 'frozen', False):
+                environnement['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+            # Ne pas transmettre les handles du dossier _MEI non plus.
+            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=True,
+                             env=environnement)
             journal_auth('REDEMARRAGE direct launcher')
             return True
         except (OSError, IOError):
