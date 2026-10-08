@@ -4,7 +4,8 @@ using System.Globalization;
 using UnityEngine;
 
 // Createur humain reutilisable dans le jeu.
-// Le composant fournit aussi la camera et la texture de rendu du panneau ADMIN.
+// Le composant fournit la camera et la texture de rendu du panel propose
+// par le NPC Esthétique.
 public sealed class AdminHumanCreator : MonoBehaviour
 {
     private const int PreviewLayer = 31;
@@ -56,6 +57,17 @@ public sealed class AdminHumanCreator : MonoBehaviour
         get { return previewTexture != null && previewTexture.IsCreated(); }
     }
 
+    public bool PreviewModelReady
+    {
+        get { return preview != null && preview.IsBuilt; }
+    }
+
+    public void SetPreviewVisible(bool visible)
+    {
+        if (previewCamera != null) previewCamera.enabled = visible;
+        if (preview != null) preview.SetVisible(visible);
+    }
+
     public void BuildPreview()
     {
         EnsurePreviewCamera();
@@ -105,11 +117,23 @@ public sealed class AdminHumanCreator : MonoBehaviour
     public bool ApplyTo(Transform target)
     {
         if (target == null) return false;
+        HumanPreview candidat = new HumanPreview(target);
+        try
+        {
+            candidat.Build(this, false);
+            if (!candidat.IsBuilt) return false;
+            candidat.SetPresentationLayer(target.gameObject.layer);
+        }
+        catch (Exception)
+        {
+            candidat.DestroyRoot();
+            Debug.LogError("[LV] Construction du maillage personnalise impossible.");
+            return false;
+        }
+        // Ne pas supprimer l'ancien personnage si la reconstruction echoue.
         if (appliedHuman != null) appliedHuman.DestroyRoot();
-        appliedHuman = new HumanPreview(target);
-        appliedHuman.Build(this, false);
-        appliedHuman.SetPresentationLayer(target.gameObject.layer);
-        return appliedHuman.IsBuilt;
+        appliedHuman = candidat;
+        return true;
     }
 
     public void AnimateAppliedHuman(bool moving, bool running, float clock)
@@ -121,9 +145,9 @@ public sealed class AdminHumanCreator : MonoBehaviour
     {
         if (previewCamera != null) return;
         previewTexture = new RenderTexture(480, 640, 24, RenderTextureFormat.ARGB32);
-        previewTexture.name = "ADMIN_HumanPreview_RenderTexture";
+        previewTexture.name = "Esthetique_HumanPreview_RenderTexture";
         previewTexture.Create();
-        GameObject cameraObject = new GameObject("ADMIN - Camera apercu humain");
+        GameObject cameraObject = new GameObject("Esthetique - Camera apercu humain");
         previewCamera = cameraObject.AddComponent<Camera>();
         previewCamera.clearFlags = CameraClearFlags.SolidColor;
         // Fond gris neutre : il reste lisible quel que soit le type de
@@ -158,6 +182,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
     private void OnDestroy()
     {
         if (appliedHuman != null) appliedHuman.DestroyRoot();
+        if (preview != null) preview.DestroyRoot();
         if (previewCamera != null) UnityEngine.Object.Destroy(previewCamera.gameObject);
         if (previewTexture != null)
         {
@@ -233,9 +258,18 @@ public sealed class AdminHumanCreator : MonoBehaviour
             get { return root != null; }
         }
 
+        public void SetVisible(bool visible)
+        {
+            if (root != null) root.SetActive(visible);
+        }
+
         public void DestroyRoot()
         {
-            if (root != null) UnityEngine.Object.Destroy(root);
+            if (root != null)
+            {
+                root.SetActive(false);
+                UnityEngine.Object.Destroy(root);
+            }
             root = null;
         }
 
@@ -284,7 +318,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             if (obj == null || obj.vertices == null || obj.vertices.Length == 0) return;
             if (root != null) UnityEngine.Object.Destroy(root);
             fedoraObject = null;
-            root = new GameObject("ADMIN - apercu humain");
+            root = new GameObject("Esthetique - apercu humain");
             root.transform.SetParent(parent, false);
 
             Vector3[] deformed = (Vector3[])obj.vertices.Clone();
@@ -297,7 +331,7 @@ public sealed class AdminHumanCreator : MonoBehaviour
             BreastVolume(deformed, values.chestShape, values.female);
             ScaleRegion(deformed, values.hipShape, -1.2f, 2.0f, 2.55f, 0.15f, 0.12f);
             // Les axes horiz/vert des cibles MakeHuman sont inverses par
-            // rapport aux libelles de l'ADMIN : vert = epaisseur, horiz =
+            // rapport aux libelles du panel : vert = epaisseur, horiz =
             // longueur pour les bras.
             Signed(deformed, values.armThickness, "l-upperarm-scale-vert-incr", "l-upperarm-scale-vert-decr", 0.55f);
             Signed(deformed, values.armThickness, "r-upperarm-scale-vert-incr", "r-upperarm-scale-vert-decr", 0.55f);
@@ -359,14 +393,14 @@ public sealed class AdminHumanCreator : MonoBehaviour
                 MaskHeadUnderFedora(deleteBody, deformed, FedoraPlacementOffset);
             Mesh mesh = obj.CreateMesh(vertices, (a, b, c) =>
                 deleteBody[a] && deleteBody[b] && deleteBody[c]);
-            GameObject meshObject = new GameObject("Humain - apercu ADMIN");
+            GameObject meshObject = new GameObject("Humain - apercu Esthetique");
             meshObject.transform.SetParent(root.transform, false);
             SkinnedMeshRenderer renderer = meshObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = mesh;
             renderer.bones = bones;
             renderer.rootBone = boneIndexes.ContainsKey("root") ? bones[boneIndexes["root"]] : bones[0];
             // La texture MakeHuman reste la base, mais sa couleur doit
-            // toujours etre multipliee par la teinte choisie dans l'ADMIN.
+            // toujours etre multipliee par la teinte choisie dans le panel.
             // L'ancienne condition forcait les femmes a blanc et annulait
             // donc le choix de teinte pour le personnage le plus teste.
             skin.mainTexture = skinTexture;

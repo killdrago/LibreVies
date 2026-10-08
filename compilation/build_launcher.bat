@@ -553,6 +553,14 @@ if not exist "%LAUNCHER%" (
     echo ERREUR : le launcher reste introuvable : %LAUNCHER%
     exit /b 1
 )
+rem Garder PHP et le jeu sur le meme contrat, sans ecraser config.php.
+if exist "%ROOT%outils\synchroniser_serveur_local.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%outils\synchroniser_serveur_local.ps1" -Sources "%JEU%\serveur"
+    if errorlevel 1 (
+        echo ERREUR : synchronisation de l'API locale impossible.
+        exit /b 1
+    )
+)
 exit /b 0
 
 rem ==========================================================================

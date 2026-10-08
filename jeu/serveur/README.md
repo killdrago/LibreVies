@@ -1,43 +1,173 @@
-# API d'authentification LibreVies
+# API de compte et de personnage LibreVies
 
-Le launcher ne se connecte pas directement à MySQL : cela obligerait à
-livrer le mot de passe de la base avec le jeu. Il appelle `api.php` avec
-l'adresse IP du serveur, et PHP utilise MySQL sur le port 3306 côté serveur.
+**Adresse locale conservée : `http://localhost/serveur/api.php`.**
+Le launcher et le jeu appellent PHP. Ils ne se connectent jamais à MySQL :
+les identifiants de la base restent dans le vrai `config.php` du serveur,
+qui n'est pas versionné ni distribué aux joueurs.
+Le paquet serveur a une seule source : **`jeu/serveur/`**.
 
-## Installation chez l'hebergeur
+## Mise à jour locale
 
-1. Envoyer ce dossier `serveur/` en entier chez l'hebergeur, dans le dossier
-   web public. L'URL sera alors par exemple :
-   `http://92.133.115.121/serveur/api.php`.
-2. Copier `config.php.example` sous le nom `config.php` dans ce meme dossier.
-3. Renseigner dans `config.php` le nom, l'utilisateur et le mot de passe de
-   la base `librevies`.
-4. Importer `membre.sql` si la table n'existe pas. Si la table existe déjà
-   avec les types de la capture, importer d'abord `corriger_membre.sql`.
-5. Importer `personnage.sql` après la création de la table `membre`.
-6. Tester :
-   `http://92.133.115.121/serveur/api.php?action=health`
-   doit répondre `API et base de données accessibles.`.
+`compilation/build_launcher.bat` met les sources à jour puis appelle
+`compilation/outils/synchroniser_serveur_local.ps1`. Le build local de diagnostic
+`compilation/build_unity_game.bat` appelle aussi cet outil, sans téléchargement.
+Il repère l'API locale existante sous XAMPP, EasyPHP ou WAMP et synchronise les
+fichiers publics depuis `jeu/serveur/`, notamment **`api.php` et `personnage.php`**.
+**Il ne remplace jamais `config.php` et n'importe aucun SQL automatiquement.**
 
-Si l'inscription répond « Connexion à la base impossible », passez
-provisoirement `debug` à `true` dans `config.php`, réessayez, puis remettez-le
-à `false`. Le détail SQL apparaîtra alors dans le launcher et sera également
-écrit dans le journal PHP d'Apache.
+Pour une installation Apache non standard, `LIBREVIES_WEB_ROOT` permet de
+préciser sa racine web. L'outil indique explicitement si aucun serveur n'a été
+repéré ; il ne modifie pas une installation distante et ne choisit pas au hasard
+entre plusieurs racines. Il peut également être exécuté seul :
 
-L'adresse modifiable par l'utilisateur est dans `auth_config.json`, à côté de
-`LibreVies.exe`. Elle doit pointer vers le dossier `serveur/` de l'hébergeur :
-
-```json
-{
-  "api_url": "http://92.133.115.121/serveur/api.php",
-  "timeout": 15
-}
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File compilation\outils\synchroniser_serveur_local.ps1
 ```
 
-Si Apache écoute sur un autre port, ajoutez-le dans l'URL, par exemple
-`http://92.133.115.121:8080/serveur/api.php`.
+Les fichiers à utiliser pour la base sont ceux du **projet** :
 
-Le mot de passe n'est pas enregistré en MD5. L'API utilise `password_hash`
-avec Argon2id si PHP le fournit, sinon l'algorithme moderne par défaut de PHP,
-et vérifie ensuite avec `password_verify`. Le port `3306` ne doit donc pas être
-exposé au launcher ni ouvert sur Internet.
+- `jeu/serveur/membre.sql` : création d'une nouvelle table `membre` ;
+- `jeu/serveur/corriger_membre.sql` : correction des types d'une ancienne table ;
+- `jeu/serveur/personnage.sql` : création de la table nullable actuelle ;
+- `jeu/serveur/mettre_a_jour_personnage.sql` : migration d'une ancienne table
+  possédant déjà ces colonnes. Sauvegarder la base avant cette migration.
+  Elle n'efface pas la table, préserve les profils `default=0`, rend les champs
+  nullable et nettoie uniquement les anciennes valeurs de base `default=1`.
+
+`CREATE TABLE IF NOT EXISTS` ne corrige pas les types d'une table déjà existante :
+la migration est nécessaire si ses champs sont encore `NOT NULL`.
+
+## Parcours du joueur
+
+1. **Inscription** : création de `membre` avec `valider=0` et, dans la même
+   transaction, de `personnage` avec le même `id` et `default=1`.
+   Tous les autres champs du personnage restent **NULL**, y compris `sexe`.
+2. **Connexion** : vérification du mot de passe par PHP/BDD. Un compte
+   `valider=0` peut encore se connecter. Aucun email n'est envoyé pour l'instant.
+   L'option `require_email_validation` reste absente ou `false` jusqu'à ce que
+   la validation par email soit réellement mise en place.
+3. **Jeu** : le profil est récupéré avant la création du joueur.
+   `default=1` garde la base actuelle ; `default=0` reconstruit le profil sauvegardé.
+   Une erreur de chargement reste visible, sans remplacer silencieusement le
+   personnage par la base.
+4. **Maison Esthétique** : parler au NPC et utiliser le panel humain existant.
+   Le créateur n'est plus accessible depuis ADMIN. Le projet autonome
+   `compilation/personnage/` n'est pas utilisé pour ce parcours.
+5. **Valider / appliquer** : les réglages sont validés côté serveur et enregistrés
+   dans la même ligne ; `default=0` et les réglages sont modifiés ensemble.
+   Le jeu applique ensuite la réponse relue en BDD. Les contrôles sont bloqués
+   pendant la requête ; un refus garde le panel ouvert sans faux succès.
+   Fermer le panel sans avoir lancé une validation n'écrit rien en BDD.
+   En cas de réponse réseau perdue, la confirmation est inconnue : le profil
+   serveur sera relu à la prochaine connexion.
+6. Le vrai **pseudo du compte** est affiché au-dessus de la tête. Le prochain
+   passage au salon reprend les réglages sauvegardés, pas le dernier brouillon annulé.
+
+Un ancien compte sans ligne `personnage` reçoit seulement sa ligne de base,
+sans remplacer un profil déjà existant. Il n'y a pas de personnages multiples.
+
+## Réglages persistés
+
+Chaque slider a sa propre colonne `DECIMAL(10,4)` ; aucune colonne JSON `sliders`,
+ni `cree_le` ou `modifie_le` n'est ajoutée. Valeurs internes : **0 à 5**,
+affichées **0 à 500** dans le panel existant. Le serveur normalise à quatre décimales.
+
+| Colonne SQL | Réglage du panel / du créateur |
+|---|---|
+| `tete` | `headShape` |
+| `yeux` | `eyesShape` |
+| `nez` | `noseShape` |
+| `bouche` | `mouthShape` |
+| `oreilles` | `earsShape` |
+| `seins` | `chestShape` — Seins volume |
+| `volume` | `legThickness` — Jambes largeur |
+| `hanche` | `hipShape` |
+| `ventre` | `belly` |
+| `largeur_bras` | `armThickness` |
+| `longueur_bras` | `armLength` |
+| `hauteur_jambe` | `legLength` |
+| `pieds` | `feetSize` |
+
+`sexe` vaut `homme` ou `femme` seulement après création. `teinte_peau` est
+l'identifiant `0` à `6`. `coiffure`, `tenue`, `chapeau` et `chaussures` utilisent
+les **identifiants stables des ressources**, pas les indices des menus :
+les catalogues autorisés sont dans `personnage.php` et correspondent à
+`MakeHumanClothingFactory`. « Aucun » reste **NULL** pour chapeau/chaussures,
+même si JsonUtility transporte une chaîne vide. La colonne `objets` est
+conservée : aucun contrôle du panel actuel ne permet encore de la modifier.
+Les ressources, morphologies et réglages de rendu MakeHuman restent inchangés.
+
+## Authentification des appels du jeu
+
+- `login` reçoit `pseudo` et `password`, puis retourne `membre`, `personnage`
+  et `session` (`token`, `expires_at`). Le mot de passe n'est jamais retourné.
+- `get_character` reçoit seulement `session_token` pour l'identité.
+- `save_character` reçoit `session_token` et `personnage` (profil complet).
+  Les éventuels `id`, `pseudo`, `default` et `objets` envoyés par le client
+  ne permettent ni de choisir un autre compte ni d'écraser ses données.
+- PHP garde la session côté serveur, avec une expiration de 24 heures et
+  nouvel identifiant aléatoire de 256 bits à chaque connexion, jamais choisi par
+  le client. Les appels authentifiés utilisent le mode strict. `random_bytes`
+  est utilisé, ou OpenSSL sur PHP 5.6. Aucune table de session n'est ajoutée ;
+  le dossier de sessions PHP doit être inscriptible.
+- Le launcher garde le jeton en RAM et le transmet au seul processus du jeu via
+  `LIBREVIES_SESSION_TOKEN` et `LIBREVIES_API_URL`, jamais dans les arguments,
+  les fichiers Autolog, le manifeste ou les journaux. Le jeu efface la variable
+  de session de son environnement puis conserve sa session uniquement en RAM.
+  Une recharge de scène ne fait pas perdre cette session.
+- Les clients utilisent un POST formulaire, compatible PHP 5.6. Le profil est
+  encodé en JSON uniquement pour son transport ; les colonnes SQL restent séparées.
+  Un POST JSON direct est aussi accepté. Une session manquante/expirée renvoie 401,
+  un profil invalide 400, une panne serveur 500/503.
+
+L'Autolog local existant reste chiffré, dans `GAME_DIR`. Décocher Autolog supprime
+ses fichiers locaux ; le jeton de session n'y est jamais enregistré.
+
+## Installation chez un hébergeur
+
+Envoyer le contenu de **`jeu/serveur/`** au serveur web. Pour une nouvelle
+installation seulement, créer le vrai `config.php` à partir de
+`jeu/serveur/config.php.example` et renseigner la base côté serveur.
+Conserver le `config.php` existant lors des mises à jour.
+Importer les fichiers SQL du projet adaptés à l'état de la base, puis tester :
+
+```text
+http://localhost/serveur/api.php?action=health
+```
+
+Le résultat attendu est `API et base de donnees accessibles.`.
+Pour une installation distante, modifier `api_url` dans `auth_config.json`
+à côté du launcher. **Utiliser HTTPS hors du poste local** pour protéger le
+mot de passe et la session pendant leur transport ; ne jamais exposer le port
+MySQL 3306 au launcher. Les mots de passe utilisent `password_hash` (Argon2id
+si disponible, sinon l'algorithme moderne par défaut), puis `password_verify`.
+
+`debug=true` permet temporairement d'obtenir le détail d'une erreur SQL.
+Le remettre à `false` ensuite. Aucun mot de passe ni jeton ne doit être copié
+dans les diagnostics ou dans Git.
+
+## Vérifications
+
+Depuis la racine du projet :
+
+```text
+python -B compilation/outils/test_personnage.py
+python -B compilation/outils/test_launcher.py
+python -B compilation/outils/test_edition.py
+python -B compilation/outils/test_amorce.py
+python -B compilation/outils/verifier_cs_syntaxe.py
+```
+
+Une recette exécutable PHP est aussi fournie dans
+`compilation/outils/test_api_personnage.mjs` (instructions en tête du fichier).
+Elle vérifie inscription/connexion, profils complets, NULL, sessions, tentative
+d'usurpation, expiration, refus sans écriture et rollback en cas de panne.
+Elle utilise **PHP WebAssembly et SQLite de test en RAM**, pas la vraie base
+MySQL ; elle ne remplace donc pas la recette finale MySQL/Unity.
+
+Après compilation Unity, vérifier en jeu : base sur un compte neuf, ouverture
+chez Esthétique, annulation, sauvegarde des 13 sliders et des choix, reconnexion
+avec le même aspect, édition du profil existant, pseudo en troisième personne,
+absence du créateur dans ADMIN et erreur visible si l'API est coupée.
+Les modifications des sources ne mettent pas à jour un ancien exécutable Unity :
+il faut reconstruire puis publier le jeu avec le flux de compilation existant.

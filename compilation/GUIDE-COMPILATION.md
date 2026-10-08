@@ -76,8 +76,10 @@ Si tu veux reconstruire plus tard après avoir supprimé les sources, relance
 
 Deux garanties importantes :
 
-* **Aucun fichier local n'est écrasé.** Seuls les fichiers *absents* sont
-  récupérés depuis GitHub : tu peux travailler dans ce dossier sans risque.
+* **Les sources suivies sont synchronisées avec la branche publiée.** Une
+  sauvegarde locale précède leur remplacement ; les coordonnées d'édition
+  sont publiées avant cette synchronisation. La configuration MySQL réelle
+  `config.php` n'est pas remplacée.
 * **Rien de tout cela n'arrive chez le joueur.** Ni Python, ni PyInstaller, ni
   Unity, ni ce dossier `compilation\` : le joueur ne reçoit que `LibreVies.exe`.
   La licence Unity (compte Unity + licence Personal, demandée par Unity Hub)
@@ -176,6 +178,46 @@ La recette simule un joueur avec un serveur local : première installation,
 mise à jour, téléchargement coupé puis repris, archive corrompue (refusée sans
 casser le jeu installé) et archive piégée (`../`). Aucun fichier du dépôt n'est
 touché.
+
+### Personnage du compte et API locale
+
+La source du jeu passe à **0.5.80** pour le parcours Esthétique. Cela ne
+remplace pas une ancienne build : reconstruire avec `build_launcher.bat`, puis
+publier les fichiers compilés avec le flux habituel. Le manifeste du jeu doit
+continuer à annoncer la version du binaire réellement publié, pas celle de
+sources encore non compilées.
+
+L'API a une seule source : `jeu/serveur/`. Les deux builds appellent
+`outils/synchroniser_serveur_local.ps1` pour mettre à jour les fichiers publics
+chez Apache local (XAMPP/EasyPHP/WAMP), **sans remplacer son vrai `config.php`**.
+L'adresse actuelle reste `http://localhost/serveur/api.php`.
+Une racine personnalisée peut être indiquée par `LIBREVIES_WEB_ROOT`.
+Les éventuelles migrations SQL restent dans `jeu/serveur/` et ne sont jamais
+importées automatiquement. Voir [`../jeu/serveur/README.md`](../jeu/serveur/README.md).
+
+Le salon utilise le panel humain du jeu ; il ne lance pas l'exécutable du
+projet autonome `compilation/personnage/`. Vérifier dans la build :
+
+1. compte neuf : `valider=0`, base inchangée, `personnage.default=1` et autres champs NULL ;
+2. parler au NPC Esthétique, changer les 13 sliders et les choix, puis annuler : aucune sauvegarde ;
+3. rouvrir, valider : attendre la confirmation serveur, constater `default=0` sur la même ligne ;
+4. fermer/reconnecter : mêmes proportions, sexe, peau et équipements ;
+5. rouvrir le salon : profil sauvegardé prérempli ; pseudo visible au-dessus de la tête ;
+6. ADMIN ne propose plus le créateur, mais conserve les autres fonctions ;
+7. couper l'API : message explicite, pas de confirmation de sauvegarde ni de faux personnage de base.
+
+Recettes complémentaires depuis la racine :
+
+```text
+python -B compilation/outils/test_personnage.py
+python -B compilation/outils/test_edition.py
+python -B compilation/outils/test_amorce.py
+python -B compilation/outils/verifier_cs_syntaxe.py
+```
+
+`test_api_personnage.mjs` exécute aussi une recette PHP avec SQLite de test
+(instructions dans le fichier). Le parseur C# et cette base de test ne remplacent
+ni la compilation Unity ni les contrôles visuels et MySQL locaux.
 
 ## 6. En cas de problème
 

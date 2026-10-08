@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.79";
+    private const string VersionJeu = "0.5.80";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -53,6 +53,12 @@ public sealed class LibreViesGame : MonoBehaviour
     // exactement de quoi sauter la cloture de 1 m.
     private const float Gravite = 20f;
     private const float ForceSaut = 8f;
+    private string pseudoJoueur = "Joueur";
+    private LibreViesCompte compteJoueur;
+    private LibreViesPersonnage personnageActuel = new LibreViesPersonnage();
+    private string erreurChargementCompte = "";
+    private Renderer[] rendusDuPersonnage;
+    private TextMesh pseudoJoueurTexte;
 
     // ------------------------------------------------------------------
     // DEMARRAGE : journal et ecran de chargement
@@ -104,18 +110,19 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
-    // Apercu humain de l'ADMIN : le composant garde les reglages et
-    // pourra etre reutilise plus tard pour creer le personnage joueur.
-    private AdminHumanCreator adminHumanCreator;
+    // Le createur humain est maintenant ouvert par le NPC Esthétique, jamais
+    // depuis l'administration. Le composant reste reutilisable pour ce panel.
+    private AdminHumanCreator humanCreator;
+    private bool creationPersonnageOpen;
+    private bool focusCreationAReinitialiser;
     private int adminNpcListeSelection;
-    private int adminJoueurSelection;
-    private bool adminJoueurMenuOuvert;
     private Vector2 adminNpcScroll;
-    private string adminEditionContexte = "Joueur : Joueur principal";
-    private bool adminHumainValide;
-    private bool adminHumainJoueurActif;
-    private bool adminPreviewSourisActive;
-    private Vector2 adminPreviewDerniereSouris;
+    private bool profilPersonnageValide;
+    private bool sauvegardePersonnageEnCours;
+    private string messageCreationPersonnage = "";
+    private bool personnageHumainActif;
+    private bool previewPersonnageSourisActive;
+    private Vector2 previewPersonnageDerniereSouris;
     private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
@@ -243,7 +250,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private GUIStyle tabStyle;
     private GUIStyle tabActifStyle;
     private GUIStyle buttonStyle;
-    private GUIStyle adminActionLongButtonStyle;
+    private GUIStyle creationActionButtonStyle;
     private GUIStyle miniCarteTextStyle;
     private GUIStyle miniCarteButtonStyle;
     private GUIStyle barreValeurStyle;
@@ -631,9 +638,28 @@ public sealed class LibreViesGame : MonoBehaviour
 #endif
     }
 
+    private void InitialiserPseudoJoueur()
+    {
+        // Nom public uniquement, utile aussi au lancement direct de diagnostic.
+        // L'identite autorisee pour la BDD vient ensuite exclusivement de PHP.
+        string[] arguments = Environment.GetCommandLineArgs();
+        for (int i = 0; i < arguments.Length - 1; i++)
+        {
+            if (!arguments[i].Equals("-libreviesPseudo", StringComparison.OrdinalIgnoreCase)) continue;
+            string valeur = (arguments[++i] ?? "").Trim();
+            if (valeur.Length < 1 || valeur.Length > 30) continue;
+            bool valide = true;
+            for (int c = 0; c < valeur.Length; c++)
+                if (Char.IsControl(valeur[c])) valide = false;
+            if (valide) pseudoJoueur = valeur;
+        }
+        compteJoueur = LibreViesCompte.Courant;
+    }
+
     private void Awake()
     {
         InitialiserJournalRuntime();
+        InitialiserPseudoJoueur();
         SupprimerFichierHistoriqueEdition();
         chrono.Start();
         AfficherVersionDansTitre();
@@ -650,6 +676,7 @@ public sealed class LibreViesGame : MonoBehaviour
             cameraObject.tag = "MainCamera";
         }
         gameCamera.clearFlags = CameraClearFlags.Skybox;
+        gameCamera.cullingMask &= ~(1 << 31); // Apercu prive du salon Esthetique.
         // Champ de vision 55 : le cadrage de la reference de jeu.
         gameCamera.fieldOfView = 55f;
         screenAdjustEffect = gameCamera.GetComponent<LibreViesScreenAdjust>();
@@ -676,18 +703,31 @@ public sealed class LibreViesGame : MonoBehaviour
     // echoue (exception) est signalee mais n'empeche plus le jeu de demarrer.
     private System.Collections.IEnumerator ConstruireMonde()
     {
+        erreurChargementCompte = "";
+        if (compteJoueur.LanceParLauncher)
+        {
+            etapeChargement = "Chargement du personnage du compte...";
+            yield return compteJoueur.Charger();
+            if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+            {
+                erreurChargementCompte = compteJoueur.Erreur;
+                yield break; // Ne pas afficher une fausse base si le profil est inconnu.
+            }
+            pseudoJoueur = compteJoueur.Joueur.pseudo;
+            personnageActuel = compteJoueur.Personnage;
+        }
         string[] noms =
         {
             "materiaux", "environnement", "terrain", "route", "village",
             "riviere", "cloture et portails", "arbres", "herbe", "rochers",
             "decor (barils, caisses)", "lampadaires", "nuages", "heros",
-            "apercu humain", "monstres", "gardes", "objets a ramasser"
+            "monstres", "gardes", "objets a ramasser"
         };
         System.Action[] travaux =
         {
             CreateMaterials, CreateEnvironment, CreateTerrain, CreateRoad, CreateTown,
             CreateWaterways, CreateFence, CreateTreesAndProps, CreateGrassTufts, CreateRocks,
-            CreateProps, CreateLampposts, CreateClouds, CreatePlayer, CreateHumanAdminPreview,
+            CreateProps, CreateLampposts, CreateClouds, CreatePlayer,
             CreateEnemies, CreateGuards, CreatePickups
         };
         for (int i = 0; i < noms.Length; i++)
@@ -706,6 +746,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             Journal("fin   : " + noms[i] + "  (" + objetsCrees + " objets)");
             yield return null;
+            if (!String.IsNullOrEmpty(erreurChargementCompte)) yield break;
         }
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
@@ -793,6 +834,7 @@ public sealed class LibreViesGame : MonoBehaviour
         MettreAJourPortesBatiments(dt);
         UpdatePlayer(dt);
         UpdateCamera();
+        MettreAJourNomJoueur();
         UpdateEffects(dt);
         UpdateHudState(dt);
     }
@@ -2635,8 +2677,8 @@ public sealed class LibreViesGame : MonoBehaviour
         CreateBuilding(new Vector3(29, 0, -3), new Vector3(6, 3.5f, 6), "Forge");
         // La mairie est proche du centre, mais decalee de la route.
         CreateBuilding(new Vector3(-8, 0, 14), new Vector3(7, 4, 6), "Mairie");
-        // Cette maison devient le salon d'esthétique : le nom est porté par
-        // sa pancarte et le médecin attend juste devant sa façade.
+        // Cette maison devient le salon d'esthétique : le NPC Esthétique
+        // attend juste devant sa façade et ouvre le createur de personnage.
         CreateBuilding(new Vector3(-27, 0, 20), new Vector3(6, 3.5f, 5), "Esthetique");
         // Maison_Sud est remise sur le terrain plat du village, loin de la
         // colline du chateau : son socle ne s'enfonce plus dans la pente.
@@ -2651,7 +2693,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // a droite de l'entrepot, derriere son etal.
         CreerPnj(new Vector3(-25.3f, 0, 2.5f), "Marchand");
         CreerPnj(new Vector3(-4.8f, 0, 17.5f), "Maire");
-        CreerPnj(new Vector3(-27f, 0, 23.35f), "Medecin");
+        CreerPnj(new Vector3(-27f, 0, 23.35f), "Esthetique");
         // Les gardes ne sont pas poses ici : ils sont crees par CreateGuards(),
         // juste devant les portails du village (voir CreateFence).
     }
@@ -4487,7 +4529,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreerPnj(Vector3 position, string metier)
     {
         float y = TerrainHeight(position.x, position.z);
-        var root = new GameObject("PNJ_" + metier).transform;
+        // Garder le chemin historique dans edition/coordonee pour ne pas
+        // perdre le placement valide du NPC devant le salon.
+        var root = new GameObject("PNJ_" + (metier == "Esthetique" ? "Medecin" : metier)).transform;
         root.position = new Vector3(position.x, y, position.z);
         var pnj = new PnjState { Root = root.gameObject, Metier = metier };
 
@@ -4549,10 +4593,10 @@ public sealed class LibreViesGame : MonoBehaviour
         TeinterPnj(pnj.Model, metier == "Maire"
             ? new Color(0.12f, 0.25f, 0.58f)
             : (metier == "Forgeron" ? new Color(0.24f, 0.27f, 0.31f)
-            : (metier == "Medecin" ? new Color(0.88f, 0.90f, 0.94f)
+            : ((metier == "Medecin" || metier == "Esthetique") ? new Color(0.88f, 0.90f, 0.94f)
             : new Color(0.36f, 0.25f, 0.20f))));
 
-        if (metier == "Medecin")
+        if (metier == "Medecin" || metier == "Esthetique")
         {
             // Blouse claire et croix rouge : les accessoires sont des détails
             // de tenue, le corps reste le vrai maillage humanoïde importé.
@@ -5389,9 +5433,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void AnimerHeroine(bool enMouvement, bool enCourse)
     {
-        if (adminHumainJoueurActif && adminHumanCreator != null)
+        if (personnageHumainActif && humanCreator != null)
         {
-            adminHumanCreator.AnimateAppliedHuman(enMouvement, enCourse, walkClock);
+            humanCreator.AnimateAppliedHuman(enMouvement, enCourse, walkClock);
             return;
         }
         if (heroineModel == null) return;
@@ -5486,21 +5530,24 @@ public sealed class LibreViesGame : MonoBehaviour
         MettreAJourMarteauHeroine();
     }
 
-    private void CreateHumanAdminPreview()
+    private void AssurerCreateurHumain()
     {
-        if (player == null) return;
-        GameObject creatorObject = new GameObject("ADMIN - Createur humain");
-        // Le mannequin est rendu par la camera du panneau ADMIN, pas dans le
-        // monde principal. Il reste donc visible quel que soit le cadrage du
-        // joueur et chaque modification est immediate dans l'aperçu.
-        creatorObject.transform.position = new Vector3(
-            player.position.x + 3.4f,
-            TerrainHeight(player.position.x + 3.4f, player.position.z) + 0.04f,
-            player.position.z + 0.4f);
-        adminHumanCreator = creatorObject.AddComponent<AdminHumanCreator>();
-        adminHumanCreator.ResetPreview();
-        // La couche 31 est reservee a l'aperçu administratif.
-        if (gameCamera != null) gameCamera.cullingMask &= ~(1 << 31);
+        if (humanCreator != null) return;
+        GameObject objet = new GameObject("ESTHETIQUE - Createur humain");
+        // Le mannequin est hors du monde jouable et sur sa couche de rendu.
+        objet.transform.position = new Vector3(0f, -1000f, 0f);
+        humanCreator = objet.AddComponent<AdminHumanCreator>();
+    }
+
+    private bool AppliquerPersonnagePersonnalise()
+    {
+        AssurerCreateurHumain();
+        personnageActuel.ChargerDans(humanCreator);
+        if (!humanCreator.ApplyTo(heroBody)) return false;
+        if (heroineModel != null) heroineModel.gameObject.SetActive(false);
+        personnageHumainActif = true;
+        rendusDuPersonnage = heroBody.GetComponentsInChildren<Renderer>(true);
+        return true;
     }
 
     private void CreatePlayer()
@@ -5512,18 +5559,63 @@ public sealed class LibreViesGame : MonoBehaviour
         cameraPivot.SetParent(player, false);
         heroBody = new GameObject("Heros_LowPoly").transform;
         heroBody.SetParent(player, false);
-        var body = heroBody;
-        // Le maillage humanoïde original CC0 est obligatoire : aucun cube,
-        // sphère ou assemblage procédural ne doit remplacer le personnage.
-        if (!CreateHumanHeroine(body))
+        if (personnageActuel.EstPrimitif)
         {
-            Debug.LogError("[LV] Parties OBJ humanoides absentes : verifiez Characters/LibreViesHeroineParts.");
-            brasAttaque = body;
+            // default=1 : garder exactement le personnage de base actuel.
+            if (!CreateHumanHeroine(heroBody))
+            {
+                Debug.LogError("[LV] Parties OBJ humanoides absentes : verifiez Characters/LibreViesHeroineParts.");
+                brasAttaque = heroBody;
+            }
         }
+        else if (!AppliquerPersonnagePersonnalise())
+        {
+            erreurChargementCompte = "Maillage personnalise absent. Recompilez le jeu avec ses ressources.";
+            throw new InvalidOperationException(erreurChargementCompte);
+        }
+        rendusDuPersonnage = heroBody.GetComponentsInChildren<Renderer>(true);
         joueurCollider = player.gameObject.AddComponent<CapsuleCollider>();
         joueurCollider.center = new Vector3(0, 1.15f, 0);
         joueurCollider.height = 2.3f;
         joueurCollider.radius = 0.48f;
+        CreerNomJoueur();
+    }
+
+    private void CreerNomJoueur()
+    {
+        GameObject objet = CreerTexte3D(pseudoJoueur, Vector3.zero,
+            new Color(1f, 0.90f, 0.35f), 0.14f);
+        if (objet == null) return;
+        objet.name = "Pseudo_Joueur";
+        objet.transform.SetParent(player, false);
+        objet.transform.localPosition = new Vector3(0f, 2.70f, 0f);
+        pseudoJoueurTexte = objet.GetComponent<TextMesh>();
+        pseudoJoueurTexte.fontStyle = FontStyle.Bold;
+        pseudoJoueurTexte.richText = false;
+    }
+
+    private void MettreAJourNomJoueur()
+    {
+        if (pseudoJoueurTexte == null || gameCamera == null || player == null) return;
+        pseudoJoueurTexte.gameObject.SetActive(!firstPerson && !dead);
+        if (firstPerson || dead) return;
+        float hauteur = player.position.y + 2.35f;
+        if (rendusDuPersonnage != null)
+        {
+            for (int i = 0; i < rendusDuPersonnage.Length; i++)
+            {
+                Renderer rendu = rendusDuPersonnage[i];
+                if (rendu != null && rendu.gameObject.activeInHierarchy)
+                    hauteur = Mathf.Max(hauteur, rendu.bounds.max.y);
+            }
+        }
+        pseudoJoueurTexte.transform.position = new Vector3(player.position.x,
+            hauteur + 0.28f, player.position.z);
+        Vector3 versCamera = gameCamera.transform.position
+            - pseudoJoueurTexte.transform.position;
+        if (versCamera.sqrMagnitude > 0.001f)
+            pseudoJoueurTexte.transform.rotation = Quaternion.LookRotation(
+                versCamera.normalized, Vector3.up) * Quaternion.Euler(0f, 180f, 0f);
     }
 
     private void ReconfigurerMonstresAdmin()
@@ -5730,7 +5822,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // La saisie de texte ne doit ni faire marcher l'héroïne ni déclencher
         // une attaque lorsque la fenêtre de conversation est ouverte.
-        if (conversationOpen) return;
+        if (conversationOpen || creationPersonnageOpen) return;
         if (attackCooldown > 0) attackCooldown -= dt;
         if (attackAnimation > 0) attackAnimation -= dt;
         // Le joueur ne reçoit qu'un lacet horizontal. Le corps reste donc
@@ -6515,6 +6607,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (pnj == null || string.IsNullOrEmpty(pnj.Metier)) return "Habitant";
         if (pnj.Metier == "Medecin") return "Médecin";
+        if (pnj.Metier == "Esthetique") return "Esthétique";
         if (pnj.Metier == "Forgeron") return "Forgeron";
         if (pnj.Metier == "Marchand") return "Marchand";
         if (pnj.Metier == "Maire") return "Maire";
@@ -6523,7 +6616,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private bool TryOuvrirConversation()
     {
-        if (conversationOpen || gameCamera == null || player == null) return false;
+        if (conversationOpen || creationPersonnageOpen || gameCamera == null || player == null) return false;
         Vector2 souris = Input.mousePosition;
         souris.y = Screen.height - souris.y;
         float meilleureProfondeur = 100000f;
@@ -6566,12 +6659,20 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         if (cible == null) return false;
+        if (cible.Metier == "Esthetique"
+            && Vector3.Distance(player.position, cible.Root.transform.position) > 4f)
+        {
+            ShowInfo("Approchez-vous du NPC Esthetique pour lui parler");
+            return true;
+        }
         conversationPnj = cible;
         conversationOpen = true;
         conversationFocusRequested = true;
         conversationInput = "";
         conversationMessages.Clear();
         conversationMessages.Add(NomAffichePnj(cible) + " : Bonjour");
+        if (cible.Metier == "Esthetique")
+            conversationMessages.Add("Je peux vous ouvrir le panel pour creer votre personnage.");
         return true;
     }
 
@@ -6609,11 +6710,22 @@ public sealed class LibreViesGame : MonoBehaviour
             FermerConversation();
             return;
         }
-        Rect texte = new Rect(cadre.x + 24f, cadre.y + 58f, largeur - 48f, hauteur - 132f);
+        bool propositionPersonnage = conversationPnj != null
+            && conversationPnj.Metier == "Esthetique";
+        float hauteurTexte = propositionPersonnage ? hauteur - 170f : hauteur - 132f;
+        Rect texte = new Rect(cadre.x + 24f, cadre.y + 58f, largeur - 48f, hauteurTexte);
         GUI.Box(texte, "", boxStyle);
         string contenu = string.Join("\n\n", conversationMessages.ToArray());
         GUI.Label(new Rect(texte.x + 14f, texte.y + 12f, texte.width - 28f, texte.height - 20f),
             contenu, conversationTextStyle);
+        if (propositionPersonnage
+            && GUI.Button(new Rect(cadre.x + 24f, cadre.y + hauteur - 94f,
+                largeur - 48f, 28f), personnageActuel.EstPrimitif
+                    ? "CREER MON PERSONNAGE" : "MODIFIER MON PERSONNAGE", buttonStyle))
+        {
+            OuvrirCreationPersonnage();
+            return;
+        }
         GUI.SetNextControlName("ConversationInput");
         conversationInput = GUI.TextField(new Rect(cadre.x + 24f, cadre.y + hauteur - 58f,
             largeur - 142f, 32f), conversationInput);
@@ -6631,6 +6743,74 @@ public sealed class LibreViesGame : MonoBehaviour
             EnvoyerMessageConversation();
             Event.current.Use();
         }
+    }
+
+    private void OuvrirCreationPersonnage()
+    {
+        // Ce chemin est appele uniquement par la conversation avec Esthetique.
+        AssurerCreateurHumain();
+        FermerConversation();
+        if (modeEdition) BasculerModeEdition();
+        adminOpen = inventoryOpen = optionsOpen = false;
+        if (personnageActuel.EstPrimitif) humanCreator.ResetPreview();
+        else
+        {
+            personnageActuel.ChargerDans(humanCreator);
+            humanCreator.BuildPreview();
+        }
+        humanCreator.ResetPreviewCamera();
+        humanCreator.SetPreviewVisible(true);
+        profilPersonnageValide = false;
+        messageCreationPersonnage = "Annuler ne change ni votre personnage ni la base de donnees.";
+        creationPersonnageOpen = true;
+    }
+
+    private void FermerCreationPersonnage()
+    {
+        if (sauvegardePersonnageEnCours) return;
+        creationPersonnageOpen = false;
+        previewPersonnageSourisActive = false;
+        // Peut etre appele par la coroutine HTTP, donc hors de OnGUI.
+        focusCreationAReinitialiser = true;
+        if (humanCreator != null) humanCreator.SetPreviewVisible(false);
+    }
+
+    private void DessinerCreationPersonnage()
+    {
+        if (!sauvegardePersonnageEnCours && Event.current.type == EventType.KeyDown
+            && Event.current.keyCode == KeyCode.Escape)
+        {
+            FermerCreationPersonnage();
+            Event.current.Use();
+            return;
+        }
+        // Meme panel et memes reglages valides, sans la colonne de l'admin.
+        // La mise a l'echelle garde tous les boutons accessibles en 1024x768.
+        const float largeur = 970f;
+        const float hauteur = 748f;
+        float echelle = Mathf.Min(1f, Mathf.Min((Screen.width - 24f) / largeur,
+            (Screen.height - 24f) / hauteur));
+        Matrix4x4 ancienneMatrice = GUI.matrix;
+        GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - largeur * echelle) * 0.5f,
+            (Screen.height - hauteur * echelle) * 0.5f, 0f), Quaternion.identity,
+            new Vector3(echelle, echelle, 1f));
+        GUI.Box(new Rect(0f, 0f, largeur, hauteur), "", boxStyle);
+        GUI.Label(new Rect(22f, 14f, 850f, 30f), "ESTHETIQUE — " + pseudoJoueur, titleStyle);
+        bool ancienEnabled = GUI.enabled;
+        GUI.enabled = !sauvegardePersonnageEnCours;
+        if (GUI.Button(new Rect(largeur - 42f, 14f, 28f, 28f), "X", buttonStyle))
+        {
+            FermerCreationPersonnage();
+            GUI.enabled = ancienEnabled;
+            GUI.matrix = ancienneMatrice;
+            return;
+        }
+        DessinerReglagesPersonnage(new Rect(18f, 52f, largeur - 36f, 638f));
+        GUI.enabled = ancienEnabled;
+        GUI.Label(new Rect(22f, hauteur - 46f, largeur - 44f, 40f),
+            sauvegardePersonnageEnCours ? "Enregistrement sur le serveur..." : messageCreationPersonnage,
+            conversationTextStyle);
+        GUI.matrix = ancienneMatrice;
     }
 
     private void DessinerLigneCage(Rect zone, float x, float y, float largeur, float hauteur)
@@ -6836,8 +7016,8 @@ public sealed class LibreViesGame : MonoBehaviour
         List<AdminNpcEntry> liste = ObtenirNpcsAdminTries();
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
             "NPC EN PLACE", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 620f, 22f),
-            "Cliquez sur un NPC ou un garde, puis ouvrez son edition humaine.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 700f, 22f),
+            "Le NPC Esthétique propose le createur de personnage dans le monde.", smallStyle);
 
         Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 260f, 430f);
         GUI.Box(listeRect, "NPC et gardes", boxStyle);
@@ -6852,7 +7032,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 entree.Nom, adminNpcListeSelection == i))
             {
                 adminNpcListeSelection = i;
-                adminEditionContexte = "NPC : " + entree.Nom;
             }
         }
         GUI.EndScrollView();
@@ -6880,17 +7059,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "Position : " + position.ToString("F1") + "\n"
                 + "Personnage 3D : maillage humain en place\n"
                 + "Accessoire : " + accessoire, smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 320f, contenu.y + 252f, 290f, 36f),
-            "OUVRIR L'EDITION HUMAINE", buttonStyle))
-        {
-            adminEditionContexte = "NPC : " + selection.Nom;
-            adminTab = 5;
-            ShowInfo("Edition de " + selection.Nom);
-        }
-        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 306f, 430f, 70f),
-            "Les regles de gameplay restent conservees :\n"
-                + "bras fixes du Maire et du Forgeron, feuille, marteau\n"
-                + "et hallebarde reserves a leurs personnages.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 252f, 480f, 90f),
+            selection.Pnj != null && selection.Pnj.Metier == "Esthetique"
+                ? "Parlez-lui dans le monde pour ouvrir le panel de creation."
+                : "Les regles de gameplay restent conservees :\n"
+                    + "bras fixes du Maire et du Forgeron, feuille, marteau\n"
+                    + "et hallebarde reserves a leurs personnages.", smallStyle);
     }
 
     private void DessinerAdminMonstres(Rect contenu)
@@ -6934,70 +7108,62 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerAdminJoueur(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
-            "JOUEURS", titleStyle);
-        string[] joueurs = { "Joueur principal" };
-        adminJoueurSelection = Mathf.Clamp(adminJoueurSelection, 0, joueurs.Length - 1);
-        Rect choixJoueur = new Rect(contenu.x + 18f, contenu.y + 58f, 300f, 32f);
-        if (GUI.Button(choixJoueur, joueurs[adminJoueurSelection] + "  ▼", buttonStyle))
-            adminJoueurMenuOuvert = !adminJoueurMenuOuvert;
-        if (adminJoueurMenuOuvert)
-        {
-            for (int i = 0; i < joueurs.Length; i++)
-            {
-                if (GUI.Button(new Rect(choixJoueur.x, choixJoueur.y + 34f + i * 30f,
-                    choixJoueur.width, 28f), joueurs[i], buttonStyle))
-                {
-                    adminJoueurSelection = i;
-                    adminJoueurMenuOuvert = false;
-                }
-            }
-        }
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 110f, 440f, 150f),
+            "JOUEUR ACTUEL", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 540f, 170f),
             player == null
                 ? "Joueur indisponible"
-                : "Nom : " + joueurs[adminJoueurSelection] + "\n"
+                : "Pseudo : " + pseudoJoueur + "\n"
                     + "Points de vie : " + hp + " / " + MaxHp + "\n"
                     + "Niveau : " + level + "\n"
                     + "Or : " + coins + "\n"
                     + "Cailloux : " + rocks + "\n"
                     + "Position : " + player.position.ToString("F1"), smallStyle);
-        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 280f, 280f, 36f),
-            "OUVRIR L'EDITION HUMAINE", buttonStyle))
-        {
-            adminEditionContexte = "Joueur : " + joueurs[adminJoueurSelection];
-            // Chaque ouverture de l'editeur revient au cadrage corps entier,
-            // meme si le dernier apercu etait reste en zoom tete.
-            adminHumanCreator.ResetPreviewCamera();
-            adminTab = 5;
-            ShowInfo("Edition du personnage joueur");
-        }
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 336f, 500f, 58f),
-            "La liste est triee par nom et pourra accueillir les futurs joueurs\n"
-                + "multijoueurs sans changer l'interface ADMIN.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 264f, 700f, 80f),
+            "La creation de personnage se fait maintenant aupres du NPC Esthétique.\n"
+                + "L'administration conserve uniquement les informations du joueur.", smallStyle);
     }
 
     private void ValiderEditionHumaine()
     {
-        if (adminHumanCreator == null) return;
-        adminHumanCreator.BuildPreview();
-        if (adminEditionContexte.StartsWith("Joueur :", StringComparison.Ordinal)
-            && heroBody != null)
+        if (sauvegardePersonnageEnCours || humanCreator == null || heroBody == null) return;
+        if (!compteJoueur.Authentifie)
         {
-            bool applique = adminHumanCreator.ApplyTo(heroBody);
-            if (applique)
-            {
-                // Le vrai maillage humain rigge remplace le modele visuel
-                // precedent. Les controles du joueur restent sur heroBody.
-                if (heroineModel != null) heroineModel.gameObject.SetActive(false);
-                adminHumainJoueurActif = true;
-                adminHumainValide = true;
-                return;
-            }
-            ShowInfo("Application impossible : maillage humain indisponible");
+            messageCreationPersonnage = "Reconnectez-vous depuis le launcher pour enregistrer votre personnage.";
             return;
         }
-        adminHumainValide = true;
-        ShowInfo("Profil humain valide dans l'apercu. Ouvrez Joueur pour l'appliquer au personnage.");
+        LibreViesPersonnage profil = LibreViesPersonnage.DepuisCreateur(humanCreator,
+            compteJoueur.Joueur.id);
+        string erreur;
+        if (!profil.EstValide(out erreur) || !humanCreator.PreviewModelReady)
+        {
+            messageCreationPersonnage = String.IsNullOrEmpty(erreur)
+                ? "Le maillage de l'apercu est indisponible." : erreur;
+            return;
+        }
+        sauvegardePersonnageEnCours = true; // Bloque les doubles clics et les modifications.
+        StartCoroutine(EnregistrerEtAppliquerPersonnage(profil));
+    }
+
+    private System.Collections.IEnumerator EnregistrerEtAppliquerPersonnage(LibreViesPersonnage profil)
+    {
+        yield return compteJoueur.Sauvegarder(profil);
+        sauvegardePersonnageEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        {
+            messageCreationPersonnage = compteJoueur.Erreur;
+            yield break; // Garder les choix du panel et le personnage precedent.
+        }
+        // Appliquer les valeurs relues en BDD (precision DECIMAL), pas une
+        // copie locale non confirmee. Le flag et les reglages sont sauves ensemble.
+        personnageActuel = compteJoueur.Personnage;
+        if (!AppliquerPersonnagePersonnalise())
+        {
+            messageCreationPersonnage = "Profil enregistre, mais son maillage est indisponible.";
+            yield break;
+        }
+        profilPersonnageValide = true;
+        FermerCreationPersonnage();
+        ShowInfo("Personnage enregistre et applique");
     }
 
     private float SliderHumain(Rect rect, string nom, float valeur)
@@ -7039,38 +7205,41 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void GererCameraPreview(Rect previewRect)
     {
-        if (adminHumanCreator == null) return;
+        if (humanCreator == null) return;
         Event evenement = Event.current;
+        Vector2 sourisPanel = GUIUtility.ScreenToGUIPoint(new Vector2(Input.mousePosition.x,
+            Screen.height - Input.mousePosition.y));
+        int controlePreview = GUIUtility.GetControlID(48103, FocusType.Passive, previewRect);
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
-        bool dansPreview = previewRect.Contains(evenement.mousePosition);
-        bool dansCommandes = commandes.Contains(evenement.mousePosition);
+        bool dansPreview = previewRect.Contains(sourisPanel);
+        bool dansCommandes = commandes.Contains(sourisPanel);
         if (evenement.type == EventType.MouseDown && evenement.button == 0
             && dansPreview && !dansCommandes)
         {
-            adminPreviewSourisActive = true;
-            adminPreviewDerniereSouris = evenement.mousePosition;
-            GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
+            previewPersonnageSourisActive = true;
+            previewPersonnageDerniereSouris = sourisPanel;
+            GUIUtility.hotControl = controlePreview;
             evenement.Use();
         }
-        else if (adminPreviewSourisActive && evenement.type == EventType.MouseDrag
+        else if (previewPersonnageSourisActive && evenement.type == EventType.MouseDrag
             && evenement.button == 0)
         {
-            Vector2 delta = evenement.mousePosition - adminPreviewDerniereSouris;
-            adminPreviewDerniereSouris = evenement.mousePosition;
-            adminHumanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
+            Vector2 delta = sourisPanel - previewPersonnageDerniereSouris;
+            previewPersonnageDerniereSouris = sourisPanel;
+            humanCreator.OrbitPreview(delta.x * 0.55f, -delta.y * 0.55f);
             evenement.Use();
         }
-        else if (adminPreviewSourisActive && evenement.type == EventType.MouseUp
+        else if (previewPersonnageSourisActive && evenement.type == EventType.MouseUp
             && evenement.button == 0)
         {
-            adminPreviewSourisActive = false;
+            previewPersonnageSourisActive = false;
             GUIUtility.hotControl = 0;
             evenement.Use();
         }
         else if (evenement.type == EventType.ScrollWheel && dansPreview
             && !dansCommandes)
         {
-            adminHumanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
+            humanCreator.ZoomPreview(-evenement.delta.y * 0.35f);
             evenement.Use();
         }
     }
@@ -7080,22 +7249,20 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect commandes = new Rect(previewRect.x + 6f, previewRect.yMax - 42f, 348f, 34f);
         GUI.Box(commandes, "", boxStyle);
         if (GUI.Button(new Rect(commandes.x + 4f, commandes.y + 3f, 32f, 28f), "-", buttonStyle))
-            adminHumanCreator.ZoomPreview(0.45f);
+            humanCreator.ZoomPreview(0.45f);
         if (GUI.Button(new Rect(commandes.x + 40f, commandes.y + 3f, 32f, 28f), "+", buttonStyle))
-            adminHumanCreator.ZoomPreview(-0.45f);
+            humanCreator.ZoomPreview(-0.45f);
         if (GUI.Button(new Rect(commandes.x + 78f, commandes.y + 3f, 86f, 28f), "ZOOM TETE", buttonStyle))
-            adminHumanCreator.ZoomHeadPreview();
+            humanCreator.ZoomHeadPreview();
         if (GUI.Button(new Rect(commandes.x + 168f, commandes.y + 3f, 86f, 28f), "DEZOOM", buttonStyle))
-            adminHumanCreator.ResetHeadPreview();
+            humanCreator.ResetHeadPreview();
         if (GUI.Button(new Rect(commandes.x + 258f, commandes.y + 3f, 84f, 28f), "CAMERA", buttonStyle))
-            adminHumanCreator.ResetPreviewCamera();
+            humanCreator.ResetPreviewCamera();
     }
 
-    private void DessinerAdminPersonnage(Rect contenu)
+    private void DessinerReglagesPersonnage(Rect contenu)
     {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 720f, 28f),
-            "EDITEUR HUMAIN - " + adminEditionContexte, titleStyle);
-        if (adminHumanCreator == null)
+        if (humanCreator == null)
         {
             GUI.Label(new Rect(contenu.x + 18f, contenu.y + 54f, 480f, 70f),
                 "Apercu humain indisponible : les ressources du personnage n'ont pas ete chargees.", smallStyle);
@@ -7104,11 +7271,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
         Rect previewRect = new Rect(contenu.x + 18f, contenu.y + 48f, 360f, 544f);
         // Le cadre noir englobe aussi les trois actions situees sous l'image
-        // et reste entierement dans le panneau ADMIN.
+        // et reste entierement dans le panel du NPC Esthétique.
         Rect previewFrame = new Rect(previewRect.x, previewRect.y, 360f, 586f);
         GUI.Box(previewFrame, "", boxStyle);
-        if (adminHumanCreator.PreviewReady && adminHumanCreator.PreviewTexture != null)
-            GUI.DrawTexture(previewRect, adminHumanCreator.PreviewTexture, ScaleMode.ScaleToFit, false);
+        if (humanCreator.PreviewReady && humanCreator.PreviewTexture != null)
+            GUI.DrawTexture(previewRect, humanCreator.PreviewTexture, ScaleMode.ScaleToFit, false);
         else
             GUI.Label(new Rect(previewRect.x + 12f, previewRect.y + 120f, 166f, 50f),
                 "Apercu en preparation...", smallStyle);
@@ -7122,38 +7289,38 @@ public sealed class LibreViesGame : MonoBehaviour
         float previewActionsY = previewRect.yMax + 8f;
         if (GUI.Button(new Rect(previewRect.x + 2f, previewActionsY, 112f, 34f), "ALEATOIRE", buttonStyle))
         {
-            adminHumanCreator.Randomize();
-            adminHumainValide = false;
+            humanCreator.Randomize();
+            profilPersonnageValide = false;
             ShowInfo("Personnage humain aleatoire genere");
         }
         if (GUI.Button(new Rect(previewRect.x + 116f, previewActionsY, 112f, 34f), "REINITIALISER", buttonStyle))
         {
-            adminHumanCreator.ResetPreview();
-            adminHumainValide = false;
+            humanCreator.ResetPreview();
+            profilPersonnageValide = false;
             ShowInfo("Reglages humains reinitialises");
         }
         if (GUI.Button(new Rect(previewRect.x + 230f, previewActionsY, 128f, 34f),
-            adminHumainValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", adminActionLongButtonStyle))
+            profilPersonnageValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", creationActionButtonStyle))
             ValiderEditionHumaine();
 
         float gauche = contenu.x + 400f;
         float droite = contenu.x + 660f;
         GUI.Label(new Rect(gauche, contenu.y + 45f, 230f, 22f), "Sexe", smallStyle);
-        if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !adminHumanCreator.female))
+        if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 68f, 92f, 28f), "Homme", !humanCreator.female))
         {
-            adminHumanCreator.female = false;
-            adminHumanCreator.hairStyle = 0;
-            adminHumanCreator.clothingStyle = 0;
-            adminHumainValide = false;
-            adminHumanCreator.BuildPreview();
+            humanCreator.female = false;
+            humanCreator.hairStyle = 0;
+            humanCreator.clothingStyle = 0;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
-        if (BoutonChoixAdmin(new Rect(gauche + 100f, contenu.y + 68f, 92f, 28f), "Femme", adminHumanCreator.female))
+        if (BoutonChoixAdmin(new Rect(gauche + 100f, contenu.y + 68f, 92f, 28f), "Femme", humanCreator.female))
         {
-            adminHumanCreator.female = true;
-            adminHumanCreator.hairStyle = 0;
-            adminHumanCreator.clothingStyle = 0;
-            adminHumainValide = false;
-            adminHumanCreator.BuildPreview();
+            humanCreator.female = true;
+            humanCreator.hairStyle = 0;
+            humanCreator.clothingStyle = 0;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
 
         GUI.Label(new Rect(gauche, contenu.y + 104f, 240f, 22f), "Teinte de peau", smallStyle);
@@ -7173,7 +7340,7 @@ public sealed class LibreViesGame : MonoBehaviour
             bool clic = GUI.Button(carre, "", GUIStyle.none);
             GUI.color = teintes[i];
             GUI.DrawTexture(carre, Texture2D.whiteTexture);
-            GUI.color = i == adminHumanCreator.skinTone ? Color.yellow : Color.black;
+            GUI.color = i == humanCreator.skinTone ? Color.yellow : Color.black;
             GUI.DrawTexture(new Rect(carre.x, carre.y, carre.width, 2f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(carre.x, carre.yMax - 2f, carre.width, 2f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(carre.x, carre.y, 2f, carre.height), Texture2D.whiteTexture);
@@ -7181,8 +7348,9 @@ public sealed class LibreViesGame : MonoBehaviour
             GUI.color = Color.white;
             if (clic)
             {
-                adminHumanCreator.skinTone = i;
-                adminHumanCreator.BuildPreview();
+                humanCreator.skinTone = i;
+                profilPersonnageValide = false;
+                humanCreator.BuildPreview();
             }
         }
 
@@ -7190,43 +7358,48 @@ public sealed class LibreViesGame : MonoBehaviour
             "Visage", smallStyle);
         float nouvelleValeur = SliderHumain(
             new Rect(gauche, contenu.y + 190f, 238f, 24f), "Tete",
-            adminHumanCreator.headShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.headShape) > 0.001f)
+            humanCreator.headShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.headShape) > 0.001f)
         {
-            adminHumanCreator.headShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.headShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumain(
             new Rect(gauche, contenu.y + 220f, 238f, 24f), "Yeux",
-            adminHumanCreator.eyesShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.eyesShape) > 0.001f)
+            humanCreator.eyesShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.eyesShape) > 0.001f)
         {
-            adminHumanCreator.eyesShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.eyesShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumain(
             new Rect(gauche, contenu.y + 250f, 238f, 24f), "Nez",
-            adminHumanCreator.noseShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.noseShape) > 0.001f)
+            humanCreator.noseShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.noseShape) > 0.001f)
         {
-            adminHumanCreator.noseShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.noseShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumain(
             new Rect(gauche, contenu.y + 280f, 238f, 24f), "Bouche",
-            adminHumanCreator.mouthShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.mouthShape) > 0.001f)
+            humanCreator.mouthShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.mouthShape) > 0.001f)
         {
-            adminHumanCreator.mouthShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.mouthShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumain(
             new Rect(gauche, contenu.y + 310f, 238f, 24f), "Oreilles",
-            adminHumanCreator.earsShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.earsShape) > 0.001f)
+            humanCreator.earsShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.earsShape) > 0.001f)
         {
-            adminHumanCreator.earsShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.earsShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
 
         GUI.Label(new Rect(gauche, contenu.y + 350f, 230f, 22f),
@@ -7237,41 +7410,42 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Rect coupe = new Rect(gauche + (i % 2) * 122f,
                 contenu.y + 378f + (i / 2) * 30f, 116f, 26f);
-            if (BoutonChoixAdmin(coupe, coiffures[i], adminHumanCreator.hairStyle == i))
+            if (BoutonChoixAdmin(coupe, coiffures[i], humanCreator.hairStyle == i))
             {
-                adminHumanCreator.hairStyle = i;
-                adminHumanCreator.BuildPreview();
+                humanCreator.hairStyle = i;
+                profilPersonnageValide = false;
+                humanCreator.BuildPreview();
             }
         }
 
         MakeHumanClothingFactory.Option[] tenues =
-            MakeHumanClothingFactory.ClothingOptions(adminHumanCreator.female);
+            MakeHumanClothingFactory.ClothingOptions(humanCreator.female);
         MakeHumanClothingFactory.Option[] chapeaux =
-            MakeHumanClothingFactory.HatOptions(adminHumanCreator.female);
+            MakeHumanClothingFactory.HatOptions(humanCreator.female);
         MakeHumanClothingFactory.Option[] chaussures =
-            MakeHumanClothingFactory.ShoeOptions(adminHumanCreator.female);
+            MakeHumanClothingFactory.ShoeOptions(humanCreator.female);
 
         // Les chaussures restent sous les coiffures pour eviter une colonne
         // d'equipement cachee par defilement.
         GUI.Label(new Rect(gauche, contenu.y + 476f, 230f, 22f),
             "Chaussures", smallStyle);
         if (BoutonChoixAdmin(new Rect(gauche, contenu.y + 502f, 116f, 27f), "Aucune",
-            adminHumanCreator.shoeStyle < 0))
+            humanCreator.shoeStyle < 0))
         {
-            adminHumanCreator.shoeStyle = -1;
-            adminHumainValide = false;
-            adminHumanCreator.BuildPreview();
+            humanCreator.shoeStyle = -1;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         for (int i = 0; i < chaussures.Length; i++)
         {
             Rect chaussure = new Rect(gauche + (i % 2) * 122f,
                 contenu.y + 532f + (i / 2) * 30f, 116f, 27f);
             if (BoutonChoixAdmin(chaussure, chaussures[i].label,
-                adminHumanCreator.shoeStyle == i))
+                humanCreator.shoeStyle == i))
             {
-                adminHumanCreator.shoeStyle = i;
-                adminHumainValide = false;
-                adminHumanCreator.BuildPreview();
+                humanCreator.shoeStyle = i;
+                profilPersonnageValide = false;
+                humanCreator.BuildPreview();
             }
         }
 
@@ -7279,67 +7453,75 @@ public sealed class LibreViesGame : MonoBehaviour
             "Corps et proportions", smallStyle);
         nouvelleValeur = SliderHumainBornes(
             new Rect(droite, contenu.y + 75f, 238f, 24f), "Seins volume",
-            adminHumanCreator.chestShape, 0f, 5f);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.chestShape) > 0.001f)
+            humanCreator.chestShape, 0f, 5f);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.chestShape) > 0.001f)
         {
-            adminHumanCreator.chestShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.chestShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 105f, 238f, 24f), "Hanches",
-            adminHumanCreator.hipShape);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.hipShape) > 0.001f)
+            humanCreator.hipShape);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.hipShape) > 0.001f)
         {
-            adminHumanCreator.hipShape = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.hipShape = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 135f, 238f, 24f), "Ventre",
-            adminHumanCreator.belly);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.belly) > 0.001f)
+            humanCreator.belly);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.belly) > 0.001f)
         {
-            adminHumanCreator.belly = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.belly = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 165f, 238f, 24f), "Bras largeur",
-            adminHumanCreator.armThickness);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armThickness) > 0.001f)
+            humanCreator.armThickness);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.armThickness) > 0.001f)
         {
-            adminHumanCreator.armThickness = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.armThickness = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 195f, 238f, 24f), "Bras longueur",
-            adminHumanCreator.armLength);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.armLength) > 0.001f)
+            humanCreator.armLength);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.armLength) > 0.001f)
         {
-            adminHumanCreator.armLength = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.armLength = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 225f, 238f, 24f), "Jambes largeur",
-            adminHumanCreator.legThickness);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legThickness) > 0.001f)
+            humanCreator.legThickness);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.legThickness) > 0.001f)
         {
-            adminHumanCreator.legThickness = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.legThickness = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 255f, 238f, 24f), "Hauteur jambe",
-            adminHumanCreator.legLength);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.legLength) > 0.001f)
+            humanCreator.legLength);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.legLength) > 0.001f)
         {
-            adminHumanCreator.legLength = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.legLength = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         nouvelleValeur = SliderHumainVolume(
             new Rect(droite, contenu.y + 285f, 238f, 24f), "Pieds",
-            adminHumanCreator.feetSize);
-        if (Mathf.Abs(nouvelleValeur - adminHumanCreator.feetSize) > 0.001f)
+            humanCreator.feetSize);
+        if (Mathf.Abs(nouvelleValeur - humanCreator.feetSize) > 0.001f)
         {
-            adminHumanCreator.feetSize = nouvelleValeur;
-            adminHumanCreator.BuildPreview();
+            humanCreator.feetSize = nouvelleValeur;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
 
         GUI.Label(new Rect(droite, contenu.y + 330f, 230f, 22f),
@@ -7349,33 +7531,33 @@ public sealed class LibreViesGame : MonoBehaviour
             Rect vetement = new Rect(droite + (i % 2) * 120f,
                 contenu.y + 353f + (i / 2) * 30f, 116f, 27f);
             if (BoutonChoixAdmin(vetement, tenues[i].label,
-                adminHumanCreator.clothingStyle == i))
+                humanCreator.clothingStyle == i))
             {
-                adminHumanCreator.clothingStyle = i;
-                adminHumainValide = false;
-                adminHumanCreator.BuildPreview();
+                humanCreator.clothingStyle = i;
+                profilPersonnageValide = false;
+                humanCreator.BuildPreview();
             }
         }
 
         float chapeauY = contenu.y + 460f;
         GUI.Label(new Rect(droite, chapeauY, 230f, 22f), "Chapeau", smallStyle);
         if (BoutonChoixAdmin(new Rect(droite, chapeauY + 24f, 116f, 27f), "Aucun",
-            adminHumanCreator.hatStyle < 0))
+            humanCreator.hatStyle < 0))
         {
-            adminHumanCreator.hatStyle = -1;
-            adminHumainValide = false;
-            adminHumanCreator.BuildPreview();
+            humanCreator.hatStyle = -1;
+            profilPersonnageValide = false;
+            humanCreator.BuildPreview();
         }
         for (int i = 0; i < chapeaux.Length; i++)
         {
             Rect chapeau = new Rect(droite + 120f,
                 chapeauY + 24f + i * 30f, 116f, 27f);
             if (BoutonChoixAdmin(chapeau, chapeaux[i].label,
-                adminHumanCreator.hatStyle == i))
+                humanCreator.hatStyle == i))
             {
-                adminHumanCreator.hatStyle = i;
-                adminHumainValide = false;
-                adminHumanCreator.BuildPreview();
+                humanCreator.hatStyle = i;
+                profilPersonnageValide = false;
+                humanCreator.BuildPreview();
             }
         }
 
@@ -7395,7 +7577,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
 
-        string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Personnage" };
+        string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre" };
         for (int i = 0; i < onglets.Length; i++)
         {
             Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -7447,21 +7629,36 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             DessinerAdminMonstres(contenu);
         }
-        else if (adminTab == 5)
-        {
-            DessinerAdminPersonnage(contenu);
-        }
     }
 
     private void OnGUI()
     {
         EnsureStyles();
+        if (focusCreationAReinitialiser)
+        {
+            GUIUtility.hotControl = 0;
+            GUI.FocusControl("");
+            focusCreationAReinitialiser = false;
+        }
         if (!mondePret)
         {
             DessinerChargement();
+            if (!String.IsNullOrEmpty(erreurChargementCompte))
+            {
+                GUI.Label(new Rect(Screen.width * 0.5f - 350f, Screen.height * 0.5f + 90f,
+                    700f, 90f), erreurChargementCompte, conversationTextStyle);
+                if (GUI.Button(new Rect(Screen.width * 0.5f - 170f, Screen.height - 80f,
+                    164f, 32f), "REESSAYER", buttonStyle))
+                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                if (GUI.Button(new Rect(Screen.width * 0.5f + 6f, Screen.height - 80f,
+                    164f, 32f), "FERMER LE JEU", buttonStyle))
+                    Application.Quit();
+            }
             return;
         }
 
+        bool ancienEnabledHud = GUI.enabled;
+        if (creationPersonnageOpen) GUI.enabled = false;
         DessinerCorrectionCouleur();
         DessinerCagesMaisonsEdition();
         if (playerUnderwater)
@@ -7522,21 +7719,23 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         DessinerEditionMaison();
         DessinerEditionPancarte();
-        if (adminOpen) DessinerAdmin();
-        if (GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
+        if (adminOpen && !creationPersonnageOpen) DessinerAdmin();
+        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
             "ADMIN", buttonStyle))
         {
             if (!adminOpen && modeEdition) BasculerModeEdition();
             adminOpen = !adminOpen;
             if (adminOpen) ShowInfo("MENU ADMINISTRATION");
         }
-        if (GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
+        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "EDITION", buttonStyle))
         {
             adminOpen = false;
             BasculerModeEdition();
         }
         if (conversationOpen) DessinerConversation();
+        GUI.enabled = ancienEnabledHud; // Le fond du modal ne recoit aucun clic.
+        if (creationPersonnageOpen) DessinerCreationPersonnage();
     }
 
     private void DessinerCorrectionCouleur()
@@ -7819,7 +8018,7 @@ public sealed class LibreViesGame : MonoBehaviour
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = new Color(0.82f, 0.87f, 0.92f) } };
         boxStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
         buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
-        adminActionLongButtonStyle = new GUIStyle(buttonStyle) { fontSize = 10 };
+        creationActionButtonStyle = new GUIStyle(buttonStyle) { fontSize = 10 };
         miniCarteTextStyle = new GUIStyle(smallStyle);
         miniCarteTextStyle.normal.textColor = Color.white;
         miniCarteTextStyle.hover.textColor = Color.white;

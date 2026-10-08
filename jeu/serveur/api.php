@@ -9,6 +9,8 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
+
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'personnage.php';
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
 function journal_api($message) {
@@ -88,6 +90,93 @@ function repondre_doublon($doublons) {
     }
 }
 
+function membre_public($membre) {
+    return array('id' => (int)$membre['id'], 'pseudo' => (string)$membre['pseudo'],
+        'valider' => (int)$membre['valider']);
+}
+
+function verifier_validation_email($membre, $config) {
+    // La validation email sera branchee plus tard. Par defaut, valider=0
+    // n'empeche pas encore de se connecter pendant le developpement.
+    if (!empty($config['require_email_validation']) && (int)$membre['valider'] !== 1) {
+        repondre(false, 'Validez votre compte par email avant de vous connecter.', array(), 403);
+    }
+}
+
+function demarrer_session_api($jeton = null, $nouvelle = false) {
+    // PHP garde la session cote serveur : aucune table ni cle secrete a
+    // distribuer. Le jeton ne circule que dans les corps POST, jamais l'URL.
+    // Seul creer_session_membre peut creer un id, genere cote serveur.
+    // Les jetons recus du client passent toujours en mode strict.
+    ini_set('session.use_strict_mode', $nouvelle ? '0' : '1');
+    ini_set('session.use_cookies', '0');
+    ini_set('session.use_only_cookies', '0');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.gc_maxlifetime', '86400');
+    session_name('LIBREVIES');
+    if ($jeton !== null) session_id($jeton);
+    if (!@session_start()) {
+        repondre(false, 'Impossible d ouvrir la session du compte.', array(), 503);
+    }
+}
+
+function creer_session_membre($membre) {
+    // Ne pas dependre de l'entropie par defaut des anciens PHP 5.6.
+    // Aucun identifiant de session fourni par le client n'est reutilise.
+    try {
+        if (function_exists('random_bytes')) {
+            $aleatoire = random_bytes(32);
+        } elseif (function_exists('openssl_random_pseudo_bytes')) {
+            $fort = false;
+            $aleatoire = openssl_random_pseudo_bytes(32, $fort);
+            if ($aleatoire === false || !$fort) throw new RuntimeException('Entropie insuffisante.');
+        } else {
+            throw new RuntimeException('Generateur securise indisponible.');
+        }
+    } catch (Exception $erreur) {
+        repondre(false, 'Impossible de securiser la session : verifiez PHP/OpenSSL.', array(), 503);
+    }
+    $jeton = bin2hex($aleatoire);
+    demarrer_session_api($jeton, true);
+    if (session_id() !== $jeton) {
+        session_destroy();
+        repondre(false, 'Impossible de securiser la session du compte.', array(), 503);
+    }
+    $expire = time() + 86400;
+    $_SESSION = array('id_membre' => (int)$membre['id'], 'expire_le' => $expire);
+    session_write_close();
+    return array('token' => $jeton, 'expires_at' => $expire);
+}
+
+function membre_authentifie($pdo, $config, $donnees) {
+    $jeton = isset($donnees['session_token']) ? $donnees['session_token'] : '';
+    if (!is_string($jeton) || !preg_match('/^[a-zA-Z0-9,-]{16,128}$/D', $jeton)) {
+        repondre(false, 'Session manquante : reconnectez-vous depuis le launcher.', array(), 401);
+    }
+    demarrer_session_api($jeton);
+    $id = isset($_SESSION['id_membre']) ? (int)$_SESSION['id_membre'] : 0;
+    $expire = isset($_SESSION['expire_le']) ? (int)$_SESSION['expire_le'] : 0;
+    if ($id <= 0 || $expire <= time()) {
+        $_SESSION = array();
+        session_destroy();
+        repondre(false, 'Session expiree : reconnectez-vous depuis le launcher.', array(), 401);
+    }
+    // Liberer le verrou avant les acces SQL et les autres requetes du jeu.
+    session_write_close();
+    try {
+        $requete = $pdo->prepare('SELECT id, pseudo, valider FROM membre WHERE id = :id LIMIT 1');
+        $requete->execute(array(':id' => $id));
+        $membre = $requete->fetch();
+    } catch (PDOException $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    if (!$membre) {
+        repondre(false, 'Compte du joueur introuvable.', array(), 401);
+    }
+    verifier_validation_email($membre, $config);
+    return $membre;
+}
+
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 if ($method === 'OPTIONS') {
     repondre(true, 'Pre-requete acceptee.');
@@ -111,6 +200,7 @@ if ($method === 'GET') {
     if ($corps === false) {
         $corps = '';
     }
+    if (strlen($corps) > 65536) repondre(false, 'Requete trop volumineuse.', array(), 413);
     $donnees = json_decode($corps, true);
     if (!is_array($donnees)) {
         $donnees = $_POST;
@@ -253,8 +343,8 @@ if ($action === 'register') {
             repondre(false, 'Inscription echouee, veuillez contacter un administrateur.', array(), 500);
         }
 
-        // Le personnage initial reprend le meme id que le compte. Les
-        // reglages sont des JSON vides, prets a etre remplis par le createur.
+        // Le personnage initial reprend le meme id que le compte. Seuls
+        // id et `default` sont fournis ; tous les reglages restent NULL.
         $personnage = $pdo->prepare(
             'INSERT INTO personnage (id, `default`) '
             . 'VALUES (:id, 1)'
@@ -267,7 +357,10 @@ if ($action === 'register') {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        if ($erreur->getCode() === '23000') {
+        // 1062 est le doublon MySQL. Une autre contrainte (ex. personnage)
+        // doit rester une erreur serveur, pas un faux pseudo deja utilise.
+        if ($erreur->getCode() === '23000' && isset($erreur->errorInfo[1])
+            && (int)$erreur->errorInfo[1] === 1062) {
             repondre(false, "Le pseudo ou l'email existe deja.", array(), 409);
         }
         repondre(false, detail_erreur($erreur, $config), array(), 500);
@@ -281,6 +374,34 @@ if ($action === 'register') {
     ));
 }
 
+if ($action === 'get_character' || $action === 'save_character') {
+    // L'id et le pseudo fournis par le client ne sont jamais une preuve
+    // d'identite. Seule la session ouverte apres password_verify fait foi.
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    try {
+        if ($action === 'save_character') {
+            $reglages = isset($donnees['personnage']) ? $donnees['personnage'] : null;
+            if (is_string($reglages)) $reglages = json_decode($reglages, true);
+            $profil = valider_profil_personnage($reglages);
+            $pdo->beginTransaction();
+            $personnage = enregistrer_personnage($pdo, (int)$membre['id'], $profil);
+            $pdo->commit();
+        } else {
+            $personnage = lire_personnage($pdo, (int)$membre['id']);
+        }
+    } catch (InvalidArgumentException $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, $erreur->getMessage(), array(), $action === 'save_character' ? 400 : 409);
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, $action === 'save_character' ? 'Personnage enregistre.' : 'Personnage charge.', array(
+        'membre' => membre_public($membre),
+        'personnage' => $personnage,
+    ));
+}
+
 if ($action === 'login') {
     $pseudo = trim(isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : '');
     $motdepasse = isset($donnees['password']) ? (string)$donnees['password'] : '';
@@ -290,7 +411,7 @@ if ($action === 'login') {
 
     try {
         $requete = $pdo->prepare(
-            'SELECT id, pseudo, motdepasse FROM membre WHERE pseudo = :pseudo LIMIT 1'
+            'SELECT id, pseudo, motdepasse, valider FROM membre WHERE pseudo = :pseudo LIMIT 1'
         );
         $requete->execute(array(':pseudo' => $pseudo));
         $membre = $requete->fetch();
@@ -300,8 +421,19 @@ if ($action === 'login') {
     if (!$membre || !password_verify($motdepasse, (string)$membre['motdepasse'])) {
         repondre(false, 'Pseudo ou mot de passe incorrect.', array(), 401);
     }
+    verifier_validation_email($membre, $config);
+    try {
+        $personnage = lire_personnage($pdo, (int)$membre['id']);
+    } catch (InvalidArgumentException $erreur) {
+        repondre(false, 'Personnage enregistre invalide : ' . $erreur->getMessage(), array(), 409);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    $session = creer_session_membre($membre);
     repondre(true, 'Connexion reussie.', array(
-        'membre' => array('id' => (int)$membre['id'], 'pseudo' => (string)$membre['pseudo']),
+        'membre' => membre_public($membre),
+        'session' => $session,
+        'personnage' => $personnage,
     ));
 }
 

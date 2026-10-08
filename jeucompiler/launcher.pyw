@@ -287,8 +287,6 @@ def auth_api_request(action, payload):
             code_http = getattr(response, 'status', getattr(response, 'code', '?'))
         journal_auth('HTTP FIN action=%s code=%s duree=%.2fs octets=%d' % (
             action, code_http, time.time() - debut_http, len(corps)))
-        journal_auth('CORPS action=%s taille=%d debut=%r' % (
-            action, len(corps), corps[:240]))
         texte = corps.decode('utf-8-sig').strip()
         if not texte:
             raise ValueError('reponse HTTP vide')
@@ -320,6 +318,8 @@ def auth_api_request(action, payload):
         message = resultat.get('message') if isinstance(resultat, dict) else None
         journal_auth('REFUS action=%s message=%s' % (action, message or 'reponse invalide'))
         raise ValueError(str(message or "reponse invalide du serveur"))
+    if action == 'login':
+        resultat['_api_url_utilisee'] = url
     return resultat
 
 
@@ -1062,15 +1062,37 @@ def dossier_journaux_jeu(exe_path):
         return None
 
 
-def launch(path):
-    # La build du jeu contient deja son runtime : aucun telechargement et
-    # aucun runtime a installer. -logFile sert uniquement a retrouver le
-    # journal du jeu (et donc la cause d'un plantage) sans chercher partout.
-    args = [path]
+def session_compte(resultat):
+    """Identite canonique et session retournees apres verification PHP/BDD."""
+    membre = resultat.get('membre') or {}
+    session = resultat.get('session') or {}
+    if not isinstance(membre, dict) or not isinstance(session, dict):
+        raise ValueError('Reponse du compte incomplete.')
+    identifiant = int(membre.get('id', 0) or 0)
+    pseudo = membre.get('pseudo', '')
+    jeton = session.get('token', '')
+    expiration = int(session.get('expires_at', 0) or 0)
+    if (identifiant <= 0 or not isinstance(pseudo, str) or not pseudo_valide(pseudo)
+            or not isinstance(jeton, str) or re.fullmatch(r'[a-zA-Z0-9,-]{16,128}', jeton) is None
+            or expiration <= time.time()):
+        raise ValueError('Session du compte absente ou expiree. Mettez l API a jour puis reconnectez-vous.')
+    return identifiant, pseudo, jeton, expiration
+
+
+def launch(path, pseudo='Joueur', session_token='', api_url=''):
+    # Le pseudo est public. La session reste en RAM, dans l'environnement du
+    # seul enfant : jamais dans argv, le manifeste, un fichier ou un journal.
+    args = [path, '-libreviesPseudo', str(pseudo or 'Joueur')]
+    env = os.environ.copy()
+    env.pop('LIBREVIES_SESSION_TOKEN', None)
+    env.pop('LIBREVIES_API_URL', None)
+    if session_token:
+        env['LIBREVIES_SESSION_TOKEN'] = str(session_token)
+        env['LIBREVIES_API_URL'] = str(api_url)
     journaux = dossier_journaux_jeu(path)
     if journaux:
         args += ['-logFile', os.path.join(journaux, 'LibreVies.log')]
-    subprocess.Popen(args, cwd=os.path.dirname(path), close_fds=False)
+    subprocess.Popen(args, cwd=os.path.dirname(path), close_fds=False, env=env)
 # ============================================================
 # APPLICATION
 # ============================================================
@@ -1096,6 +1118,10 @@ class App(tk.Tk):
         self.authenticated = False
         self.auth_busy = False
         self.logged_pseudo = ""
+        self.logged_membre_id = 0
+        self.session_token = ''
+        self.session_expires_at = 0
+        self.connected_api_url = ''
         self.auth_message = ""
         self.derniere_raison = ""
         self._ui_queue = []
@@ -1418,7 +1444,7 @@ class App(tk.Tk):
             # Pour une inscription, une seule requete est envoyee : l action
             # register verifie le pseudo et l email en BDD juste avant INSERT.
             # Cela evite de bloquer sur une seconde action API intermediaire.
-            auth_api_request(action, payload)
+            resultat = auth_api_request(action, payload)
             journal_auth('API OK action=%s' % action)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
@@ -1446,8 +1472,11 @@ class App(tk.Tk):
                 self._ui_call(lambda: self._registration_failed(
                     'Inscription non verifiee par le serveur.'))
             else:
-                self._ui_call(lambda: self._auth_succeeded(
-                    payload['pseudo'], payload['password'], compact_on_success))
+                membre_id, pseudo, jeton, expiration = session_compte(resultat)
+                url_api = resultat.get('_api_url_utilisee', '')
+                self._ui_call(lambda identifiant=membre_id, nom=pseudo, token=jeton,
+                              expire=expiration, url=url_api: self._auth_succeeded(
+                    nom, payload['password'], compact_on_success, identifiant, token, expire, url))
         except Exception as erreur:
             journal_auth('ECHEC action=%s erreur=%s' % (action, erreur))
             message_erreur = str(erreur)
@@ -1497,11 +1526,16 @@ class App(tk.Tk):
         self.login_greeting.config(text='Bonjour %s' % pseudo)
         self.login_greeting.place(x=330, y=39, width=180, height=22)
 
-    def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
+    def _auth_succeeded(self, pseudo, mdp, compact_on_success=False, membre_id=0,
+                        session_token='', session_expires_at=0, api_url=''):
         self.auth_busy = False
         self.auth_message = ''
         self.authenticated = True
         self.logged_pseudo = pseudo
+        self.logged_membre_id = int(membre_id or 0)
+        self.session_token = session_token
+        self.session_expires_at = session_expires_at
+        self.connected_api_url = api_url
         self.login_button.config(state='disabled', text='Connecte')
         self.login_pseudo.config(state='disabled')
         self.login_mdp.config(state='disabled')
@@ -1526,6 +1560,10 @@ class App(tk.Tk):
     def _auth_failed(self, message, automatic=False):
         self.auth_busy = False
         self.authenticated = False
+        self.logged_membre_id = 0
+        self.session_token = ''
+        self.session_expires_at = 0
+        self.connected_api_url = ''
         self.auth_message = str(message)[:100]
         if automatic and ('incorrect' in str(message).lower()
                           or 'invalide' in str(message).lower()):
@@ -1533,6 +1571,12 @@ class App(tk.Tk):
             self.autolog = None
             self.remember_var.set(False)
         try:
+            self.login_greeting.place_forget()
+            self.login_pseudo.config(state='normal')
+            self.login_mdp.config(state='normal')
+            self.login_pseudo.place(x=335, y=39, width=75, height=19)
+            self.login_mdp.place(x=448, y=39, width=65, height=19)
+            self.login_button.place(x=330, y=70, width=80, height=20)
             self.login_button.config(state='normal', text='Connexion')
             if not getattr(self, '_auth_ui_compact', False):
                 self.register_button.config(state='normal')
@@ -1746,7 +1790,7 @@ class App(tk.Tk):
                           or 'Jeu non installe : verifiez la connexion puis relancez')
 
     def _update_play_state(self):
-        autorise = bool(self.updates_done and self.authenticated and self.game)
+        autorise = bool(self.updates_done and self.authenticated and self.session_token and self.game)
         if autorise:
             self.play_btn.config(state='normal', bg=GREEN)
             self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
@@ -1768,8 +1812,11 @@ class App(tk.Tk):
     def play(self):
         if not (self.updates_done and self.authenticated and self.ready and self.game):
             return
+        if not self.session_token or self.session_expires_at <= time.time():
+            self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
+            return
         try:
-            launch(self.game)
+            launch(self.game, self.logged_pseudo, self.session_token, self.connected_api_url)
         except Exception as e:
             self._upd_bar(0, 'Lancement impossible : %s' % e)
             return

@@ -10,4 +10,7 @@ return [
     // Passez temporairement à true pour voir l'erreur SQL dans la réponse.
     // Remettez false ensuite si l'API est accessible depuis Internet.
     'debug' => false,
+    // Laisser false pour l'instant : l'envoi des emails sera ajoute plus tard.
+    // Quand il sera en place, true bloquera les comptes dont valider vaut 0.
+    'require_email_validation' => false,
 ];

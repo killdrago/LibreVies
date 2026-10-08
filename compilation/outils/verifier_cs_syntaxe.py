@@ -52,7 +52,7 @@ PrimitiveType Camera CameraClearFlags Light LightType LightShadows Mesh RenderTe
 MeshRenderer MeshCollider CapsuleCollider BoxCollider SphereCollider Collider Destroy
 Object System String StringComparison Convert Random TextMesh TextAnchor Rect GUI GUIStyle
 GUIContent GUISkin Texture Sprite SpriteRenderer Bounds Ray RaycastHit Physics JsonUtility
-Directory Path File DateTime List Dictionary Array Exception UnityEngine MonoBehaviour
+Directory Path File DateTime List Dictionary Array Exception InvalidOperationException UnityEngine MonoBehaviour
 GUILayout GUIUtility Space SendMessage Instantiate Math MeshRenderer MeshFilter
 AddComponent GetComponent SetActive LookRotation Euler Slerp Distance Lerp Clamp Clamp01
 InverseLerp SmoothStep Sin Cos Sqrt Abs Max Min Round RoundToInt Sign Pow Atan2 Tan Floor
@@ -65,7 +65,7 @@ Combine GetInstanceID CompareTag Invoke CancelInvoke StartCoroutine StopCoroutin
 QuaternionIdentity Normalize SetResolution RunInBackground targetFrameRate deltaTime
 DllImport BoneWeight MemoryStream InvalidDataException ZipArchive ZipArchiveEntry ZipArchiveMode
 unscaledDeltaTime fixedDeltaTime timeScale frameCount realtimeSinceStartup
-CopyTo Open GetEntry SetVertices SetUVs
+CopyTo Open GetEntry SetVertices SetUVs LibreViesPersonnage
 """.split())
 
 RACINE_IF = None
@@ -217,7 +217,7 @@ def champs_masques(chemin):
     for i, ligne in enumerate(lignes):
         if niveaux[i] < 2 or imbrique[i]:
             continue
-        trouve = re.match(r"\s*(?:var|(?:[A-Za-z_][\w<>,.\[\]]*))\s+(\w+)\s*=", ligne)
+        trouve = re.match(r"\s*(?:var|(?:[A-Za-z_][\w<>,.\[\]]*))\s+(\w+)\s*=(?!=)", ligne)
         if not trouve:
             continue
         mot = re.match(r"\s*(?:var|([A-Za-z_]\w*))", ligne)

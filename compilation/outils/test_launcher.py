@@ -217,25 +217,37 @@ def main() -> int:
     appels = {}
     vrai_popen = launcher.subprocess.Popen
     launcher.subprocess.Popen = lambda args, **k: appels.update(
-        {"args": args, "cwd": k.get("cwd")})
-    launcher.launch(exe)
+        {"args": args, "cwd": k.get("cwd"), "env": k.get("env")})
+    token = 'jeton-session-de-test-123456789012'
+    environnement_avant = dict(os.environ)
+    launcher.launch(exe, 'Joueur Test', token, 'http://localhost/serveur/api.php')
     launcher.subprocess.Popen = vrai_popen
     arguments = appels.get("args") or []
     verifier(bool(arguments) and arguments[0] == exe,
              "le jeu est lance par son chemin complet")
     # Le journal du jeu est force a cote de son executable : c'est ce fichier
     # qui permet de comprendre un plantage (bouton RAPPORT du launcher).
-    verifier(len(arguments) == 3 and arguments[1] == "-logFile",
+    verifier('-logFile' in arguments,
              "le jeu est lance avec -logFile (journal du jeu)")
-    journal = arguments[2] if len(arguments) > 2 else ""
+    journal = arguments[arguments.index('-logFile') + 1] if '-logFile' in arguments else ""
     verifier(journal.replace("\\", "/").endswith("logs/LibreVies.log"),
              "le journal est ecrit dans logs/LibreVies.log")
     verifier(os.path.isdir(os.path.dirname(journal)),
              "le dossier des journaux est cree au lancement")
     verifier(appels.get("cwd") == os.path.dirname(exe),
              "le jeu demarre dans son propre dossier")
-    verifier(appels.get("cwd") == os.path.dirname(exe),
-             "le jeu demarre dans son propre dossier")
+    verifier(arguments[arguments.index('-libreviesPseudo') + 1] == 'Joueur Test',
+             "le pseudo public est transmis au jeu sans etre coupe")
+    verifier('-libreviesId' not in arguments and token not in arguments,
+             "ni id d authentification ni session ne sont dans argv")
+    verifier((appels.get('env') or {}).get('LIBREVIES_SESSION_TOKEN') == token,
+             "la session temporaire est transmise au seul processus du jeu")
+    verifier((appels.get('env') or {}).get('LIBREVIES_API_URL') == 'http://localhost/serveur/api.php',
+             "le jeu utilise la meme API que la connexion")
+    verifier(dict(os.environ) == environnement_avant,
+             "l environnement du launcher ne garde pas de session")
+    verifier(not any(token.encode() in p.read_bytes() for p in jeu.rglob('*') if p.is_file()),
+             "la session n est ecrite dans aucun fichier local")
 
     print("== 10. mise a jour du code du launcher (sans reconstruction) ==")
     # Tout le launcher est dans launcher.pyw : quand son hash change, le

@@ -22,6 +22,16 @@ if not exist "%PROJECT%\Assets" (
     exit /b 1
 )
 
+rem Synchronisation locale uniquement, sans telechargement ni import SQL.
+if exist "%ROOT%outils\synchroniser_serveur_local.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%outils\synchroniser_serveur_local.ps1" -Sources "%JEU%\serveur"
+    if errorlevel 1 (
+        echo ERREUR : synchronisation de l'API locale impossible.
+        pause
+        exit /b 1
+    )
+)
+
 rem Force le backend Mono meme si l'installation locale conserve un ancien reglage IL2CPP.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Join-Path $env:PROJECT 'ProjectSettings\ProjectSettings.asset'; if (Test-Path $p) { $c = Get-Content -Raw $p; $c = $c -replace '(?m)^([ \t]*Standalone:[ \t]*)1[ \t]*$', '${1}0'; Set-Content -Path $p -Value $c -Encoding UTF8 }"
 if errorlevel 1 (
