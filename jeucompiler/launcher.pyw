@@ -1464,15 +1464,29 @@ class App(tk.Tk):
         self._check_game()
 
     def _relancer(self):
-        """Relance le launcher apres une mise a jour ou une inscription."""
+        """Relance le launcher apres fermeture de l ancien processus.
+
+        Le delai evite que deux executions onefile PyInstaller utilisent en
+        meme temps leur dossier temporaire ``_MEI``.
+        """
+        script = os.path.join(GAME_DIR, '.librevies-restart.cmd')
         try:
             if getattr(sys, 'frozen', False):
                 commande = [sys.executable]
             else:
                 commande = [sys.executable, os.path.abspath(__file__)]
-            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=False)
+            with open(script, 'w', encoding='utf-8', newline='\r\n') as fichier:
+                fichier.write('@echo off\r\n')
+                fichier.write('timeout /t 2 /nobreak >nul\r\n')
+                fichier.write('start "" %s\r\n' % subprocess.list2cmdline(commande))
+                fichier.write('del /f /q "%~f0" >nul 2>&1\r\n')
+            flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            subprocess.Popen(['cmd.exe', '/d', '/c', script], cwd=GAME_DIR,
+                             creationflags=flags, close_fds=False)
+            journal_auth('REDEMARRAGE planifie apres fermeture propre')
             return True
         except (OSError, IOError):
+            journal_auth('REDEMARRAGE planification impossible')
             return False
 
     def _finish_launcher_update(self, pending):
