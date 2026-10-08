@@ -11,7 +11,21 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
+function journal_api($message) {
+    // Le journal est place hors de eds-www pour ne pas etre telechargeable
+    // par HTTP. Aucun mot de passe n'est jamais ecrit.
+    $chemin = dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'journal_api.log';
+    $ligne = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
+    if (@file_put_contents($chemin, $ligne, FILE_APPEND | LOCK_EX) === false) {
+        // Secours si EasyPHP refuse l'ecriture dans le dossier parent.
+        @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . 'journal_api.log',
+                           $ligne, FILE_APPEND | LOCK_EX);
+    }
+}
+
 function repondre($ok, $message = '', $extra = array(), $code = 200) {
+    journal_api('REPONSE code=' . (int)$code . ' ok=' . ($ok ? 'true' : 'false')
+        . ' message=' . $message);
     http_response_code($code);
     echo json_encode(array_merge(array('ok' => $ok, 'message' => $message), $extra),
                      JSON_UNESCAPED_UNICODE);
@@ -54,6 +68,10 @@ if ($method === 'GET') {
     }
     $action = isset($donnees['action']) ? (string)$donnees['action'] : '';
 }
+
+journal_api('REQUETE methode=' . $method . ' action=' . $action
+    . ' email=' . (isset($donnees['email']) ? (string)$donnees['email'] : '')
+    . ' pseudo=' . (isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : ''));
 
 try {
     $dsn = sprintf(
@@ -132,6 +150,7 @@ if ($action === 'register') {
     }
 
     try {
+        journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
         $requete = $pdo->prepare(
             'INSERT INTO membre (pseudo, motdepasse, email) '
             . 'VALUES (:pseudo, :motdepasse, :email)'

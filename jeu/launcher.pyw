@@ -220,14 +220,27 @@ def pseudo_valide(pseudo):
             and re.fullmatch(r"[\w -]+", pseudo, re.UNICODE) is not None)
 
 
+def journal_auth(message):
+    """Journal local de diagnostic sans jamais ecrire le mot de passe."""
+    try:
+        chemin = os.path.join(GAME_DIR, 'journal_auth.log')
+        with open(chemin, 'a', encoding='utf-8', newline='\n') as fichier:
+            fichier.write('[%s] %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), message))
+    except (OSError, IOError):
+        pass
+
+
 def auth_api_request(action, payload):
     """Appelle l'API HTTP ; le launcher ne contient aucun mot de passe MySQL."""
     config = load_auth_config()
     url = config['api_url']
     if not url.lower().startswith(('http://', 'https://')):
+        journal_auth('ERREUR action=%s URL invalide' % action)
         raise ValueError("URL d authentification invalide")
     donnees = dict(payload or {})
     donnees['action'] = action
+    journal_auth('REQUETE action=%s email=%s pseudo=%s' % (
+        action, donnees.get('email', ''), donnees.get('pseudo', '')))
     req = urllib.request.Request(
         url,
         data=json.dumps(donnees, ensure_ascii=False).encode('utf-8'),
@@ -237,6 +250,9 @@ def auth_api_request(action, payload):
     try:
         with urllib.request.urlopen(req, timeout=config['timeout']) as response:
             resultat = json.loads(response.read().decode('utf-8'))
+        journal_auth('REPONSE action=%s ok=%s message=%s' % (
+            action, resultat.get('ok') if isinstance(resultat, dict) else None,
+            resultat.get('message', '') if isinstance(resultat, dict) else 'JSON invalide'))
     except urllib.error.HTTPError as erreur:
         # L'API renvoie aussi son message en JSON pour les erreurs 400/401/500.
         try:
@@ -244,11 +260,18 @@ def auth_api_request(action, payload):
         except (OSError, ValueError):
             resultat = {}
         message = resultat.get('message') if isinstance(resultat, dict) else None
+        journal_auth('HTTP action=%s code=%s message=%s' % (
+            action, erreur.code, message or 'reponse HTTP sans JSON'))
         raise ValueError(str(message or 'Serveur HTTP %s' % erreur.code))
     except urllib.error.URLError as erreur:
+        journal_auth('RESEAU action=%s erreur=%s' % (action, erreur.reason))
         raise ValueError('Serveur de connexion inaccessible : %s' % erreur.reason)
+    except Exception as erreur:
+        journal_auth('EXCEPTION action=%s erreur=%s' % (action, erreur))
+        raise
     if not isinstance(resultat, dict) or not resultat.get('ok'):
         message = resultat.get('message') if isinstance(resultat, dict) else None
+        journal_auth('REFUS action=%s message=%s' % (action, message or 'reponse invalide'))
         raise ValueError(str(message or "reponse invalide du serveur"))
     return resultat
 
@@ -1172,12 +1195,15 @@ class App(tk.Tk):
 
     def _auth_worker(self, action, payload, automatic, compact_on_success):
         try:
+            journal_auth('DEBUT action=%s email=%s pseudo=%s' % (
+                action, payload.get('email', ''), payload.get('pseudo', '')))
             auth_api_request(action, payload)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
                 # dix fois, avec une seconde entre chaque tentative.
                 for tentative in range(10):
                     numero = tentative + 1
+                    journal_auth('VERIFICATION inscription tentative=%d/10' % numero)
                     self.after(0, lambda n=numero: self._upd_bar(
                         10 + n * 8,
                         'Verification de l inscription (%d/10)...' % n))
@@ -1186,22 +1212,28 @@ class App(tk.Tk):
                             'email': payload['email'],
                             'pseudo': payload['pseudo'],
                         })
+                        journal_auth('VERIFICATION inscription OK tentative=%d/10' % numero)
                         self.after(0, lambda p=payload: self._registration_succeeded(p))
                         return
-                    except Exception:
+                    except Exception as erreur_verification:
+                        journal_auth('VERIFICATION inscription ECHEC tentative=%d/10 erreur=%s' % (
+                            numero, erreur_verification))
                         if tentative < 9:
                             time.sleep(1)
+                journal_auth('INSCRIPTION ECHEC apres 10 tentatives')
                 self.after(0, self._registration_failed)
             else:
                 self.after(0, lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
+            journal_auth('ECHEC action=%s erreur=%s' % (action, erreur))
             if action == 'register':
                 self.after(0, self._registration_failed)
             else:
                 self.after(0, lambda: self._auth_failed(str(erreur)))
 
     def _registration_failed(self):
+        journal_auth('INSCRIPTION ECHEC affichee au joueur')
         self.auth_busy = False
         self.login_button.config(state='normal', text='Connexion')
         self.register_button.config(state='normal')
@@ -1211,6 +1243,7 @@ class App(tk.Tk):
         self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
 
     def _registration_succeeded(self, payload):
+        journal_auth('INSCRIPTION VERIFIEE, preparation du redemarrage')
         self.auth_busy = False
         cfg = load_local_config()
         cfg['registration_done'] = True
@@ -1228,8 +1261,10 @@ class App(tk.Tk):
 
         self._upd_bar(100, 'Inscription reussie, redemarrage du launcher...')
         if self._relancer():
+            journal_auth('REDEMARRAGE launcher demande')
             self.after(600, self.destroy)
         else:
+            journal_auth('REDEMARRAGE launcher impossible, secours interface')
             # Secours pour une execution inhabituelle : l interface est tout
             # de meme compactee sans modifier le bouton Connexion.
             self._hide_registration_and_center_login()
