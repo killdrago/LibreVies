@@ -98,7 +98,8 @@ CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 # Ce fichier est volontairement separe du manifeste : l'adresse IP du serveur
 # peut changer sans declencher une mise a jour du launcher.
 AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
-AUTH_API_URL_DEFAULT = "http://92.133.115.121/serveur/api.php"
+AUTOLOGIN_PATH = os.path.join(GAME_DIR, "autolog.json")
+AUTH_API_URL_DEFAULT = "http://localhost/serveur/api.php"
 AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
 # le launcher telecharge la nouvelle version puis redemarre : aucune
@@ -306,18 +307,20 @@ def auth_api_request(action, payload):
 
 
 def save_local_config(cfg):
-    # Les identifiants facultatifs appartiennent a la machine, pas au
-    # manifeste distant : ne jamais les perdre lorsqu'une MAJ est enregistree.
+    # Les anciennes versions stockaient parfois les identifiants dans le
+    # manifeste local. Ils doivent maintenant vivre uniquement dans
+    # autolog.json, jamais dans version_url.json.
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             previous = json.load(f)
         if isinstance(previous, dict):
             cfg = dict(cfg)
-            for key in ('saved_pseudo', 'saved_mdp', 'registration_done'):
-                if key not in cfg and key in previous:
-                    cfg[key] = previous[key]
+            if 'registration_done' not in cfg and 'registration_done' in previous:
+                cfg['registration_done'] = previous['registration_done']
     except (OSError, ValueError):
         pass
+    cfg.pop('saved_pseudo', None)
+    cfg.pop('saved_mdp', None)
 
     # Ecriture atomique : une coupure pendant la mise a jour ne doit jamais
     # laisser un version_url.json vide ou invalide.
@@ -326,6 +329,66 @@ def save_local_config(cfg):
         json.dump(cfg, f, indent=2, ensure_ascii=False)
         f.write('\n')
     os.replace(tmp, CONFIG_PATH)
+
+
+def load_autolog():
+    """Charge les identifiants locaux utilises par la case Autolog."""
+    try:
+        with open(AUTOLOGIN_PATH, 'r', encoding='utf-8') as f:
+            donnees = json.load(f)
+        pseudo = texte_saisi(donnees.get('pseudo', ''), 30)
+        mdp = motdepasse_saisi(donnees.get('password', ''))
+        if pseudo_valide(pseudo) and mdp:
+            return {'pseudo': pseudo, 'password': mdp}
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def save_autolog(pseudo, mdp):
+    """Ecrit l'Autolog dans le dossier jeu, de facon atomique."""
+    pseudo = texte_saisi(pseudo, 30)
+    mdp = motdepasse_saisi(mdp)
+    if not pseudo_valide(pseudo) or not mdp:
+        raise ValueError('identifiants Autolog invalides')
+    tmp = AUTOLOGIN_PATH + '.tmp'
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump({'version': 1, 'pseudo': pseudo, 'password': mdp},
+                  f, ensure_ascii=False)
+        f.write('\n')
+    os.replace(tmp, AUTOLOGIN_PATH)
+
+
+def clear_autolog():
+    """Supprime le fichier local si le joueur decoche Autolog."""
+    try:
+        os.remove(AUTOLOGIN_PATH)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        # Le fichier peut deja avoir ete supprime par le joueur ou un
+        # nettoyage local : l'etat logique reste bien desactive.
+        pass
+
+
+def migrate_legacy_autolog():
+    """Migre une fois les identifiants des anciennes versions."""
+    actuel = load_autolog()
+    if actuel:
+        return actuel
+    try:
+        cfg = load_local_config()
+        pseudo = texte_saisi(cfg.get('saved_pseudo', ''), 30)
+        mdp = motdepasse_saisi(cfg.get('saved_mdp', ''))
+        if not pseudo_valide(pseudo) or not mdp:
+            return None
+        save_autolog(pseudo, mdp)
+        cfg.pop('saved_pseudo', None)
+        cfg.pop('saved_mdp', None)
+        save_local_config(cfg)
+        return {'pseudo': pseudo, 'password': mdp}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
 
 
 def normalize_raw_url(url):
@@ -948,12 +1011,17 @@ class App(tk.Tk):
         self.auth_busy = False
         self.logged_pseudo = ""
         self.derniere_raison = ""
+        self.autolog = migrate_legacy_autolog()
         self.build()
-        self._load_saved_login()
-        # Le cadre Inscription reste visible par defaut. Il est masque
-        # uniquement apres une authentification Autolog reussie.
+        self._load_autolog_login()
+        if self.autolog:
+            # Un joueur deja connu n'a plus besoin du cadre Inscription.
+            # La connexion HTTP est lancee juste apres l'affichage.
+            self._hide_registration_and_center_login()
+            self._upd_bar(5, 'Connexion automatique...')
         self.start_update()
-        self.after(250, self._start_autolog)
+        if self.autolog:
+            self.after(250, self._start_autolog)
 
     def frame(self, x1, y1, x2, y2, color=CARD, outline=ACCENT):
         self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline, width=2)
@@ -1007,8 +1075,11 @@ class App(tk.Tk):
         self.autolog_check = tk.Checkbutton(
             self, text="Autolog", font=("Segoe UI", 8), fg=TEXT2, bg=CARD,
             selectcolor="#111122", activebackground=CARD, activeforeground=TEXT,
-            variable=self.remember_var, cursor="hand2")
+            variable=self.remember_var, command=self._autolog_toggle,
+            cursor="hand2")
         self.autolog_check.place(x=420, y=70)
+        self.login_pseudo.bind('<Return>', self._submit_login_event)
+        self.login_mdp.bind('<Return>', self._submit_login_event)
         self.login_widgets = [self.login_pseudo, self.login_mdp,
                               self.login_button, self.autolog_check]
 
@@ -1041,6 +1112,9 @@ class App(tk.Tk):
             self, text="S'inscrire", font=("Segoe UI", 9, "bold"), fg=TEXT,
             bg=BLUE, relief="flat", cursor="hand2", command=self._do_register)
         self.register_button.place(x=680, y=70, width=230, height=18)
+        self.reg_email.bind('<Return>', self._submit_register_event)
+        self.reg_pseudo.bind('<Return>', self._submit_register_event)
+        self.reg_mdp.bind('<Return>', self._submit_register_event)
         self.registration_widgets = [self.reg_email, self.reg_pseudo,
                                      self.reg_mdp, self.register_button]
 
@@ -1126,16 +1200,28 @@ class App(tk.Tk):
     # CONNEXION / INSCRIPTION
     # ============================================================
 
-    def _load_saved_login(self):
-        cfg = load_local_config()
-        if cfg.get("saved_pseudo"):
-            self.login_pseudo.insert(0, cfg["saved_pseudo"])
-            self.remember_var.set(True)
-        if cfg.get("saved_mdp"):
-            self.login_mdp.insert(0, cfg["saved_mdp"])
+    def _load_autolog_login(self):
+        if not self.autolog:
+            return
+        self.login_pseudo.insert(0, self.autolog['pseudo'])
+        self.login_mdp.insert(0, self.autolog['password'])
+        self.remember_var.set(True)
+
+    def _autolog_toggle(self):
+        if not self.remember_var.get():
+            clear_autolog()
+            self.autolog = None
+
+    def _submit_login_event(self, event):
+        self._do_login()
+        return 'break'
+
+    def _submit_register_event(self, event):
+        self._do_register()
+        return 'break'
 
     def _start_autolog(self):
-        if not self.remember_var.get():
+        if not self.autolog or self.auth_busy:
             return
         pseudo = texte_saisi(self.login_pseudo.get(), 30)
         mdp = motdepasse_saisi(self.login_mdp.get())
@@ -1154,9 +1240,9 @@ class App(tk.Tk):
             'login', {'pseudo': pseudo, 'password': mdp}, automatic=False)
 
     def _do_register(self):
-        email = self.reg_email.get().strip()
-        pseudo = self.reg_pseudo.get().strip()
-        mdp = self.reg_mdp.get().strip()
+        email = texte_saisi(self.reg_email.get(), 254)
+        pseudo = texte_saisi(self.reg_pseudo.get(), 30)
+        mdp = motdepasse_saisi(self.reg_mdp.get())
         if not email_valide(email):
             self._auth_failed("Adresse email invalide : exemple@domaine.fr")
             return
@@ -1222,7 +1308,8 @@ class App(tk.Tk):
             if action == 'register':
                 self.after(0, self._registration_failed)
             else:
-                self.after(0, lambda: self._auth_failed(str(erreur)))
+                self.after(0, lambda: self._auth_failed(
+                    str(erreur), automatic=automatic))
 
     def _registration_failed(self):
         journal_auth('INSCRIPTION ECHEC affichee au joueur')
@@ -1237,16 +1324,11 @@ class App(tk.Tk):
     def _registration_succeeded(self, payload):
         journal_auth('INSCRIPTION VERIFIEE, preparation du redemarrage')
         self.auth_busy = False
-        cfg = load_local_config()
-        cfg['registration_done'] = True
-        if self.remember_var.get():
-            cfg['saved_pseudo'] = payload['pseudo']
-            cfg['saved_mdp'] = payload['password']
-        else:
-            cfg.pop('saved_pseudo', None)
-            cfg.pop('saved_mdp', None)
         try:
-            save_local_config(cfg)
+            if self.remember_var.get():
+                save_autolog(payload['pseudo'], payload['password'])
+            else:
+                clear_autolog()
         except OSError as erreur:
             self._auth_failed('inscription creee, mais sauvegarde locale impossible : %s' % erreur)
             return
@@ -1264,22 +1346,30 @@ class App(tk.Tk):
         self.login_button.config(state='disabled', text='Connecte')
         self.login_pseudo.config(state='disabled')
         self.login_mdp.config(state='disabled')
-        cfg = load_local_config()
-        cfg['registration_done'] = True
-        if self.remember_var.get():
-            cfg['saved_pseudo'] = pseudo
-            cfg['saved_mdp'] = mdp
-        else:
-            cfg.pop('saved_pseudo', None)
-            cfg.pop('saved_mdp', None)
-        save_local_config(cfg)
+        try:
+            if self.remember_var.get():
+                save_autolog(pseudo, mdp)
+                self.autolog = {'pseudo': pseudo, 'password': mdp}
+            else:
+                clear_autolog()
+                self.autolog = None
+        except OSError as erreur:
+            self.remember_var.set(False)
+            self.autolog = None
+            journal_auth('AUTOLOG sauvegarde impossible erreur=%s' % erreur)
         if compact_on_success or self.remember_var.get():
             self._hide_registration_and_center_login()
+        self._upd_bar(100, 'Connexion reussie')
         self._update_play_state()
 
-    def _auth_failed(self, message):
+    def _auth_failed(self, message, automatic=False):
         self.auth_busy = False
         self.authenticated = False
+        if automatic and ('incorrect' in str(message).lower()
+                          or 'invalide' in str(message).lower()):
+            clear_autolog()
+            self.autolog = None
+            self.remember_var.set(False)
         try:
             self.login_button.config(state='normal', text='Connexion')
             if not getattr(self, '_auth_ui_compact', False):
