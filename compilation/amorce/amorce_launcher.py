@@ -33,6 +33,10 @@ try:
 except ImportError:
     pass
 try:
+    import queue
+except ImportError:
+    pass
+try:
     import time
 except ImportError:
     pass
