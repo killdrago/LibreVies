@@ -14,9 +14,7 @@ l'adresse IP du serveur, et PHP utilise MySQL sur le port 3306 côté serveur.
    la base `librevies`.
 4. Importer `membre.sql` si la table n'existe pas. Si la table existe déjà
    avec les types de la capture, importer d'abord `corriger_membre.sql`.
-5. Si la table `membre` existe déjà sans la colonne `valider`, importer une
-   seule fois `ajouter_valider.sql`. La valeur `0` signifie « non valide »
-   et la valeur `1` signifie « valide ».
+5. Importer `personnage.sql` après la création de la table `membre`.
 6. Tester :
    `http://92.133.115.121/serveur/api.php?action=health`
    doit répondre `API et base de données accessibles.`.

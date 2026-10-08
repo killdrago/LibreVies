@@ -1494,7 +1494,7 @@ class App(tk.Tk):
         self.login_pseudo.place_forget()
         self.login_mdp.place_forget()
         self.login_button.place_forget()
-        self.login_greeting.config(text='Bonjour (%s)' % pseudo)
+        self.login_greeting.config(text='Bonjour %s' % pseudo)
         self.login_greeting.place(x=330, y=39, width=180, height=22)
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
