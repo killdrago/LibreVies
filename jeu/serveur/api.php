@@ -58,6 +58,36 @@ function detail_erreur($erreur, $config) {
         : 'Connexion a la base impossible.';
 }
 
+function doublons_membre($pdo, $pseudo, $email) {
+    // Les deux requetes laissent MySQL appliquer sa collation,
+    // notamment pour les majuscules/minuscules.
+    $requetePseudo = $pdo->prepare(
+        'SELECT id FROM membre WHERE pseudo = :pseudo LIMIT 1'
+    );
+    $requetePseudo->execute(array(':pseudo' => $pseudo));
+    $pseudoExiste = (bool)$requetePseudo->fetchColumn();
+
+    $requeteEmail = $pdo->prepare(
+        'SELECT id FROM membre WHERE email = :email LIMIT 1'
+    );
+    $requeteEmail->execute(array(':email' => $email));
+    $emailExiste = (bool)$requeteEmail->fetchColumn();
+
+    return array('pseudo' => $pseudoExiste, 'email' => $emailExiste);
+}
+
+function repondre_doublon($doublons) {
+    if (!empty($doublons['pseudo']) && !empty($doublons['email'])) {
+        repondre(false, "Le pseudo et l'email existent deja.", array(), 409);
+    }
+    if (!empty($doublons['pseudo'])) {
+        repondre(false, 'Le pseudo existe deja.', array(), 409);
+    }
+    if (!empty($doublons['email'])) {
+        repondre(false, "L'email existe deja.", array(), 409);
+    }
+}
+
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 if ($method === 'OPTIONS') {
     repondre(true, 'Pre-requete acceptee.');
@@ -116,6 +146,23 @@ if ($method !== 'POST') {
     repondre(false, 'Action GET inconnue.', array(), 400);
 }
 
+if ($action === 'check_account') {
+    $email = trim(isset($donnees['email']) ? (string)$donnees['email'] : '');
+    $pseudo = trim(isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : '');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        repondre(false, 'Adresse email invalide.', array(), 400);
+    }
+    if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
+        repondre(false, 'Pseudo invalide : 3 a 30 caracteres.', array(), 400);
+    }
+    try {
+        repondre_doublon(doublons_membre($pdo, $pseudo, $email));
+    } catch (PDOException $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'Email et pseudo disponibles.');
+}
+
 if ($action === 'registration_status') {
     $email = trim(isset($donnees['email']) ? (string)$donnees['email'] : '');
     $pseudo = trim(isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : '');
@@ -160,34 +207,10 @@ if ($action === 'register') {
         repondre(false, 'Le mot de passe doit contenir au moins 8 caracteres.', array(), 400);
     }
 
-    // Donner une indication precise avant l INSERT, tout en gardant une
-    // requete preparee. La contrainte UNIQUE reste necessaire pour les
-    // inscriptions simultanees et est geree plus bas.
+    // Verification juste avant l INSERT. La contrainte UNIQUE reste
+    // necessaire pour les inscriptions simultanees et est geree plus bas.
     try {
-        // Deux requetes separees laissent MySQL appliquer sa collation
-        // (notamment pour les majuscules/minuscules) au lieu de comparer
-        // les chaines PHP avec une egalite stricte.
-        $pseudoDejaPresent = $pdo->prepare(
-            'SELECT id FROM membre WHERE pseudo = :pseudo LIMIT 1'
-        );
-        $pseudoDejaPresent->execute(array(':pseudo' => $pseudo));
-        $pseudoExiste = (bool)$pseudoDejaPresent->fetchColumn();
-
-        $emailDejaPresent = $pdo->prepare(
-            'SELECT id FROM membre WHERE email = :email LIMIT 1'
-        );
-        $emailDejaPresent->execute(array(':email' => $email));
-        $emailExiste = (bool)$emailDejaPresent->fetchColumn();
-
-        if ($pseudoExiste && $emailExiste) {
-            repondre(false, "Le pseudo et l'email existent deja.", array(), 409);
-        }
-        if ($pseudoExiste) {
-            repondre(false, 'Le pseudo existe deja.', array(), 409);
-        }
-        if ($emailExiste) {
-            repondre(false, "L'email existe deja.", array(), 409);
-        }
+        repondre_doublon(doublons_membre($pdo, $pseudo, $email));
     } catch (PDOException $erreur) {
         repondre(false, detail_erreur($erreur, $config), array(), 500);
     }

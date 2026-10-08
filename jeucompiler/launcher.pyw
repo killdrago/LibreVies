@@ -1336,7 +1336,8 @@ class App(tk.Tk):
         if self.auth_busy:
             return
         self.auth_busy = True
-        self.auth_message = ''
+        self.auth_message = ('Verification du pseudo et de l email...'
+                             if action == 'register' else '')
         self.login_button.config(
             state='disabled',
             text=('Autolog...' if automatic else
@@ -1351,6 +1352,13 @@ class App(tk.Tk):
         try:
             journal_auth('DEBUT action=%s email=%s pseudo=%s' % (
                 action, payload.get('email', ''), payload.get('pseudo', '')))
+            if action == 'register':
+                # Le doublon est refuse avant de calculer le hash et avant
+                # toute tentative d INSERT en base.
+                auth_api_request('check_account', {
+                    'email': payload['email'],
+                    'pseudo': payload['pseudo'],
+                })
             auth_api_request(action, payload)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
