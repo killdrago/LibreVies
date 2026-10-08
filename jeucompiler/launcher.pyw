@@ -412,8 +412,11 @@ def _manifest_files(cfg):
         if nom == 'launcher.pyw' and not getattr(sys, 'frozen', False):
             # Le launcher en cours de developpement se met a jour avec git.
             continue
-        if nom.lower() == 'librevies.exe' and not getattr(sys, 'frozen', False):
-            # Inutile de telecharger l'exe quand on travaille sur les sources.
+        if nom.lower() == 'librevies.exe':
+            # L'amorce PyInstaller est deja executee et doit rester celle
+            # fabriquee localement. Une ancienne copie distante peut manquer
+            # python311.dll et casser le redemarrage. Les mises a jour portent
+            # sur launcher.pyw et sur le jeu, pas sur cette amorce.
             continue
         resultat[nom] = info
     return resultat

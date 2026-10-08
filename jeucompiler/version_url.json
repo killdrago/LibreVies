@@ -9,10 +9,6 @@
       "hash": "16956a13dcafb8bd3134e0ed9e8ddd2c",
       "size": 1746
     },
-    "LibreVies.exe": {
-      "hash": "d7cfed03abe41255e47d54f556b43a34",
-      "size": 12215120
-    },
     "edition/coordonee": {
       "hash": "9bc272f2ebdf5bd05c7e1842f0668cb9",
       "size": 396704
@@ -386,8 +382,8 @@
       "size": 1482784
     },
     "launcher.pyw": {
-      "hash": "71b76d454402528ef953192b676cb069",
-      "size": 667356
+      "hash": "0584221a5fcb204906b438e2d37f70f7",
+      "size": 667537
     },
     "personnage/D3D12/D3D12Core.dll": {
       "hash": "8bed03240b764906c937c0d6ccd560ac",
