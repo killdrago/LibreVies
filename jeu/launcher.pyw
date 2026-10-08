@@ -1267,16 +1267,11 @@ class App(tk.Tk):
             self._auth_failed('inscription creee, mais sauvegarde locale impossible : %s' % erreur)
             return
 
+        # Utiliser exactement le meme chemin que pour une mise a jour du
+        # launcher : attente, fermeture, puis relance par l amorce.
         self._upd_bar(100, 'Inscription reussie, redemarrage du launcher...')
-        if self._relancer():
-            journal_auth('REDEMARRAGE launcher demande')
-            self.after(600, self.destroy)
-        else:
-            journal_auth('REDEMARRAGE launcher impossible, secours interface')
-            # Secours pour une execution inhabituelle : l interface est tout
-            # de meme compactee sans modifier le bouton Connexion.
-            self._hide_registration_and_center_login()
-            self._upd_bar(100, 'Inscription reussie. Connectez-vous.')
+        journal_auth('INSCRIPTION appelle le redemarrage standard des MAJ')
+        self._finish_launcher_update((None, None))
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
