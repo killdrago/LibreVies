@@ -247,8 +247,14 @@ def journal_auth(message):
     """Journal local de diagnostic sans jamais ecrire le mot de passe."""
     try:
         chemin = os.path.join(GAME_DIR, 'journal_auth.log')
+        ligne = '[%s] [%s] %s\n' % (
+            time.strftime('%Y-%m-%d %H:%M:%S'),
+            threading.current_thread().name,
+            message,
+        )
         with open(chemin, 'a', encoding='utf-8', newline='\n') as fichier:
-            fichier.write('[%s] %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), message))
+            fichier.write(ligne)
+            fichier.flush()
     except (OSError, IOError):
         pass
 
@@ -264,6 +270,9 @@ def auth_api_request(action, payload):
     donnees['action'] = action
     journal_auth('REQUETE action=%s email=%s pseudo=%s' % (
         action, donnees.get('email', ''), donnees.get('pseudo', '')))
+    journal_auth('HTTP DEBUT action=%s url=%s timeout=%ss' % (
+        action, url, config['timeout']))
+    debut_http = time.time()
     # Formulaire classique plutot que JSON : PHP 5.6 n'emet ainsi pas
     # l'avertissement $HTTP_RAW_POST_DATA avant la reponse JSON.
     req = urllib.request.Request(
@@ -275,6 +284,9 @@ def auth_api_request(action, payload):
     try:
         with urllib.request.urlopen(req, timeout=config['timeout']) as response:
             corps = response.read()
+            code_http = getattr(response, 'status', getattr(response, 'code', '?'))
+        journal_auth('HTTP FIN action=%s code=%s duree=%.2fs octets=%d' % (
+            action, code_http, time.time() - debut_http, len(corps)))
         journal_auth('CORPS action=%s taille=%d debut=%r' % (
             action, len(corps), corps[:240]))
         texte = corps.decode('utf-8-sig').strip()
@@ -291,14 +303,18 @@ def auth_api_request(action, payload):
         except (OSError, ValueError):
             resultat = {}
         message = resultat.get('message') if isinstance(resultat, dict) else None
-        journal_auth('HTTP action=%s code=%s message=%s' % (
-            action, erreur.code, message or 'reponse HTTP sans JSON'))
+        journal_auth('HTTP ERREUR action=%s code=%s duree=%.2fs message=%s' % (
+            action, erreur.code, time.time() - debut_http,
+            message or 'reponse HTTP sans JSON'))
         raise ValueError(str(message or 'Serveur HTTP %s' % erreur.code))
     except urllib.error.URLError as erreur:
-        journal_auth('RESEAU action=%s erreur=%s' % (action, erreur.reason))
+        journal_auth('RESEAU action=%s duree=%.2fs type=%s erreur=%s' % (
+            action, time.time() - debut_http, type(erreur.reason).__name__,
+            erreur.reason))
         raise ValueError('Serveur de connexion inaccessible : %s' % erreur.reason)
     except Exception as erreur:
-        journal_auth('EXCEPTION action=%s erreur=%s' % (action, erreur))
+        journal_auth('EXCEPTION HTTP action=%s duree=%.2fs type=%s erreur=%s' % (
+            action, time.time() - debut_http, type(erreur).__name__, erreur))
         raise
     if not isinstance(resultat, dict) or not resultat.get('ok'):
         message = resultat.get('message') if isinstance(resultat, dict) else None
@@ -1336,6 +1352,7 @@ class App(tk.Tk):
         if self.auth_busy:
             return
         self.auth_busy = True
+        journal_auth('DEMANDE UI action=%s automatique=%s' % (action, automatic))
         self.auth_message = ('Verification du pseudo et de l email...'
                              if action == 'register' else '')
         self._upd_bar(0, self.auth_message or 'Connexion en cours...')
@@ -1357,6 +1374,7 @@ class App(tk.Tk):
             # register verifie le pseudo et l email en BDD juste avant INSERT.
             # Cela evite de bloquer sur une seconde action API intermediaire.
             auth_api_request(action, payload)
+            journal_auth('API OK action=%s' % action)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
                 # dix fois, avec une seconde entre chaque tentative.
@@ -1397,6 +1415,7 @@ class App(tk.Tk):
         journal_auth('INSCRIPTION ECHEC affichee au joueur message=%s' % message)
         self.auth_busy = False
         self.auth_message = str(message)[:100]
+        journal_auth('RESULTAT INSCRIPTION message=%s' % self.auth_message)
         self.login_button.config(state='normal', text='Connexion')
         self.register_button.config(state='normal')
         self._update_play_state()
