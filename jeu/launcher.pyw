@@ -1071,6 +1071,10 @@ class App(tk.Tk):
                                       fg=TEXT, bg=GREEN, relief="flat", cursor="hand2",
                                       command=self._do_login)
         self.login_button.place(x=330, y=70, width=80, height=20)
+        self.login_greeting = tk.Label(
+            self, text='', font=("Segoe UI", 10, "bold"), fg=ACCENT,
+            bg=CARD, anchor='w')
+        self.login_greeting.place_forget()
         self.remember_var = tk.BooleanVar(value=False)
         self.autolog_check = tk.Checkbutton(
             self, text="Autolog", font=("Segoe UI", 8), fg=TEXT2, bg=CARD,
@@ -1299,27 +1303,28 @@ class App(tk.Tk):
                         if tentative < 9:
                             time.sleep(1)
                 journal_auth('INSCRIPTION ECHEC apres 10 tentatives')
-                self.after(0, self._registration_failed)
+                self.after(0, lambda: self._registration_failed(
+                    'Inscription non verifiee par le serveur.'))
             else:
                 self.after(0, lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
             journal_auth('ECHEC action=%s erreur=%s' % (action, erreur))
             if action == 'register':
-                self.after(0, self._registration_failed)
+                self.after(0, lambda: self._registration_failed(str(erreur)))
             else:
                 self.after(0, lambda: self._auth_failed(
                     str(erreur), automatic=automatic))
 
-    def _registration_failed(self):
-        journal_auth('INSCRIPTION ECHEC affichee au joueur')
+    def _registration_failed(self, message='Inscription impossible.'):
+        journal_auth('INSCRIPTION ECHEC affichee au joueur message=%s' % message)
         self.auth_busy = False
         self.login_button.config(state='normal', text='Connexion')
         self.register_button.config(state='normal')
         self._update_play_state()
-        # Placer ce message apres _update_play_state : cette methode peut
-        # mettre a jour la barre avec l etat de connexion.
-        self._upd_bar(0, 'Inscription echouee, veuillez contacter un administrateur')
+        # Afficher le retour precis de l API : notamment si le pseudo ou
+        # l email est deja utilise, plutot que le vague "inscription echouee".
+        self._upd_bar(0, str(message)[:100])
 
     def _registration_succeeded(self, payload):
         journal_auth('INSCRIPTION VERIFIEE, preparation du redemarrage')
@@ -1338,6 +1343,14 @@ class App(tk.Tk):
         self._upd_bar(100, 'Inscription reussie, redemarrage du launcher...')
         journal_auth('INSCRIPTION appelle le redemarrage standard des MAJ')
         self._finish_launcher_update((None, None))
+
+    def _show_logged_greeting(self, pseudo):
+        self.login_pseudo.place_forget()
+        self.login_mdp.place_forget()
+        self.login_button.place_forget()
+        self.login_greeting.config(text='Bonjour (%s)' % pseudo)
+        x = 425 if getattr(self, '_auth_ui_compact', False) else 330
+        self.login_greeting.place(x=x, y=39, width=180, height=22)
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
@@ -1359,6 +1372,7 @@ class App(tk.Tk):
             journal_auth('AUTOLOG sauvegarde impossible erreur=%s' % erreur)
         if compact_on_success or self.remember_var.get():
             self._hide_registration_and_center_login()
+        self._show_logged_greeting(pseudo)
         self._upd_bar(100, 'Connexion reussie')
         self._update_play_state()
 

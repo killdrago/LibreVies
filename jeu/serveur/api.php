@@ -160,6 +160,38 @@ if ($action === 'register') {
         repondre(false, 'Le mot de passe doit contenir au moins 8 caracteres.', array(), 400);
     }
 
+    // Donner une indication precise avant l INSERT, tout en gardant une
+    // requete preparee. La contrainte UNIQUE reste necessaire pour les
+    // inscriptions simultanees et est geree plus bas.
+    try {
+        // Deux requetes separees laissent MySQL appliquer sa collation
+        // (notamment pour les majuscules/minuscules) au lieu de comparer
+        // les chaines PHP avec une egalite stricte.
+        $pseudoDejaPresent = $pdo->prepare(
+            'SELECT id FROM membre WHERE pseudo = :pseudo LIMIT 1'
+        );
+        $pseudoDejaPresent->execute(array(':pseudo' => $pseudo));
+        $pseudoExiste = (bool)$pseudoDejaPresent->fetchColumn();
+
+        $emailDejaPresent = $pdo->prepare(
+            'SELECT id FROM membre WHERE email = :email LIMIT 1'
+        );
+        $emailDejaPresent->execute(array(':email' => $email));
+        $emailExiste = (bool)$emailDejaPresent->fetchColumn();
+
+        if ($pseudoExiste && $emailExiste) {
+            repondre(false, "Le pseudo et l'email existent deja.", array(), 409);
+        }
+        if ($pseudoExiste) {
+            repondre(false, 'Le pseudo existe deja.', array(), 409);
+        }
+        if ($emailExiste) {
+            repondre(false, "L'email existe deja.", array(), 409);
+        }
+    } catch (PDOException $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+
     // PHP 5.6 utilise PASSWORD_DEFAULT (bcrypt). Les versions plus recentes
     // peuvent proposer Argon2id ; dans tous les cas, aucun MD5 n'est utilise.
     $algorithme = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
@@ -197,7 +229,7 @@ if ($action === 'register') {
         }
     } catch (PDOException $erreur) {
         if ($erreur->getCode() === '23000') {
-            repondre(false, 'Ce pseudo ou cet email est deja utilise.', array(), 409);
+            repondre(false, "Le pseudo ou l'email existe deja.", array(), 409);
         }
         repondre(false, detail_erreur($erreur, $config), array(), 500);
     }
