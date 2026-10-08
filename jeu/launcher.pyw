@@ -1212,6 +1212,27 @@ class App(tk.Tk):
         self.registration_widgets = [self.reg_email, self.reg_pseudo,
                                      self.reg_mdp, self.register_button]
 
+        # --- CLASSEMENT DU JOUEUR (a la place de l'inscription apres connexion) ---
+        self.ranking_canvas_items = []
+        self.ranking_canvas_items.append(self.canvas.create_rectangle(
+            584, 15, 1004, 100, fill=CARD, outline=ACCENT, width=2))
+        self.ranking_canvas_items.append(self.canvas.create_text(
+            794, 20, text="Votre classement", font=("Segoe UI", 13, "bold"),
+            fill=ACCENT, anchor="n"))
+        self.ranking_canvas_items.append(self.canvas.create_line(
+            794, 43, 794, 94, fill="#555577", width=1))
+        self.ranking_canvas_items.append(self.canvas.create_text(
+            610, 52, text="Experience", font=("Segoe UI", 9),
+            fill=TEXT2, anchor="w"))
+        self.ranking_canvas_items.append(self.canvas.create_text(
+            610, 79, text="Chasse", font=("Segoe UI", 9),
+            fill=TEXT2, anchor="w"))
+        self.ranking_canvas_items.append(self.canvas.create_text(
+            820, 52, text="Territoire", font=("Segoe UI", 9),
+            fill=TEXT2, anchor="w"))
+        for item in self.ranking_canvas_items:
+            self.canvas.itemconfigure(item, state='hidden')
+
         # ====== ACTUALITES + CLASSEMENT ======
         self.frame(20, 110, 510, 370, color="#1a2a4a")
         self.canvas.create_text(265, 128, text="Dernieres actualites",
@@ -1474,8 +1495,7 @@ class App(tk.Tk):
         self.login_mdp.place_forget()
         self.login_button.place_forget()
         self.login_greeting.config(text='Bonjour (%s)' % pseudo)
-        x = 425 if getattr(self, '_auth_ui_compact', False) else 330
-        self.login_greeting.place(x=x, y=39, width=180, height=22)
+        self.login_greeting.place(x=330, y=39, width=180, height=22)
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
@@ -1498,6 +1518,7 @@ class App(tk.Tk):
             journal_auth('AUTOLOG sauvegarde impossible erreur=%s' % erreur)
         if compact_on_success or self.remember_var.get():
             self._hide_registration_and_center_login()
+        self._show_ranking()
         self._show_logged_greeting(pseudo)
         self._upd_bar(100, 'Connexion reussie')
         self._update_play_state()
@@ -1520,21 +1541,20 @@ class App(tk.Tk):
         self._upd_bar(0, 'Connexion impossible : %s' % str(message)[:70])
         self._update_play_state()
 
-    def _hide_registration_and_center_login(self):
-        if getattr(self, '_auth_ui_compact', False):
-            return
-        self._auth_ui_compact = True
+    def _show_ranking(self):
         for item in self.registration_canvas_items:
             self.canvas.itemconfigure(item, state='hidden')
         for widget in self.registration_widgets:
             widget.place_forget()
-        decalage = 95
-        for item in self.login_canvas_items:
-            self.canvas.move(item, decalage, 0)
-        self.login_pseudo.place_configure(x=430)
-        self.login_mdp.place_configure(x=543)
-        self.login_button.place_configure(x=425)
-        self.autolog_check.place_configure(x=515)
+        for item in self.ranking_canvas_items:
+            self.canvas.itemconfigure(item, state='normal')
+
+    def _hide_registration_and_center_login(self):
+        if getattr(self, '_auth_ui_compact', False):
+            self._show_ranking()
+            return
+        self._auth_ui_compact = True
+        self._show_ranking()
 
     # ============================================================
     # CLASSEMENT — rotation auto
