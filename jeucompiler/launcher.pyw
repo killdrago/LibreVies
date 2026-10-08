@@ -1353,22 +1353,9 @@ class App(tk.Tk):
         try:
             journal_auth('DEBUT action=%s email=%s pseudo=%s' % (
                 action, payload.get('email', ''), payload.get('pseudo', '')))
-            if action == 'register':
-                # Le doublon est refuse avant de calculer le hash et avant
-                # toute tentative d INSERT en base.
-                try:
-                    auth_api_request('check_account', {
-                        'email': payload['email'],
-                        'pseudo': payload['pseudo'],
-                    })
-                except ValueError as erreur_verification:
-                    # Compatibilite avec un ancien api.php deja installe :
-                    # son action register possede aussi la verification juste
-                    # avant INSERT. On continue donc avec elle si l ancienne
-                    # API ne connait pas encore check_account.
-                    if 'action inconnue' not in str(erreur_verification).lower():
-                        raise
-                    journal_auth('CHECK_ACCOUNT absent, verification register utilisee')
+            # Pour une inscription, une seule requete est envoyee : l action
+            # register verifie le pseudo et l email en BDD juste avant INSERT.
+            # Cela evite de bloquer sur une seconde action API intermediaire.
             auth_api_request(action, payload)
             if action == 'register':
                 # Apres l INSERT, verifier la presence de la ligne jusqu a
