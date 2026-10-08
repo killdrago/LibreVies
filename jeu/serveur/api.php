@@ -224,6 +224,7 @@ if ($action === 'register') {
     }
 
     try {
+        $pdo->beginTransaction();
         journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
         $requete = $pdo->prepare(
             'INSERT INTO membre (pseudo, motdepasse, email, valider) '
@@ -248,9 +249,35 @@ if ($action === 'register') {
         ));
         $membre = $verification->fetch();
         if (!$membre) {
+            $pdo->rollBack();
             repondre(false, 'Inscription echouee, veuillez contacter un administrateur.', array(), 500);
         }
+
+        // Le personnage initial reprend le meme id que le compte. Les
+        // reglages sont des JSON vides, prets a etre remplis par le createur.
+        $personnage = $pdo->prepare(
+            'INSERT INTO personnage '
+            . '(id, `default`, sexe, sliders, teinte_peau, coiffure, '
+            . 'chaussures, chapeau, tenue, objets) '
+            . 'VALUES (:id, 1, :sexe, :sliders, :teinte_peau, :coiffure, '
+            . ':chaussures, :chapeau, :tenue, :objets)'
+        );
+        $personnage->execute(array(
+            ':id' => (int)$membre['id'],
+            ':sexe' => 'homme',
+            ':sliders' => '{}',
+            ':teinte_peau' => '',
+            ':coiffure' => '',
+            ':chaussures' => '',
+            ':chapeau' => '',
+            ':tenue' => '{}',
+            ':objets' => '{}',
+        ));
+        $pdo->commit();
     } catch (PDOException $erreur) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         if ($erreur->getCode() === '23000') {
             repondre(false, "Le pseudo ou l'email existe deja.", array(), 409);
         }
