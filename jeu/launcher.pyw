@@ -422,16 +422,6 @@ def _manifest_files(cfg):
     return resultat
 
 
-def _is_running_launcher(path):
-    if not getattr(sys, 'frozen', False):
-        return False
-    try:
-        return os.path.normcase(os.path.abspath(path)) == os.path.normcase(
-            os.path.abspath(sys.executable))
-    except (OSError, TypeError):
-        return False
-
-
 def _lire_json(url, timeout=20):
     # Evite de lire un ancien version_url.json dans le cache du CDN.
     url += ('&' if '?' in url else '?') + 'librevies_cache=' + str(int(time.time() * 1000))
@@ -526,22 +516,12 @@ def apply_updates(modified, remote_cfg, progress_cb):
                 errors.append('%s : taille inattendue apres telechargement' % fname)
                 continue
 
-            if _is_running_launcher(local_path):
-                # Windows verrouille l'executable actuellement lance. On le
-                # remplace apres fermeture via un petit script systeme, puis
-                # on relance automatiquement le launcher.
-                staged = local_path + '.new'
-                with open(staged, 'wb') as f:
-                    f.write(data)
-                pending_launcher = (local_path, staged)
-            else:
-                _stage_or_replace(local_path, data)
-                if (pending_launcher is None
-                        and os.path.normcase(os.path.abspath(local_path)) == CORE_PATH):
-                    # C'est le code du launcher qui vient de changer : il
-                    # suffit de redemarrer pour l'appliquer (le fichier n'est
-                    # pas verrouille, l'amorce le relit a chaque lancement).
-                    pending_launcher = (None, local_path)
+            _stage_or_replace(local_path, data)
+            if (pending_launcher is None
+                    and os.path.normcase(os.path.abspath(local_path)) == CORE_PATH):
+                # C'est le code du launcher qui vient de changer : il
+                # suffit de redemarrer pour l'appliquer.
+                pending_launcher = (None, local_path)
             downloaded += 1
         except Exception as e:
             errors.append('%s : %s' % (fname, e))
@@ -554,26 +534,6 @@ def _stage_or_replace(path, data):
     with open(tmp, 'wb') as f:
         f.write(data)
     os.replace(tmp, path)
-
-
-def schedule_launcher_restart(target, staged):
-    """Programme le remplacement de LibreVies.exe apres sa fermeture."""
-    script = os.path.join(GAME_DIR, '.librevies-update.cmd')
-    try:
-        with open(script, 'w', encoding='utf-8', newline='\r\n') as f:
-            f.write('@echo off\r\n')
-            f.write(':wait\r\n')
-            f.write('copy /Y "%s" "%s" >nul 2>&1\r\n' % (staged, target))
-            f.write('if errorlevel 1 (timeout /t 1 /nobreak >nul & goto wait)\r\n')
-            f.write('del /f /q "%s" >nul 2>&1\r\n' % staged)
-            f.write('start "" "%s"\r\n' % target)
-            f.write('del /f /q "%~f0" >nul 2>&1\r\n')
-        flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-        subprocess.Popen(['cmd.exe', '/d', '/c', script], cwd=GAME_DIR,
-                         creationflags=flags, close_fds=False)
-        return True
-    except (OSError, IOError):
-        return False
 
 
 # ============================================================
@@ -1489,7 +1449,10 @@ class App(tk.Tk):
                 commande = [sys.executable]
             else:
                 commande = [sys.executable, os.path.abspath(__file__)]
-            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=False)
+            # Ne pas transmettre les handles du dossier _MEI au nouveau
+            # processus : cela empeche le bootloader PyInstaller de nettoyer
+            # le dossier temporaire de l'ancienne instance.
+            subprocess.Popen(commande, cwd=GAME_DIR, close_fds=True)
             journal_auth('REDEMARRAGE direct launcher')
             return True
         except (OSError, IOError):
@@ -1498,21 +1461,19 @@ class App(tk.Tk):
 
     def _finish_launcher_update(self, pending):
         target, staged = pending
-        if target is None:
-            # Nouveau code du launcher : l'amorce relit launcher.pyw a chaque
-            # lancement, un simple redemarrage suffit.
-            if self._relancer():
-                self._upd_bar(100, 'Launcher mis a jour, redemarrage...')
-                self.after(600, self.destroy)
-            else:
-                self._upd_bar(100, 'Launcher mis a jour (actif au prochain lancement)')
-                self._check_game()
+        if target is not None:
+            # L executable PyInstaller local n est jamais remplace par une
+            # copie distante. Cette branche reste une protection pour un
+            # ancien manifeste qui contiendrait encore LibreVies.exe.
+            self._check_game()
             return
-        if schedule_launcher_restart(target, staged):
+        # Nouveau code du launcher : l'amorce relit launcher.pyw a chaque
+        # lancement, un simple redemarrage suffit.
+        if self._relancer():
             self._upd_bar(100, 'Launcher mis a jour, redemarrage...')
-            self.after(600, self.destroy)
+            self.after(1000, self.destroy)
         else:
-            self._upd_bar(100, 'MAJ du launcher impossible (dossier protege)')
+            self._upd_bar(100, 'Launcher mis a jour (actif au prochain lancement)')
             self._check_game()
 
     # ============================================================
