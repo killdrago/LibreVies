@@ -142,13 +142,17 @@ if ($action === 'register') {
             ':email' => $email,
         ));
 
-        // Verification apres insertion : l'inscription n'est validee que si
-        // la ligne est bien relisible dans la base.
-        $id = (int)$pdo->lastInsertId();
+        // Verification apres insertion par les deux valeurs saisies par le
+        // joueur. On ne depend pas de lastInsertId(), car certaines tables
+        // anciennes de LibreVies n'ont pas encore un AUTO_INCREMENT fiable.
         $verification = $pdo->prepare(
-            'SELECT id, pseudo, email FROM membre WHERE id = :id LIMIT 1'
+            'SELECT id, pseudo, email FROM membre '
+            . 'WHERE email = :email AND pseudo = :pseudo LIMIT 1'
         );
-        $verification->execute(array(':id' => $id));
+        $verification->execute(array(
+            ':email' => $email,
+            ':pseudo' => $pseudo,
+        ));
         $membre = $verification->fetch();
         if (!$membre) {
             repondre(false, 'Inscription echouee, veuillez contacter un administrateur.', array(), 500);
