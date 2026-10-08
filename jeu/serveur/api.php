@@ -257,21 +257,20 @@ if ($action === 'register') {
         // reglages sont des JSON vides, prets a etre remplis par le createur.
         $personnage = $pdo->prepare(
             'INSERT INTO personnage '
-            . '(id, `default`, sexe, sliders, teinte_peau, coiffure, '
-            . 'chaussures, chapeau, tenue, objets) '
-            . 'VALUES (:id, 1, :sexe, :sliders, :teinte_peau, :coiffure, '
-            . ':chaussures, :chapeau, :tenue, :objets)'
+            . '(id, `default`, sexe, teinte_peau, coiffure, chaussures, '
+            . 'chapeau, tenue, objets) '
+            . 'VALUES (:id, 1, :sexe, :teinte_peau, :coiffure, :chaussures, '
+            . ':chapeau, :tenue, :objets)'
         );
         $personnage->execute(array(
             ':id' => (int)$membre['id'],
             ':sexe' => 'homme',
-            ':sliders' => '{}',
             ':teinte_peau' => '',
             ':coiffure' => '',
             ':chaussures' => '',
             ':chapeau' => '',
-            ':tenue' => '{}',
-            ':objets' => '{}',
+            ':tenue' => '',
+            ':objets' => '',
         ));
         $pdo->commit();
     } catch (PDOException $erreur) {
