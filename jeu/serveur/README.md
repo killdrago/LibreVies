@@ -12,7 +12,9 @@ Le paquet serveur a une seule source : **`jeu/serveur/`**.
 `compilation/outils/synchroniser_serveur_local.ps1`. Le build local de diagnostic
 `compilation/build_unity_game.bat` appelle aussi cet outil, sans téléchargement.
 Il repère l'API locale existante sous XAMPP, EasyPHP ou WAMP et synchronise les
-fichiers publics depuis `jeu/serveur/`, notamment **`api.php` et `personnage.php`**.
+fichiers publics depuis `jeu/serveur/`, notamment **`api.php`, `personnage.php`
+et `securite.php`**. Il n'est pas necessaire de reconstruire Unity pour une
+correction uniquement PHP : l'outil de synchronisation peut etre lance seul.
 **Il ne remplace jamais `config.php` et n'importe aucun SQL automatiquement.**
 
 Pour une installation Apache non standard, `LIBREVIES_WEB_ROOT` permet de
@@ -29,6 +31,10 @@ Les fichiers à utiliser pour la base sont ceux du **projet** :
 - `jeu/serveur/membre.sql` : création d'une nouvelle table `membre` ;
 - `jeu/serveur/corriger_membre.sql` : correction des types d'une ancienne table ;
 - `jeu/serveur/personnage.sql` : création de la table nullable actuelle ;
+- `jeu/serveur/classement.sql` : table `classement` liee au meme ID de membre,
+  avec `experience`, `chasse` et `territoire` a zero. Ce fichier complete aussi
+  les comptes deja inscrits qui n'ont pas de ligne, sans effacer les scores
+  des joueurs deja presents ;
 - `jeu/serveur/mettre_a_jour_personnage.sql` : migration d'une ancienne table
   possédant déjà ces colonnes. Sauvegarder la base avant cette migration.
   Elle n'efface pas la table, préserve les profils `default=0`, rend les champs
@@ -40,8 +46,12 @@ la migration est nécessaire si ses champs sont encore `NOT NULL`.
 ## Parcours du joueur
 
 1. **Inscription** : création de `membre` avec `valider=0` et, dans la même
-   transaction, de `personnage` avec le même `id` et `default=1`.
+   transaction, de `personnage` avec le même `id` et `default=1`, puis de
+   `classement` avec cet ID et `experience=0`, `chasse=0`, `territoire=0`.
    Tous les autres champs du personnage restent **NULL**, y compris `sexe`.
+   Si une des trois insertions echoue, aucune des trois lignes n'est conservee.
+   La table `classement` doit exister avant une nouvelle inscription : utiliser
+   le fichier du projet `jeu/serveur/classement.sql` si elle n'existe pas encore.
 2. **Connexion** : vérification du mot de passe par PHP/BDD. Un compte
    `valider=0` peut encore se connecter. Aucun email n'est envoyé pour l'instant.
    L'option `require_email_validation` reste absente ou `false` jusqu'à ce que
@@ -107,9 +117,16 @@ Les ressources, morphologies et réglages de rendu MakeHuman restent inchangés.
   ne permettent ni de choisir un autre compte ni d'écraser ses données.
 - PHP garde la session côté serveur, avec une expiration de 24 heures et
   nouvel identifiant aléatoire de 256 bits à chaque connexion, jamais choisi par
-  le client. Les appels authentifiés utilisent le mode strict. `random_bytes`
-  est utilisé, ou OpenSSL sur PHP 5.6. Aucune table de session n'est ajoutée ;
-  le dossier de sessions PHP doit être inscriptible.
+  le client. Les appels authentifiés utilisent le mode strict. Le helper
+  `securite.php` essaie `random_bytes`, puis OpenSSL, puis le generateur
+  cryptographique du systeme : `/dev/urandom` sous Unix ou le CSPRNG Windows
+  de .NET via PowerShell sous Windows. Ce dernier permet la connexion sur
+  PHP 5.6/EasyPHP sans avoir a activer l'extension OpenSSL. `proc_open` et le
+  PowerShell du systeme doivent alors etre autorises cote serveur. La commande
+  est fixe, sans donnee HTTP, mot de passe ou jeton. Aucun `rand`, `mt_rand`
+  ou `uniqid` n'est utilise en secours : sans source cryptographique accessible,
+  la connexion est refusee plutot que de creer un jeton previsible.
+  Aucune table de session n'est ajoutée ; le dossier de sessions PHP doit être inscriptible.
 - Le launcher garde le jeton en RAM et le transmet au seul processus du jeu via
   `LIBREVIES_SESSION_TOKEN` et `LIBREVIES_API_URL`, jamais dans les arguments,
   les fichiers Autolog, le manifeste ou les journaux. Le jeu efface la variable
@@ -156,12 +173,17 @@ python -B compilation/outils/test_launcher.py
 python -B compilation/outils/test_edition.py
 python -B compilation/outils/test_amorce.py
 python -B compilation/outils/verifier_cs_syntaxe.py
+php compilation/outils/test_securite.php
 ```
 
 Une recette exécutable PHP est aussi fournie dans
 `compilation/outils/test_api_personnage.mjs` (instructions en tête du fichier).
 Elle vérifie inscription/connexion, profils complets, NULL, sessions, tentative
 d'usurpation, expiration, refus sans écriture et rollback en cas de panne.
+Elle verifie aussi l'inscription membre/personnage/classement, les scores a zero,
+le rollback si classement echoue, la preservation des scores existants et
+une connexion sans random_bytes/OpenSSL. Les I/O du chemin Windows sont simulees
+pour les tests unitaires ; l'execution reelle de PowerShell necessite Windows.
 Elle utilise **PHP WebAssembly et SQLite de test en RAM**, pas la vraie base
 MySQL ; elle ne remplace donc pas la recette finale MySQL/Unity.
 

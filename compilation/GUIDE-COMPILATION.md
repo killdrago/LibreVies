@@ -189,7 +189,11 @@ sources encore non compilées.
 
 L'API a une seule source : `jeu/serveur/`. Les deux builds appellent
 `outils/synchroniser_serveur_local.ps1` pour mettre à jour les fichiers publics
-chez Apache local (XAMPP/EasyPHP/WAMP), **sans remplacer son vrai `config.php`**.
+chez Apache local (XAMPP/EasyPHP/WAMP), **sans remplacer son vrai `config.php`**. Cet outil copie aussi `securite.php`
+(generateur de session compatible sans OpenSSL) et `classement.sql`. Ce SQL
+ajoute les classements manquants des anciens comptes sans reinitialiser leurs
+scores. Pour une correction uniquement PHP, lancer cet outil seul suffit :
+pas besoin de recompiler le jeu.
 L'adresse actuelle reste `http://localhost/serveur/api.php`.
 Une racine personnalisée peut être indiquée par `LIBREVIES_WEB_ROOT`.
 Les éventuelles migrations SQL restent dans `jeu/serveur/` et ne sont jamais
@@ -198,7 +202,8 @@ importées automatiquement. Voir [`../jeu/serveur/README.md`](../jeu/serveur/REA
 Le salon utilise le panel humain du jeu ; il ne lance pas l'exécutable du
 projet autonome `compilation/personnage/`. Vérifier dans la build :
 
-1. compte neuf : `valider=0`, base inchangée, `personnage.default=1` et autres champs NULL ;
+1. compte neuf : `valider=0`, base inchangée, `personnage.default=1` et autres champs NULL,
+   classement au meme ID avec experience/chasse/territoire a zero ;
 2. parler au NPC Esthétique, changer les 13 sliders et les choix, puis annuler : aucune sauvegarde ;
 3. rouvrir, valider : attendre la confirmation serveur, constater `default=0` sur la même ligne ;
 4. fermer/reconnecter : mêmes proportions, sexe, peau et équipements ;

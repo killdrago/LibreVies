@@ -20,6 +20,17 @@ const { loadNodeRuntime } = await import(pathToFileURL(require.resolve('@php-was
 const php = new PHP(await loadNodeRuntime(process.env.PHP || '8.3', {
     emscriptenOptions: { processId: 1 }
 }));
+// Unitaires du CSPRNG et du chemin Windows avec I/O simulees.
+php.mkdir('/outils');
+php.mkdir('/jeu');
+php.mkdir('/jeu/serveur');
+php.writeFile('/jeu/serveur/securite.php', readFileSync(join(root, 'jeu/serveur/securite.php'), 'utf8'));
+php.writeFile('/outils/test_securite.php', readFileSync(join(root, 'compilation/outils/test_securite.php'), 'utf8')
+    .replaceAll("__DIR__ . '/../../jeu/serveur/securite.php'", "'/jeu/serveur/securite.php'"));
+const securiteResult = await php.run({ scriptPath: '/outils/test_securite.php' });
+assert.equal(securiteResult.exitCode, 0, securiteResult.text + securiteResult.errors);
+assert(!securiteResult.text.includes('Fatal error'), securiteResult.text);
+console.log(securiteResult.text.trim());
 const sliders = ['tete', 'yeux', 'nez', 'bouche', 'oreilles', 'seins', 'volume',
     'hanche', 'ventre', 'largeur_bras', 'longueur_bras', 'hauteur_jambe', 'pieds'];
 const source = name => readFileSync(join(root, 'jeu/serveur', name), 'utf8');
@@ -27,9 +38,11 @@ php.mkdir('/tests');
 php.mkdir('/tests/serveur');
 php.mkdir('/tests/sessions');
 php.writeFile('/tests/serveur/config.php', source('config.php.example'));
+php.writeFile('/tests/serveur/securite.php', source('securite.php'));
 const api = source('api.php');
 assert(api.includes('new PDO($dsn,'), 'Le point de remplacement du DSN a change.');
-php.writeFile('/tests/serveur/api.php', api.replace('new PDO($dsn,', "new PDO('sqlite:/tests/test.sqlite',"));
+const apiSQLite = api.replace('new PDO($dsn,', "new PDO('sqlite:/tests/test.sqlite',");
+php.writeFile('/tests/serveur/api.php', apiSQLite);
 php.writeFile('/tests/serveur/personnage.php', source('personnage.php')
     .replaceAll('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO'));
 const initialization = `<?php
@@ -42,6 +55,9 @@ $pdo->exec('CREATE TABLE personnage (id INTEGER PRIMARY KEY REFERENCES membre(id
  ${sliders.map(name => name + ' DECIMAL(10,4) NULL').join(', ')},
  teinte_peau TEXT NULL, coiffure TEXT NULL, chaussures TEXT NULL,
  chapeau TEXT NULL, tenue TEXT NULL, objets TEXT NULL)');
+$pdo->exec('CREATE TABLE classement (id INTEGER PRIMARY KEY REFERENCES membre(id),
+ experience INTEGER NOT NULL DEFAULT 0, chasse INTEGER NOT NULL DEFAULT 0,
+ territoire INTEGER NOT NULL DEFAULT 0)');
 echo 'OK';`;
 assert.equal((await php.run({ code: initialization })).text, 'OK');
 
@@ -71,6 +87,11 @@ const row = async id => {
     result.id = Number(result.id); result.default = Number(result.default);
     return result;
 };
+const classement = async id => {
+    const result = await sql(`echo json_encode($pdo->query('SELECT * FROM classement WHERE id=${id}')->fetch());`);
+    for (const key of Object.keys(result)) result[key] = Number(result[key]);
+    return result;
+};
 const password = 'motdepasse-de-recette-184!';
 const a = await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password });
 const b = await request('register', { email: 'bob@example.test', pseudo: 'Bob Test', password });
@@ -79,7 +100,10 @@ const initial = await row(idA);
 assert.equal(initial.default, 1);
 assert(Object.entries(initial).every(([key, value]) => key === 'id' || key === 'default' || value === null));
 assert.equal(Number(await sql(`echo json_encode($pdo->query('SELECT valider FROM membre WHERE id=${idA}')->fetchColumn());`)), 0);
-console.log('OK inscription atomique : meme id, default=1, tous les reglages NULL, valider=0');
+assert.deepEqual(await classement(idA), { id: idA, experience: 0, chasse: 0, territoire: 0 });
+assert.deepEqual(await classement(idB), { id: idB, experience: 0, chasse: 0, territoire: 0 });
+await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password }, 409);
+console.log('OK inscription atomique membre/personnage/classement : meme id, default=1, reglages NULL, valider=0, trois scores a 0');
 
 await request('login', { pseudo: 'Alice Test', password: 'incorrect' }, 401);
 const login = await request('login', { pseudo: 'alice test', password });
@@ -89,6 +113,18 @@ assert.deepEqual(login.personnage, { id: idA, default: 1 });
 assert(/^[0-9a-f]{64}$/.test(login.session.token) && login.session.expires_at > Date.now() / 1000);
 assert(!JSON.stringify(login).includes(password));
 const token = login.session.token;
+// Simuler PHP 5.6 sans random_bytes/OpenSSL, sans modifier PHP.ini du poste.
+// Le generateur de l'OS doit prendre le relais et produire un nouveau jeton.
+php.writeFile('/tests/serveur/securite.php', source('securite.php')
+    .replace("function_exists('random_bytes')", 'false')
+    .replace("function_exists('openssl_random_pseudo_bytes')", 'false'));
+const loginSansOpenSSL = await request('login', { pseudo: 'Alice Test', password });
+assert(/^[0-9a-f]{64}$/.test(loginSansOpenSSL.session.token));
+assert.notEqual(loginSansOpenSSL.session.token, login.session.token);
+assert.equal((await request('get_character', { session_token: loginSansOpenSSL.session.token })).membre.id, idA);
+php.writeFile('/tests/serveur/securite.php', source('securite.php'));
+console.log('OK connexion sans random_bytes ni OpenSSL : CSPRNG du systeme, jeton utilisable');
+
 await request('get_character', { id: idA, pseudo: 'Alice Test' }, 401);
 await request('save_character', { id: idA, pseudo: 'Alice Test' }, 401);
 await request('get_character', { session_token: 'x'.repeat(40) }, 401);
@@ -151,6 +187,27 @@ assert.equal(Number(await sql("echo json_encode($pdo->query(\"SELECT count(*) FR
 await sql("$pdo->exec('DROP TRIGGER refuser_inscription');");
 console.log('OK panne SQL : ni default=0 premature ni inscription orpheline');
 
+// Une erreur dans la troisieme insertion annule les deux premieres.
+const nombreAvantPanne = await sql("echo json_encode(array('membre' => $pdo->query('SELECT count(*) FROM membre')->fetchColumn(), 'personnage' => $pdo->query('SELECT count(*) FROM personnage')->fetchColumn(), 'classement' => $pdo->query('SELECT count(*) FROM classement')->fetchColumn()));");
+await sql(`$pdo->exec("CREATE TRIGGER refuser_classement BEFORE INSERT ON classement
+  BEGIN SELECT RAISE(ABORT, 'indisponible'); END");`);
+await request('register', { email: 'classement-panne@example.test', pseudo: 'Classement Panne', password }, 500);
+assert.deepEqual(await sql("echo json_encode(array('membre' => $pdo->query('SELECT count(*) FROM membre')->fetchColumn(), 'personnage' => $pdo->query('SELECT count(*) FROM personnage')->fetchColumn(), 'classement' => $pdo->query('SELECT count(*) FROM classement')->fetchColumn()));"), nombreAvantPanne);
+await sql("$pdo->exec('DROP TRIGGER refuser_classement');");
+console.log('OK panne classement : membre et personnage annules aussi, aucun compte incomplet');
+
+// La migration SQL ajoute seulement les lignes manquantes aux anciens comptes.
+await sql(`$pdo->exec('UPDATE classement SET experience=125, chasse=7, territoire=3 WHERE id=${idA}');
+  $pdo->exec('DELETE FROM classement WHERE id=${idB}');`);
+const backfill = source('classement.sql').slice(source('classement.sql').indexOf('INSERT IGNORE INTO'))
+    .replace('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO');
+await sql('$pdo->exec(' + JSON.stringify(backfill) + ');');
+await sql('$pdo->exec(' + JSON.stringify(backfill) + ');');
+assert.deepEqual(await classement(idA), { id: idA, experience: 125, chasse: 7, territoire: 3 });
+assert.deepEqual(await classement(idB), { id: idB, experience: 0, chasse: 0, territoire: 0 });
+console.log('OK ancien compte : classement manquant complete sans remise a zero des scores existants');
+
+
 await sql(`$pdo->exec('DELETE FROM personnage WHERE id=${idB}');`);
 const legacy = await request('get_character', { session_token: bobLogin.session.token });
 assert.deepEqual(legacy.personnage, { id: idB, default: 1 });
@@ -162,7 +219,7 @@ $_SESSION['expire_le'] = time() - 1; session_write_close();` });
 assert.equal(expire.exitCode, 0, expire.errors);
 await request('get_character', { session_token: token }, 401);
 const logs = php.readFileAsText('/journal_api.log');
-for (const secret of [password, token, reconnect.session.token, bobLogin.session.token])
+for (const secret of [password, token, loginSansOpenSSL.session.token, reconnect.session.token, bobLogin.session.token])
     assert(!logs.includes(secret), 'Secret present dans le journal de l API.');
 console.log('OK ancien compte initialise sans ecraser un profil ; session expiree refusee ; aucun secret dans les logs');
 php.exit();

@@ -119,6 +119,9 @@ class ContratPersonnage(unittest.TestCase):
         initial = section(API, "if ($action === 'register')", "if ($action === 'get_character'")
         self.assertIn("INSERT INTO personnage (id, `default`)", initial)
         self.assertIn("VALUES (:id, 1)", initial)
+        self.assertIn("INSERT INTO classement (id, experience, chasse, territoire)", initial)
+        self.assertIn("VALUES (:id, 0, 0, 0)", initial)
+        self.assertLess(initial.index("INSERT INTO classement"), initial.index("$pdo->commit()"))
         self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0)", initial)
 
     def test_migration_ne_supprime_pas_les_profils_et_sync_preserve_config(self):
@@ -130,6 +133,8 @@ class ContratPersonnage(unittest.TestCase):
         synchronisation = (ROOT / "compilation/outils/synchroniser_serveur_local.ps1").read_text()
         fichiers = section(synchronisation, "foreach ($nom in @(", "$source =")
         self.assertIn("'personnage.php'", fichiers)
+        self.assertIn("'securite.php'", fichiers)
+        self.assertIn("'classement.sql'", fichiers)
         self.assertIn("'api.php'", fichiers)
         self.assertNotIn("'config.php'", fichiers)
         for fichier in ("build_launcher.bat", "build_unity_game.bat"):

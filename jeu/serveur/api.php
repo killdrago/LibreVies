@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'securite.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'personnage.php';
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
@@ -121,20 +122,13 @@ function demarrer_session_api($jeton = null, $nouvelle = false) {
 }
 
 function creer_session_membre($membre) {
-    // Ne pas dependre de l'entropie par defaut des anciens PHP 5.6.
-    // Aucun identifiant de session fourni par le client n'est reutilise.
+    // Le helper utilise aussi le CSPRNG du systeme si PHP 5.6 ne fournit
+    // pas random_bytes et si OpenSSL est desactive (EasyPHP/Windows).
     try {
-        if (function_exists('random_bytes')) {
-            $aleatoire = random_bytes(32);
-        } elseif (function_exists('openssl_random_pseudo_bytes')) {
-            $fort = false;
-            $aleatoire = openssl_random_pseudo_bytes(32, $fort);
-            if ($aleatoire === false || !$fort) throw new RuntimeException('Entropie insuffisante.');
-        } else {
-            throw new RuntimeException('Generateur securise indisponible.');
-        }
+        $aleatoire = octets_aleatoires_securises(32);
     } catch (Exception $erreur) {
-        repondre(false, 'Impossible de securiser la session : verifiez PHP/OpenSSL.', array(), 503);
+        journal_api('SESSION generateur inaccessible PHP=' . PHP_VERSION . ' OS=' . PHP_OS);
+        repondre(false, 'Impossible de securiser la session : generateur du systeme inaccessible.', array(), 503);
     }
     $jeton = bin2hex($aleatoire);
     demarrer_session_api($jeton, true);
@@ -313,6 +307,7 @@ if ($action === 'register') {
         repondre(false, 'Impossible de securiser le mot de passe.', array(), 500);
     }
 
+    $etapeInscription = 'membre';
     try {
         $pdo->beginTransaction();
         journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
@@ -345,6 +340,7 @@ if ($action === 'register') {
 
         // Le personnage initial reprend le meme id que le compte. Seuls
         // id et `default` sont fournis ; tous les reglages restent NULL.
+        $etapeInscription = 'personnage';
         $personnage = $pdo->prepare(
             'INSERT INTO personnage (id, `default`) '
             . 'VALUES (:id, 1)'
@@ -352,14 +348,22 @@ if ($action === 'register') {
         $personnage->execute(array(
             ':id' => (int)$membre['id'],
         ));
+        // Un seul classement par joueur, lie au meme id que le membre.
+        // Une panne de cette insertion annule aussi membre et personnage.
+        $etapeInscription = 'classement';
+        $classement = $pdo->prepare(
+            'INSERT INTO classement (id, experience, chasse, territoire) '
+            . 'VALUES (:id, 0, 0, 0)'
+        );
+        $classement->execute(array(':id' => (int)$membre['id']));
         $pdo->commit();
     } catch (PDOException $erreur) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        // 1062 est le doublon MySQL. Une autre contrainte (ex. personnage)
+        // 1062 est le doublon MySQL. Un doublon sur personnage/classement
         // doit rester une erreur serveur, pas un faux pseudo deja utilise.
-        if ($erreur->getCode() === '23000' && isset($erreur->errorInfo[1])
+        if ($etapeInscription === 'membre' && $erreur->getCode() === '23000' && isset($erreur->errorInfo[1])
             && (int)$erreur->errorInfo[1] === 1062) {
             repondre(false, "Le pseudo ou l'email existe deja.", array(), 409);
         }
