@@ -17,7 +17,7 @@ Le dossier compilation/ (projet Unity, scripts, images de travail) ne part
 JAMAIS chez le joueur.
 """
 import tkinter as tk
-import subprocess, threading, os, sys, time
+import subprocess, threading, queue, os, sys, time
 import urllib.request, urllib.error, urllib.parse, hashlib, json
 import re
 import unicodedata
@@ -1098,8 +1098,10 @@ class App(tk.Tk):
         self.logged_pseudo = ""
         self.auth_message = ""
         self.derniere_raison = ""
+        self._ui_queue = queue.Queue()
         self.autolog = migrate_legacy_autolog()
         self.build()
+        self.after(50, self._drain_ui_queue)
         self._load_autolog_login()
         if self.autolog:
             # Un joueur deja connu n'a plus besoin du cadre Inscription.
@@ -1291,6 +1293,26 @@ class App(tk.Tk):
     # CONNEXION / INSCRIPTION
     # ============================================================
 
+    def _ui_call(self, callback):
+        """Planifie une action Tk depuis un thread sans appeler Tkinter hors du thread principal."""
+        self._ui_queue.put(callback)
+
+    def _drain_ui_queue(self):
+        try:
+            while True:
+                callback = self._ui_queue.get_nowait()
+                try:
+                    callback()
+                except Exception as erreur:
+                    journal_auth('ERREUR CALLBACK UI type=%s erreur=%s' % (
+                        type(erreur).__name__, erreur))
+        except queue.Empty:
+            pass
+        try:
+            self.after(50, self._drain_ui_queue)
+        except tk.TclError:
+            pass
+
     def _load_autolog_login(self):
         if not self.autolog:
             return
@@ -1381,7 +1403,7 @@ class App(tk.Tk):
                 for tentative in range(10):
                     numero = tentative + 1
                     journal_auth('VERIFICATION inscription tentative=%d/10' % numero)
-                    self.after(0, lambda n=numero: self._upd_bar(
+                    self._ui_call(lambda n=numero: self._upd_bar(
                         10 + n * 8,
                         'Verification de l inscription (%d/10)...' % n))
                     try:
@@ -1390,7 +1412,7 @@ class App(tk.Tk):
                             'pseudo': payload['pseudo'],
                         })
                         journal_auth('VERIFICATION inscription OK tentative=%d/10' % numero)
-                        self.after(0, lambda p=payload: self._registration_succeeded(p))
+                        self._ui_call(lambda p=payload: self._registration_succeeded(p))
                         return
                     except Exception as erreur_verification:
                         journal_auth('VERIFICATION inscription ECHEC tentative=%d/10 erreur=%s' % (
@@ -1398,17 +1420,17 @@ class App(tk.Tk):
                         if tentative < 9:
                             time.sleep(1)
                 journal_auth('INSCRIPTION ECHEC apres 10 tentatives')
-                self.after(0, lambda: self._registration_failed(
+                self._ui_call(lambda: self._registration_failed(
                     'Inscription non verifiee par le serveur.'))
             else:
-                self.after(0, lambda: self._auth_succeeded(
+                self._ui_call(lambda: self._auth_succeeded(
                     payload['pseudo'], payload['password'], compact_on_success))
         except Exception as erreur:
             journal_auth('ECHEC action=%s erreur=%s' % (action, erreur))
             if action == 'register':
-                self.after(0, lambda: self._registration_failed(str(erreur)))
+                self._ui_call(lambda: self._registration_failed(str(erreur)))
             else:
-                self.after(0, lambda: self._auth_failed(
+                self._ui_call(lambda: self._auth_failed(
                     str(erreur), automatic=automatic))
 
     def _registration_failed(self, message='Inscription impossible.'):
