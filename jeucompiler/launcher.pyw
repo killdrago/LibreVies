@@ -1459,10 +1459,10 @@ class App(tk.Tk):
         self._check_game()
 
     def _relancer(self):
-        """Relance le launcher apres fermeture de l ancien processus.
+        """Ferme ce processus, puis le script CMD relance l application.
 
-        Le delai evite que deux executions onefile PyInstaller utilisent en
-        meme temps leur dossier temporaire ``_MEI``.
+        Le script est invisible et attend que le PID actuel ait disparu avant
+        de lancer LibreVies.exe. Cela evite les conflits de dossiers _MEI.
         """
         script = os.path.join(GAME_DIR, '.librevies-restart.cmd')
         try:
@@ -1470,15 +1470,19 @@ class App(tk.Tk):
                 commande = [sys.executable]
             else:
                 commande = [sys.executable, os.path.abspath(__file__)]
+            pid = os.getpid()
+            ligne_commande = subprocess.list2cmdline(commande)
             with open(script, 'w', encoding='utf-8', newline='\r\n') as fichier:
                 fichier.write('@echo off\r\n')
-                fichier.write('timeout /t 2 /nobreak >nul\r\n')
-                fichier.write('start "" %s\r\n' % subprocess.list2cmdline(commande))
+                fichier.write(':attendre\r\n')
+                fichier.write('tasklist /FI "PID eq %d" /NH | find "%d" >nul\r\n' % (pid, pid))
+                fichier.write('if not errorlevel 1 (timeout /t 1 /nobreak >nul & goto attendre)\r\n')
+                fichier.write('start "" %s\r\n' % ligne_commande)
                 fichier.write('del /f /q "%~f0" >nul 2>&1\r\n')
             flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
             subprocess.Popen(['cmd.exe', '/d', '/c', script], cwd=GAME_DIR,
                              creationflags=flags, close_fds=False)
-            journal_auth('REDEMARRAGE planifie apres fermeture propre')
+            journal_auth('REDEMARRAGE CMD invisible, attente PID=%d' % pid)
             return True
         except (OSError, IOError):
             journal_auth('REDEMARRAGE planification impossible')
