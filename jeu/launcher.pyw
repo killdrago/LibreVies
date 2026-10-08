@@ -98,7 +98,8 @@ CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 # Ce fichier est volontairement separe du manifeste : l'adresse IP du serveur
 # peut changer sans declencher une mise a jour du launcher.
 AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
-AUTOLOGIN_PATH = os.path.join(GAME_DIR, "autolog.json")
+AUTOLOGIN_PATH = os.path.join(GAME_DIR, "autolog.dat")
+AUTOLOGIN_LEGACY_PATH = os.path.join(GAME_DIR, "autolog.json")
 AUTH_API_URL_DEFAULT = "http://localhost/serveur/api.php"
 AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
@@ -331,44 +332,113 @@ def save_local_config(cfg):
     os.replace(tmp, CONFIG_PATH)
 
 
-def load_autolog():
-    """Charge les identifiants locaux utilises par la case Autolog."""
+def _dpapi_transform(donnees, proteger):
+    """Chiffre ou dechiffre avec DPAPI, lie au compte Windows courant."""
+    if os.name != 'nt':
+        raise OSError('Autolog securise disponible sous Windows uniquement')
+    import ctypes
+
+    class DATA_BLOB(ctypes.Structure):
+        _fields_ = [
+            ('cbData', ctypes.c_uint32),
+            ('pbData', ctypes.POINTER(ctypes.c_ubyte)),
+        ]
+
+    if not donnees:
+        raise ValueError('donnees Autolog vides')
+    tampon = ctypes.create_string_buffer(donnees)
+    entree = DATA_BLOB(
+        len(donnees),
+        ctypes.cast(tampon, ctypes.POINTER(ctypes.c_ubyte)))
+    sortie = DATA_BLOB()
+    flags = ctypes.c_uint32(0x1)  # CRYPTPROTECT_UI_FORBIDDEN
+    crypt32 = ctypes.windll.crypt32
+    if proteger:
+        ok = crypt32.CryptProtectData(
+            ctypes.byref(entree), None, None, None, None,
+            flags, ctypes.byref(sortie))
+    else:
+        ok = crypt32.CryptUnprotectData(
+            ctypes.byref(entree), None, None, None, None,
+            flags, ctypes.byref(sortie))
+    if not ok or not sortie.pbData:
+        raise ctypes.WinError()
     try:
-        with open(AUTOLOGIN_PATH, 'r', encoding='utf-8') as f:
-            donnees = json.load(f)
+        return ctypes.string_at(sortie.pbData, sortie.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(sortie.pbData)
+
+
+def _autolog_values(donnees):
+    try:
+        if isinstance(donnees, bytes):
+            donnees = donnees.decode('utf-8')
+        donnees = json.loads(donnees)
         pseudo = texte_saisi(donnees.get('pseudo', ''), 30)
         mdp = motdepasse_saisi(donnees.get('password', ''))
         if pseudo_valide(pseudo) and mdp:
             return {'pseudo': pseudo, 'password': mdp}
+    except (UnicodeDecodeError, ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+
+def load_autolog():
+    """Charge l'Autolog chiffre avec la protection Windows DPAPI."""
+    try:
+        with open(AUTOLOGIN_PATH, 'rb') as f:
+            actuel = _autolog_values(_dpapi_transform(f.read(), False))
+        if actuel:
+            # Supprimer une eventuelle ancienne copie en clair.
+            try:
+                os.remove(AUTOLOGIN_LEGACY_PATH)
+            except FileNotFoundError:
+                pass
+            return actuel
+    except (OSError, ValueError, AttributeError):
+        pass
+
+    # Migration unique de l'ancien fichier JSON en clair. La copie en clair
+    # est supprimee immediatement apres son chiffrement.
+    try:
+        with open(AUTOLOGIN_LEGACY_PATH, 'r', encoding='utf-8') as f:
+            ancien = _autolog_values(f.read())
+        if ancien:
+            save_autolog(ancien['pseudo'], ancien['password'])
+            return ancien
     except (OSError, ValueError, AttributeError):
         pass
     return None
 
 
 def save_autolog(pseudo, mdp):
-    """Ecrit l'Autolog dans le dossier jeu, de facon atomique."""
+    """Ecrit l'Autolog chiffre dans le dossier jeu, de facon atomique."""
     pseudo = texte_saisi(pseudo, 30)
     mdp = motdepasse_saisi(mdp)
     if not pseudo_valide(pseudo) or not mdp:
         raise ValueError('identifiants Autolog invalides')
+    contenu = json.dumps(
+        {'version': 1, 'pseudo': pseudo, 'password': mdp},
+        ensure_ascii=False).encode('utf-8')
+    chiffre = _dpapi_transform(contenu, True)
     tmp = AUTOLOGIN_PATH + '.tmp'
-    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
-        json.dump({'version': 1, 'pseudo': pseudo, 'password': mdp},
-                  f, ensure_ascii=False)
-        f.write('\n')
+    with open(tmp, 'wb') as f:
+        f.write(chiffre)
     os.replace(tmp, AUTOLOGIN_PATH)
+    try:
+        os.remove(AUTOLOGIN_LEGACY_PATH)
+    except FileNotFoundError:
+        pass
 
 
 def clear_autolog():
-    """Supprime le fichier local si le joueur decoche Autolog."""
-    try:
-        os.remove(AUTOLOGIN_PATH)
-    except FileNotFoundError:
-        pass
-    except OSError:
-        # Le fichier peut deja avoir ete supprime par le joueur ou un
-        # nettoyage local : l'etat logique reste bien desactive.
-        pass
+    """Supprime les fichiers Autolog chiffre et historique."""
+    for chemin in (AUTOLOGIN_PATH, AUTOLOGIN_LEGACY_PATH,
+                   AUTOLOGIN_PATH + '.tmp'):
+        try:
+            os.remove(chemin)
+        except FileNotFoundError:
+            pass
 
 
 def migrate_legacy_autolog():
@@ -1010,6 +1080,7 @@ class App(tk.Tk):
         self.authenticated = False
         self.auth_busy = False
         self.logged_pseudo = ""
+        self.auth_message = ""
         self.derniere_raison = ""
         self.autolog = migrate_legacy_autolog()
         self.build()
@@ -1265,6 +1336,7 @@ class App(tk.Tk):
         if self.auth_busy:
             return
         self.auth_busy = True
+        self.auth_message = ''
         self.login_button.config(
             state='disabled',
             text=('Autolog...' if automatic else
@@ -1319,6 +1391,7 @@ class App(tk.Tk):
     def _registration_failed(self, message='Inscription impossible.'):
         journal_auth('INSCRIPTION ECHEC affichee au joueur message=%s' % message)
         self.auth_busy = False
+        self.auth_message = str(message)[:100]
         self.login_button.config(state='normal', text='Connexion')
         self.register_button.config(state='normal')
         self._update_play_state()
@@ -1354,6 +1427,7 @@ class App(tk.Tk):
 
     def _auth_succeeded(self, pseudo, mdp, compact_on_success=False):
         self.auth_busy = False
+        self.auth_message = ''
         self.authenticated = True
         self.logged_pseudo = pseudo
         self.login_button.config(state='disabled', text='Connecte')
@@ -1379,6 +1453,7 @@ class App(tk.Tk):
     def _auth_failed(self, message, automatic=False):
         self.auth_busy = False
         self.authenticated = False
+        self.auth_message = str(message)[:100]
         if automatic and ('incorrect' in str(message).lower()
                           or 'invalide' in str(message).lower()):
             clear_autolog()
@@ -1608,7 +1683,7 @@ class App(tk.Tk):
         if not self.updates_done:
             return
         if not self.authenticated:
-            self._upd_bar(100, 'Connectez-vous pour jouer')
+            self._upd_bar(0, self.auth_message or 'Connectez-vous pour jouer')
 
     def _ready(self, ok):
         self.ready = bool(ok)

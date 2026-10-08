@@ -54,4 +54,6 @@ __pycache__/
 /jeu/serveur/config.php
 
 # Identifiants Autolog propres a chaque joueur (jamais versionnes)
+/jeu/autolog.dat
+/jeu/autolog.dat.tmp
 /jeu/autolog.json
