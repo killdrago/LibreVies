@@ -1,34 +1,35 @@
 -- Personnage LibreVies : un personnage par compte.
 -- personnage.id reprend exactement membre.id.
--- Chaque reglage de slider possede sa propre colonne.
+-- A la creation du compte, seul id et `default` sont renseignes.
+-- Tous les autres champs restent NULL jusqu'a la creation du personnage.
 
 USE librevies;
 
 CREATE TABLE IF NOT EXISTS personnage (
   id INT UNSIGNED NOT NULL,
   `default` TINYINT(1) NOT NULL DEFAULT 1,
-  sexe ENUM('homme', 'femme') NOT NULL DEFAULT 'homme',
+  sexe ENUM('homme', 'femme') NULL DEFAULT NULL,
 
-  tete DECIMAL(10,4) NOT NULL DEFAULT 0,
-  yeux DECIMAL(10,4) NOT NULL DEFAULT 0,
-  nez DECIMAL(10,4) NOT NULL DEFAULT 0,
-  bouche DECIMAL(10,4) NOT NULL DEFAULT 0,
-  oreilles DECIMAL(10,4) NOT NULL DEFAULT 0,
-  seins DECIMAL(10,4) NOT NULL DEFAULT 0,
-  volume DECIMAL(10,4) NOT NULL DEFAULT 0,
-  hanche DECIMAL(10,4) NOT NULL DEFAULT 0,
-  ventre DECIMAL(10,4) NOT NULL DEFAULT 0,
-  largeur_bras DECIMAL(10,4) NOT NULL DEFAULT 0,
-  longueur_bras DECIMAL(10,4) NOT NULL DEFAULT 0,
-  hauteur_jambe DECIMAL(10,4) NOT NULL DEFAULT 0,
-  pieds DECIMAL(10,4) NOT NULL DEFAULT 0,
+  tete DECIMAL(10,4) NULL DEFAULT NULL,
+  yeux DECIMAL(10,4) NULL DEFAULT NULL,
+  nez DECIMAL(10,4) NULL DEFAULT NULL,
+  bouche DECIMAL(10,4) NULL DEFAULT NULL,
+  oreilles DECIMAL(10,4) NULL DEFAULT NULL,
+  seins DECIMAL(10,4) NULL DEFAULT NULL,
+  volume DECIMAL(10,4) NULL DEFAULT NULL,
+  hanche DECIMAL(10,4) NULL DEFAULT NULL,
+  ventre DECIMAL(10,4) NULL DEFAULT NULL,
+  largeur_bras DECIMAL(10,4) NULL DEFAULT NULL,
+  longueur_bras DECIMAL(10,4) NULL DEFAULT NULL,
+  hauteur_jambe DECIMAL(10,4) NULL DEFAULT NULL,
+  pieds DECIMAL(10,4) NULL DEFAULT NULL,
 
-  teinte_peau VARCHAR(32) NOT NULL DEFAULT '',
-  coiffure VARCHAR(100) NOT NULL DEFAULT '',
-  chaussures VARCHAR(100) NOT NULL DEFAULT '',
-  chapeau VARCHAR(100) NOT NULL DEFAULT '',
-  tenue VARCHAR(100) NOT NULL DEFAULT '',
-  objets TEXT NOT NULL,
+  teinte_peau VARCHAR(32) NULL DEFAULT NULL,
+  coiffure VARCHAR(100) NULL DEFAULT NULL,
+  chaussures VARCHAR(100) NULL DEFAULT NULL,
+  chapeau VARCHAR(100) NULL DEFAULT NULL,
+  tenue VARCHAR(100) NULL DEFAULT NULL,
+  objets TEXT NULL,
 
   PRIMARY KEY (id),
   CONSTRAINT fk_personnage_membre

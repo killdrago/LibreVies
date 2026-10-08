@@ -256,21 +256,11 @@ if ($action === 'register') {
         // Le personnage initial reprend le meme id que le compte. Les
         // reglages sont des JSON vides, prets a etre remplis par le createur.
         $personnage = $pdo->prepare(
-            'INSERT INTO personnage '
-            . '(id, `default`, sexe, teinte_peau, coiffure, chaussures, '
-            . 'chapeau, tenue, objets) '
-            . 'VALUES (:id, 1, :sexe, :teinte_peau, :coiffure, :chaussures, '
-            . ':chapeau, :tenue, :objets)'
+            'INSERT INTO personnage (id, `default`) '
+            . 'VALUES (:id, 1)'
         );
         $personnage->execute(array(
             ':id' => (int)$membre['id'],
-            ':sexe' => 'homme',
-            ':teinte_peau' => '',
-            ':coiffure' => '',
-            ':chaussures' => '',
-            ':chapeau' => '',
-            ':tenue' => '',
-            ':objets' => '',
         ));
         $pdo->commit();
     } catch (PDOException $erreur) {
