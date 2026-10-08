@@ -249,7 +249,13 @@ def auth_api_request(action, payload):
         method='POST')
     try:
         with urllib.request.urlopen(req, timeout=config['timeout']) as response:
-            resultat = json.loads(response.read().decode('utf-8'))
+            corps = response.read()
+        journal_auth('CORPS action=%s taille=%d debut=%r' % (
+            action, len(corps), corps[:240]))
+        texte = corps.decode('utf-8-sig').strip()
+        if not texte:
+            raise ValueError('reponse HTTP vide')
+        resultat = json.loads(texte)
         journal_auth('REPONSE action=%s ok=%s message=%s' % (
             action, resultat.get('ok') if isinstance(resultat, dict) else None,
             resultat.get('message', '') if isinstance(resultat, dict) else 'JSON invalide'))

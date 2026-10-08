@@ -27,8 +27,14 @@ function repondre($ok, $message = '', $extra = array(), $code = 200) {
     journal_api('REPONSE code=' . (int)$code . ' ok=' . ($ok ? 'true' : 'false')
         . ' message=' . $message);
     http_response_code($code);
-    echo json_encode(array_merge(array('ok' => $ok, 'message' => $message), $extra),
-                     JSON_UNESCAPED_UNICODE);
+    $contenu = array_merge(array('ok' => $ok, 'message' => $message), $extra);
+    $json = json_encode($contenu, JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        journal_api('ERREUR json_encode code=' . (int)json_last_error());
+        http_response_code(500);
+        $json = '{"ok":false,"message":"Reponse JSON impossible."}';
+    }
+    echo $json;
     exit;
 }
 
