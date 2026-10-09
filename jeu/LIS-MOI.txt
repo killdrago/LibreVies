@@ -4,7 +4,7 @@ ESSAIS LOCAUX — DOSSIER JEU UNIQUEMENT
 2. Lancer compilation\build_launcher.bat pour mettre les sources a jour et compiler.
 3. Ouvrir jeu\LibreVies.exe, se connecter puis cliquer JOUER.
 
-Apres le nouveau build : Launcher 4.2.2 / jeu 0.5.85.
+Apres le nouveau build : Launcher 4.2.2 / jeu 0.5.86.
 Le launcher ne telecharge pas de binaire distant en mode local.
 Une ancienne assembly 0.5.79 est refusee plutot que presentee comme la nouvelle.
 Le pseudo est au-dessus de la tete en troisieme personne : redescendu de 10 cm, taille /4 conservee.
@@ -16,6 +16,10 @@ Le deplacement vers un serveur de distribution sera fait manuellement plus tard.
 Avatars NPC : les six profils complets doivent etre presents dans la table npc. Les anciens scripts SQL de mise en place sont retires.
 Les six profils sont lus en BDD a la connexion et reconstruits en MakeHuman.
 Relancer le SQL change leurs apparences, pas leurs positions ou fonctions.
+
+ADMIN est affiche uniquement si membre.droit vaut 1 (droits relus a la connexion).
+NPC : onglets des villes, liste deroulante puis MODIFIER L'ESTHETIQUE / VALIDER.
+Les deux gardes sont nommes Garde Nord et Garde Sud.
 
 --- Anciennes consignes de distribution (non actives en mode local) ---
 

@@ -30,8 +30,9 @@ class AvatarsNpc(unittest.TestCase):
         self.assertNotIn("$donnees['id']", npc)
         helper = (ROOT / "jeu/serveur/npc.php").read_text()
         self.assertIn("valider_profil_personnage($ligne)", helper)
-        self.assertNotIn("INSERT", helper)
-        self.assertNotIn("UPDATE", helper)
+        lecture = helper.split("function enregistrer_npc", 1)[0]
+        self.assertNotIn("INSERT", lecture)
+        self.assertNotIn("UPDATE", lecture)
 
     def test_chargement_avant_monde_et_application_avant_edition(self):
         game = (ROOT / "compilation/unity/Assets/Scripts/LibreViesGame.cs").read_text()

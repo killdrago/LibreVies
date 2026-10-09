@@ -1,5 +1,5 @@
 <?php
-// Profils de NPC lus exclusivement cote serveur, sans modification depuis le jeu.
+// Profils de NPC : lecture joueur, modification uniquement apres controle droit=1 dans api.php.
 function identifiants_npc_village() {
     return array('maire', 'forgeron', 'marchand', 'esthetique', 'garde_nord', 'garde_sud');
 }
@@ -29,4 +29,20 @@ function lire_npcs_village($pdo) {
         $resultat[] = $profils[$id];
     }
     return $resultat;
+}
+
+// Les noms de colonnes sont une liste serveur, l'id est parametre.
+// Ni id/default/objets/droit dans le profil ne peuvent elever des permissions.
+function enregistrer_npc($pdo, $id, $profil) {
+    $colonnes = array_merge(array('sexe'), colonnes_sliders_personnage(),
+        array('teinte_peau', 'coiffure', 'chaussures', 'chapeau', 'tenue'));
+    $parametres = array(':id' => $id);
+    $affectations = array();
+    foreach ($colonnes as $colonne) {
+        $affectations[] = $colonne . ' = :' . $colonne;
+        $parametres[':' . $colonne] = $profil[$colonne];
+    }
+    $requete = $pdo->prepare('UPDATE npc SET ' . implode(', ', $affectations) . ' WHERE id = :id');
+    $requete->execute($parametres);
+    // objets est preserve : les accessoires de metier sont independants de l'esthetique.
 }

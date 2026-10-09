@@ -149,6 +149,31 @@ await sql("$pdo->exec('UPDATE npc SET nez=NULL');");
 await request('get_npcs', { session_token: login.session.token }, 409);
 await sql(seedBootstrap + '$pdo->exec(' + JSON.stringify(seedSqlite) + ');');
 console.log('OK 6 NPC aleatoires complets, profils stables, objets preserves ; absence/incomplet/session factice refuses');
+const npcAvantAdmin = (await request('get_npcs', { session_token: login.session.token })).npcs;
+const maireAvant = npcAvantAdmin.find(npc => npc.id === 'maire');
+const draftNpc = { ...maireAvant, tete: 1.234567, objets: 'injection', droit: 1 };
+assert.equal(login.membre.droit, 0);
+await request('save_npc', { session_token: login.session.token, npc_id: 'maire', personnage: JSON.stringify(draftNpc), droit: 1 }, 403);
+assert.deepEqual((await request('get_npcs', { session_token: login.session.token })).npcs, npcAvantAdmin);
+await sql(`$pdo->exec('UPDATE membre SET droit=1 WHERE id=${idA}');`);
+const admin = await request('login', { pseudo: 'Alice Test', password });
+assert.equal(admin.membre.droit, 1);
+const npcSaved = await request('save_npc', { session_token: admin.session.token, npc_id: 'maire', personnage: JSON.stringify(draftNpc) });
+assert.equal(npcSaved.npcs.find(npc => npc.id === 'maire').tete, 1.2346);
+assert.equal(npcSaved.npcs.find(npc => npc.id === 'maire').objets, maireAvant.objets);
+assert.deepEqual(npcSaved.npcs.find(npc => npc.id === 'marchand'), npcAvantAdmin.find(npc => npc.id === 'marchand'));
+await request('save_npc', { session_token: admin.session.token, npc_id: 'inconnu', personnage: JSON.stringify(draftNpc) }, 400);
+await request('save_npc', { session_token: admin.session.token, npc_id: 'maire', personnage: JSON.stringify({ ...draftNpc, volume: -1 }) }, 400);
+await sql(`$pdo->exec("CREATE TRIGGER refuser_npc BEFORE UPDATE ON npc BEGIN SELECT RAISE(ABORT, 'indisponible'); END");`);
+await request('save_npc', { session_token: admin.session.token, npc_id: 'maire', personnage: JSON.stringify({ ...draftNpc, tete: 3 }) }, 500);
+assert.deepEqual((await request('get_npcs', { session_token: admin.session.token })).npcs, npcSaved.npcs);
+await sql("$pdo->exec('DROP TRIGGER refuser_npc');");
+await sql(`$pdo->exec('UPDATE membre SET droit=2 WHERE id=${idA}');`);
+await request('save_npc', { session_token: admin.session.token, npc_id: 'maire', personnage: JSON.stringify(draftNpc), droit: 1 }, 403);
+await sql(`$pdo->exec('UPDATE membre SET droit=0 WHERE id=${idA}');`);
+await request('save_npc', { session_token: admin.session.token, npc_id: 'maire', personnage: JSON.stringify(draftNpc), droit: 1 }, 403);
+console.log('OK ADMIN droit=1 seulement : sauvegarde NPC, precision/objets, refus invalide, rollback et revocation live');
+
 
 // Simuler PHP 5.6 sans random_bytes/OpenSSL, sans modifier PHP.ini du poste.
 // Le generateur de l'OS doit prendre le relais et produire un nouveau jeton.

@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.85";
+    private const string VersionJeu = "0.5.86";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -117,6 +117,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool focusCreationAReinitialiser;
     private int adminNpcListeSelection;
     private Vector2 adminNpcScroll;
+    private bool adminNpcListeOuverte;
+    private int adminNpcVilleSelection;
+    private string cibleEditionNpc;
+    private string nomEditionNpc;
+    private const string VilleDepart = "Village de depart";
     private bool profilPersonnageValide;
     private bool sauvegardePersonnageEnCours;
     private string messageCreationPersonnage = "";
@@ -401,6 +406,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public GameObject Root;
         public Transform Model;
         public AdminHumanCreator CreateurNpc;
+        public string Ville = VilleDepart;
         public Transform JambeG;
         public Transform JambeD;
         public Transform GenouG;
@@ -482,6 +488,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class AdminNpcEntry
     {
         public string Nom;
+        public string Id;
+        public string Ville;
         public PnjState Pnj;
         public GardeState Garde;
     }
@@ -491,6 +499,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public GameObject Root;
         public Transform Model;
         public AdminHumanCreator CreateurNpc;
+        public string Ville = VilleDepart;
         public Transform Corps;
         public Transform JambeG;
         public Transform JambeD;
@@ -2745,6 +2754,20 @@ public sealed class LibreViesGame : MonoBehaviour
         accessoire.localRotation = Quaternion.identity;
     }
 
+    private void MettreAJourArmeGarde(GardeState garde)
+    {
+        if (garde == null || garde.CreateurNpc == null || garde.Hallebarde == null) return;
+        Transform poignet = garde.CreateurNpc.AppliedBone("wrist.R");
+        Transform doigts = garde.CreateurNpc.AppliedBone("finger3-1.R");
+        if (poignet == null) return;
+        Vector3 prise = doigts == null ? poignet.position : Vector3.Lerp(poignet.position, doigts.position, 0.65f);
+        // Le pivot importe de la hampe est deja a son point de prise. La main
+        // MakeHuman a un autre axe local : conserver la hampe verticale dans
+        // le repere du garde, au lieu de lui appliquer la rotation du poignet.
+        garde.Hallebarde.position = prise;
+        garde.Hallebarde.rotation = garde.Root.transform.rotation;
+    }
+
     private bool AppliquerAvatarsNpcs()
     {
         try
@@ -2769,6 +2792,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     garde.Nord ? "garde_nord" : "garde_sud");
                 AttacherAccessoireNpc(garde.Hallebarde, garde.CreateurNpc.AppliedBone("wrist.R"));
                 garde.Model.gameObject.SetActive(false);
+                MettreAJourArmeGarde(garde);
             }
             Journal("6 avatars NPC MakeHuman reconstruits depuis la BDD");
             return true;
@@ -4421,7 +4445,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private void CreerGarde(Vector2 poste, Vector2 portail, bool nord)
+    private void CreerGarde(Vector2 poste, Vector2 portail, bool nord, string ville = VilleDepart)
     {
         const string dossier = "Characters/LibreViesGuardParts";
         float y = TerrainHeight(poste.x, poste.y);
@@ -4429,7 +4453,7 @@ public sealed class LibreViesGame : MonoBehaviour
         root.position = new Vector3(poste.x, y, poste.y);
         var state = new GardeState
         {
-            Root = root.gameObject, Poste = poste, Portail = portail, Nord = nord
+            Root = root.gameObject, Poste = poste, Portail = portail, Nord = nord, Ville = ville
         };
         GameObject model = new GameObject("Garde_Humanoide_Original_CC0");
         model.transform.SetParent(root, false);
@@ -4580,6 +4604,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (garde.CreateurNpc != null)
             {
                 garde.CreateurNpc.AnimateAppliedHuman(marche, false, garde.Phase * 8f);
+                MettreAJourArmeGarde(garde);
                 continue;
             }
             float cycle = marche ? Mathf.Sin(garde.Phase * 8f) : 0f;
@@ -4658,14 +4683,14 @@ public sealed class LibreViesGame : MonoBehaviour
         corneObjet.transform.SetParent(racine, false);
     }
 
-    private void CreerPnj(Vector3 position, string metier)
+    private void CreerPnj(Vector3 position, string metier, string ville = VilleDepart)
     {
         float y = TerrainHeight(position.x, position.z);
         // Garder le chemin historique dans edition/coordonee pour ne pas
         // perdre le placement valide du NPC devant le salon.
         var root = new GameObject("PNJ_" + (metier == "Esthetique" ? "Medecin" : metier)).transform;
         root.position = new Vector3(position.x, y, position.z);
-        var pnj = new PnjState { Root = root.gameObject, Metier = metier };
+        var pnj = new PnjState { Root = root.gameObject, Metier = metier, Ville = ville };
 
         // Les habitants utilisent le même humanoïde OBJ indépendant que
         // l'héroïne : plus de capsule, cube ou tête carrée issue du prototype
@@ -6895,7 +6920,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void OuvrirCreationPersonnage()
     {
-        // Ce chemin est appele uniquement par la conversation avec Esthetique.
+        // Le personnage du joueur reste editable seulement chez Esthetique.
+        cibleEditionNpc = null;
+        nomEditionNpc = null;
         AssurerCreateurHumain();
         FermerConversation();
         if (modeEdition) BasculerModeEdition();
@@ -6913,10 +6940,33 @@ public sealed class LibreViesGame : MonoBehaviour
         creationPersonnageOpen = true;
     }
 
+    private void OuvrirCreationNpc(AdminNpcEntry entree)
+    {
+        if (!CompteAdministrateur || entree == null || sauvegardePersonnageEnCours) return;
+        LibreViesNpc npc = ProfilNpc(entree.Id);
+        if (npc == null) { ShowInfo("Profil NPC indisponible"); return; }
+        AssurerCreateurHumain();
+        FermerConversation();
+        cibleEditionNpc = entree.Id;
+        nomEditionNpc = entree.Nom;
+        npc.ProfilHumain().ChargerDans(humanCreator);
+        humanCreator.BuildPreview();
+        humanCreator.ResetPreviewCamera();
+        humanCreator.SetPreviewVisible(true);
+        adminOpen = false;
+        adminNpcListeOuverte = false;
+        profilPersonnageValide = false;
+        messageCreationPersonnage = "Modifier le NPC puis VALIDER pour enregistrer. Annuler ne change rien.";
+        creationPersonnageOpen = true;
+    }
+
     private void FermerCreationPersonnage()
     {
         if (sauvegardePersonnageEnCours) return;
+        bool depuisNpc = !String.IsNullOrEmpty(cibleEditionNpc);
         creationPersonnageOpen = false;
+        cibleEditionNpc = nomEditionNpc = null;
+        if (depuisNpc && CompteAdministrateur) { adminOpen = true; adminTab = 2; }
         previewPersonnageSourisActive = false;
         // Peut etre appele par la coroutine HTTP, donc hors de OnGUI.
         focusCreationAReinitialiser = true;
@@ -6925,6 +6975,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerCreationPersonnage()
     {
+        if (!String.IsNullOrEmpty(cibleEditionNpc) && !CompteAdministrateur && !sauvegardePersonnageEnCours)
+        {
+            FermerCreationPersonnage();
+            return;
+        }
         if (!sauvegardePersonnageEnCours && Event.current.type == EventType.KeyDown
             && Event.current.keyCode == KeyCode.Escape)
         {
@@ -6943,7 +6998,8 @@ public sealed class LibreViesGame : MonoBehaviour
             (Screen.height - hauteur * echelle) * 0.5f, 0f), Quaternion.identity,
             new Vector3(echelle, echelle, 1f));
         GUI.Box(new Rect(0f, 0f, largeur, hauteur), "", boxStyle);
-        GUI.Label(new Rect(22f, 14f, 850f, 30f), "ESTHETIQUE — " + pseudoJoueur, titleStyle);
+        GUI.Label(new Rect(22f, 14f, 850f, 30f), String.IsNullOrEmpty(cibleEditionNpc) ? "ESTHETIQUE — " + pseudoJoueur
+                : "ESTHETIQUE NPC — " + nomEditionNpc, titleStyle);
         bool ancienEnabled = GUI.enabled;
         GUI.enabled = !sauvegardePersonnageEnCours;
         if (GUI.Button(new Rect(largeur - 42f, 14f, 28f, 28f), "X", buttonStyle))
@@ -7147,12 +7203,12 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < pnjs.Count; i++)
         {
             if (pnjs[i] != null && pnjs[i].Root != null)
-                result.Add(new AdminNpcEntry { Nom = NomAffichePnj(pnjs[i]), Pnj = pnjs[i] });
+                result.Add(new AdminNpcEntry { Nom = NomAffichePnj(pnjs[i]), Id = pnjs[i].Metier.ToLowerInvariant(), Ville = pnjs[i].Ville, Pnj = pnjs[i] });
         }
         for (int i = 0; i < gardes.Count; i++)
         {
             if (gardes[i] != null && gardes[i].Root != null)
-                result.Add(new AdminNpcEntry { Nom = "Garde " + (i + 1).ToString("00"), Garde = gardes[i] });
+                result.Add(new AdminNpcEntry { Nom = gardes[i].Nord ? "Garde Nord" : "Garde Sud", Id = gardes[i].Nord ? "garde_nord" : "garde_sud", Ville = gardes[i].Ville, Garde = gardes[i] });
         }
         result.Sort((a, b) => string.Compare(a.Nom, b.Nom,
             StringComparison.CurrentCultureIgnoreCase));
@@ -7161,58 +7217,62 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerAdminNpc(Rect contenu)
     {
-        List<AdminNpcEntry> liste = ObtenirNpcsAdminTries();
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
-            "NPC EN PLACE", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 44f, 700f, 22f),
-            "Le NPC Esthétique propose le createur de personnage dans le monde.", smallStyle);
-
-        Rect listeRect = new Rect(contenu.x + 18f, contenu.y + 76f, 260f, 430f);
-        GUI.Box(listeRect, "NPC et gardes", boxStyle);
-        Rect vue = new Rect(listeRect.x + 8f, listeRect.y + 28f, listeRect.width - 16f, listeRect.height - 36f);
-        float hauteur = Mathf.Max(vue.height, liste.Count * 32f);
-        adminNpcScroll = GUI.BeginScrollView(vue, adminNpcScroll,
-            new Rect(0f, 0f, vue.width - 18f, hauteur));
-        for (int i = 0; i < liste.Count; i++)
+        if (!CompteAdministrateur) return;
+        List<AdminNpcEntry> tous = ObtenirNpcsAdminTries();
+        List<string> villes = new List<string>();
+        for (int i = 0; i < tous.Count; i++)
+            if (!villes.Contains(tous[i].Ville)) villes.Add(tous[i].Ville);
+        villes.Sort(StringComparer.CurrentCultureIgnoreCase);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f), "NPC", titleStyle);
+        if (villes.Count == 0)
         {
-            AdminNpcEntry entree = liste[i];
-            if (BoutonChoixAdmin(new Rect(0f, i * 32f, vue.width - 28f, 28f),
-                entree.Nom, adminNpcListeSelection == i))
-            {
-                adminNpcListeSelection = i;
-            }
-        }
-        GUI.EndScrollView();
-
-        if (liste.Count == 0)
-        {
-            GUI.Label(new Rect(contenu.x + 320f, contenu.y + 90f, 420f, 80f),
-                "Aucun NPC ou garde n'est encore charge.", smallStyle);
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 700f, 40f), "Aucune ville avec NPC chargee.", smallStyle);
             return;
         }
+        adminNpcVilleSelection = Mathf.Clamp(adminNpcVilleSelection, 0, villes.Count - 1);
+        Rect barreVilles = new Rect(contenu.x + 18f, contenu.y + 44f, contenu.width - 36f, 34f);
+        int ville = GUI.Toolbar(barreVilles, adminNpcVilleSelection, villes.ToArray(), buttonStyle);
+        if (ville != adminNpcVilleSelection)
+        {
+            adminNpcVilleSelection = ville;
+            adminNpcListeSelection = 0;
+            adminNpcListeOuverte = false;
+        }
+        List<AdminNpcEntry> liste = new List<AdminNpcEntry>();
+        for (int i = 0; i < tous.Count; i++)
+            if (tous[i].Ville == villes[adminNpcVilleSelection]) liste.Add(tous[i]);
+        if (liste.Count == 0) return;
         adminNpcListeSelection = Mathf.Clamp(adminNpcListeSelection, 0, liste.Count - 1);
         AdminNpcEntry selection = liste[adminNpcListeSelection];
-        string metier = selection.Pnj != null ? NomAffichePnj(selection.Pnj) : "Garde";
-        Vector3 position = selection.Pnj != null
-            ? selection.Pnj.Root.transform.position
-            : selection.Garde.Root.transform.position;
-        string accessoire = selection.Pnj != null
-            ? (selection.Pnj.Marteau != null ? "marteau"
-                : (selection.Pnj.Feuille != null ? "feuille" : "aucun"))
-            : "hallebarde";
-        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 84f, 440f, 30f),
-            selection.Nom, titleStyle);
-        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 122f, 480f, 110f),
-            "Type : " + metier + "\n"
-                + "Position : " + position.ToString("F1") + "\n"
-                + "Personnage 3D : maillage humain en place\n"
-                + "Accessoire : " + accessoire, smallStyle);
-        GUI.Label(new Rect(contenu.x + 320f, contenu.y + 252f, 480f, 90f),
-            selection.Pnj != null && selection.Pnj.Metier == "Esthetique"
-                ? "Parlez-lui dans le monde pour ouvrir le panel de creation."
-                : "Les regles de gameplay restent conservees :\n"
-                    + "bras fixes du Maire et du Forgeron, feuille, marteau\n"
-                    + "et hallebarde reserves a leurs personnages.", smallStyle);
+        Rect choix = new Rect(contenu.x + 18f, contenu.y + 100f, 310f, 34f);
+        if (GUI.Button(choix, selection.Nom + "  ▼", buttonStyle)) adminNpcListeOuverte = !adminNpcListeOuverte;
+        bool actif = GUI.enabled;
+        GUI.enabled = actif && !adminNpcListeOuverte;
+        Vector3 position = selection.Pnj != null ? selection.Pnj.Root.transform.position : selection.Garde.Root.transform.position;
+        GUI.Label(new Rect(contenu.x + 352f, contenu.y + 100f, contenu.width - 376f, 34f), selection.Nom, titleStyle);
+        GUI.Label(new Rect(contenu.x + 352f, contenu.y + 146f, contenu.width - 376f, 100f),
+            "Ville : " + selection.Ville + "\nPosition : " + position.ToString("F1")
+            + "\nProfil d'avatar : " + selection.Id, smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 352f, contenu.y + 262f, 300f, 38f), "MODIFIER L'ESTHETIQUE", buttonStyle))
+            OuvrirCreationNpc(selection);
+        GUI.Label(new Rect(contenu.x + 352f, contenu.y + 316f, contenu.width - 376f, 74f),
+            "Le bouton VALIDER du createur enregistre l'avatar dans la table npc.\n"
+            + "Les positions et fonctions de metier sont conservees.", smallStyle);
+        GUI.enabled = actif;
+        if (adminNpcListeOuverte)
+        {
+            Rect popup = new Rect(choix.x, choix.yMax + 3f, choix.width, Mathf.Min(224f, liste.Count * 32f + 12f));
+            GUI.Box(popup, "", boxStyle);
+            adminNpcScroll = GUI.BeginScrollView(popup, adminNpcScroll,
+                new Rect(0f, 0f, popup.width - 20f, liste.Count * 32f));
+            for (int i = 0; i < liste.Count; i++)
+                if (GUI.Button(new Rect(6f, i * 32f + 3f, popup.width - 34f, 29f), liste[i].Nom, buttonStyle))
+                {
+                    adminNpcListeSelection = i;
+                    adminNpcListeOuverte = false;
+                }
+            GUI.EndScrollView();
+        }
     }
 
     private void DessinerAdminMonstres(Rect contenu)
@@ -7274,6 +7334,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private void ValiderEditionHumaine()
     {
         if (sauvegardePersonnageEnCours || humanCreator == null || heroBody == null) return;
+        if (!String.IsNullOrEmpty(cibleEditionNpc) && !CompteAdministrateur)
+        {
+            messageCreationPersonnage = "Edition NPC reservee aux administrateurs.";
+            return;
+        }
         if (!compteJoueur.Authentifie)
         {
             messageCreationPersonnage = "Reconnectez-vous depuis le launcher pour enregistrer votre personnage.";
@@ -7289,7 +7354,8 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
         sauvegardePersonnageEnCours = true; // Bloque les doubles clics et les modifications.
-        StartCoroutine(EnregistrerEtAppliquerPersonnage(profil));
+        if (String.IsNullOrEmpty(cibleEditionNpc)) StartCoroutine(EnregistrerEtAppliquerPersonnage(profil));
+        else StartCoroutine(EnregistrerEtAppliquerNpc(cibleEditionNpc, profil));
     }
 
     private System.Collections.IEnumerator EnregistrerEtAppliquerPersonnage(LibreViesPersonnage profil)
@@ -7312,6 +7378,57 @@ public sealed class LibreViesGame : MonoBehaviour
         profilPersonnageValide = true;
         FermerCreationPersonnage();
         ShowInfo("Personnage enregistre et applique");
+    }
+
+    private System.Collections.IEnumerator EnregistrerEtAppliquerNpc(string id, LibreViesPersonnage profil)
+    {
+        yield return compteJoueur.SauvegarderNpc(id, profil);
+        sauvegardePersonnageEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        {
+            messageCreationPersonnage = compteJoueur.Erreur;
+            yield break;
+        }
+        try
+        {
+            bool trouve = false;
+            List<AdminNpcEntry> liste = ObtenirNpcsAdminTries();
+            for (int i = 0; i < liste.Count; i++)
+            {
+                AdminNpcEntry entree = liste[i];
+                if (entree.Id != id) continue;
+                AdminHumanCreator createur = entree.Pnj != null ? entree.Pnj.CreateurNpc : entree.Garde.CreateurNpc;
+                Transform root = entree.Pnj != null ? entree.Pnj.Root.transform : entree.Garde.Root.transform;
+                Transform premier = entree.Pnj != null ? entree.Pnj.Marteau : entree.Garde.Hallebarde;
+                Transform second = entree.Pnj != null ? entree.Pnj.Feuille : null;
+                Transform ancienneMain = createur.AppliedBone("wrist.R");
+                // Ne pas detruire l'accessoire avec l'ancienne armature.
+                if (premier != null) premier.SetParent(root, true);
+                if (second != null) second.SetParent(root, true);
+                ProfilNpc(id).ProfilHumain().ChargerDans(createur);
+                if (!createur.ApplyTo(createur.transform))
+                {
+                    AttacherAccessoireNpc(premier, ancienneMain);
+                    AttacherAccessoireNpc(second, ancienneMain);
+                    throw new InvalidOperationException("Profil enregistre, mais reconstruction de l'avatar indisponible.");
+                }
+                AttacherAccessoireNpc(premier, createur.AppliedBone("wrist.R"));
+                AttacherAccessoireNpc(second, createur.AppliedBone("wrist.R"));
+                if (entree.Pnj != null) entree.Pnj.Main = createur.AppliedBone("wrist.R");
+                else MettreAJourArmeGarde(entree.Garde);
+                trouve = true;
+                break;
+            }
+            if (!trouve) throw new InvalidOperationException("NPC enregistre ; rechargez la ville pour l'afficher.");
+        }
+        catch (Exception erreur)
+        {
+            messageCreationPersonnage = erreur.Message;
+            yield break;
+        }
+        profilPersonnageValide = true;
+        FermerCreationPersonnage();
+        ShowInfo("Esthetique du NPC enregistree et appliquee");
     }
 
     private float SliderHumain(Rect rect, string nom, float valeur)
@@ -7448,7 +7565,7 @@ public sealed class LibreViesGame : MonoBehaviour
             ShowInfo("Reglages humains reinitialises");
         }
         if (GUI.Button(new Rect(previewRect.x + 230f, previewActionsY, 128f, 34f),
-            profilPersonnageValide ? "PROFIL VALIDE" : "VALIDER / APPLIQUER", creationActionButtonStyle))
+            profilPersonnageValide ? "PROFIL VALIDE" : (String.IsNullOrEmpty(cibleEditionNpc) ? "VALIDER / APPLIQUER" : "VALIDER / ENREGISTRER"), creationActionButtonStyle))
             ValiderEditionHumaine();
 
         float gauche = contenu.x + 400f;
@@ -7711,8 +7828,14 @@ public sealed class LibreViesGame : MonoBehaviour
 
     }
 
+    private bool CompteAdministrateur
+    {
+        get { return compteJoueur != null && compteJoueur.EstAdministrateur; }
+    }
+
     private void DessinerAdmin()
     {
+        if (!CompteAdministrateur) { adminOpen = false; return; }
         Rect fenetre = new Rect(Screen.width * 0.5f - 590f,
             Screen.height * 0.5f - 360f, 1180f, 720f);
         GUI.Box(fenetre, "", boxStyle);
@@ -7867,8 +7990,9 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         DessinerEditionMaison();
         DessinerEditionPancarte();
-        if (adminOpen && !creationPersonnageOpen) DessinerAdmin();
-        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
+        if (!CompteAdministrateur) adminOpen = false;
+        if (CompteAdministrateur && adminOpen && !creationPersonnageOpen) DessinerAdmin();
+        if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
             "ADMIN", buttonStyle))
         {
             if (!adminOpen && modeEdition) BasculerModeEdition();

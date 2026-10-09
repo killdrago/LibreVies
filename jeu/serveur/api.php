@@ -94,7 +94,7 @@ function repondre_doublon($doublons) {
 
 function membre_public($membre) {
     return array('id' => (int)$membre['id'], 'pseudo' => (string)$membre['pseudo'],
-        'valider' => (int)$membre['valider']);
+        'valider' => (int)$membre['valider'], 'droit' => (int)$membre['droit']);
 }
 
 function verifier_validation_email($membre, $config) {
@@ -159,7 +159,7 @@ function membre_authentifie($pdo, $config, $donnees) {
     // Liberer le verrou avant les acces SQL et les autres requetes du jeu.
     session_write_close();
     try {
-        $requete = $pdo->prepare('SELECT id, pseudo, valider FROM membre WHERE id = :id LIMIT 1');
+        $requete = $pdo->prepare('SELECT id, pseudo, valider, droit FROM membre WHERE id = :id LIMIT 1');
         $requete->execute(array(':id' => $id));
         $membre = $requete->fetch();
     } catch (PDOException $erreur) {
@@ -379,6 +379,33 @@ if ($action === 'register') {
     ));
 }
 
+if ($action === 'save_npc') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    if ((int)$membre['droit'] !== 1) {
+        repondre(false, 'Modification NPC reservee aux administrateurs.', array(), 403);
+    }
+    $idNpc = isset($donnees['npc_id']) ? texte_recu($donnees['npc_id'], 100) : '';
+    if (!in_array($idNpc, identifiants_npc_village(), true)) {
+        repondre(false, 'Identifiant NPC inconnu.', array(), 400);
+    }
+    try {
+        $reglages = isset($donnees['personnage']) ? $donnees['personnage'] : null;
+        if (is_string($reglages)) $reglages = json_decode($reglages, true);
+        $profil = valider_profil_personnage($reglages);
+        $pdo->beginTransaction();
+        enregistrer_npc($pdo, $idNpc, $profil);
+        $npcs = lire_npcs_village($pdo);
+        $pdo->commit();
+    } catch (InvalidArgumentException $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, $erreur->getMessage(), array(), 400);
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'NPC enregistre.', array('membre' => membre_public($membre), 'npcs' => $npcs));
+}
+
 if ($action === 'get_npcs') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     try {
@@ -428,7 +455,7 @@ if ($action === 'login') {
 
     try {
         $requete = $pdo->prepare(
-            'SELECT id, pseudo, motdepasse, valider FROM membre WHERE pseudo = :pseudo LIMIT 1'
+            'SELECT id, pseudo, motdepasse, valider, droit FROM membre WHERE pseudo = :pseudo LIMIT 1'
         );
         $requete->execute(array(':pseudo' => $pseudo));
         $membre = $requete->fetch();

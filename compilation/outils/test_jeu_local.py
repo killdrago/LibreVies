@@ -44,7 +44,7 @@ class JeuLocal(unittest.TestCase):
         self.game = self.jeu / "game"
         self.dll = self.game / "LibreViesGame_Data/Managed/Assembly-CSharp.dll"
 
-    def creer_export(self, version="0.5.85"):
+    def creer_export(self, version="0.5.86"):
         self.dll.parent.mkdir(parents=True, exist_ok=True)
         self.dll.write_bytes(version.encode("utf-16le") + b"\0" + b"\0".join(
             nom.encode() for nom in self.preparation.REQUIRED) + b"\0")
@@ -52,10 +52,10 @@ class JeuLocal(unittest.TestCase):
         (self.game / "version_jeu.json").write_text(json.dumps({
             "version": version, "assembly_sha256": hashlib.sha256(self.dll.read_bytes()).hexdigest()}))
 
-    def test_export85_lance_malgre_ancien_manifeste79(self):
+    def test_export86_lance_malgre_ancien_manifeste79(self):
         self.creer_export()
         self.assertEqual(Path(self.launcher.find_game()), self.game / "LibreViesGame.exe")
-        self.assertIn("v0.5.85", self.launcher.diagnostic_jeu_local()[1])
+        self.assertIn("v0.5.86", self.launcher.diagnostic_jeu_local()[1])
 
     def test_aucun_http_et_aucun_remplacement_du_game(self):
         self.creer_export()
@@ -81,7 +81,7 @@ class JeuLocal(unittest.TestCase):
         self.assertIsNone(self.launcher.find_game())
         self.assertIn("obsolete", self.launcher.diagnostic_jeu_local()[1])
         with self.assertRaises(ValueError):
-            self.preparation.preparer(self.jeu, "0.5.85")
+            self.preparation.preparer(self.jeu, "0.5.86")
         self.assertEqual(json.loads((self.jeu / "version_url.json").read_text())["game_version"], "0.5.79")
 
     def test_ancienne_assembly_non_verifiee_rejetee(self):
@@ -89,19 +89,19 @@ class JeuLocal(unittest.TestCase):
         self.dll.write_bytes(b"ancien jeu sans pseudo")
         self.assertIsNone(self.launcher.find_game())
         with self.assertRaises(ValueError):
-            self.preparation.preparer(self.jeu, "0.5.85")
+            self.preparation.preparer(self.jeu, "0.5.86")
 
-    def test_preparation_met_version85_sans_toucher_aux_secrets(self):
+    def test_preparation_met_version86_sans_toucher_aux_secrets(self):
         self.creer_export()
         prive = {"autolog.dat": b"chiffre-recette", "auth_config.json": b'{"api_url":"http://localhost/serveur/api.php"}'}
         for name, contenu in prive.items():
             (self.jeu / name).write_bytes(contenu)
-        self.preparation.preparer(self.jeu, "0.5.85")
+        self.preparation.preparer(self.jeu, "0.5.86")
         manifest = json.loads((self.jeu / "version_url.json").read_text())
         self.assertTrue(manifest["mode_local"])
-        self.assertEqual(manifest["game_version"], "0.5.85")
+        self.assertEqual(manifest["game_version"], "0.5.86")
         self.assertEqual(manifest["game_build"]["mode"], "local")
-        self.assertEqual(json.loads((self.jeu / "etat_jeu.json").read_text())["version"], "0.5.85")
+        self.assertEqual(json.loads((self.jeu / "etat_jeu.json").read_text())["version"], "0.5.86")
         for name, contenu in prive.items():
             self.assertEqual((self.jeu / name).read_bytes(), contenu)
         self.assertNotIn("autolog", json.dumps(manifest))

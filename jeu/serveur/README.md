@@ -83,7 +83,9 @@ Les actions du jeu sont des POST formulaire ou JSON :
 - `login` : pseudo/password -> membre, personnage, session token/expires_at ;
 - `get_character` : session_token -> membre et personnage ;
 - `save_character` : session_token et profil complet -> profil enregistre ;
-- `get_npcs` : session_token -> les six profils NPC complets (lecture seule).
+- `get_npcs` : session_token -> les six profils NPC complets (lecture joueur).
+- `save_npc` : session_token, npc_id, personnage -> profils relus apres sauvegarde,
+  uniquement pour un membre dont la BDD indique exactement `droit=1`.
 
 L'identite provient de la session, jamais d'un ID/pseudo/droit fourni par le
 client. Les jetons sont 32 octets cryptographiques (256 bits), expires apres
@@ -95,7 +97,7 @@ en RAM. Aucun corps de requete, mot de passe ou jeton n'est journalise.
 
 Reponse 401 : session absente/expiree. Reponse 400 : reglage refuse. Reponse 409 :
 profil NPC absent/incomplet, a corriger dans la table `npc`. Reponse 500/503 :
-probleme serveur/BDD. Aucun endpoint ne permet au client de modifier un NPC.
+probleme serveur/BDD. Reponse 403 : edition NPC refusee pour un non-administrateur.
 Les ID humains actuels sont `maire`, `forgeron`, `marchand`, `esthetique`,
 `garde_nord`, `garde_sud`. Les tirages en BDD ne changent pas a la connexion.
 
@@ -126,7 +128,7 @@ credentials dans les diagnostics/Git.
 Flux actif : **Git -> compilation/build_launcher.bat -> jeu/LibreVies.exe**.
 Aucune publication ou copie dans un autre dossier n'est necessaire. Le marqueur
 `jeu/game/version_jeu.json` verifie l'assembly ; un ancien jeu 0.5.79 n'est jamais
-renomme artificiellement en nouvelle version. Sources actuelles : **0.5.85**.
+renomme artificiellement en nouvelle version. Sources actuelles : **0.5.86**.
 Pseudo visible en troisieme personne. Les avatars NPC utilisent le meme
 createur MakeHuman que le joueur, en conservant roots/positions/fonctions.
 
@@ -148,3 +150,32 @@ transactions et rollback sur PHP WebAssembly/SQLite de test, pas la vraie BDD.
 Les controles C# statiques ne remplacent pas un build et une verification
 visuelle Unity/Windows : verifier les six avatars, leurs poses/accessoires,
 le pseudo et la sauvegarde chez Esthetique apres compilation native.
+
+## Administration NPC (0.5.86)
+
+`droit` est retourne par PHP dans l'identite du compte puis lu par Unity.
+Le bouton et le panneau ADMIN ne sont pas affiches pour `droit=0` ou toute
+valeur autre que 1. Aucun droit n'est attribue automatiquement : si une personne
+est admin, sa colonne `membre.droit` doit etre 1, puis elle doit se reconnecter.
+Le lancement direct sans compte ne donne pas de droit admin.
+
+Les changements d'esthetique NPC utilisent le meme createur humain que le salon
+(13 sliders, sexe, peau, cheveux, tenue, chapeau et chaussures). Fermer le panel
+n'ecrit rien. VALIDER envoie `save_npc` ; PHP relit le droit en BDD a chaque
+requete, ignore les droits/ID de compte envoyes par le client et modifie seulement
+le NPC nomme et autorise. Transaction, profil relu et precision DECIMAL(10,4) ;
+`objets`/positions sont preserves. Un droit retire est refuse meme avec une
+ancienne session. Le joueur n'est pas modifie par une edition de NPC.
+
+Les acces admin aux NPC passent par une liste deroulante. La barre horizontale
+est construite depuis les villes des NPC actuellement presents et filtre leur
+liste. Le code cree actuellement un seul village : `Village de depart`. Aucun
+nom de ville fictif n'est ajoute. Creer un NPC/garde dans une autre ville peut
+renseigner son parametre `ville` et fait apparaitre ce nom dans la barre. La
+creation complete de villes et l'ajout de nouveaux IDs de NPC a la BDD restent
+un chantier separe ; cette mise a jour n'ajoute ni ville ni colonne SQL.
+
+Les hallebardes suivent le centre de la paume (poignet vers racine du majeur)
+apres l'animation et gardent l'axe vertical du garde, pas celui de son poignet.
+La reconstruction d'un avatar detache ses accessoires avant de supprimer
+l'ancienne armature, puis les rattache a la nouvelle main.

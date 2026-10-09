@@ -16,6 +16,7 @@ public sealed class LibreViesCompte
         public int id;
         public string pseudo;
         public int valider;
+        public int droit;
     }
 
     [Serializable]
@@ -49,6 +50,11 @@ public sealed class LibreViesCompte
     public string Erreur { get; private set; }
     public LibreViesNpc[] Npcs { get; private set; }
 
+    public bool EstAdministrateur
+    {
+        get { return Authentifie && Joueur.droit == 1; }
+    }
+
     public bool SessionPresente
     {
         get { return !String.IsNullOrEmpty(jeton); }
@@ -81,12 +87,22 @@ public sealed class LibreViesCompte
         yield return Envoyer("get_npcs", null);
     }
 
+    public IEnumerator SauvegarderNpc(string id, LibreViesPersonnage profil)
+    {
+        if (!EstAdministrateur)
+        {
+            Erreur = "Edition NPC reservee aux administrateurs.";
+            yield break;
+        }
+        yield return Envoyer("save_npc", profil, id);
+    }
+
     public IEnumerator Sauvegarder(LibreViesPersonnage profil)
     {
         yield return Envoyer("save_character", profil);
     }
 
-    private IEnumerator Envoyer(string action, LibreViesPersonnage profil)
+    private IEnumerator Envoyer(string action, LibreViesPersonnage profil, string idNpc = null)
     {
         Erreur = "";
         if (!SessionPresente)
@@ -97,6 +113,7 @@ public sealed class LibreViesCompte
         // Formulaire classique : evite $HTTP_RAW_POST_DATA sur PHP 5.6.
         // Seul le profil est encode en JSON pour son transport, jamais en SQL.
         string formulaire = "action=" + action + "&session_token=" + UnityWebRequest.EscapeURL(jeton);
+        if (idNpc != null) formulaire += "&npc_id=" + UnityWebRequest.EscapeURL(idNpc);
         if (profil != null)
             formulaire += "&personnage=" + UnityWebRequest.EscapeURL(JsonUtility.ToJson(profil));
         byte[] corps = Encoding.UTF8.GetBytes(formulaire);
@@ -118,6 +135,7 @@ public sealed class LibreViesCompte
             {
                 Erreur = reponse != null && !String.IsNullOrEmpty(reponse.message)
                     ? reponse.message : "Serveur inaccessible. Reessayez sans fermer le panel.";
+                if (requete.responseCode == 403 && Joueur != null) Joueur.droit = 0;
                 if (requete.responseCode == 401)
                 {
                     jeton = null;
@@ -126,7 +144,7 @@ public sealed class LibreViesCompte
                 // Ne jamais journaliser le corps POST, le jeton ou la reponse.
                 yield break;
             }
-            if (action == "get_npcs")
+            if (action == "get_npcs" || action == "save_npc")
             {
                 if (reponse.membre == null || Joueur == null || reponse.membre.id != Joueur.id
                     || reponse.npcs == null || reponse.npcs.Length != 6)
@@ -146,6 +164,7 @@ public sealed class LibreViesCompte
                     }
                 }
                 Npcs = reponse.npcs;
+                Joueur = reponse.membre;
                 yield break;
             }
             string erreurProfil = "";
