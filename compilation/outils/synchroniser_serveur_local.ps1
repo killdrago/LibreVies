@@ -93,7 +93,7 @@ if (!(Test-Path -LiteralPath $destination)) { New-Item -ItemType Directory -Path
 $nombre = 0
 # Le helper doit arriver avant l'API qui l'inclut.
 foreach ($nom in @('securite.php', 'personnage.php', 'personnage.sql', 'mettre_a_jour_personnage.sql', 'classement.sql',
-    'membre.sql', 'corriger_membre.sql', 'config.php.example', 'README.md', 'api.php')) {
+    'membre.sql', 'ajouter_droit.sql', 'corriger_membre.sql', 'config.php.example', 'README.md', 'api.php')) {
     $source = Join-Path $Sources $nom
     $cible = Join-Path $destination $nom
     if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw ('Source serveur absente : ' + $nom) }

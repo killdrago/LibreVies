@@ -181,7 +181,7 @@ touché.
 
 ### Personnage du compte et API locale
 
-La source du jeu passe à **0.5.80** pour le parcours Esthétique. Cela ne
+La source du jeu passe à **0.5.81** pour le parcours Esthétique et les correctifs du village. Cela ne
 remplace pas une ancienne build : reconstruire avec `build_launcher.bat`, puis
 publier les fichiers compilés avec le flux habituel. Le manifeste du jeu doit
 continuer à annoncer la version du binaire réellement publié, pas celle de
@@ -255,7 +255,7 @@ charge par Apache. Voir **`jeu/serveur/README.md`**, section Environnement local
 pour les limites des tests et les exigences des extensions de phpMyAdmin.
 
 Le jeu actuellement publie est **0.5.79** et son assembly ne contient pas
-encore l'affichage du pseudo. Les sources sont **0.5.80** : relancer
+encore l'affichage du pseudo. Les sources sont **0.5.81** : relancer
 **`compilation/build_launcher.bat`** (met les sources a jour puis compile),
 puis la publication qu'il propose. Modifier PHP ne met pas le jeu a jour.
 Le build Unity refuse maintenant les scripts charges obsoletes, un decalage
@@ -267,3 +267,33 @@ Apres installation du nouvel export, se connecter avec le launcher puis
 passer en **troisieme personne** : le vrai pseudo doit etre au-dessus de la tete.
 Le journal runtime contient `pseudo joueur pret` ou un diagnostic si la police
 3D manque. Aucun nouvel export natif n'a ete fabrique dans la verification Linux.
+
+## Correctifs 0.5.81 : version reellement publiee, poignees et droits
+
+Le bouton publication de `build_launcher.bat` utilise maintenant le publieur
+racine `publier_jeu_compiler.py` au lieu de l'ancien publieur d'archives vers
+`jeu/version_url.json`. Les joueurs lisent **jeucompiler**, pas cette ancienne
+archive. Le build synchronise aussi les deux fichiers du publieur racine.
+
+Unity ecrit `game/version_jeu.json` avec la version et le SHA-256 de son assembly.
+Le publieur refuse un ancien export, une empreinte incoherente ou un numero
+saisi different du binaire. Le titre du launcher indique **Launcher 4.2.1** et
+la version du jeu ; le 0.5.79 actuellement publie n'est pas renomme artificiellement.
+
+Apres mise a jour des sources, lancer `compilation/build_launcher.bat`, choisir
+la publication, puis **Analyser / Envoyer** dans le publieur jeucompiler. Un
+nouveau jeu doit afficher **0.5.81** et le pseudo en troisieme personne.
+Cette version contient aussi les poignees et le correctif de profondeur/taille
+des affiches. Aucun build Unity natif n'a ete execute dans le sandbox Linux.
+
+Importer une seule fois `jeu/serveur/ajouter_droit.sql` avant les nouvelles
+inscriptions si la colonne manque. Les trois insertions membre/personnage/
+classement restent atomiques ; `valider=0`, `droit=0`, sliders NULL a la creation.
+Le vrai `config.php`, les donnees utilisateur et l'Autolog ne sont pas distribues.
+
+Recettes ajoutees :
+
+```text
+python -B compilation/outils/test_correctifs_81.py
+python -B compilation/outils/test_entete_launcher.py
+```

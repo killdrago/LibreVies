@@ -140,7 +140,7 @@ class ContratPersonnage(unittest.TestCase):
         self.assertIn("INSERT INTO classement (id, experience, chasse, territoire)", initial)
         self.assertIn("VALUES (:id, 0, 0, 0)", initial)
         self.assertLess(initial.index("INSERT INTO classement"), initial.index("$pdo->commit()"))
-        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0)", initial)
+        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0, 0)", initial)
 
     def test_migration_ne_supprime_pas_les_profils_et_sync_preserve_config(self):
         migration = (ROOT / "jeu/serveur/mettre_a_jour_personnage.sql").read_text()

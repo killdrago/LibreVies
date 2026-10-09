@@ -45,6 +45,9 @@ class Widget:
     def destroy(self):
         pass
 
+    def title(self, text):
+        self.window_title = text
+
 
 class BooleanVar:
     def __init__(self, value=False):
@@ -177,6 +180,27 @@ class EnteteLauncher(unittest.TestCase):
         for widget in (self.app.login_pseudo, self.app.login_mdp, self.app.login_button):
             self.assertIsNotNone(widget.placement)
         self.assertIsNotNone(self.app.autolog_check.placement)
+
+    def test_titre_windows_affiche_les_deux_versions(self):
+        self.app._set_version("0.5.79")
+        self.assertEqual(self.app.window_title, "LibreVies - Launcher v4.2.1 - Jeu v0.5.79")
+        self.app._set_version("0.5.81")
+        self.assertTrue(self.app.window_title.endswith("Jeu v0.5.81"))
+        self.assertEqual(self.app.canvas.items[self.app.brand_item]["text"], "LibreVies")
+
+    def test_diagnostic_ancien_jeu_sans_pseudo(self):
+        executable = Path(self.temp.name) / "game" / "LibreViesGame.exe"
+        assembly = executable.parent / "LibreViesGame_Data/Managed/Assembly-CSharp.dll"
+        assembly.parent.mkdir(parents=True, exist_ok=True)
+        assembly.write_bytes(b"ancienne assembly 0.5.79")
+        info = self.launcher.informations_export_jeu(str(executable))
+        self.assertFalse(info["compte"])
+        self.assertEqual(info["version"], "")
+        with patch.object(self.launcher, "find_game", return_value=str(executable)), \
+                patch.object(self.launcher, "lire_etat_jeu", return_value={"version": "0.5.79"}):
+            self.app._check_game()
+        self.assertIn("sans pseudo/profil", self.app.diagnostic_ancien_jeu)
+        self.assertIn("Jeu v0.5.79", self.app.window_title)
 
     def test_copies_identiques_et_hash_de_publication_a_jour(self):
         source = (ROOT / "jeu/launcher.pyw").read_bytes()

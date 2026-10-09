@@ -1,5 +1,5 @@
 """
-LibreVies — Launcher joueur (version 4.2.0)
+LibreVies — Launcher joueur (version 4.2.1)
 
 Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
   1. il lit version_url.json dans le dossier GitHub jeucompiler ;
@@ -108,7 +108,7 @@ AUTH_TIMEOUT = 15
 CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.2.0"
+LAUNCHER_VERSION = "4.2.1"
 GAME_VERSION = "0.5.79"
 # Les fichiers publies pour les joueurs sont dans le dossier GitHub
 # jeucompiler. Une seule chaine evite toute ambiguite lors d'une edition
@@ -1079,6 +1079,32 @@ def session_compte(resultat):
     return identifiant, pseudo, jeton, expiration
 
 
+def titre_launcher(version_jeu):
+    return "LibreVies - Launcher v%s - Jeu v%s" % (LAUNCHER_VERSION, version_jeu or GAME_VERSION)
+
+
+def informations_export_jeu(executable):
+    """Lit l'export reel sans executer de DLL ni exposer la session."""
+    dossier = os.path.dirname(executable)
+    dll = os.path.join(dossier, 'LibreViesGame_Data', 'Managed', 'Assembly-CSharp.dll')
+    resultat = {'version': '', 'compte': None}
+    try:
+        with open(dll, 'rb') as flux:
+            contenu = flux.read()
+        noms = ('InitialiserPseudoJoueur', 'CreerNomJoueur', 'MettreAJourNomJoueur')
+        resultat['compte'] = all((nom + '\0').encode('ascii') in contenu for nom in noms)
+        with open(os.path.join(dossier, 'version_jeu.json'), 'r', encoding='utf-8') as flux:
+            marqueur = json.load(flux)
+        version = marqueur.get('version')
+        if (isinstance(version, str) and re.fullmatch(r'\d+\.\d+\.\d+', version)
+                and marqueur.get('assembly_sha256') == hashlib.sha256(contenu).hexdigest()
+                and version.encode('utf-16le') in contenu):
+            resultat['version'] = version
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return resultat
+
+
 def launch(path, pseudo='Joueur', session_token='', api_url=''):
     # Le pseudo est public. La session reste en RAM, dans l'environnement du
     # seul enfant : jamais dans argv, le manifeste, un fichier ou un journal.
@@ -1100,7 +1126,7 @@ def launch(path, pseudo='Joueur', session_token='', api_url=''):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LibreVies")
+        self.title(titre_launcher(load_local_config().get('game_version') or GAME_VERSION))
         self.geometry("1024x768")
         self.resizable(False, False)
         self.configure(bg=BG)
@@ -1124,6 +1150,7 @@ class App(tk.Tk):
         self.connected_api_url = ''
         self.auth_message = ""
         self.derniere_raison = ""
+        self.diagnostic_ancien_jeu = ""
         self._ui_queue = []
         self._ui_queue_lock = threading.Lock()
         self.autolog = migrate_legacy_autolog()
@@ -1677,11 +1704,10 @@ class App(tk.Tk):
         threading.Thread(target=self._run_update, daemon=True).start()
 
     def _set_version(self, version):
-        # La version reste dans le manifeste mais n'est plus affichee dans
-        # l'en-tete : cela laisse la place aux controles de connexion.
+        # Version dans le cadre Windows, sans prendre la place de la connexion.
         try:
             self.canvas.itemconfig(self.brand_item, text="LibreVies")
-            self.title("LibreVies")
+            self.title(titre_launcher(version))
         except Exception:
             pass
 
@@ -1794,6 +1820,13 @@ class App(tk.Tk):
     def _check_game(self):
         self.game = find_game()
         self.ready = bool(self.game)
+        self.diagnostic_ancien_jeu = ""
+        if self.game:
+            informations = informations_export_jeu(self.game)
+            version = informations['version'] or lire_etat_jeu().get('version') or load_local_config().get('game_version') or GAME_VERSION
+            self._set_version(version)
+            if informations['compte'] is False:
+                self.diagnostic_ancien_jeu = 'Jeu v%s sans pseudo/profil : nouvel export Unity a publier' % version
         self._update_play_state()
         if not self.game and self.updates_done:
             self._upd_bar(0, self.derniere_raison
@@ -1803,7 +1836,7 @@ class App(tk.Tk):
         autorise = bool(self.updates_done and self.authenticated and self.session_token and self.game)
         if autorise:
             self.play_btn.config(state='normal', bg=GREEN)
-            self._upd_bar(100, 'Pret ! Cliquez sur JOUER')
+            self._upd_bar(100, getattr(self, 'diagnostic_ancien_jeu', '') or 'Pret ! Cliquez sur JOUER')
             return
         self.play_btn.config(state='disabled', bg='#444444')
         if not self.updates_done:

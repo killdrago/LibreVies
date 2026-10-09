@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.80";
+    private const string VersionJeu = "0.5.81";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -512,6 +512,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public Transform Maison;
         public Transform Panneau;
         public TextMesh Texte;
+        public Material MateriauTexte;
         public GameObject Soulignement;
         public string Libelle;
         public Color Couleur;
@@ -2776,6 +2777,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Renderer renduPorte = vantailPorte.GetComponent<Renderer>();
         if (renduPorte != null)
             renduPorte.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        CreerPoigneesPorte(pivotPorte);
         batiment.PorteRoot = pivotPorte;
         batiment.PorteLargeur = 1.2f;
         batiment.PorteHauteur = HauteurPorteConfortable;
@@ -2791,6 +2793,23 @@ public sealed class LibreViesGame : MonoBehaviour
         ActualiserOuverturePorteVisuelle(batiment);
         CreerAfficheMaison(root, size, name);
         CollerOuverturesEtPancarteAuMur(batiment);
+    }
+
+    private void CreerPoigneesPorte(Transform pivot)
+    {
+        // Deux bequilles, pres du bord libre du vantail, jamais sur la charniere.
+        // Enfants du pivot : elles suivent la porte lors de l'ouverture/edition.
+        Transform poignees = new GameObject("Poignees_Porte").transform;
+        poignees.SetParent(pivot, false);
+        for (int face = -1; face <= 1; face += 2)
+        {
+            Box(new Vector3(1.03f, -0.22f, face * 0.075f),
+                new Vector3(0.07f, 0.17f, 0.025f), "MetalAluminium", poignees, "Rosace_Poignee");
+            Box(new Vector3(1.03f, -0.22f, face * 0.105f),
+                new Vector3(0.035f, 0.035f, 0.045f), "MetalAluminium", poignees, "Axe_Poignee");
+            Box(new Vector3(0.95f, -0.22f, face * 0.13f),
+                new Vector3(0.18f, 0.045f, 0.045f), "MetalAluminium", poignees, "Poignee_Porte");
+        }
     }
 
     private bool TryTrouverCoteRedimensionnement(ElementEdition element, out int cote)
@@ -3776,6 +3795,16 @@ public sealed class LibreViesGame : MonoBehaviour
             };
             AppliquerTaillePancarte(facade);
             AppliquerStylePancarte(facade);
+            Shader shaderTexte = Resources.Load<Shader>("LVShaders/LVFacadeText");
+            Renderer renduTexte = texte.GetComponent<Renderer>();
+            if (shaderTexte != null && renduTexte != null && facade.Texte.font != null)
+            {
+                facade.MateriauTexte = new Material(shaderTexte);
+                facade.MateriauTexte.mainTexture = facade.Texte.font.material.mainTexture;
+                renduTexte.sharedMaterial = facade.MateriauTexte;
+            }
+            else Debug.LogWarning("[LV] Shader de facade absent : recompilez avec LVFacadeText.");
+            AjusterTexteDansPanneau(facade);
             textesFacades.Add(facade);
         }
     }
@@ -3803,6 +3832,27 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         MettreAJourSoulignement(facade);
+    }
+
+    private void AjusterTexteDansPanneau(FacadeTextState facade)
+    {
+        if (facade == null || facade.Root == null || facade.Panneau == null) return;
+        Renderer rendu = facade.Root.GetComponent<Renderer>();
+        if (rendu == null) return;
+        Vector3 texte = rendu.localBounds.size;
+        float disponibleX = Mathf.Max(0.10f, facade.LargeurPanneau - 0.24f);
+        float disponibleY = Mathf.Max(0.10f, facade.HauteurPanneau - 0.12f);
+        float facteur = Mathf.Min(1f,
+            disponibleX / Mathf.Max(texte.x, 0.001f),
+            disponibleY / Mathf.Max(texte.y, 0.001f));
+        // La taille choisie en EDITION est conservee ; seul le rendu est borne
+        // au panneau. Une ancienne valeur excessive ne deborde plus ailleurs.
+        facade.Root.transform.localScale = new Vector3(
+            facteur / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.x), 0.001f),
+            facteur / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.y), 0.001f),
+            facteur / Mathf.Max(Mathf.Abs(facade.Panneau.localScale.z), 0.001f));
+        if (facade.MateriauTexte != null && facade.Texte != null && facade.Texte.font != null)
+            facade.MateriauTexte.mainTexture = facade.Texte.font.material.mainTexture;
     }
 
     private void ModifierTaillePancarte(FacadeTextState facade, bool hauteur, bool agrandir)
@@ -6145,6 +6195,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             Renderer rendu = affiche.Root.GetComponent<Renderer>();
             if (rendu == null) continue;
+            AjusterTexteDansPanneau(affiche);
             affiche.Position = affiche.Root.transform.position;
             Transform parentFacade = affiche.Maison != null
                 ? affiche.Maison : affiche.Root.transform.parent;

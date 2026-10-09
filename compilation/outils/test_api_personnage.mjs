@@ -52,7 +52,7 @@ const initialization = `<?php
 $pdo = new PDO('sqlite:/tests/test.sqlite');
 $pdo->exec('CREATE TABLE membre (id INTEGER PRIMARY KEY AUTOINCREMENT,
  pseudo TEXT COLLATE NOCASE NOT NULL UNIQUE, motdepasse TEXT NOT NULL,
- email TEXT COLLATE NOCASE NOT NULL UNIQUE, valider INTEGER NOT NULL DEFAULT 0)');
+ email TEXT COLLATE NOCASE NOT NULL UNIQUE, valider INTEGER NOT NULL DEFAULT 0, droit INTEGER NOT NULL DEFAULT 0)');
 $pdo->exec('CREATE TABLE personnage (id INTEGER PRIMARY KEY REFERENCES membre(id),
  \`default\` INTEGER NOT NULL DEFAULT 1, sexe TEXT NULL,
  ${sliders.map(name => name + ' DECIMAL(10,4) NULL').join(', ')},
@@ -97,13 +97,16 @@ const classement = async id => {
     return result;
 };
 const password = 'motdepasse-de-recette-184!';
-const a = await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password });
+const a = await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password, droit: 255 });
 const b = await request('register', { email: 'bob@example.test', pseudo: 'Bob Test', password });
 const idA = a.membre.id, idB = b.membre.id;
 const initial = await row(idA);
 assert.equal(initial.default, 1);
 assert(Object.entries(initial).every(([key, value]) => key === 'id' || key === 'default' || value === null));
 assert.equal(Number(await sql(`echo json_encode($pdo->query('SELECT valider FROM membre WHERE id=${idA}')->fetchColumn());`)), 0);
+assert.equal(Number(await sql(`echo json_encode($pdo->query('SELECT droit FROM membre WHERE id=${idA}')->fetchColumn());`)), 0);
+assert.equal(Number(await sql(`echo json_encode($pdo->query('SELECT droit FROM membre WHERE id=${idB}')->fetchColumn());`)), 0);
+console.log('OK droit=0 impose par le serveur meme si le client envoie 255');
 assert.deepEqual(await classement(idA), { id: idA, experience: 0, chasse: 0, territoire: 0 });
 assert.deepEqual(await classement(idB), { id: idB, experience: 0, chasse: 0, territoire: 0 });
 await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password }, 409);

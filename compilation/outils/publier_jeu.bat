@@ -1,39 +1,23 @@
 @echo off
 setlocal EnableExtensions
-rem ============================================================
-rem  Publie la compilation du jeu pour tous les joueurs.
-rem
-rem  A lancer APRES build_launcher.bat (qui a rempli jeu\game).
-rem  Double-clic : version et notes sont demandees.
-rem ============================================================
-set "OUTILS=%~dp0"
-set "RACINE=%OUTILS%..\.."
-set "JEU=%RACINE%\jeu\game"
-set "EXE=%RACINE%\jeu\LibreVies.exe"
-
-if not exist "%JEU%" (
-    echo ERREUR : %JEU% est absent.
-    echo Lance d'abord compilation\build_launcher.bat : il exporte le jeu
-    echo justement dans ce dossier.
+rem Le launcher lit jeucompiler : ne plus publier l'ancien manifeste jeu en archive.
+set "RACINE=%~dp0..\.."
+if not exist "%RACINE%\jeu\game\version_jeu.json" (
+    echo ERREUR : export Unity verifie absent.
+    echo Relance compilation\build_launcher.bat avant de publier.
     pause
     exit /b 1
 )
-
-set "VERSION=%~1"
-if not defined VERSION set /p VERSION=Version du jeu a publier (ex. 0.5.0) :
-set "NOTES=%~2"
-if not defined NOTES set /p NOTES=Notes affichees dans le launcher (Entree = garder) :
-
-set "ARGS=--jeu "%JEU%" --version "%VERSION%""
-if defined NOTES set "ARGS=%ARGS% --notes "%NOTES%""
-if exist "%EXE%" set "ARGS=%ARGS% --exe "%EXE%""
-
-python "%OUTILS%publier_jeu.py" %ARGS% --pousser
+if not exist "%RACINE%\publier_jeu_compiler.py" (
+    echo ERREUR : publieur jeucompiler absent. Mets le projet a jour.
+    pause
+    exit /b 1
+)
+cd /d "%RACINE%"
+python "%RACINE%\publier_jeu_compiler.py"
 if errorlevel 1 (
-    echo.
-    echo La publication a echoue. Rien n'est perdu : relance le script.
+    echo ERREUR : publication jeucompiler interrompue.
     pause
     exit /b 1
 )
-echo.
-pause
+exit /b 0

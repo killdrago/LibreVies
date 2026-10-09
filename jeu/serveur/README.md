@@ -29,6 +29,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File compilation\outils\synchroni
 Les fichiers à utiliser pour la base sont ceux du **projet** :
 
 - `jeu/serveur/membre.sql` : création d'une nouvelle table `membre` ;
+- `jeu/serveur/ajouter_droit.sql` : ajout de `membre.droit` aux bases existantes
+  (une seule fois si la colonne n'existe pas). `TINYINT UNSIGNED NOT NULL DEFAULT 0`
+  initialise les anciens comptes a zero sans modifier leurs autres donnees ;
 - `jeu/serveur/corriger_membre.sql` : correction des types d'une ancienne table ;
 - `jeu/serveur/personnage.sql` : création de la table nullable actuelle ;
 - `jeu/serveur/classement.sql` : table `classement` liee au meme ID de membre,
@@ -45,7 +48,7 @@ la migration est nécessaire si ses champs sont encore `NOT NULL`.
 
 ## Parcours du joueur
 
-1. **Inscription** : création de `membre` avec `valider=0` et, dans la même
+1. **Inscription** : création de `membre` avec `valider=0` et `droit=0` et, dans la même
    transaction, de `personnage` avec le même `id` et `default=1`, puis de
    `classement` avec cet ID et `experience=0`, `chasse=0`, `territoire=0`.
    Tous les autres champs du personnage restent **NULL**, y compris `sexe`.
@@ -201,7 +204,7 @@ celle de PHP ne recompilent pas l'assembly Unity.
 
 Lancer **`compilation/build_launcher.bat`** pour recuperer les sources et
 reconstruire le jeu, puis utiliser la publication proposee par ce build.
-Le jeu doit afficher **0.5.80** au lancement. Le pseudo canonique vient de
+Le jeu doit afficher **0.5.81** au lancement. Le pseudo canonique vient de
 l'API ; il est visible au-dessus de la tete **en troisieme personne**, pas
 pendant la mort ou en vue a la premiere personne.
 
@@ -241,3 +244,36 @@ avec le même aspect, édition du profil existant, pseudo en troisième personne
 absence du créateur dans ADMIN et erreur visible si l'API est coupée.
 Les modifications des sources ne mettent pas à jour un ancien exécutable Unity :
 il faut reconstruire puis publier le jeu avec le flux de compilation existant.
+
+## Droits de compte et nouvelle publication
+
+Pour la base existante, avant de tester une nouvelle inscription :
+
+```sql
+ALTER TABLE membre
+  ADD COLUMN droit TINYINT UNSIGNED NOT NULL DEFAULT 0;
+```
+
+A executer uniquement si la colonne n'existe pas encore. Le serveur impose
+`droit=0` a l'inscription, meme si le client envoie une autre valeur. Cette
+colonne est reservee aux droits futurs : aucune elevation depuis le launcher,
+aucun changement de l'ADMIN du jeu ni blocage email n'est introduit ici.
+
+Le launcher **4.2.1** affiche sa version et celle du jeu dans le titre Windows.
+Un ancien binaire sans affichage du pseudo est signale sans empecher de jouer.
+
+Le build de **0.5.81** ajoute les poignees sur les deux faces des portes et
+borne chaque libelle a sa pancarte. Le shader des libelles de facade teste
+la profondeur : ENTREPOT ne se dessine plus par-dessus Esthetique.
+Les ressources MakeHuman et les coordonnees du village restent intactes.
+
+Le bouton de publication lance maintenant **`publier_jeu_compiler.py`**, car
+c'est `jeucompiler/version_url.json` que lisent les joueurs. Le publieur prend
+la version dans **`game/version_jeu.json`**, genere par Unity apres validation,
+et verifie son SHA-256 d'assembly. Il ne reprend plus 0.5.79 depuis un ancien
+manifeste. Les sources du publieur racine sont aussi mises a jour par le build.
+
+Sans Unity Windows ici, les binaires publies restent **0.5.79** : ni les
+poignees ni le pseudo ne peuvent apparaitre dans cet ancien executable. La
+compilation et sa publication dans jeucompiler doivent encore etre lancees
+sur le PC de compilation. Le SQL n'est jamais importe automatiquement.

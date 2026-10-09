@@ -40,7 +40,7 @@ TEXT_EXTS = {
 }
 IGNORER_NOMS = {
     "__pycache__", ".git", "Library", "Temp", "Logs", "obj", "Build",
-    "build", "game.install", "game.ancien", "sauvegarde_locale", "logs", "Logs"
+    "build", "game.install", "game.ancien", "sauvegarde_locale", "logs", "Logs", "journaux"
 }
 IGNORER_SUFFIXES = (".download", ".download.part", ".new", ".part", ".tmp")
 FICHIERS_LOCAUX_PRESERVES = {"auth_config.json"}
@@ -309,7 +309,7 @@ def fichiers_source(source: Path) -> dict[str, Path]:
         relatif = chemin.relative_to(source).as_posix()
         # Ces fichiers appartiennent a la machine de compilation et ne doivent
         # jamais etre distribues aux joueurs.
-        if (relatif in {"version_url.json", "etat_jeu.json", "auth_config.json"}
+        if (relatif in {"version_url.json", "etat_jeu.json", "auth_config.json", "autolog.dat", "autolog.json"}
                 or relatif == "serveur" or relatif.startswith("serveur/")):
             # Le package d'hebergement reste dans jeu/serveur ; il ne doit
             # pas etre recopie dans la distribution du joueur.
@@ -321,11 +321,26 @@ def fichiers_source(source: Path) -> dict[str, Path]:
 
 
 def lire_version_source(source: Path) -> str:
+    """Version de l'export, jamais celle d'un ancien manifeste du launcher."""
+    marqueur = source / "game" / "version_jeu.json"
+    assembly = source / "game" / "LibreViesGame_Data" / "Managed" / "Assembly-CSharp.dll"
     try:
-        donnees = json.loads((source / "version_url.json").read_text(encoding="utf-8"))
-        return str(donnees.get("game_version") or "0.0.0")
-    except (OSError, ValueError, TypeError):
-        return "0.0.0"
+        informations = json.loads(marqueur.read_text(encoding="utf-8"))
+        version = informations['version']
+        digest = informations['assembly_sha256']
+        contenu = assembly.read_bytes()
+    except (OSError, ValueError, KeyError, TypeError) as erreur:
+        raise PublicationError("Export Unity non verifie. Relance compilation/build_launcher.bat : "
+                               "game/version_jeu.json et son assembly sont necessaires.") from erreur
+    if (not isinstance(version, str) or re.fullmatch(r'\d+\.\d+\.\d+', version) is None
+            or not isinstance(digest, str) or hashlib.sha256(contenu).hexdigest() != digest):
+        raise PublicationError("Version/empreinte d'export invalide : ne pas publier un ancien jeu renomme.")
+    noms = ('InitialiserPseudoJoueur', 'CreerNomJoueur', 'MettreAJourNomJoueur',
+            'LibreViesCompte', 'LibreViesPersonnage', 'CreerPoigneesPorte', 'AjusterTexteDansPanneau')
+    if (version.encode('utf-16le') not in contenu
+            or any((nom + '\0').encode('ascii') not in contenu for nom in noms)):
+        raise PublicationError("Assembly obsolete : version ou fonctionnalites du compte/pseudo absentes.")
+    return version
 
 
 def lire_version_launcher(source: Path) -> str:
@@ -347,6 +362,10 @@ def trouver_executable(source_files: dict[str, Path]) -> tuple[str, Path] | tupl
 def construire_manifeste(source: Path, depot: str, branche: str,
                          dossier_distant: str, version: str, notes: str,
                          files: dict[str, Path]) -> bytes:
+    version_export = lire_version_source(source)
+    if version != version_export:
+        raise PublicationError("Version demandee %s differente de l'export %s."
+                               % (version, version_export))
     infos: dict[str, dict[str, object]] = {}
     game_hashes: list[str] = []
     exe_rel, _ = trouver_executable(files)
@@ -484,7 +503,11 @@ class App(tk.Tk):
         self.depot_var = tk.StringVar(value=depot_github())
         self.branche_var = tk.StringVar(value=branche_courante())
         self.distant_var = tk.StringVar(value=DOSSIER_DISTANT_DEFAUT)
-        self.version_var = tk.StringVar(value=lire_version_source(SOURCE_DEFAUT))
+        try:
+            version_locale = lire_version_source(SOURCE_DEFAUT)
+        except PublicationError:
+            version_locale = ""  # L'analyse affichera le diagnostic, pas un crash au lancement.
+        self.version_var = tk.StringVar(value=version_locale)
         self.notes_var = tk.StringVar(value="")
         self.limite_var = tk.StringVar(value="50")
         self.tout_var = tk.BooleanVar(value=False)
@@ -535,7 +558,11 @@ class App(tk.Tk):
         chemin = filedialog.askdirectory(initialdir=self.source_var.get())
         if chemin:
             self.source_var.set(chemin)
-            self.version_var.set(lire_version_source(Path(chemin)))
+            try:
+                self.version_var.set(lire_version_source(Path(chemin)))
+            except PublicationError as erreur:
+                self.version_var.set("")
+                messagebox.showerror("Export Unity a refaire", str(erreur))
 
     def _choisir_cible(self):
         chemin = filedialog.askdirectory(initialdir=self.cible_var.get())
@@ -559,7 +586,8 @@ class App(tk.Tk):
             self.depot_var.set(depot)
             self.branche_var.set(branche)
             self.distant_var.set(distant)
-            version = self.version_var.get().strip()
+            version = lire_version_source(source)
+            self.version_var.set(version)
             if not depot or not branche or not distant or not version:
                 raise PublicationError("Depot, branche, dossier distant et version sont obligatoires.")
             files = fichiers_source(source)
@@ -655,6 +683,9 @@ class App(tk.Tk):
 
     def _envoyer_thread(self, racine_git: Path, cible: Path):
         try:
+            source_locale = Path(self.source_var.get()).expanduser().resolve()
+            if lire_version_source(source_locale) != json.loads(self.manifeste)['game_version']:
+                raise PublicationError("Le build a change apres analyse : recommence l'analyse.")
             total = len(self.lots)
             cible.mkdir(parents=True, exist_ok=True)
             for numero, lot in enumerate(self.lots, 1):
@@ -673,6 +704,8 @@ class App(tk.Tk):
                             chemin.write_bytes(self.manifeste)
                         else:
                             assert operation.source is not None
+                            if hash_fichier(operation.source) != operation.hash_source:
+                                raise PublicationError("Fichier modifie apres analyse : " + operation.relatif)
                             shutil.copy2(operation.source, chemin)
                     chemins_git = [str((cible / operation.relatif).relative_to(racine_git))
                                    for operation in lot]

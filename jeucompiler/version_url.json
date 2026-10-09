@@ -1,5 +1,5 @@
 {
-  "launcher_version": "4.2.0",
+  "launcher_version": "4.2.1",
   "game_version": "0.5.79",
   "notes": "",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeucompiler",
@@ -382,8 +382,8 @@
       "size": 1482784
     },
     "launcher.pyw": {
-      "hash": "bd82769f0a5b7fff2901aaaa5ffc2865",
-      "size": 679600
+      "hash": "461cedf7d511e5207cc595926305c131",
+      "size": 681381
     },
     "personnage/D3D12/D3D12Core.dll": {
       "hash": "8bed03240b764906c937c0d6ccd560ac",

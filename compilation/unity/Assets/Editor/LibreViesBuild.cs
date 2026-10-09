@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -36,6 +37,7 @@ public static class LibreViesBuild
         if (report.summary.result != BuildResult.Succeeded)
             throw new Exception("La build Unity a échoué : " + report.summary.result);
         VerifierExport(output, versionAttendue);
+        EcrireVersionExport(output, versionAttendue);
         Debug.Log("LibreVies Unity exporté et verifie : v" + versionAttendue + " - " + output);
     }
 
@@ -64,12 +66,30 @@ public static class LibreViesBuild
         if (!Contient(contenu, Encoding.Unicode.GetBytes(version)))
             throw new Exception("Export Unity obsolete : la version " + version + " est absente du binaire.");
         foreach (string nom in new[] { "InitialiserPseudoJoueur", "CreerNomJoueur", "MettreAJourNomJoueur",
-            "LibreViesCompte", "LibreViesPersonnage" })
+            "LibreViesCompte", "LibreViesPersonnage", "CreerPoigneesPorte", "AjusterTexteDansPanneau" })
         {
             if (!Contient(contenu, Encoding.ASCII.GetBytes(nom + "\0")))
                 throw new Exception("Export Unity incomplet : " + nom
                     + " est absent. Le pseudo et le profil du compte ne seraient pas disponibles en jeu.");
         }
+    }
+
+    [Serializable]
+    private sealed class VersionExport
+    {
+        public string version;
+        public string assembly_sha256;
+    }
+
+    private static void EcrireVersionExport(string executable, string version)
+    {
+        string dossier = Path.GetDirectoryName(executable);
+        string dll = Path.Combine(dossier, Path.GetFileNameWithoutExtension(executable) + "_Data/Managed/Assembly-CSharp.dll");
+        string hash;
+        using (SHA256 sha = SHA256.Create())
+            hash = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(dll))).Replace("-", "").ToLowerInvariant();
+        VersionExport informations = new VersionExport { version = version, assembly_sha256 = hash };
+        File.WriteAllText(Path.Combine(dossier, "version_jeu.json"), JsonUtility.ToJson(informations, true));
     }
 
     private static bool Contient(byte[] contenu, byte[] cherche)

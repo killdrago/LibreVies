@@ -19,6 +19,12 @@ function Get-GitBlobSha([string] $path) {
 
 function Get-LocalPath([string] $remote) {
     $barre = $remote.Replace('/', '\')
+    # Ces deux fichiers sont a la racine du projet, pas dans compilation.
+    # Le build doit aussi mettre le vrai publieur jeucompiler a jour.
+    if ($remote -in @('publier_jeu_compiler.py', 'publier_jeu_compiler.bat')) {
+        $racineProjet = Split-Path -Parent ($env:LV_ROOT.TrimEnd([char[]]'\/'))
+        return Join-Path $racineProjet $remote
+    }
     if ($barre.StartsWith('compilation\')) {
         return Join-Path $env:LV_ROOT $barre.Substring(12)
     }
@@ -29,6 +35,7 @@ function Get-LocalPath([string] $remote) {
 }
 
 function Est-Source([string] $remote) {
+    if ($remote -in @('publier_jeu_compiler.py', 'publier_jeu_compiler.bat')) { return $true }
     $p = $remote.Replace('/', '\')
     if (!($p.StartsWith('compilation\') -or $p.StartsWith('jeu\'))) { return $false }
     foreach ($ignore in @('\image\', '\Library\', '\Temp\', '\Logs\', '\obj\', '\Build\', '\build\', '\game\', '\game.ancien\', '\game.install\')) {
