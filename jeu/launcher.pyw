@@ -109,7 +109,7 @@ ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
 LAUNCHER_VERSION = "4.2.2"
 GAME_VERSION = "0.5.79"  # Ancienne version distribuee, jamais un numero invente pour le binaire.
-LOCAL_GAME_VERSION = "0.5.82"
+LOCAL_GAME_VERSION = "0.5.83"
 # Travail courant : dossier jeu uniquement. En mode local, aucun fichier
 # compile distant ne peut remplacer l'export de compilation.
 DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"

@@ -2,7 +2,9 @@
 
 ## Flux actuel (remplace les anciens paragraphes de publication ci-dessous)
 
-On travaille uniquement dans **`jeu`**. Le transfert vers un dossier de
+Le fonctionnement est simplement **Git -> build -> `jeu`** : je pousse les
+sources, le build les telecharge et compile sur ton PC. On travaille
+uniquement dans **`jeu`**. Le transfert vers un dossier de
 distribution/serveur sera fait manuellement plus tard : le build ne lance
 aucun publieur et ne synchronise plus les outils de publication de la racine.
 
@@ -10,7 +12,7 @@ aucun publieur et ne synchronise plus les outils de publication de la racine.
 2. Lancer **`compilation/build_launcher.bat`** pour mettre les sources a jour
    et compiler Unity.
 3. Ouvrir **`jeu/LibreVies.exe`** dans CE dossier, puis se connecter.
-4. Le titre doit afficher **Launcher 4.2.2 — Jeu 0.5.82** apres un build valide.
+4. Le titre doit afficher **Launcher 4.2.2 — Jeu 0.5.83** apres un build valide.
 
 `jeu/version_url.json` contient `mode_local: true`. Dans ce mode, le launcher
 n'appelle aucun serveur de distribution, ne telecharge aucune ancienne
@@ -24,9 +26,10 @@ local. Une ancienne 0.5.79, un export incomplet ou un marqueur incoherent ne
 peuvent pas etre presentes comme une compilation actuelle. Un build echoue
 n'active pas silencieusement l'ancien jeu.
 
-La version **0.5.82** garde le pseudo du compte au-dessus de la tete en vue
-**troisieme personne**. Les poignees sont maintenant des boutons ronds blancs,
-a gauche a 14 cm du bord, a mi-hauteur ; diametre 11,22 cm, correspondant a la
+La version **0.5.83** garde le pseudo du compte au-dessus de la tete en vue
+**troisieme personne**, remonte de 20 cm et affiche a un quart de sa taille
+precedente. Les poignees sont maintenant des boutons ronds blancs,
+a droite a 14 cm du bord, a mi-hauteur ; diametre 11,22 cm, correspondant a la
 hauteur du nez du maire (maillage importe de 11 cm, echelle PNJ 1,02).
 Le sens d'ouverture, les maisons et les ressources du personnage ne changent pas.
 
@@ -41,7 +44,7 @@ python -B compilation/outils/test_entete_launcher.py
 ```
 
 Les executables Windows ne sont pas fabriques dans le sandbox Linux. La
-version 0.5.82 indiquee ici est celle des sources a compiler, pas un binaire
+version 0.5.83 indiquee ici est celle des sources a compiler, pas un binaire
 qui aurait ete renomme. Aucun changement de PHP/MySQL n'est necessaire ici.
 
 ---

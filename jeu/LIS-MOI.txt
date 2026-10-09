@@ -4,11 +4,11 @@ ESSAIS LOCAUX — DOSSIER JEU UNIQUEMENT
 2. Lancer compilation\build_launcher.bat pour mettre les sources a jour et compiler.
 3. Ouvrir jeu\LibreVies.exe, se connecter puis cliquer JOUER.
 
-Apres le nouveau build : Launcher 4.2.2 / jeu 0.5.82.
+Apres le nouveau build : Launcher 4.2.2 / jeu 0.5.83.
 Le launcher ne telecharge pas de binaire distant en mode local.
 Une ancienne assembly 0.5.79 est refusee plutot que presentee comme la nouvelle.
-Le pseudo est au-dessus de la tete en troisieme personne.
-Poignees : rond blanc a gauche, mi-hauteur, de la taille du nez du maire.
+Le pseudo est au-dessus de la tete en troisieme personne : +20 cm, taille /4.
+Poignees : rond blanc a droite, mi-hauteur, de la taille du nez du maire.
 
 Aucune publication ni copie dans un autre dossier n'est necessaire pour tester.
 Le deplacement vers un serveur de distribution sera fait manuellement plus tard.

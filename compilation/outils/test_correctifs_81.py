@@ -117,7 +117,7 @@ class Monde(unittest.TestCase):
         self.assertIn('"Poignee_Ronde_Blanche"', construction)
         self.assertIn('"White"', construction)
         self.assertIn("PrimitiveType.Sphere", construction)
-        self.assertIn("new Vector3(0.14f, 0f", construction)
+        self.assertIn("new Vector3(1.06f, 0f", construction)
         self.assertNotIn("collider: true", construction)
 
     def test_shader_affiche_teste_la_profondeur(self):

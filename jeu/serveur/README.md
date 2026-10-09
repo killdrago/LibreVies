@@ -6,7 +6,7 @@ est en mode local (`mode_local: true`) et ne remplace pas `jeu/game` par une
 ancienne version distante. La connexion PHP, les sessions, le personnage,
 `droit=0` et l'Autolog continuent de fonctionner comme avant.
 
-Les sources sont en **0.5.82**. Le build verifie l'assembly puis prepare
+Les sources sont en **0.5.83**. Le build verifie l'assembly puis prepare
 `jeu/version_url.json` et l'etat local avec la version reelle. Le pseudo est
 visible en troisieme personne sur ce nouvel export ; il n'est pas ajoute a
 un ancien executable 0.5.79 simplement en changeant un numero de manifeste.
