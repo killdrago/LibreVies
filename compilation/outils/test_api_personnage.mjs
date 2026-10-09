@@ -31,6 +31,9 @@ const securiteResult = await php.run({ scriptPath: '/outils/test_securite.php' }
 assert.equal(securiteResult.exitCode, 0, securiteResult.text + securiteResult.errors);
 assert(!securiteResult.text.includes('Fatal error'), securiteResult.text);
 console.log(securiteResult.text.trim());
+const moteur = await php.run({ code: '<?php echo PHP_VERSION;' });
+assert.equal(moteur.exitCode, 0, moteur.errors);
+console.log('Moteur de recette : PHP ' + moteur.text);
 const sliders = ['tete', 'yeux', 'nez', 'bouche', 'oreilles', 'seins', 'volume',
     'hanche', 'ventre', 'largeur_bras', 'longueur_bras', 'hauteur_jambe', 'pieds'];
 const source = name => readFileSync(join(root, 'jeu/serveur', name), 'utf8');
@@ -63,7 +66,7 @@ assert.equal((await php.run({ code: initialization })).text, 'OK');
 
 const request = async (action, data = {}, status = 200, json = false) => {
     const params = { action, ...data };
-    const bootstrap = `<?php ini_set('session.save_path', '/tests/sessions'); require '/tests/serveur/api.php';`;
+    const bootstrap = `<?php error_reporting(E_ALL); ini_set('display_errors', '1'); ini_set('session.save_path', '/tests/sessions'); require '/tests/serveur/api.php';`;
     php.writeFile('/tests/request.php', bootstrap);
     const response = await php.run({
         scriptPath: '/tests/request.php', method: 'POST', relativeUri: '/serveur/api.php',
@@ -72,6 +75,7 @@ const request = async (action, data = {}, status = 200, json = false) => {
     });
     assert.equal(response.httpStatusCode, status, response.text + '\n' + response.errors);
     assert.equal(response.exitCode, 0, response.errors);
+    assert(!/(Warning|Deprecated|Fatal error|Notice):/.test(response.text + response.errors), response.text + response.errors);
     const body = response.json;
     assert.equal(body.ok, status === 200, response.text);
     return body;

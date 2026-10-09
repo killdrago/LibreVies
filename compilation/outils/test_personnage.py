@@ -99,12 +99,30 @@ class ContratPersonnage(unittest.TestCase):
         self.assertIn("pseudoJoueur", nom)
         self.assertIn("richText = false", nom)
         self.assertIn("Quaternion.LookRotation", nom)
+        self.assertIn("Quaternion.Euler(0f, 180f, 0f)", nom)
+        self.assertIn("MettreAJourNomJoueur();", nom)
+        self.assertIn("police 3D absente", nom)
         self.assertIn("!firstPerson && !dead", nom)
         self.assertIn("rendu.bounds.max.y", nom)
         fenetre = section(GAME, "void DessinerCreationPersonnage()", "void DessinerLigneCage(")
         self.assertIn("GUI.matrix", fenetre)
         self.assertIn("Screen.width", fenetre)
         self.assertIn("Screen.height", fenetre)
+
+    def test_export_controle_version_et_fonctions_du_compte(self):
+        editeur = (ROOT / "compilation/unity/Assets/Editor/LibreViesBuild.cs").read_text()
+        self.assertLess(editeur.index("VerifierVersionSources();"), editeur.index("BuildPipeline.BuildPlayer"))
+        self.assertLess(editeur.index("VerifierExport(output, versionAttendue)"),
+                        editeur.index('Debug.Log("LibreVies Unity export'))
+        self.assertIn("GetRawConstantValue()", editeur)
+        self.assertIn("PlayerSettings.bundleVersion != attendue", editeur)
+        self.assertIn("Encoding.Unicode.GetBytes(version)", editeur)
+        self.assertIn("Assembly-CSharp.dll", editeur)
+        for nom in ("InitialiserPseudoJoueur", "CreerNomJoueur", "MettreAJourNomJoueur",
+                    "LibreViesCompte", "LibreViesPersonnage"):
+            self.assertIn('"' + nom + '"', editeur)
+        self.assertIn('nom + "\\0"', editeur)
+        # Ce test est statique ; la compilation Unity doit encore etre faite sous Windows.
 
     def test_enregistrement_serveur_protege(self):
         actions = section(API, "if ($action === 'get_character'", "if ($action === 'login')")

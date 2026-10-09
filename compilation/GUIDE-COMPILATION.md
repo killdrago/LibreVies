@@ -246,3 +246,24 @@ ni la compilation Unity ni les contrôles visuels et MySQL locaux.
   coupé au milieu par une nouvelle publication.
 * L'archive publiée est un `.zip` dont les fichiers sont **à la racine** : le
   launcher la dézippe directement dans `game\`.
+
+## PHP 8.3.3 / phpMyAdmin 5.2.3 / Apache 2.4.43 et pseudo en jeu
+
+Le code serveur est compatible avec cette pile pour les essais locaux,
+sous reserve de `pdo_mysql`, des sessions inscriptibles et du bon module PHP
+charge par Apache. Voir **`jeu/serveur/README.md`**, section Environnement local,
+pour les limites des tests et les exigences des extensions de phpMyAdmin.
+
+Le jeu actuellement publie est **0.5.79** et son assembly ne contient pas
+encore l'affichage du pseudo. Les sources sont **0.5.80** : relancer
+**`compilation/build_launcher.bat`** (met les sources a jour puis compile),
+puis la publication qu'il propose. Modifier PHP ne met pas le jeu a jour.
+Le build Unity refuse maintenant les scripts charges obsoletes, un decalage
+entre la version des sources et du projet ou un export sans les methodes du
+compte/pseudo. Ne jamais relever simplement le numero dans le manifeste d'un
+ancien jeu pour simuler une nouvelle compilation.
+
+Apres installation du nouvel export, se connecter avec le launcher puis
+passer en **troisieme personne** : le vrai pseudo doit etre au-dessus de la tete.
+Le journal runtime contient `pseudo joueur pret` ou un diagnostic si la police
+3D manque. Aucun nouvel export natif n'a ete fabrique dans la verification Linux.

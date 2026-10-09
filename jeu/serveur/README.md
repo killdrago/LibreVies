@@ -163,6 +163,54 @@ si disponible, sinon l'algorithme moderne par défaut), puis `password_verify`.
 Le remettre à `false` ensuite. Aucun mot de passe ni jeton ne doit être copié
 dans les diagnostics ou dans Git.
 
+## Environnement local PHP 8.3 / Apache
+
+Le code de l'API est compatible avec **PHP 8.3.3**. Il utilise PDO/MySQL,
+JSON, les sessions PHP et `password_hash`/`password_verify`. `random_bytes`
+est natif : OpenSSL n'est pas indispensable pour les jetons de l'API.
+Les anciens mots de passe bcrypt restent lisibles sur PHP 8.3.
+
+- Activer `pdo_mysql` dans le PHP reellement utilise par Apache ; conserver
+  le vrai `config.php` existant et un dossier de sessions PHP inscriptible.
+- **Apache 2.4.43** peut servir ces fichiers PHP : l'API ne demande ni
+  reecriture d'URL ni fonctionnalite d'une version Apache plus recente.
+  Sous Windows, PHP et le module Apache doivent avoir la meme architecture.
+  Le chargement comme module exige le build PHP Thread Safe et
+  `php8apache2_4.dll`. FastCGI utilise normalement le build Non Thread Safe.
+- **phpMyAdmin 5.2.3** accepte PHP 8.3 (contrainte officielle PHP
+  `^7.2.5 || ^8.0`). Il est un outil d'administration : ni le launcher
+  ni Unity ne l'utilisent pour contacter la BDD. Ses propres extensions
+  requises incluent `mysqli` et OpenSSL, en plus de celles de l'API.
+  Reference : https://github.com/phpmyadmin/phpmyadmin/blob/RELEASE_5_2_3/composer.json
+- Les versions declarees ne prouvent pas que la configuration locale est
+  correcte : ouvrir `http://localhost/serveur/api.php?action=health`, puis
+  verifier connexion et sauvegarde d'un personnage depuis le launcher.
+
+La recette automatisee a ete executee avec un moteur **PHP 8.3 WebAssembly**,
+avec `E_ALL` et SQLite de test : ce n'est pas une execution exacte de
+PHP 8.3.3/Apache 2.4.43/MySQL sous Windows. Elle ne teste pas phpMyAdmin.
+Aucune mise a niveau supplementaire n'est exigee pour faire fonctionner le
+code actuel en local. Compatibilite fonctionnelle ne signifie pas absence de
+vulnerabilites : ne pas exposer ces anciennes versions ni phpMyAdmin a Internet.
+
+## Pseudo absent dans un ancien jeu
+
+Le jeu publie en **0.5.79** ne contient pas encore `LibreViesCompte`,
+`CreerNomJoueur` et `MettreAJourNomJoueur`. La mise a jour du launcher ou
+celle de PHP ne recompilent pas l'assembly Unity.
+
+Lancer **`compilation/build_launcher.bat`** pour recuperer les sources et
+reconstruire le jeu, puis utiliser la publication proposee par ce build.
+Le jeu doit afficher **0.5.80** au lancement. Le pseudo canonique vient de
+l'API ; il est visible au-dessus de la tete **en troisieme personne**, pas
+pendant la mort ou en vue a la premiere personne.
+
+L'export Unity verifie maintenant la version des sources, les scripts charges
+et l'assembly exportee. Un ancien binaire ne peut plus passer ce controle
+comme un export actuel. Le journal runtime indique `pseudo joueur pret` ou,
+si necessaire, l'absence de police 3D. Les ressources et reglages visuels
+valides du monde ne sont pas modifies.
+
 ## Vérifications
 
 Depuis la racine du projet :

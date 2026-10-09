@@ -5585,13 +5585,20 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         GameObject objet = CreerTexte3D(pseudoJoueur, Vector3.zero,
             new Color(1f, 0.90f, 0.35f), 0.14f);
-        if (objet == null) return;
+        if (objet == null)
+        {
+            Journal("pseudo joueur indisponible : police 3D absente");
+            Debug.LogWarning("[LV] Pseudo joueur non affiche : police 3D absente de l export Unity.");
+            return;
+        }
         objet.name = "Pseudo_Joueur";
         objet.transform.SetParent(player, false);
         objet.transform.localPosition = new Vector3(0f, 2.70f, 0f);
         pseudoJoueurTexte = objet.GetComponent<TextMesh>();
         pseudoJoueurTexte.fontStyle = FontStyle.Bold;
         pseudoJoueurTexte.richText = false;
+        MettreAJourNomJoueur(); // Position et orientation correctes des la premiere image.
+        Journal("pseudo joueur pret : " + pseudoJoueur + " (visible en troisieme personne)");
     }
 
     private void MettreAJourNomJoueur()
