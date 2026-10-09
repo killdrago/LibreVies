@@ -1,12 +1,11 @@
 """
-LibreVies — Launcher joueur (version 4.2.1)
+LibreVies — Launcher joueur (version 4.2.2)
 
-Le joueur ne recoit que ce fichier (compile en LibreVies.exe). Au lancement :
-  1. il lit version_url.json dans le dossier GitHub jeucompiler ;
-  2. il compare les hashes et telecharge les fichiers modifies ;
-  3. il installe les fichiers deja compiles dans game/ (ou conserve la
-     compatibilite avec les anciennes archives GitHub) ;
-  4. il active JOUER.
+Travail courant : dossier jeu en mode LOCAL.
+  1. le build fabrique jeu/game et son marqueur de version verifie ;
+  2. le launcher lit cette assembly locale, jamais un ancien jeu distant ;
+  3. la connexion PHP reste obligatoire ;
+  4. JOUER lance cet export local, sans publication ni telechargement Unity.
 
 Ce fichier CONTIENT le launcher : LibreVies.exe n'est qu'une petite amorce
 qui l'execute. C'est donc ici que se trouve le code, et ce fichier se met a
@@ -108,12 +107,12 @@ AUTH_TIMEOUT = 15
 CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.2.1"
-GAME_VERSION = "0.5.79"
-# Les fichiers publies pour les joueurs sont dans le dossier GitHub
-# jeucompiler. Une seule chaine evite toute ambiguite lors d'une edition
-# manuelle sous Windows.
-DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeucompiler"
+LAUNCHER_VERSION = "4.2.2"
+GAME_VERSION = "0.5.79"  # Ancienne version distribuee, jamais un numero invente pour le binaire.
+LOCAL_GAME_VERSION = "0.5.82"
+# Travail courant : dossier jeu uniquement. En mode local, aucun fichier
+# compile distant ne peut remplacer l'export de compilation.
+DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
@@ -188,7 +187,7 @@ def load_local_config():
         except (OSError, ValueError):
             pass
     return {"launcher_version": LAUNCHER_VERSION, "game_version": GAME_VERSION,
-            "notes": "", "game_url": "", "raw_url": DEFAULT_RAW_URL,
+            "notes": "", "game_url": "", "raw_url": DEFAULT_RAW_URL, "mode_local": True,
             "files": {}, "game_build": {}}
 
 
@@ -545,7 +544,7 @@ def _fichier_volatile(nom):
 def _manifest_files(cfg):
     """Fichiers unitaires declares par le manifeste distant.
 
-    Le depot ``jeucompiler`` peut contenir aussi bien les petits fichiers que
+    Une distribution HTTP peut contenir aussi bien les petits fichiers que
     le build Unity deja compile. Le champ ``game_build`` reste reserve au
     mode archive historique.
     """
@@ -595,6 +594,9 @@ def _taille_lisible(octets):
 # ============================================================
 
 def check_for_updates(progress_cb):
+    if mode_local_actif():
+        return {"error": None, "modified": [], "remote_cfg": load_local_config(), "build": None}
+
     local_cfg = load_local_config()
     raw_url = normalize_raw_url(local_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
     if not raw_url:
@@ -689,7 +691,7 @@ def _stage_or_replace(path, data):
 # JEU COMPLET — INSTALLATION
 #
 # Le flux courant recupere les fichiers deja compiles depuis le dossier
-# GitHub « jeucompiler ». Le mode archive ci-dessous reste disponible pour
+# une distribution HTTP. Le mode archive ci-dessous reste disponible pour
 # les anciennes installations et les anciennes releases.
 # ============================================================
 
@@ -771,7 +773,7 @@ def _trouver_exe_jeu(dossier, profondeur=2):
 def _build_est_fichiers(build):
     """Indique qu'une compilation est publiee fichier par fichier.
 
-    Ce mode est utilise par le depot ``jeucompiler`` : le launcher recupere
+    En mode distribue optionnel : le launcher recupere
     directement les fichiers modifies depuis l'URL raw, sans archive ni
     recompilation chez le joueur.
     """
@@ -985,15 +987,36 @@ def installer_build_jeu(build, progress_cb):
         return False, str(e), None
 
 
+def mode_local_actif():
+    return load_local_config().get('mode_local') is True
+
+
+def executable_jeu_local():
+    return os.path.abspath(os.path.join(GAME_DIR, 'game', 'LibreViesGame.exe'))
+
+
+def diagnostic_jeu_local():
+    executable = executable_jeu_local()
+    informations = informations_export_jeu(executable)
+    if not os.path.isfile(executable):
+        return None, 'Export local absent : lancez compilation/build_launcher.bat'
+    if not informations['version'] or informations['compte'] is not True:
+        return None, 'Ancien export local non verifie (0.5.79 possible) : relancez le build'
+    if informations['version'] != LOCAL_GAME_VERSION:
+        return None, 'Export local v%s obsolete : v%s attendu, relancez le build' % (informations['version'], LOCAL_GAME_VERSION)
+    return executable, 'Jeu local v%s verifie : aucun telechargement distant' % informations['version']
+
+
 def find_game():
-    """Retrouve uniquement un jeu valide selon le manifeste distant."""
+    """Mode local : choisir l'export reel, jamais le hash d'un ancien manifeste."""
+    if mode_local_actif():
+        return diagnostic_jeu_local()[0]
     etat = lire_etat_jeu()
     cfg = load_local_config()
     build = cfg.get('game_build') if isinstance(cfg.get('game_build'), dict) else {}
 
-    # Nouveau mode : le depot « jeucompiler » contient les fichiers deja
-    # compiles. On verifie leurs hashes locaux avant d'activer JOUER, sans
-    # demander une archive ni une recompilation au joueur.
+    # Mode distribue optionnel : verification des hashes publies.
+    # Ce chemin est ignore pendant le travail local dans jeu.
     if _build_est_fichiers(build):
         fichiers = _fichiers_jeu_manifest(cfg, build)
         if not fichiers:
@@ -1093,7 +1116,7 @@ def informations_export_jeu(executable):
             contenu = flux.read()
         noms = ('InitialiserPseudoJoueur', 'CreerNomJoueur', 'MettreAJourNomJoueur')
         resultat['compte'] = all((nom + '\0').encode('ascii') in contenu for nom in noms)
-        with open(os.path.join(dossier, 'version_jeu.json'), 'r', encoding='utf-8') as flux:
+        with open(os.path.join(dossier, 'version_jeu.json'), 'r', encoding='utf-8-sig') as flux:
             marqueur = json.load(flux)
         version = marqueur.get('version')
         if (isinstance(version, str) and re.fullmatch(r'\d+\.\d+\.\d+', version)
@@ -1712,6 +1735,11 @@ class App(tk.Tk):
             pass
 
     def _run_update(self):
+        if mode_local_actif():
+            # L'API du compte reste active ; seule la distribution du jeu est
+            # locale. Ne pas ecraser le nouveau build par un ancien fichier HTTP.
+            self._ui_call(lambda: self._updates_finished(True))
+            return
         result = check_for_updates(self.upd)
         if result['error']:
             # Une panne reseau ne doit jamais bloquer un jeu deja installe.
@@ -1818,7 +1846,10 @@ class App(tk.Tk):
     # ============================================================
 
     def _check_game(self):
-        self.game = find_game()
+        if mode_local_actif():
+            self.game, self.derniere_raison = diagnostic_jeu_local()
+        else:
+            self.game = find_game()
         self.ready = bool(self.game)
         self.diagnostic_ancien_jeu = ""
         if self.game:
@@ -1826,7 +1857,7 @@ class App(tk.Tk):
             version = informations['version'] or lire_etat_jeu().get('version') or load_local_config().get('game_version') or GAME_VERSION
             self._set_version(version)
             if informations['compte'] is False:
-                self.diagnostic_ancien_jeu = 'Jeu v%s sans pseudo/profil : nouvel export Unity a publier' % version
+                self.diagnostic_ancien_jeu = 'Jeu v%s sans pseudo/profil : export Unity local a reconstruire' % version
         self._update_play_state()
         if not self.game and self.updates_done:
             self._upd_bar(0, self.derniere_raison
@@ -1836,13 +1867,19 @@ class App(tk.Tk):
         autorise = bool(self.updates_done and self.authenticated and self.session_token and self.game)
         if autorise:
             self.play_btn.config(state='normal', bg=GREEN)
-            self._upd_bar(100, getattr(self, 'diagnostic_ancien_jeu', '') or 'Pret ! Cliquez sur JOUER')
+            message = getattr(self, 'diagnostic_ancien_jeu', '') or 'Pret ! Cliquez sur JOUER'
+            if mode_local_actif():
+                version = informations_export_jeu(self.game)['version']
+                message = 'Jeu local v%s pret ! Cliquez sur JOUER' % version
+            self._upd_bar(100, message)
             return
         self.play_btn.config(state='disabled', bg='#444444')
         if not self.updates_done:
             return
         if not self.authenticated:
             self._upd_bar(0, self.auth_message or 'Connectez-vous pour jouer')
+        elif mode_local_actif() and not self.game:
+            self._upd_bar(0, getattr(self, 'derniere_raison', '') or 'Export local absent : relancez le build')
 
     def _ready(self, ok):
         self.ready = bool(ok)

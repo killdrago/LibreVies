@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.81";
+    private const string VersionJeu = "0.5.82";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -2797,19 +2797,14 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerPoigneesPorte(Transform pivot)
     {
-        // Deux bequilles, pres du bord libre du vantail, jamais sur la charniere.
-        // Enfants du pivot : elles suivent la porte lors de l'ouverture/edition.
+        // Bouton rond BLANC, a gauche, a mi-hauteur ; 14 cm depuis le bord.
+        // Diametre egal a la hauteur du nez importe du maire : 0.11 m x 1.02.
+        const float diametre = 0.11f * 1.02f;
         Transform poignees = new GameObject("Poignees_Porte").transform;
         poignees.SetParent(pivot, false);
         for (int face = -1; face <= 1; face += 2)
-        {
-            Box(new Vector3(1.03f, -0.22f, face * 0.075f),
-                new Vector3(0.07f, 0.17f, 0.025f), "MetalAluminium", poignees, "Rosace_Poignee");
-            Box(new Vector3(1.03f, -0.22f, face * 0.105f),
-                new Vector3(0.035f, 0.035f, 0.045f), "MetalAluminium", poignees, "Axe_Poignee");
-            Box(new Vector3(0.95f, -0.22f, face * 0.13f),
-                new Vector3(0.18f, 0.045f, 0.045f), "MetalAluminium", poignees, "Poignee_Porte");
-        }
+            Primitive(PrimitiveType.Sphere, new Vector3(0.14f, 0f, face * 0.10f),
+                Vector3.one * diametre, "White", poignees, "Poignee_Ronde_Blanche");
     }
 
     private bool TryTrouverCoteRedimensionnement(ElementEdition element, out int cote)

@@ -102,6 +102,12 @@ if not exist "%EXPORT%\LibreViesGame.exe" (
     pause
     exit /b 1
 )
+python "%ROOT%outils\preparer_jeu_local.py" --verifier-seulement --export "%EXPORT%"
+if errorlevel 1 (
+    echo ERREUR : nouvel export obsolete ou incomplet. Ancien jeu conserve.
+    pause
+    exit /b 1
+)
 if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
 if exist "%JEU%\game" (
     echo ERREUR : fermez LibreViesGame.exe avant de remplacer jeu\game.
@@ -117,6 +123,12 @@ if errorlevel 1 (
 )
 
 echo.
+python "%ROOT%outils\preparer_jeu_local.py" --jeu "%JEU%"
+if errorlevel 1 (
+    echo ERREUR : preparation du mode local impossible.
+    pause
+    exit /b 1
+)
 echo Jeu exporte dans %JEU%\game\
 echo IMPORTANT : Unity a aussi genere UnityPlayer.dll et un dossier *_Data.
 echo Conserve tout le dossier game, pas seulement le .exe.
@@ -133,6 +145,6 @@ echo.
 echo Createur exporte dans %JEU%\personnage\
 echo Le dossier contient l'executable et toutes ses dependances Unity.
 echo.
-echo Pour publier cette compilation : outils\publier_jeu.bat
+echo Pour tester : ouvrir jeu\LibreVies.exe. Aucune publication necessaire.
 echo.
 pause

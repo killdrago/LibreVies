@@ -1,3 +1,20 @@
+ESSAIS LOCAUX — DOSSIER JEU UNIQUEMENT
+
+1. Fermer le jeu et le launcher.
+2. Lancer compilation\build_launcher.bat pour mettre les sources a jour et compiler.
+3. Ouvrir jeu\LibreVies.exe, se connecter puis cliquer JOUER.
+
+Apres le nouveau build : Launcher 4.2.2 / jeu 0.5.82.
+Le launcher ne telecharge pas de binaire distant en mode local.
+Une ancienne assembly 0.5.79 est refusee plutot que presentee comme la nouvelle.
+Le pseudo est au-dessus de la tete en troisieme personne.
+Poignees : rond blanc a gauche, mi-hauteur, de la taille du nez du maire.
+
+Aucune publication ni copie dans un autre dossier n'est necessaire pour tester.
+Le deplacement vers un serveur de distribution sera fait manuellement plus tard.
+
+--- Anciennes consignes de distribution (non actives en mode local) ---
+
 LibreVies — comment jouer
 =========================
 
@@ -19,20 +36,26 @@ Où sont mes fichiers ?
 ----------------------
 Tout reste dans ce dossier :
   launcher.pyw       le launcher lui-même (il se met à jour tout seul)
-  auth_config.json   l'adresse IP de l'API de connexion (modifiable)
-  serveur\           le dossier complet à envoyer chez l'hébergeur
   game\              le jeu téléchargé (LibreViesGame.exe ou LibreVies.exe)
   game\logs\         le journal du jeu (LibreVies.log) : utile en cas de plantage
   etat_jeu.json      l'état de l'installation (version, date)
   jeu.download.part  téléchargement en cours (reprise automatique)
+
+Les deux boutons en bas du launcher
+-----------------------------------
+* RAPPORT     ouvre le dossier des journaux (jeu et plantages). Si ton jeu
+              plante, ouvre-le et envoie le fichier LibreVies.log : c'est lui
+              qui explique ce qui s'est passé.
+* DOSSIER DU JEU  ouvre le dossier où le jeu est installé.
 
 En cas de souci
 ---------------
 * « Hors ligne » : vérifie ta connexion puis relance le launcher.
 * Le téléchargement échoue en boucle : supprime jeu.download.part et
   relance le launcher.
-* Le jeu ne démarre pas : supprime le dossier game\ puis relance le
-  launcher : il le retéléchargera entièrement.
+* Le jeu ne démarre pas : clique sur RAPPORT et envoie le journal, ou
+  supprime le dossier game\ puis relance le launcher : il le
+  retéléchargera entièrement.
 * Le launcher lui-même plante : un fichier journal_launcher.txt apparaît à
   côté de LibreVies.exe, il contient la cause.
 

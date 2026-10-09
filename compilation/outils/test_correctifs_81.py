@@ -95,17 +95,16 @@ class Publication(unittest.TestCase):
         self.assertFalse(set(files) & {"autolog.dat", "autolog.json", "auth_config.json"})
         self.assertFalse(any(name.startswith("serveur/") for name in files))
 
-    def test_bouton_build_utilise_le_bon_publieur(self):
-        bat = (ROOT / "compilation/outils/publier_jeu.bat").read_text()
-        self.assertIn("publier_jeu_compiler.py", bat)
-        self.assertIn("version_jeu.json", bat)
-        self.assertNotIn("--pousser", bat)  # Plus de publication de l'ancien jeu/version_url.
+    def test_build_est_local_sans_publieur(self):
+        bat = (ROOT / "compilation/build_launcher.bat").read_text()
+        self.assertIn("preparer_jeu_local.py", bat)
+        self.assertNotIn("call \"%ROOT%outils\\publier_jeu.bat\"", bat)
+        self.assertNotIn("Publier cette compilation maintenant", bat)
         export = (ROOT / "compilation/unity/Assets/Editor/LibreViesBuild.cs").read_text()
         self.assertLess(export.index("VerifierExport(output, versionAttendue)"), export.index("EcrireVersionExport(output, versionAttendue)"))
         self.assertIn("SHA256.Create()", export)
         sync = (ROOT / "compilation/outils/synchroniser_sources.ps1").read_text()
-        self.assertEqual(sync.count("'publier_jeu_compiler.py'"), 2)
-        self.assertIn("$racineProjet", sync)
+        self.assertNotIn("publier_jeu_compiler", sync)
 
 
 class Monde(unittest.TestCase):
@@ -115,9 +114,10 @@ class Monde(unittest.TestCase):
         self.assertIn('new GameObject("Poignees_Porte")', construction)
         self.assertIn("poignees.SetParent(pivot, false)", construction)
         self.assertIn("face <= 1; face += 2", construction)
-        for name in ("Rosace_Poignee", "Axe_Poignee", "Poignee_Porte"):
-            self.assertIn('"' + name + '"', construction)
-        self.assertIn('"MetalAluminium"', construction)
+        self.assertIn('"Poignee_Ronde_Blanche"', construction)
+        self.assertIn('"White"', construction)
+        self.assertIn("PrimitiveType.Sphere", construction)
+        self.assertIn("new Vector3(0.14f, 0f", construction)
         self.assertNotIn("collider: true", construction)
 
     def test_shader_affiche_teste_la_profondeur(self):

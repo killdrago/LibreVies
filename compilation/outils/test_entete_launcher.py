@@ -183,7 +183,7 @@ class EnteteLauncher(unittest.TestCase):
 
     def test_titre_windows_affiche_les_deux_versions(self):
         self.app._set_version("0.5.79")
-        self.assertEqual(self.app.window_title, "LibreVies - Launcher v4.2.1 - Jeu v0.5.79")
+        self.assertEqual(self.app.window_title, "LibreVies - Launcher v4.2.2 - Jeu v0.5.79")
         self.app._set_version("0.5.81")
         self.assertTrue(self.app.window_title.endswith("Jeu v0.5.81"))
         self.assertEqual(self.app.canvas.items[self.app.brand_item]["text"], "LibreVies")
@@ -196,18 +196,20 @@ class EnteteLauncher(unittest.TestCase):
         info = self.launcher.informations_export_jeu(str(executable))
         self.assertFalse(info["compte"])
         self.assertEqual(info["version"], "")
-        with patch.object(self.launcher, "find_game", return_value=str(executable)), \
+        with patch.object(self.launcher, "mode_local_actif", return_value=False), \
+                patch.object(self.launcher, "find_game", return_value=str(executable)), \
                 patch.object(self.launcher, "lire_etat_jeu", return_value={"version": "0.5.79"}):
             self.app._check_game()
         self.assertIn("sans pseudo/profil", self.app.diagnostic_ancien_jeu)
         self.assertIn("Jeu v0.5.79", self.app.window_title)
 
-    def test_copies_identiques_et_hash_de_publication_a_jour(self):
-        source = (ROOT / "jeu/launcher.pyw").read_bytes()
-        self.assertEqual(source, (ROOT / "jeucompiler/launcher.pyw").read_bytes())
-        manifest = json.loads((ROOT / "jeucompiler/version_url.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["files"]["launcher.pyw"],
-                         {"hash": hashlib.md5(source).hexdigest(), "size": len(source)})
+    def test_seul_jeu_est_utilise_en_mode_local(self):
+        source = (ROOT / "jeu/launcher.pyw").read_text(encoding="utf-8")
+        manifest = json.loads((ROOT / "jeu/version_url.json").read_text(encoding="utf-8"))
+        self.assertTrue(manifest["mode_local"])
+        self.assertTrue(self.launcher.DEFAULT_RAW_URL.endswith("/jeu"))
+        self.assertEqual(manifest["launcher_version"], self.launcher.LAUNCHER_VERSION)
+        self.assertNotIn("jeucompiler", source)
 
 
 if __name__ == "__main__":

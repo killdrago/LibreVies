@@ -1,3 +1,21 @@
+# Serveur LibreVies — essais locaux dans `jeu`
+
+**Flux actuel :** compiler avec `compilation/build_launcher.bat`, puis ouvrir
+`jeu/LibreVies.exe`. Aucune publication de jeu n'est necessaire. Le launcher
+est en mode local (`mode_local: true`) et ne remplace pas `jeu/game` par une
+ancienne version distante. La connexion PHP, les sessions, le personnage,
+`droit=0` et l'Autolog continuent de fonctionner comme avant.
+
+Les sources sont en **0.5.82**. Le build verifie l'assembly puis prepare
+`jeu/version_url.json` et l'etat local avec la version reelle. Le pseudo est
+visible en troisieme personne sur ce nouvel export ; il n'est pas ajoute a
+un ancien executable 0.5.79 simplement en changeant un numero de manifeste.
+
+Les informations historiques sur la publication ci-dessous ne sont plus le
+flux actif. Aucun dossier de distribution externe n'est gere pendant ces essais.
+
+---
+
 # API de compte et de personnage LibreVies
 
 **Adresse locale conservée : `http://localhost/serveur/api.php`.**

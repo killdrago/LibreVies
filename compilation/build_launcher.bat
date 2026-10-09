@@ -19,7 +19,7 @@ rem  sont publies sur la branche de travail : une coordonnee locale ne peut
 rem  donc jamais etre ecrasee par le telechargement GitHub.
 rem  Avant tout remplacement, l'ancienne version est copiee dans
 rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
-rem  Etape suivante : outils\publier_jeu.bat (met le jeu en ligne)
+rem  Travail LOCAL : lancer jeu\LibreVies.exe apres le build, sans publication.
 rem ==========================================================================
 
 rem --- Ou lire les sources (change la branche si besoin) -------------------
@@ -138,6 +138,13 @@ if not exist "%EXPORT%\LibreViesGame.exe" (
     echo ERREUR : Unity n'a pas produit LibreViesGame.exe
     goto :echec
 )
+rem Verifier le nouvel export AVANT de toucher au jeu deja installe.
+"%PYTHON%" "%ROOT%outils\preparer_jeu_local.py" --verifier-seulement --export "%EXPORT%"
+if errorlevel 1 (
+    echo ERREUR : l'export n'est pas celui des sources actuelles.
+    echo L'ancien jeu est conserve. Consultez build\unity.log.
+    goto :echec
+)
 rem Remplacement seulement apres un export complet reussi. Si le jeu actuel
 rem tourne encore, on arrete proprement ici avec un message explicite.
 if exist "%JEU%\game" rmdir /s /q "%JEU%\game"
@@ -153,6 +160,13 @@ if errorlevel 1 (
 )
 if not exist "%JEU%\game\LibreViesGame.exe" (
     echo ERREUR : le nouvel export a ete deplace mais son executable manque.
+    goto :echec
+)
+
+rem Activer le jeu local : aucune verification distante ne doit le remplacer.
+"%PYTHON%" "%ROOT%outils\preparer_jeu_local.py" --jeu "%JEU%"
+if errorlevel 1 (
+    echo ERREUR : preparation du launcher local impossible.
     goto :echec
 )
 
@@ -248,20 +262,13 @@ echo.
 echo ==========================================================================
 echo   TERMINE
 echo ==========================================================================
-echo   A donner au joueur : %JEU%\LibreVies.exe
-echo   A publier (le jeu) : %JEU%\game\
-echo   Createur humain   : %PERSONNAGE%\LibreViesPersonnage.exe
+echo   Launcher local     : %JEU%\LibreVies.exe
+echo   Jeu exporte        : %JEU%\game\
+echo   Createur humain    : %PERSONNAGE%\LibreViesPersonnage.exe
 echo.
-echo   Le joueur ne peut jouer qu'apres la publication de cette compilation.
-echo.
-choice /c ON /n /m "Publier cette compilation maintenant pour tous les joueurs ? [O/N] "
-if errorlevel 2 goto :fin
-if not errorlevel 1 goto :fin
-if exist "%ROOT%outils\publier_jeu.bat" (
-    call "%ROOT%outils\publier_jeu.bat"
-) else (
-    echo ERREUR : %ROOT%outils\publier_jeu.bat est introuvable.
-)
+echo   Ouvrez ce launcher local pour tester le jeu.
+echo   Aucun envoi/publieur distant n'est lance : travail dans jeu seulement.
+echo   La version affichee vient de l'assembly qui vient d'etre compilee.
 goto :fin
 
 :echec

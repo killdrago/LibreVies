@@ -1,3 +1,53 @@
+# Compilation LibreVies — travail local dans `jeu`
+
+## Flux actuel (remplace les anciens paragraphes de publication ci-dessous)
+
+On travaille uniquement dans **`jeu`**. Le transfert vers un dossier de
+distribution/serveur sera fait manuellement plus tard : le build ne lance
+aucun publieur et ne synchronise plus les outils de publication de la racine.
+
+1. Fermer le jeu et le launcher deja ouverts.
+2. Lancer **`compilation/build_launcher.bat`** pour mettre les sources a jour
+   et compiler Unity.
+3. Ouvrir **`jeu/LibreVies.exe`** dans CE dossier, puis se connecter.
+4. Le titre doit afficher **Launcher 4.2.2 — Jeu 0.5.82** apres un build valide.
+
+`jeu/version_url.json` contient `mode_local: true`. Dans ce mode, le launcher
+n'appelle aucun serveur de distribution, ne telecharge aucune ancienne
+assembly et ne depend pas des hashes d'un manifeste distant. La connexion
+PHP et l'Autolog restent inchanges : seule la distribution du jeu est locale.
+
+Le marqueur `jeu/game/version_jeu.json` est genere par Unity avec le SHA-256
+de l'assembly. `outils/preparer_jeu_local.py` valide l'export temporaire avant
+remplacement, puis enregistre la version reelle dans le manifeste et l'etat
+local. Une ancienne 0.5.79, un export incomplet ou un marqueur incoherent ne
+peuvent pas etre presentes comme une compilation actuelle. Un build echoue
+n'active pas silencieusement l'ancien jeu.
+
+La version **0.5.82** garde le pseudo du compte au-dessus de la tete en vue
+**troisieme personne**. Les poignees sont maintenant des boutons ronds blancs,
+a gauche a 14 cm du bord, a mi-hauteur ; diametre 11,22 cm, correspondant a la
+hauteur du nez du maire (maillage importe de 11 cm, echelle PNJ 1,02).
+Le sens d'ouverture, les maisons et les ressources du personnage ne changent pas.
+
+Le script `build_unity_game.bat` prepare aussi le mode local, mais ne met pas
+les sources a jour : utiliser le build principal apres une mise a jour.
+
+Verification en dehors d'Unity :
+
+```text
+python -B compilation/outils/test_jeu_local.py
+python -B compilation/outils/test_entete_launcher.py
+```
+
+Les executables Windows ne sont pas fabriques dans le sandbox Linux. La
+version 0.5.82 indiquee ici est celle des sources a compiler, pas un binaire
+qui aurait ete renomme. Aucun changement de PHP/MySQL n'est necessaire ici.
+
+---
+
+## Historique du guide (publication non active pendant les essais locaux)
+
 # LibreVies — guide de compilation (côté auteur uniquement)
 
 Ce dossier ne part **jamais** chez le joueur. Il contient tout ce qu'il faut
