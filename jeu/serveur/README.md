@@ -6,7 +6,7 @@ est en mode local (`mode_local: true`) et ne remplace pas `jeu/game` par une
 ancienne version distante. La connexion PHP, les sessions, le personnage,
 `droit=0` et l'Autolog continuent de fonctionner comme avant.
 
-Les sources sont en **0.5.84**. Le build verifie l'assembly puis prepare
+Les sources sont en **0.5.85**. Le build verifie l'assembly puis prepare
 `jeu/version_url.json` et l'etat local avec la version reelle. Le pseudo est
 visible en troisieme personne sur ce nouvel export ; il n'est pas ajoute a
 un ancien executable 0.5.79 simplement en changeant un numero de manifeste.
@@ -303,6 +303,29 @@ memes colonnes de personnalisation, types et champs NULL que `personnage`.
 Seules differences : pas de colonne `default`, `id VARCHAR(100)` comme cle
 primaire (ex. `maire`), et pas de cle etrangere vers un compte `membre`.
 
-Le SQL n'est jamais importe automatiquement. Cette table est preparee pour
-une utilisation future ; aucun chargement/sauvegarde des NPC en BDD n'est
-branche dans le jeu par cette creation de schema.
+Le SQL n'est jamais importe automatiquement. **`remplir_npc.sql`** remplit
+les six profils humains du village : `maire`, `forgeron`, `marchand`,
+`esthetique`, `garde_nord`, `garde_sud`. Le tirage utilise uniquement les
+catalogues du createur et des valeurs de sliders internes 0..5. Il est
+persistant : rien n'est rerandomise a la connexion. Relancer la requete
+remplace les apparences de ces six NPC, mais preserve leurs `objets` deja
+renseignes. Les anciens vendeurs retires et les monstres ne sont pas inclus.
+
+Le jeu **0.5.85** lit ces profils via le POST authentifie `get_npcs`. Ce
+endpoint est en lecture seule ; aucun id/droit client ne permet de modifier
+un NPC. Une table manquante, un profil absent ou incomplet est signale : le
+jeu ne pretend pas utiliser les avatars SQL en gardant les anciens visuels.
+Le lancement direct de diagnostic sans session conserve les anciens modeles.
+
+Les corps MakeHuman utilisent le meme createur que le joueur (sexe, peau,
+13 sliders, coiffure et equipement). Les anciens renderers sont masques;
+les roots d'edition, positions, fonctions et collisions restent inchanges.
+Marteau, feuille et hallebardes sont reattaches au rig. Les gardes conservent
+leur logique de deplacement/combat et utilisent la marche du rig MakeHuman.
+Il faut encore verifier visuellement les accessoires/poses sous Unity :
+aucun nouveau binaire Windows n'a ete produit dans le sandbox Linux.
+
+Procedure : importer `npc.sql` si la table manque, executer `remplir_npc.sql`
+dans phpMyAdmin, puis lancer `compilation/build_launcher.bat` et jouer depuis
+`jeu/LibreVies.exe`. Le build copie `npc.php` et le SQL vers l'API locale,
+sans remplacer le vrai `config.php` ni importer le SQL lui-meme.

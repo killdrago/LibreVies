@@ -42,6 +42,7 @@ php.mkdir('/tests/serveur');
 php.mkdir('/tests/sessions');
 php.writeFile('/tests/serveur/config.php', source('config.php.example'));
 php.writeFile('/tests/serveur/securite.php', source('securite.php'));
+php.writeFile('/tests/serveur/npc.php', source('npc.php'));
 const api = source('api.php');
 assert(api.includes('new PDO($dsn,'), 'Le point de remplacement du DSN a change.');
 const apiSQLite = api.replace('new PDO($dsn,', "new PDO('sqlite:/tests/test.sqlite',");
@@ -55,6 +56,10 @@ $pdo->exec('CREATE TABLE membre (id INTEGER PRIMARY KEY AUTOINCREMENT,
  email TEXT COLLATE NOCASE NOT NULL UNIQUE, valider INTEGER NOT NULL DEFAULT 0, droit INTEGER NOT NULL DEFAULT 0)');
 $pdo->exec('CREATE TABLE personnage (id INTEGER PRIMARY KEY REFERENCES membre(id),
  \`default\` INTEGER NOT NULL DEFAULT 1, sexe TEXT NULL,
+ ${sliders.map(name => name + ' DECIMAL(10,4) NULL').join(', ')},
+ teinte_peau TEXT NULL, coiffure TEXT NULL, chaussures TEXT NULL,
+ chapeau TEXT NULL, tenue TEXT NULL, objets TEXT NULL)');
+$pdo->exec('CREATE TABLE npc (id TEXT PRIMARY KEY, sexe TEXT NULL,
  ${sliders.map(name => name + ' DECIMAL(10,4) NULL').join(', ')},
  teinte_peau TEXT NULL, coiffure TEXT NULL, chaussures TEXT NULL,
  chapeau TEXT NULL, tenue TEXT NULL, objets TEXT NULL)');
@@ -120,6 +125,31 @@ assert.deepEqual(login.personnage, { id: idA, default: 1 });
 assert(/^[0-9a-f]{64}$/.test(login.session.token) && login.session.expires_at > Date.now() / 1000);
 assert(!JSON.stringify(login).includes(password));
 const token = login.session.token;
+// Les profils NPC ne se lisent qu'avec une vraie session ; aucun id client
+// ne peut choisir ou modifier les lignes serveur.
+await request('get_npcs', {}, 401);
+await request('get_npcs', { session_token: login.session.token }, 409);
+const npcColumns = ['sexe', ...sliders, 'teinte_peau', 'coiffure', 'chaussures', 'chapeau', 'tenue'];
+const seedMySQL = source('remplir_npc.sql');
+const seedSqlite = seedMySQL.slice(seedMySQL.indexOf('INSERT INTO npc'), seedMySQL.indexOf('ON DUPLICATE KEY UPDATE'))
+    + 'ON CONFLICT(id) DO UPDATE SET ' + npcColumns.map(name => name + '=excluded.' + name).join(', ') + ';';
+const seedBootstrap = `$pdo->sqliteCreateFunction('RAND', function () { return mt_rand(0, 9999999) / 10000000; });
+$pdo->sqliteCreateFunction('FLOOR', function ($x) { return (int)floor($x); });
+$pdo->sqliteCreateFunction('ELT', function () { $a = func_get_args(); $i = (int)$a[0]; return isset($a[$i]) ? $a[$i] : null; });`;
+await sql(seedBootstrap + '$pdo->exec(' + JSON.stringify(seedSqlite) + ');');
+let npcs = await request('get_npcs', { session_token: login.session.token, id: 'autre', droit: 255 });
+assert.deepEqual(npcs.npcs.map(npc => npc.id), ['maire', 'forgeron', 'marchand', 'esthetique', 'garde_nord', 'garde_sud']);
+assert(npcs.npcs.every(npc => !('default' in npc) && npc.objets === null));
+assert.deepEqual((await request('get_npcs', { session_token: login.session.token })).npcs, npcs.npcs);
+await sql("$pdo->exec(\"UPDATE npc SET objets='accessoire-conserve' WHERE id='maire'\");");
+await sql(seedBootstrap + '$pdo->exec(' + JSON.stringify(seedSqlite) + ');');
+npcs = await request('get_npcs', { session_token: login.session.token });
+assert.equal(npcs.npcs.find(npc => npc.id === 'maire').objets, 'accessoire-conserve');
+await sql("$pdo->exec('UPDATE npc SET nez=NULL');");
+await request('get_npcs', { session_token: login.session.token }, 409);
+await sql(seedBootstrap + '$pdo->exec(' + JSON.stringify(seedSqlite) + ');');
+console.log('OK 6 NPC aleatoires complets, profils stables, objets preserves ; absence/incomplet/session factice refuses');
+
 // Simuler PHP 5.6 sans random_bytes/OpenSSL, sans modifier PHP.ini du poste.
 // Le generateur de l'OS doit prendre le relais et produire un nouveau jeton.
 php.writeFile('/tests/serveur/securite.php', source('securite.php')

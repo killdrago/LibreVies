@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.84";
+    private const string VersionJeu = "0.5.85";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -400,6 +400,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         public GameObject Root;
         public Transform Model;
+        public AdminHumanCreator CreateurNpc;
         public Transform JambeG;
         public Transform JambeD;
         public Transform GenouG;
@@ -489,6 +490,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         public GameObject Root;
         public Transform Model;
+        public AdminHumanCreator CreateurNpc;
         public Transform Corps;
         public Transform JambeG;
         public Transform JambeD;
@@ -716,6 +718,13 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             pseudoJoueur = compteJoueur.Joueur.pseudo;
             personnageActuel = compteJoueur.Personnage;
+            etapeChargement = "Chargement des avatars des NPC...";
+            yield return compteJoueur.ChargerNpcs();
+            if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+            {
+                erreurChargementCompte = compteJoueur.Erreur;
+                yield break;
+            }
         }
         string[] noms =
         {
@@ -749,6 +758,7 @@ public sealed class LibreViesGame : MonoBehaviour
             yield return null;
             if (!String.IsNullOrEmpty(erreurChargementCompte)) yield break;
         }
+        if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
@@ -2699,6 +2709,78 @@ public sealed class LibreViesGame : MonoBehaviour
         // juste devant les portails du village (voir CreateFence).
     }
 
+    private LibreViesNpc ProfilNpc(string id)
+    {
+        if (compteJoueur.Npcs == null) return null;
+        for (int i = 0; i < compteJoueur.Npcs.Length; i++)
+            if (compteJoueur.Npcs[i].id == id) return compteJoueur.Npcs[i];
+        return null;
+    }
+
+    private AdminHumanCreator CreerAvatarNpc(Transform root, Transform ancien, string id)
+    {
+        LibreViesNpc npc = ProfilNpc(id);
+        if (npc == null) throw new InvalidOperationException("Profil NPC absent : " + id);
+        string erreur;
+        if (!npc.EstValide(out erreur)) throw new InvalidOperationException(erreur);
+        Transform cible = new GameObject("Avatar_NPC_MakeHuman").transform;
+        cible.SetParent(root, false);
+        cible.localScale = ancien == null ? Vector3.one : ancien.localScale;
+        AdminHumanCreator createur = cible.gameObject.AddComponent<AdminHumanCreator>();
+        npc.ProfilHumain().ChargerDans(createur);
+        if (!createur.ApplyTo(cible) || createur.AppliedBone("wrist.R") == null)
+        {
+            Destroy(cible.gameObject);
+            throw new InvalidOperationException("Maillage/rig MakeHuman NPC absent : " + id);
+        }
+        createur.AnimateAppliedHuman(false, false, 0f);
+        return createur;
+    }
+
+    private void AttacherAccessoireNpc(Transform accessoire, Transform paume)
+    {
+        if (accessoire == null || paume == null) return;
+        accessoire.SetParent(paume, false);
+        accessoire.localPosition = Vector3.zero;
+        accessoire.localRotation = Quaternion.identity;
+    }
+
+    private bool AppliquerAvatarsNpcs()
+    {
+        try
+        {
+            for (int i = 0; i < pnjs.Count; i++)
+            {
+                PnjState pnj = pnjs[i];
+                string id = pnj.Metier.ToLowerInvariant();
+                pnj.CreateurNpc = CreerAvatarNpc(pnj.Root.transform, pnj.Model, id);
+                Transform paume = pnj.CreateurNpc.AppliedBone("wrist.R");
+                AttacherAccessoireNpc(pnj.Marteau, paume);
+                AttacherAccessoireNpc(pnj.Feuille, paume);
+                pnj.Main = paume;
+                // L'ancienne hierarchie reste pour les coordonnees, mais n'est
+                // plus visible. Etal/fonctions de metier restent inchanges.
+                pnj.Model.gameObject.SetActive(false);
+            }
+            for (int i = 0; i < gardes.Count; i++)
+            {
+                GardeState garde = gardes[i];
+                garde.CreateurNpc = CreerAvatarNpc(garde.Root.transform, garde.Model,
+                    garde.Nord ? "garde_nord" : "garde_sud");
+                AttacherAccessoireNpc(garde.Hallebarde, garde.CreateurNpc.AppliedBone("wrist.R"));
+                garde.Model.gameObject.SetActive(false);
+            }
+            Journal("6 avatars NPC MakeHuman reconstruits depuis la BDD");
+            return true;
+        }
+        catch (Exception erreur)
+        {
+            erreurChargementCompte = "Avatars NPC : " + erreur.Message;
+            Debug.LogError("[LV] " + erreurChargementCompte);
+            return false;
+        }
+    }
+
     private void CreateBuilding(Vector3 position, Vector3 size, string name)
     {
         var root = new GameObject(name).transform;
@@ -4495,6 +4577,11 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             if (regard.sqrMagnitude > 0.0001f)
                 garde.Root.transform.rotation = Quaternion.LookRotation(new Vector3(regard.x, 0f, regard.y));
+            if (garde.CreateurNpc != null)
+            {
+                garde.CreateurNpc.AnimateAppliedHuman(marche, false, garde.Phase * 8f);
+                continue;
+            }
             float cycle = marche ? Mathf.Sin(garde.Phase * 8f) : 0f;
             float balancement = marche ? cycle * 34f : 0f;
             float flexionGenouG = marche ? Mathf.Max(0f, -cycle) * 44f : 0f;
@@ -4790,6 +4877,12 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 balancement = Mathf.Abs(Mathf.Sin(pnj.Phase * 1.8f)) * 0.12f;
                 hauteur = 0f;
+            }
+            if (pnj.CreateurNpc != null)
+            {
+                pnj.CreateurNpc.AnimateAppliedHuman(false, false, pnj.Phase);
+                if (pnj.Etal != null) pnj.Etal.localRotation = Quaternion.identity;
+                continue;
             }
             bool accessoireBrasDroit = pnj.Metier == "Forgeron" || pnj.Metier == "Maire";
             if (pnj.Corps != null) pnj.Corps.localPosition = new Vector3(0f, hauteur, 0f);

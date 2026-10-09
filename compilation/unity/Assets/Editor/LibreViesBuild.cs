@@ -66,7 +66,7 @@ public static class LibreViesBuild
         if (!Contient(contenu, Encoding.Unicode.GetBytes(version)))
             throw new Exception("Export Unity obsolete : la version " + version + " est absente du binaire.");
         foreach (string nom in new[] { "InitialiserPseudoJoueur", "CreerNomJoueur", "MettreAJourNomJoueur",
-            "LibreViesCompte", "LibreViesPersonnage", "CreerPoigneesPorte", "AjusterTexteDansPanneau" })
+            "LibreViesCompte", "LibreViesPersonnage", "CreerPoigneesPorte", "AjusterTexteDansPanneau", "LibreViesNpc", "ChargerNpcs", "AppliquerAvatarsNpcs" })
         {
             if (!Contient(contenu, Encoding.ASCII.GetBytes(nom + "\0")))
                 throw new Exception("Export Unity incomplet : " + nom

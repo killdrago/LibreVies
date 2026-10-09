@@ -12,7 +12,7 @@ aucun publieur et ne synchronise plus les outils de publication de la racine.
 2. Lancer **`compilation/build_launcher.bat`** pour mettre les sources a jour
    et compiler Unity.
 3. Ouvrir **`jeu/LibreVies.exe`** dans CE dossier, puis se connecter.
-4. Le titre doit afficher **Launcher 4.2.2 — Jeu 0.5.84** apres un build valide.
+4. Le titre doit afficher **Launcher 4.2.2 — Jeu 0.5.85** apres un build valide.
 
 `jeu/version_url.json` contient `mode_local: true`. Dans ce mode, le launcher
 n'appelle aucun serveur de distribution, ne telecharge aucune ancienne
@@ -26,7 +26,7 @@ local. Une ancienne 0.5.79, un export incomplet ou un marqueur incoherent ne
 peuvent pas etre presentes comme une compilation actuelle. Un build echoue
 n'active pas silencieusement l'ancien jeu.
 
-La version **0.5.84** garde le pseudo du compte au-dessus de la tete en vue
+La version **0.5.85** garde le pseudo du compte au-dessus de la tete en vue
 **troisieme personne**, redescendu de 10 cm par rapport a la version precedente et affiche a un quart de sa taille
 precedente. Les poignees sont maintenant des boutons ronds blancs,
 a droite a 14 cm du bord, a mi-hauteur ; diametre 11,22 cm, correspondant a la
@@ -44,7 +44,7 @@ python -B compilation/outils/test_entete_launcher.py
 ```
 
 Les executables Windows ne sont pas fabriques dans le sandbox Linux. La
-version 0.5.84 indiquee ici est celle des sources a compiler, pas un binaire
+version 0.5.85 indiquee ici est celle des sources a compiler, pas un binaire
 qui aurait ete renomme. Aucun changement de PHP/MySQL n'est necessaire ici.
 
 ---

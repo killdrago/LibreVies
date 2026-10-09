@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUIRED = ("InitialiserPseudoJoueur", "CreerNomJoueur", "MettreAJourNomJoueur",
-            "LibreViesCompte", "LibreViesPersonnage", "CreerPoigneesPorte")
+            "LibreViesCompte", "LibreViesPersonnage", "CreerPoigneesPorte", "LibreViesNpc", "ChargerNpcs", "AppliquerAvatarsNpcs")
 
 
 def version_sources(root: Path = ROOT) -> str:

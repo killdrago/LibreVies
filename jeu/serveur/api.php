@@ -12,6 +12,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'securite.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'personnage.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'npc.php';
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
 function journal_api($message) {
@@ -376,6 +377,18 @@ if ($action === 'register') {
             'email' => (string)$membre['email'],
         ),
     ));
+}
+
+if ($action === 'get_npcs') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    try {
+        $npcs = lire_npcs_village($pdo);
+    } catch (InvalidArgumentException $erreur) {
+        repondre(false, $erreur->getMessage(), array(), 409);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'Profils NPC charges.', array('membre' => membre_public($membre), 'npcs' => $npcs));
 }
 
 if ($action === 'get_character' || $action === 'save_character') {

@@ -141,6 +141,13 @@ public sealed class AdminHumanCreator : MonoBehaviour
         if (appliedHuman != null) appliedHuman.Animate(moving, running, clock);
     }
 
+    // Acces en lecture aux points de l'avatar pour les accessoires des NPC.
+    // Aucune camera/texture d'apercu n'est construite pour ces personnages.
+    public Transform AppliedBone(string nom)
+    {
+        return appliedHuman == null ? null : appliedHuman.FindBone(nom);
+    }
+
     private void EnsurePreviewCamera()
     {
         if (previewCamera != null) return;

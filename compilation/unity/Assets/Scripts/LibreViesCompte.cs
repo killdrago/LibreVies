@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -24,6 +25,7 @@ public sealed class LibreViesCompte
         public string message;
         public Membre membre;
         public LibreViesPersonnage personnage;
+        public LibreViesNpc[] npcs;
     }
 
     [Serializable]
@@ -45,6 +47,7 @@ public sealed class LibreViesCompte
     public Membre Joueur { get; private set; }
     public LibreViesPersonnage Personnage { get; private set; }
     public string Erreur { get; private set; }
+    public LibreViesNpc[] Npcs { get; private set; }
 
     public bool SessionPresente
     {
@@ -70,6 +73,12 @@ public sealed class LibreViesCompte
     public IEnumerator Charger()
     {
         yield return Envoyer("get_character", null);
+    }
+
+    public IEnumerator ChargerNpcs()
+    {
+        Npcs = null;
+        yield return Envoyer("get_npcs", null);
     }
 
     public IEnumerator Sauvegarder(LibreViesPersonnage profil)
@@ -115,6 +124,28 @@ public sealed class LibreViesCompte
                     Joueur = null;
                 }
                 // Ne jamais journaliser le corps POST, le jeton ou la reponse.
+                yield break;
+            }
+            if (action == "get_npcs")
+            {
+                if (reponse.membre == null || Joueur == null || reponse.membre.id != Joueur.id
+                    || reponse.npcs == null || reponse.npcs.Length != 6)
+                {
+                    Erreur = "Reponse NPC incomplete : executez remplir_npc.sql.";
+                    yield break;
+                }
+                HashSet<string> identifiants = new HashSet<string>();
+                for (int i = 0; i < reponse.npcs.Length; i++)
+                {
+                    string erreurNpc;
+                    if (reponse.npcs[i] == null || !reponse.npcs[i].EstValide(out erreurNpc)
+                        || !identifiants.Add(reponse.npcs[i].id))
+                    {
+                        Erreur = "Profil NPC invalide ou duplique.";
+                        yield break;
+                    }
+                }
+                Npcs = reponse.npcs;
                 yield break;
             }
             string erreurProfil = "";
