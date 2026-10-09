@@ -44,7 +44,7 @@ class JeuLocal(unittest.TestCase):
         self.game = self.jeu / "game"
         self.dll = self.game / "LibreViesGame_Data/Managed/Assembly-CSharp.dll"
 
-    def creer_export(self, version="0.5.83"):
+    def creer_export(self, version="0.5.84"):
         self.dll.parent.mkdir(parents=True, exist_ok=True)
         self.dll.write_bytes(version.encode("utf-16le") + b"\0" + b"\0".join(
             nom.encode() for nom in self.preparation.REQUIRED) + b"\0")
@@ -52,10 +52,10 @@ class JeuLocal(unittest.TestCase):
         (self.game / "version_jeu.json").write_text(json.dumps({
             "version": version, "assembly_sha256": hashlib.sha256(self.dll.read_bytes()).hexdigest()}))
 
-    def test_export83_lance_malgre_ancien_manifeste79(self):
+    def test_export84_lance_malgre_ancien_manifeste79(self):
         self.creer_export()
         self.assertEqual(Path(self.launcher.find_game()), self.game / "LibreViesGame.exe")
-        self.assertIn("v0.5.83", self.launcher.diagnostic_jeu_local()[1])
+        self.assertIn("v0.5.84", self.launcher.diagnostic_jeu_local()[1])
 
     def test_aucun_http_et_aucun_remplacement_du_game(self):
         self.creer_export()
@@ -81,7 +81,7 @@ class JeuLocal(unittest.TestCase):
         self.assertIsNone(self.launcher.find_game())
         self.assertIn("obsolete", self.launcher.diagnostic_jeu_local()[1])
         with self.assertRaises(ValueError):
-            self.preparation.preparer(self.jeu, "0.5.83")
+            self.preparation.preparer(self.jeu, "0.5.84")
         self.assertEqual(json.loads((self.jeu / "version_url.json").read_text())["game_version"], "0.5.79")
 
     def test_ancienne_assembly_non_verifiee_rejetee(self):
@@ -89,19 +89,19 @@ class JeuLocal(unittest.TestCase):
         self.dll.write_bytes(b"ancien jeu sans pseudo")
         self.assertIsNone(self.launcher.find_game())
         with self.assertRaises(ValueError):
-            self.preparation.preparer(self.jeu, "0.5.83")
+            self.preparation.preparer(self.jeu, "0.5.84")
 
-    def test_preparation_met_version83_sans_toucher_aux_secrets(self):
+    def test_preparation_met_version84_sans_toucher_aux_secrets(self):
         self.creer_export()
         prive = {"autolog.dat": b"chiffre-recette", "auth_config.json": b'{"api_url":"http://localhost/serveur/api.php"}'}
         for name, contenu in prive.items():
             (self.jeu / name).write_bytes(contenu)
-        self.preparation.preparer(self.jeu, "0.5.83")
+        self.preparation.preparer(self.jeu, "0.5.84")
         manifest = json.loads((self.jeu / "version_url.json").read_text())
         self.assertTrue(manifest["mode_local"])
-        self.assertEqual(manifest["game_version"], "0.5.83")
+        self.assertEqual(manifest["game_version"], "0.5.84")
         self.assertEqual(manifest["game_build"]["mode"], "local")
-        self.assertEqual(json.loads((self.jeu / "etat_jeu.json").read_text())["version"], "0.5.83")
+        self.assertEqual(json.loads((self.jeu / "etat_jeu.json").read_text())["version"], "0.5.84")
         for name, contenu in prive.items():
             self.assertEqual((self.jeu / name).read_bytes(), contenu)
         self.assertNotIn("autolog", json.dumps(manifest))
@@ -129,14 +129,14 @@ class JeuLocal(unittest.TestCase):
         # Porte large de 1.20 m : centre a 1.06 m, donc 14 cm du bord droit.
         self.assertAlmostEqual(1.20 - 1.06, 0.14)
 
-    def test_pseudo_rehausse20cm_et_taille_divisee_par4(self):
+    def test_pseudo_redescendu10cm_et_taille_quart_conservee(self):
         cs = (ROOT / "compilation/unity/Assets/Scripts/LibreViesGame.cs").read_text()
         nom = cs.split("private void CreerNomJoueur()", 1)[1].split("private void ReconfigurerMonstresAdmin()", 1)[0]
         self.assertIn("0.035f", nom)
-        self.assertIn("hauteur + 0.48f", nom)
-        self.assertIn("new Vector3(0f, 2.90f, 0f)", nom)
+        self.assertIn("hauteur + 0.38f", nom)
+        self.assertIn("new Vector3(0f, 2.80f, 0f)", nom)
         self.assertAlmostEqual(0.14 / 4, 0.035)
-        self.assertAlmostEqual(0.48 - 0.28, 0.20)
+        self.assertAlmostEqual(0.48 - 0.38, 0.10)
         self.assertIn("Quaternion.LookRotation", nom)
         self.assertIn("!firstPerson && !dead", nom)
 

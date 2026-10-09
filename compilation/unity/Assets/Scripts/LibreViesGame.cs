@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.83";
+    private const string VersionJeu = "0.5.84";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -5639,7 +5639,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         objet.name = "Pseudo_Joueur";
         objet.transform.SetParent(player, false);
-        objet.transform.localPosition = new Vector3(0f, 2.90f, 0f);
+        objet.transform.localPosition = new Vector3(0f, 2.80f, 0f);
         pseudoJoueurTexte = objet.GetComponent<TextMesh>();
         pseudoJoueurTexte.fontStyle = FontStyle.Bold;
         pseudoJoueurTexte.richText = false;
@@ -5662,9 +5662,9 @@ public sealed class LibreViesGame : MonoBehaviour
                     hauteur = Mathf.Max(hauteur, rendu.bounds.max.y);
             }
         }
-        // 20 cm plus haut que l'ancien decalage de 28 cm.
+        // Redescendu de 10 cm : decalage de 38 cm au-dessus du personnage.
         pseudoJoueurTexte.transform.position = new Vector3(player.position.x,
-            hauteur + 0.48f, player.position.z);
+            hauteur + 0.38f, player.position.z);
         Vector3 versCamera = gameCamera.transform.position
             - pseudoJoueurTexte.transform.position;
         if (versCamera.sqrMagnitude > 0.001f)

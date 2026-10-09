@@ -6,7 +6,7 @@ est en mode local (`mode_local: true`) et ne remplace pas `jeu/game` par une
 ancienne version distante. La connexion PHP, les sessions, le personnage,
 `droit=0` et l'Autolog continuent de fonctionner comme avant.
 
-Les sources sont en **0.5.83**. Le build verifie l'assembly puis prepare
+Les sources sont en **0.5.84**. Le build verifie l'assembly puis prepare
 `jeu/version_url.json` et l'etat local avec la version reelle. Le pseudo est
 visible en troisieme personne sur ce nouvel export ; il n'est pas ajoute a
 un ancien executable 0.5.79 simplement en changeant un numero de manifeste.
@@ -295,3 +295,14 @@ Sans Unity Windows ici, les binaires publies restent **0.5.79** : ni les
 poignees ni le pseudo ne peuvent apparaitre dans cet ancien executable. La
 compilation et sa publication dans jeucompiler doivent encore etre lancees
 sur le PC de compilation. Le SQL n'est jamais importe automatiquement.
+
+## Table NPC
+
+Le script du projet **`jeu/serveur/npc.sql`** cree une table `npc` avec les
+memes colonnes de personnalisation, types et champs NULL que `personnage`.
+Seules differences : pas de colonne `default`, `id VARCHAR(100)` comme cle
+primaire (ex. `maire`), et pas de cle etrangere vers un compte `membre`.
+
+Le SQL n'est jamais importe automatiquement. Cette table est preparee pour
+une utilisation future ; aucun chargement/sauvegarde des NPC en BDD n'est
+branche dans le jeu par cette creation de schema.
