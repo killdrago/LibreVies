@@ -131,7 +131,7 @@ public sealed class LibreViesCompte
                 if (reponse.membre == null || Joueur == null || reponse.membre.id != Joueur.id
                     || reponse.npcs == null || reponse.npcs.Length != 6)
                 {
-                    Erreur = "Reponse NPC incomplete : executez remplir_npc.sql.";
+                    Erreur = "Reponse NPC incomplete : six profils complets sont attendus dans la table npc.";
                     yield break;
                 }
                 HashSet<string> identifiants = new HashSet<string>();

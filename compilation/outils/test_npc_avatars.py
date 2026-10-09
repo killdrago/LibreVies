@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class AvatarsNpc(unittest.TestCase):
     def test_tous_les_npc_humains_dans_sql_et_helper(self):
-        sql = (ROOT / "jeu/serveur/remplir_npc.sql").read_text()
+        sql = (ROOT / "compilation/outils/fixtures/npc_profiles_fixture.sql").read_text()
         helper = (ROOT / "jeu/serveur/npc.php").read_text()
         for id in ("maire", "forgeron", "marchand", "esthetique", "garde_nord", "garde_sud"):
             self.assertIn("'" + id + "'", sql)
@@ -59,6 +59,18 @@ class AvatarsNpc(unittest.TestCase):
             self.assertIn("AttacherAccessoireNpc(" + nom, avatar)
         self.assertIn("AnimateAppliedHuman(marche, false", game)
         self.assertIn("AnimateAppliedHuman(false, false, pnj.Phase)", game)
+
+    def test_acces_os_defini_dans_humanpreview_regression_cs1061(self):
+        source = (ROOT / "compilation/unity/Assets/Scripts/AdminHumanCreator.cs").read_text()
+        facade = source.split("public Transform AppliedBone", 1)[1].split("private void EnsurePreviewCamera", 1)[0]
+        self.assertIn("appliedHuman.FindBone(nom)", facade)
+        interieur = source.split("private sealed class HumanPreview", 1)[1]
+        self.assertIn("public Transform FindBone(string name)", interieur)
+        lookup = interieur.split("public Transform FindBone(string name)", 1)[1].split("private void LoadTargets", 1)[0]
+        self.assertIn("bones == null || boneIndexes == null", lookup)
+        self.assertIn("boneIndexes.TryGetValue(name, out index)", lookup)
+        self.assertIn("index >= bones.Length", lookup)
+        self.assertIn("return bones[index]", lookup)
 
     def test_id_texte_et_validation_du_client(self):
         dto = (ROOT / "compilation/unity/Assets/Scripts/LibreViesNpc.cs").read_text()

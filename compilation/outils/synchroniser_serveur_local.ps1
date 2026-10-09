@@ -92,8 +92,8 @@ if ([IO.Path]::GetFullPath($Sources).TrimEnd('\') -eq [IO.Path]::GetFullPath($de
 if (!(Test-Path -LiteralPath $destination)) { New-Item -ItemType Directory -Path $destination | Out-Null }
 $nombre = 0
 # Le helper doit arriver avant l'API qui l'inclut.
-foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'personnage.sql', 'npc.sql', 'remplir_npc.sql', 'mettre_a_jour_personnage.sql', 'classement.sql',
-    'membre.sql', 'ajouter_droit.sql', 'corriger_membre.sql', 'config.php.example', 'README.md', 'api.php')) {
+foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'personnage.sql', 'npc.sql', 'classement.sql',
+    'membre.sql', 'config.php.example', 'README.md', 'api.php')) {
     $source = Join-Path $Sources $nom
     $cible = Join-Path $destination $nom
     if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw ('Source serveur absente : ' + $nom) }
@@ -102,7 +102,16 @@ foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'personnage.sql'
     Copy-Item -LiteralPath $source -Destination $cible -Force
     $nombre++
 }
+# Retirer uniquement les anciennes migrations publiques connues : ni BDD,
+# ni config.php, ni fichiers locaux inconnus ne sont touches.
+foreach ($ancien in @('ajouter_droit.sql', 'remplir_npc.sql', 'mettre_a_jour_personnage.sql', 'corriger_membre.sql')) {
+    $cibleAncienne = Join-Path $destination $ancien
+    if (Test-Path -LiteralPath $cibleAncienne -PathType Leaf) {
+        Remove-Item -LiteralPath $cibleAncienne -Force
+        Write-Host ('        Ancien script SQL retire : ' + $ancien)
+    }
+}
 Write-Host ('        API locale : ' + $nombre + ' fichier(s) mis a jour depuis jeu\serveur.')
 Write-Host '        Configuration MySQL conservee : config.php n est jamais remplace.'
-Write-Host '        Les migrations SQL restent dans jeu\serveur, sans import automatique.'
+Write-Host '        Schemas actuels conserves dans jeu\serveur, sans import automatique.'
 exit 0

@@ -142,12 +142,14 @@ class ContratPersonnage(unittest.TestCase):
         self.assertLess(initial.index("INSERT INTO classement"), initial.index("$pdo->commit()"))
         self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0, 0)", initial)
 
-    def test_migration_ne_supprime_pas_les_profils_et_sync_preserve_config(self):
-        migration = (ROOT / "jeu/serveur/mettre_a_jour_personnage.sql").read_text()
-        self.assertNotIn("DROP TABLE", migration.upper())
-        self.assertNotIn("TRUNCATE", migration.upper())
-        self.assertIn("WHERE `default` = 1", migration)
-        self.assertIn("WHERE p.id IS NULL", migration)
+    def test_schema_actuel_et_sync_preservent_config(self):
+        schema = (ROOT / "jeu/serveur/personnage.sql").read_text()
+        self.assertNotIn("DROP TABLE", schema.upper())
+        self.assertNotIn("TRUNCATE", schema.upper())
+        self.assertIn("NULL DEFAULT NULL", schema)
+        self.assertIn("REFERENCES membre (id)", schema)
+        for nom in ("ajouter_droit.sql", "remplir_npc.sql", "mettre_a_jour_personnage.sql", "corriger_membre.sql"):
+            self.assertFalse((ROOT / "jeu/serveur" / nom).exists())
         synchronisation = (ROOT / "compilation/outils/synchroniser_serveur_local.ps1").read_text()
         fichiers = section(synchronisation, "foreach ($nom in @(", "$source =")
         self.assertIn("'personnage.php'", fichiers)

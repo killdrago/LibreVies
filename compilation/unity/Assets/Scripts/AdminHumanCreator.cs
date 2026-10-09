@@ -280,6 +280,16 @@ public sealed class AdminHumanCreator : MonoBehaviour
             root = null;
         }
 
+        // Renvoie un os existant sans modifier le rig ni sa pose.
+        // Utilise par AppliedBone pour attacher les accessoires des NPC.
+        public Transform FindBone(string name)
+        {
+            if (string.IsNullOrEmpty(name) || bones == null || boneIndexes == null) return null;
+            int index;
+            if (!boneIndexes.TryGetValue(name, out index) || index < 0 || index >= bones.Length) return null;
+            return bones[index];
+        }
+
         private void LoadTargets()
         {
             string[] names =

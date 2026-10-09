@@ -339,8 +339,8 @@ nouveau jeu doit afficher **0.5.81** et le pseudo en troisieme personne.
 Cette version contient aussi les poignees et le correctif de profondeur/taille
 des affiches. Aucun build Unity natif n'a ete execute dans le sandbox Linux.
 
-Importer une seule fois `jeu/serveur/ajouter_droit.sql` avant les nouvelles
-inscriptions si la colonne manque. Les trois insertions membre/personnage/
+Le schema actuel `jeu/serveur/membre.sql` contient `droit` ; les anciens
+scripts de migration ne font plus partie du paquet serveur. Les trois insertions membre/personnage/
 classement restent atomiques ; `valider=0`, `droit=0`, sliders NULL a la creation.
 Le vrai `config.php`, les donnees utilisateur et l'Autolog ne sont pas distribues.
 
@@ -350,3 +350,18 @@ Recettes ajoutees :
 python -B compilation/outils/test_correctifs_81.py
 python -B compilation/outils/test_entete_launcher.py
 ```
+
+## Correction du build et nettoyage serveur
+
+L'erreur Unity CS1061 sur `HumanPreview.FindBone` est corrigee : la methode
+publique existe dans le rig et retourne seulement un os valide, sans modifier
+la pose ni le maillage. Relancer `compilation/build_launcher.bat` recupere cette
+correction avant compilation. Version du jeu inchangee : **0.5.85**.
+
+Les anciennes migrations SQL et le script de peuplement ponctuel sont retires
+de `jeu/serveur`. Aucun profil de BDD n'est efface ni rerandomise par le build.
+La synchronisation ne reclame plus ces fichiers et retire leurs anciennes
+copies publiques connues. `config.php` et les fichiers inconnus sont preserves.
+Seule une fixture SQL de recette reste dans `compilation/outils/fixtures`, hors
+paquet serveur, pour les tests. Conserver les schemas actuels pour une nouvelle
+installation (membre, personnage, classement, npc).

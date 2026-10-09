@@ -15,7 +15,7 @@ function lire_npcs_village($pdo) {
             $profil = valider_profil_personnage($ligne);
         } catch (InvalidArgumentException $erreur) {
             throw new InvalidArgumentException('Profil NPC ' . $id . ' incomplet/invalide : '
-                . $erreur->getMessage() . ' Executez jeu/serveur/remplir_npc.sql.');
+                . $erreur->getMessage() . ' Completez ce profil dans la table npc.');
         }
         $profils[$id] = array_merge(array('id' => $id), $profil,
             array('objets' => isset($ligne['objets']) ? (string)$ligne['objets'] : null));
@@ -24,7 +24,7 @@ function lire_npcs_village($pdo) {
     foreach (identifiants_npc_village() as $id) {
         if (!isset($profils[$id])) {
             throw new InvalidArgumentException('NPC manquant : ' . $id
-                . '. Executez jeu/serveur/remplir_npc.sql.');
+                . '. Ajoutez son profil complet dans la table npc.');
         }
         $resultat[] = $profils[$id];
     }

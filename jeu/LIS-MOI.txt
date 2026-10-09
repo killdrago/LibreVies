@@ -13,7 +13,7 @@ Poignees : rond blanc a droite, mi-hauteur, de la taille du nez du maire.
 Aucune publication ni copie dans un autre dossier n'est necessaire pour tester.
 Le deplacement vers un serveur de distribution sera fait manuellement plus tard.
 
-Avatars NPC : importer jeu/serveur/remplir_npc.sql avant le build.
+Avatars NPC : les six profils complets doivent etre presents dans la table npc. Les anciens scripts SQL de mise en place sont retires.
 Les six profils sont lus en BDD a la connexion et reconstruits en MakeHuman.
 Relancer le SQL change leurs apparences, pas leurs positions ou fonctions.
 

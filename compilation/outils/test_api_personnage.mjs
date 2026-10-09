@@ -130,7 +130,7 @@ const token = login.session.token;
 await request('get_npcs', {}, 401);
 await request('get_npcs', { session_token: login.session.token }, 409);
 const npcColumns = ['sexe', ...sliders, 'teinte_peau', 'coiffure', 'chaussures', 'chapeau', 'tenue'];
-const seedMySQL = source('remplir_npc.sql');
+const seedMySQL = readFileSync(join(root, 'compilation/outils/fixtures/npc_profiles_fixture.sql'), 'utf8');
 const seedSqlite = seedMySQL.slice(seedMySQL.indexOf('INSERT INTO npc'), seedMySQL.indexOf('ON DUPLICATE KEY UPDATE'))
     + 'ON CONFLICT(id) DO UPDATE SET ' + npcColumns.map(name => name + '=excluded.' + name).join(', ') + ';';
 const seedBootstrap = `$pdo->sqliteCreateFunction('RAND', function () { return mt_rand(0, 9999999) / 10000000; });

@@ -1,3 +1,4 @@
+-- Recette de test uniquement : jamais copiee dans le paquet serveur.
 -- Executer apres npc.sql. Les profils sont tires UNE fois en BDD,
 -- puis restent identiques a chaque connexion.
 -- Relancer cette requete rerandomise les 6 avatars (objets deja presents preserves).
