@@ -160,6 +160,64 @@ def installer(log):
 # Generation (execute par l'environnement IA, avec --worker)
 # ---------------------------------------------------------------------------
 
+def colorer_depuis_photo(mesh, image):
+    """Remplace les couleurs de sommets de TripoSR (pales) par celles de la photo.
+
+    Le maillage est projete sur la photo : l'axe Y du modele (tete -> bout du manche)
+    correspond a l'axe horizontal de la photo. L'axe de profondeur (X ou Z) et son sens
+    sont choisis automatiquement : on garde la correspondance ou le manche (clair) et
+    la tete (sombre) ressortent le mieux, comme sur la photo.
+    """
+    import numpy as np
+
+    im = np.asarray(image.convert("RGB")).astype(np.float32)
+    bord = np.concatenate([im[:4].reshape(-1, 3), im[-4:].reshape(-1, 3)])
+    fond = np.median(bord, axis=0)
+    ys, xs = np.where(np.abs(im - fond).sum(-1) > 60)
+    if xs.size == 0:
+        raise RuntimeError("objet introuvable dans la photo")
+    X0, X1, Y0, Y1 = xs.min(), xs.max(), ys.min(), ys.max()
+
+    V = np.asarray(mesh.vertices, dtype=np.float64)
+    centre = (V.min(0) + V.max(0)) / 2.0
+    demi = (V.max(0) - V.min(0)) / 2.0
+    hauteur = V[:, 1].max() - V[:, 1].min()
+    ymin = V[:, 1].min()
+    tete = V[:, 1] < ymin + 0.17 * hauteur
+    manche = (V[:, 1] > ymin + 0.40 * hauteur) & \
+        (np.abs(V[:, 0] - centre[0]) < 0.35 * demi[0]) & \
+        (np.abs(V[:, 2] - centre[2]) < 0.35 * demi[2])
+    if not tete.any() or not manche.any():
+        raise RuntimeError("forme du modele inattendue")
+
+    def projeter(axe, signe):
+        px = X0 + (V[:, 1] - ymin) / hauteur * (X1 - X0)
+        d = (V[:, axe] - centre[axe]) / max(demi[axe], 1e-9)
+        py = (Y0 + Y1) / 2.0 - signe * d * (Y1 - Y0) / 2.0
+        px = np.clip(np.round(px).astype(int), 0, im.shape[1] - 1)
+        py = np.clip(np.round(py).astype(int), 0, im.shape[0] - 1)
+        return im[py, px]
+
+    meilleur = None
+    for axe in (0, 2):
+        for signe in (1, -1):
+            c = projeter(axe, signe)
+            lum = c.mean(axis=1)
+            score = lum[manche].mean() - lum[tete].mean()
+            if meilleur is None or score > meilleur[0]:
+                meilleur = (score, c, axe, signe)
+    score, couleurs, axe, signe = meilleur
+    if score < 30:
+        raise RuntimeError("la photo ne correspond pas clairement au modele (ecart %.0f)" % score)
+
+    rgba = np.zeros((len(V), 4), dtype=np.uint8)
+    rgba[:, :3] = np.clip(couleurs, 0, 255).astype(np.uint8)
+    rgba[:, 3] = 255
+    mesh.visual.vertex_colors = rgba
+    print("Couleurs reprises de la photo (axe %s, sens %+d, ecart %.0f)." % (
+        "XZ"[axe // 2], signe, score), flush=True)
+
+
 def texturer(mesh, resolution=1024):
     """Deplie le maillage (UV, xatlas) et cuit les couleurs de la photo dans une texture.
 
@@ -298,6 +356,10 @@ def generer(args):
     os.makedirs(dossier, exist_ok=True)
     image.save(os.path.join(dossier, "photo_traitee.png"))
     print("Depliage UV et cuisson de la texture (couleurs de la photo)...", flush=True)
+    try:
+        colorer_depuis_photo(mesh, image)
+    except Exception as erreur:
+        print("Couleurs de la photo non reprises (" + str(erreur) + ") : couleurs TripoSR gardees.", flush=True)
     try:
         mesh_uv, image_tex, uv, F2, V2 = texturer(mesh)
         exporter_texture(mesh_uv, image_tex, uv, F2, V2, dossier, args.nom)
