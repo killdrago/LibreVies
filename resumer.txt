@@ -74,6 +74,21 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — OUTIL PHOTO VERS 3D (TRIPOSR, CPU)
+  Demande : un seul fichier qui vérifie, installe et crée tout ce qui manque, puis
+  ouvre l'outil de génération de modèles 3D à partir d'une photo.
+  Fichier : compilation/LibreVies_IA_3D.py (lancement : double-clic ou python).
+  Crée compilation/IA/ : venv (IA/venv), code officiel TripoSR (IA/TripoSR, téléchargé
+  depuis codeload.github.com), modèles (IA/modeles), sorties (IA/sorties/<nom>/ en .glb et .obj).
+  Si le dossier unity existe, copie le .obj dans unity/Assets/Resources/Items/<nom>/.
+  Choix techniques : torchmcubes remplacé par scikit-image (évite une compilation sous
+  Windows) via un module de remplacement IA/TripoSR/torchmcubes.py ; rendu de texture
+  désactivé (couleurs de sommets seulement, non lues par Unity en .obj). Aucune carte
+  NVIDIA requise : calcul sur processeur.
+  Test effectué : compilation syntaxique du fichier ; remplacement scikit-image testé sur
+  une sphère. NON testé sur Windows : installation pip, téléchargement des modèles, génération.
+  Dépendance : .gitignore ignore /compilation/IA/.
+
 MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BAT REVENU A LA VERSION D'ORIGINE + JSON
   Constat utilisateur : après les ajouts (symbolic-ref, CRLF), build_launcher.bat affiche
   « Le système ne trouve pas le nom de fichier de commandes - preparer_git » avant la
