@@ -128,7 +128,7 @@ credentials dans les diagnostics/Git.
 Flux actif : **Git -> compilation/build_launcher.bat -> jeu/LibreVies.exe**.
 Aucune publication ou copie dans un autre dossier n'est necessaire. Le marqueur
 `jeu/game/version_jeu.json` verifie l'assembly ; un ancien jeu 0.5.79 n'est jamais
-renomme artificiellement en nouvelle version. Sources actuelles : **0.5.86**.
+renomme artificiellement en nouvelle version. Sources actuelles : **0.5.87**.
 Pseudo visible en troisieme personne. Les avatars NPC utilisent le meme
 createur MakeHuman que le joueur, en conservant roots/positions/fonctions.
 
@@ -179,3 +179,66 @@ Les hallebardes suivent le centre de la paume (poignet vers racine du majeur)
 apres l'animation et gardent l'axe vertical du garde, pas celui de son poignet.
 La reconstruction d'un avatar detache ses accessoires avant de supprimer
 l'ancienne armature, puis les rattache a la nouvelle main.
+
+## Administration des joueurs et bannissement (0.5.87 — 10/10/2026)
+
+Dans ce projet la table s'appelle **membre**, au singulier. Nouvelle colonne :
+`bani ENUM('non','oui') NOT NULL DEFAULT 'non'`. Une inscription impose `non`,
+même si le client envoie un autre statut. Le schéma `membre.sql` est à jour
+pour une installation neuve ; il ne modifie pas une ancienne table existante.
+
+**Base existante : sauvegarder, puis ajouter UNE FOIS la colonne avant de
+lancer la nouvelle API/le jeu.** Ne pas importer/recréer toute la table :
+
+```sql
+USE librevies;
+ALTER TABLE membre
+  ADD COLUMN bani ENUM('non', 'oui') NOT NULL DEFAULT 'non';
+```
+
+Si `SHOW COLUMNS FROM membre LIKE 'bani';` retourne déjà la colonne, ne pas
+exécuter cet ALTER à nouveau et ne pas remettre tous les statuts à non.
+Aucune migration n'est exécutée automatiquement par le build ou PHP.
+L'API refuse explicitement un schéma sans cette colonne, au lieu de supposer
+que tous les joueurs sont autorisés. `config.php` reste préservé.
+
+Dans **ADMIN > Joueur** : saisie d'un pseudo, RECHERCHER, résultats cliquables,
+caractéristiques en dessous, case Bannir et VALIDER. Les caractéristiques sont
+les informations de compte, profil et classement **enregistrées en BDD** ; les
+PV/or/position locaux sont affichés seulement pour le compte actuellement joué.
+Le mot de passe/hash et les jetons ne sont jamais affichés ni retournés.
+Fermer ou cocher sans VALIDER n'écrit rien. Seule la colonne `membre.bani` est
+modifiée ; personnage, scores, droits, coordonnées et autres comptes sont préservés.
+
+API POST uniquement (health reste disponible en GET) :
+- `search_players`: session_token, search -> players, identité de l'admin ;
+- `get_player`: session_token, player_id -> player (membre/personnage/classement) ;
+- `save_player_ban`: session_token, player_id, bani='oui'/'non' -> état relu.
+
+Ces trois actions exigent un membre **non bani, droit exactement 1**, relu à
+chaque requête. Recherche partielle préparée, caractères SQL %/_/! littéraux,
+30 résultats maximum. L'écriture revalide/verrouille l'admin et la cible dans
+la transaction InnoDB ; les données de compte fournies par le client ne sont
+jamais une preuve d'identité/droit. Un droit retiré ou une panne SQL est refusé.
+
+Un compte `bani=oui` est refusé à la connexion et sur ses anciennes sessions,
+avec HTTP 403, code `membre_bani` et le message :
+`Joueur bani veuillez contacter l'administrateur`.
+Le launcher **4.2.3** exige explicitement `bani=non`, revérifie via PHP au clic
+JOUER et toutes les 10 secondes tant qu'il reste connecté. Un serveur inaccessible,
+un champ absent ou une session invalide ne débloquent pas le jeu. Une erreur 401
+réaffiche la connexion ; aucun mot de passe n'est nécessaire pour ces contrôles.
+Autolog DPAPI reste local/chiffré, jamais de jeton/secret dans un fichier ou log.
+Le bannissement ne prétend pas être un système de kick multijoueur : les appels
+API sont interdits ; le jeu local déjà lancé n'a pas une autorité réseau de mouvement.
+
+Tester ban puis unban sur un **autre compte de test**, pas sur son propre admin :
+un auto-bannissement supprime aussi l'accès ADMIN (avertissement dans le panel).
+La validation native Unity/Windows/MySQL reste à effectuer après le build 0.5.87.
+
+Les armes des gardes sont maintenant alignées sur le centre mesuré du **mesh de
+hampe importé**, pas uniquement sur le pivot vide (OBJ éventuellement décentré/
+miroité). Compensation TransformVector après animation, hauteur du pseudo inchangée,
+texte du pseudo réduit de 0.035 à 0.0175. Aucune ressource MakeHuman modifiée.
+
+Recette complémentaire : `python -B compilation/outils/test_bani.py`.

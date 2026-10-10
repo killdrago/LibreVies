@@ -140,7 +140,7 @@ class ContratPersonnage(unittest.TestCase):
         self.assertIn("INSERT INTO classement (id, experience, chasse, territoire)", initial)
         self.assertIn("VALUES (:id, 0, 0, 0)", initial)
         self.assertLess(initial.index("INSERT INTO classement"), initial.index("$pdo->commit()"))
-        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0, 0)", initial)
+        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0, 0, 'non')", initial)
 
     def test_schema_actuel_et_sync_preservent_config(self):
         schema = (ROOT / "jeu/serveur/personnage.sql").read_text()
@@ -175,7 +175,7 @@ class SessionLauncher(unittest.TestCase):
 
     def reponse(self):
         return {"ok": True, "message": "Connexion reussie.",
-                "membre": {"id": 123, "pseudo": "Pseudo Canonique", "valider": 0},
+                "membre": {"id": 123, "pseudo": "Pseudo Canonique", "valider": 0, "bani": "non"},
                 "session": {"token": "jeton-secret-recette-0123456789", "expires_at": 4102444800},
                 "_api_url_utilisee": "http://localhost/serveur/api.php"}
 

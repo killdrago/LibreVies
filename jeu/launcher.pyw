@@ -1,5 +1,5 @@
 """
-LibreVies — Launcher joueur (version 4.2.2)
+LibreVies — Launcher joueur (version 4.2.3)
 
 Travail courant : dossier jeu en mode LOCAL.
   1. le build fabrique jeu/game et son marqueur de version verifie ;
@@ -107,9 +107,9 @@ AUTH_TIMEOUT = 15
 CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.2.2"
+LAUNCHER_VERSION = "4.2.3"
 GAME_VERSION = "0.5.79"  # Ancienne version distribuee, jamais un numero invente pour le binaire.
-LOCAL_GAME_VERSION = "0.5.86"
+LOCAL_GAME_VERSION = "0.5.87"
 # Travail courant : dossier jeu uniquement. En mode local, aucun fichier
 # compile distant ne peut remplacer l'export de compilation.
 DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"
@@ -258,10 +258,32 @@ def journal_auth(message):
         pass
 
 
-def auth_api_request(action, payload):
+BANI_MESSAGE = "Joueur bani veuillez contacter l'administrateur"
+
+
+class CompteBaniError(ValueError):
+    pass
+
+
+class SessionCompteError(ValueError):
+    pass
+
+
+def verifier_statut_bani(membre):
+    """Ne jamais assimiler un champ absent/ancien serveur a bani=non."""
+    if not isinstance(membre, dict):
+        raise ValueError('Reponse du compte incomplete.')
+    if membre.get('bani') == 'oui':
+        raise CompteBaniError(BANI_MESSAGE)
+    if membre.get('bani') != 'non':
+        raise ValueError('Statut bani manquant ou inconnu : mettez a jour l API et le schema membre.')
+    return 'non'
+
+
+def auth_api_request(action, payload, api_url=None):
     """Appelle l'API HTTP ; le launcher ne contient aucun mot de passe MySQL."""
     config = load_auth_config()
-    url = config['api_url']
+    url = api_url or config['api_url']
     if not url.lower().startswith(('http://', 'https://')):
         journal_auth('ERREUR action=%s URL invalide' % action)
         raise ValueError("URL d authentification invalide")
@@ -303,6 +325,10 @@ def auth_api_request(action, payload):
         journal_auth('HTTP ERREUR action=%s code=%s duree=%.2fs message=%s' % (
             action, erreur.code, time.time() - debut_http,
             message or 'reponse HTTP sans JSON'))
+        if isinstance(resultat, dict) and resultat.get('code') == 'membre_bani':
+            raise CompteBaniError(BANI_MESSAGE)
+        if erreur.code == 401 and action != 'login':
+            raise SessionCompteError(str(message or 'Session expiree : reconnectez-vous.'))
         raise ValueError(str(message or 'Serveur HTTP %s' % erreur.code))
     except urllib.error.URLError as erreur:
         journal_auth('RESEAU action=%s duree=%.2fs type=%s erreur=%s' % (
@@ -316,6 +342,8 @@ def auth_api_request(action, payload):
     if not isinstance(resultat, dict) or not resultat.get('ok'):
         message = resultat.get('message') if isinstance(resultat, dict) else None
         journal_auth('REFUS action=%s message=%s' % (action, message or 'reponse invalide'))
+        if isinstance(resultat, dict) and resultat.get("code") == "membre_bani":
+            raise CompteBaniError(BANI_MESSAGE)
         raise ValueError(str(message or "reponse invalide du serveur"))
     if action == 'login':
         resultat['_api_url_utilisee'] = url
@@ -1091,6 +1119,7 @@ def session_compte(resultat):
     session = resultat.get('session') or {}
     if not isinstance(membre, dict) or not isinstance(session, dict):
         raise ValueError('Reponse du compte incomplete.')
+    verifier_statut_bani(membre)
     identifiant = int(membre.get('id', 0) or 0)
     pseudo = membre.get('pseudo', '')
     jeton = session.get('token', '')
@@ -1166,6 +1195,9 @@ class App(tk.Tk):
         self.updates_done = False
         self.authenticated = False
         self.auth_busy = False
+        self.compte_bani = False
+        self.compte_verifie = False
+        self.verification_compte_en_cours = False
         self.logged_pseudo = ""
         self.logged_membre_id = 0
         self.session_token = ''
@@ -1179,6 +1211,7 @@ class App(tk.Tk):
         self.autolog = migrate_legacy_autolog()
         self.build()
         self.after(50, self._drain_ui_queue)
+        self.after(10000, self._controle_compte_periodique)
         self._load_autolog_login()
         if self.autolog:
             # Un joueur deja connu n'a plus besoin du cadre Inscription.
@@ -1477,6 +1510,8 @@ class App(tk.Tk):
         if self.auth_busy:
             return
         self.auth_busy = True
+        self.compte_bani = False
+        self.compte_verifie = False
         journal_auth('DEMANDE UI action=%s automatique=%s' % (action, automatic))
         self.auth_message = ('Verification du pseudo et de l email...'
                              if action == 'register' else '')
@@ -1540,8 +1575,9 @@ class App(tk.Tk):
                 self._ui_call(lambda message=message_erreur:
                               self._registration_failed(message))
             else:
-                self._ui_call(lambda message=message_erreur, auto=automatic:
-                              self._auth_failed(message, automatic=auto))
+                bani = isinstance(erreur, CompteBaniError)
+                self._ui_call(lambda message=message_erreur, auto=automatic, interdit=bani:
+                              self._auth_failed(message, automatic=auto, banned=interdit))
 
     def _registration_failed(self, message='Inscription impossible.'):
         journal_auth('INSCRIPTION ECHEC affichee au joueur message=%s' % message)
@@ -1589,6 +1625,9 @@ class App(tk.Tk):
         self.auth_busy = False
         self.auth_message = ''
         self.authenticated = True
+        self.compte_bani = False
+        self.compte_verifie = True
+        self.verification_compte_en_cours = False
         self.logged_pseudo = pseudo
         self.logged_membre_id = int(membre_id or 0)
         self.session_token = session_token
@@ -1615,9 +1654,12 @@ class App(tk.Tk):
         self._upd_bar(100, 'Connexion reussie')
         self._update_play_state()
 
-    def _auth_failed(self, message, automatic=False):
+    def _auth_failed(self, message, automatic=False, banned=False):
         self.auth_busy = False
         self.authenticated = False
+        self.compte_bani = bool(banned)
+        self.compte_verifie = False
+        self.verification_compte_en_cours = False
         self.logged_membre_id = 0
         self.session_token = ''
         self.session_expires_at = 0
@@ -1706,6 +1748,8 @@ class App(tk.Tk):
     # ============================================================
 
     def _upd_bar(self, pct, txt):
+        if getattr(self, 'compte_bani', False):
+            pct, txt = 0, BANI_MESSAGE
         w = max(2, int(pct / 100 * 698))
         self.canvas.coords(self.bar_fill, 21, 701, 21 + w, 739)
         self.canvas.itemconfig(self.bar_text, text=txt)
@@ -1864,7 +1908,11 @@ class App(tk.Tk):
                           or 'Jeu non installe : verifiez la connexion puis relancez')
 
     def _update_play_state(self):
-        autorise = bool(self.updates_done and self.authenticated and self.session_token and self.game)
+        autorise = bool(self.updates_done and self.authenticated and self.session_token and self.game
+                        and getattr(self, 'compte_verifie', False)
+                        and not getattr(self, 'compte_bani', False)
+                        and not getattr(self, 'verification_compte_en_cours', False)
+                        and not getattr(self, 'auth_busy', False))
         if autorise:
             self.play_btn.config(state='normal', bg=GREEN)
             message = getattr(self, 'diagnostic_ancien_jeu', '') or 'Pret ! Cliquez sur JOUER'
@@ -1874,6 +1922,15 @@ class App(tk.Tk):
             self._upd_bar(100, message)
             return
         self.play_btn.config(state='disabled', bg='#444444')
+        if getattr(self, 'compte_bani', False):
+            self._upd_bar(0, BANI_MESSAGE)
+            return
+        if getattr(self, 'verification_compte_en_cours', False):
+            self._upd_bar(0, 'Verification du compte avant JOUER...')
+            return
+        if self.authenticated and not getattr(self, 'compte_verifie', False):
+            self._upd_bar(0, self.auth_message or 'Verification du compte necessaire')
+            return
         if not self.updates_done:
             return
         if not self.authenticated:
@@ -1889,8 +1946,78 @@ class App(tk.Tk):
     # LANCEMENT DU JEU
     # ============================================================
 
+    def _controle_compte_periodique(self):
+        # Relecture en BDD via PHP, meme si le launcher etait deja connecte.
+        if (self.authenticated and not self.auth_busy
+                and not self.verification_compte_en_cours):
+            self._verifier_compte(ouvrir_jeu=False)
+        self.after(10000, self._controle_compte_periodique)
+
+    def _verifier_compte(self, ouvrir_jeu=False):
+        if (not self.authenticated or getattr(self, 'compte_bani', False)
+                or getattr(self, 'verification_compte_en_cours', False)
+                or getattr(self, 'auth_busy', False)):
+            return
+        if not self.session_token or self.session_expires_at <= time.time():
+            self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
+            return
+        self.verification_compte_en_cours = True
+        self.compte_verifie = False
+        self._update_play_state()
+        threading.Thread(target=self._verification_compte_worker,
+                         args=(self.session_token, self.logged_membre_id,
+                               self.connected_api_url, ouvrir_jeu), daemon=True).start()
+
+    def _verification_compte_worker(self, token, identifiant, api_url, ouvrir_jeu):
+        resultat, erreur = None, None
+        try:
+            # URL de la session deja authentifiee, pas un autre serveur modifie
+            # entre temps. Aucun mot de passe/env/fichier pour cette verification.
+            resultat = auth_api_request('get_character', {'session_token': token}, api_url=api_url)
+            membre = resultat.get('membre') or {}
+            verifier_statut_bani(membre)
+            if int(membre.get('id', 0) or 0) != identifiant:
+                raise SessionCompteError('Identite du compte non confirmee : reconnectez-vous.')
+        except Exception as exception:
+            erreur = exception
+        self._ui_call(lambda r=resultat, e=erreur, t=token, ouvrir=ouvrir_jeu:
+                      self._fin_verification_compte(t, r, e, ouvrir))
+
+    def _fin_verification_compte(self, token, resultat, erreur, ouvrir_jeu=False):
+        # Une ancienne reponse ne doit pas agir sur une nouvelle connexion.
+        if token != self.session_token or not self.authenticated or getattr(self, 'auth_busy', False):
+            return
+        self.verification_compte_en_cours = False
+        if erreur is not None:
+            if isinstance(erreur, CompteBaniError):
+                self._auth_failed(BANI_MESSAGE, banned=True)
+            elif isinstance(erreur, SessionCompteError):
+                self._auth_failed(str(erreur))
+            else:
+                self.compte_verifie = False
+                self.auth_message = 'Compte non verifie, JOUER bloque : %s' % str(erreur)[:65]
+                self._update_play_state()
+            return
+        self.compte_verifie = True
+        self.auth_message = ''
+        self._update_play_state()
+        if ouvrir_jeu:
+            self._lancer_jeu_verifie()
+
     def play(self):
         if not (self.updates_done and self.authenticated and self.ready and self.game):
+            return
+        if getattr(self, 'compte_bani', False) or getattr(self, 'verification_compte_en_cours', False):
+            return
+        if not self.session_token or self.session_expires_at <= time.time():
+            self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
+            return
+        # Toujours une derniere relecture serveur au clic, meme apres un poll OK.
+        self._verifier_compte(ouvrir_jeu=True)
+
+    def _lancer_jeu_verifie(self):
+        if not (self.updates_done and self.authenticated and self.ready and self.game
+                and self.compte_verifie and not self.compte_bani and not self.auth_busy):
             return
         if not self.session_token or self.session_expires_at <= time.time():
             self._auth_failed('Session expiree : reconnectez-vous pour jouer.')

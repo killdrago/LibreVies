@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.86";
+    private const string VersionJeu = "0.5.87";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -110,6 +110,14 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+    private string adminPseudoRecherche = "";
+    private LibreViesCompte.Membre[] adminJoueursTrouves = new LibreViesCompte.Membre[0];
+    private LibreViesJoueurAdmin adminJoueurSelectionne;
+    private bool adminJoueurRequeteEnCours;
+    private bool adminJoueurBani;
+    private string adminMessageJoueur = "Recherchez un pseudo puis cliquez sur le joueur.";
+    private Vector2 adminRechercheScroll;
+    private Vector2 adminCaracteristiquesScroll;
     // Le createur humain est maintenant ouvert par le NPC Esthétique, jamais
     // depuis l'administration. Le composant reste reutilisable pour ce panel.
     private AdminHumanCreator humanCreator;
@@ -416,6 +424,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public Transform CoudeG;
         public Transform CoudeD;
         public Transform Hallebarde;
+        // Point reel mesure sur la hampe importee, dans le repere de l'arme.
+        public Vector3 PriseHallebarde;
         public Obstacle Corps;
         public Vector2 Poste;      // la ou il revient quand tout est calme
         public Vector2 Portail;    // la porte qu'il surveille
@@ -2754,6 +2764,31 @@ public sealed class LibreViesGame : MonoBehaviour
         accessoire.localRotation = Quaternion.identity;
     }
 
+    private static Vector3 MesurerPriseHallebarde(Transform arme)
+    {
+        Transform hampe = arme == null ? null : arme.Find("Guard_HalberdShaft");
+        if (hampe == null) throw new InvalidOperationException("Hampe de hallebarde absente.");
+        MeshFilter[] filtres = hampe.GetComponentsInChildren<MeshFilter>(true);
+        Vector3 minimum = Vector3.zero, maximum = Vector3.zero;
+        bool premier = true;
+        for (int i = 0; i < filtres.Length; i++)
+        {
+            if (filtres[i].sharedMesh == null) continue;
+            Bounds bounds = filtres[i].sharedMesh.bounds;
+            for (int coin = 0; coin < 8; coin++)
+            {
+                Vector3 point = bounds.center + Vector3.Scale(bounds.extents, new Vector3(
+                    (coin & 1) == 0 ? -1f : 1f, (coin & 2) == 0 ? -1f : 1f,
+                    (coin & 4) == 0 ? -1f : 1f));
+                point = arme.InverseTransformPoint(filtres[i].transform.TransformPoint(point));
+                if (premier) { minimum = maximum = point; premier = false; }
+                else { minimum = Vector3.Min(minimum, point); maximum = Vector3.Max(maximum, point); }
+            }
+        }
+        if (premier) throw new InvalidOperationException("Mesh de hampe introuvable.");
+        return (minimum + maximum) * 0.5f;
+    }
+
     private void MettreAJourArmeGarde(GardeState garde)
     {
         if (garde == null || garde.CreateurNpc == null || garde.Hallebarde == null) return;
@@ -2761,11 +2796,13 @@ public sealed class LibreViesGame : MonoBehaviour
         Transform doigts = garde.CreateurNpc.AppliedBone("finger3-1.R");
         if (poignet == null) return;
         Vector3 prise = doigts == null ? poignet.position : Vector3.Lerp(poignet.position, doigts.position, 0.65f);
-        // Le pivot importe de la hampe est deja a son point de prise. La main
+        // Le point de prise est mesure dans le mesh importe. La main
         // MakeHuman a un autre axe local : conserver la hampe verticale dans
         // le repere du garde, au lieu de lui appliquer la rotation du poignet.
-        garde.Hallebarde.position = prise;
         garde.Hallebarde.rotation = garde.Root.transform.rotation;
+        // Les OBJ peuvent etre miroites/decentres par l'importeur. Aligner le
+        // vrai centre de la hampe, pas seulement le pivot GameObject vide.
+        garde.Hallebarde.position = prise - garde.Hallebarde.TransformVector(garde.PriseHallebarde);
     }
 
     private bool AppliquerAvatarsNpcs()
@@ -4502,6 +4539,7 @@ public sealed class LibreViesGame : MonoBehaviour
         state.Hallebarde = CreerPivotImporte(state.Model, dossier,
             new Vector3(0.59f, 1.10f, 0.05f), "Pivot_Garde_Hallebarde",
             "Guard_HalberdShaft", "Guard_HalberdBlade", "Guard_HalberdHook", "Guard_HalberdTip");
+        state.PriseHallebarde = MesurerPriseHallebarde(state.Hallebarde);
         AppliquerShaderPersonnage(state.Model);
         TeinterGarde(state.Model, gardes.Count % 2 == 0
             ? new Color(0.18f, 0.34f, 0.78f)
@@ -5746,9 +5784,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerNomJoueur()
     {
-        // Taille precedente 0.14 / 4 : seul le pseudo du joueur est reduit.
+        // Nouvelle demande : 0.035 / 2, sans changer couleur ni hauteur.
         GameObject objet = CreerTexte3D(pseudoJoueur, Vector3.zero,
-            new Color(1f, 0.90f, 0.35f), 0.035f);
+            new Color(1f, 0.90f, 0.35f), 0.0175f);
         if (objet == null)
         {
             Journal("pseudo joueur indisponible : police 3D absente");
@@ -7313,22 +7351,145 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
+    private IEnumerator RechercherJoueursAdministration()
+    {
+        if (!CompteAdministrateur || adminJoueurRequeteEnCours) yield break;
+        adminJoueurRequeteEnCours = true;
+        adminJoueurSelectionne = null;
+        adminJoueursTrouves = new LibreViesCompte.Membre[0];
+        adminMessageJoueur = "Recherche des joueurs...";
+        adminRechercheScroll = adminCaracteristiquesScroll = Vector2.zero;
+        yield return compteJoueur.RechercherJoueurs(adminPseudoRecherche.Trim());
+        adminJoueurRequeteEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { adminMessageJoueur = compteJoueur.Erreur; yield break; }
+        adminJoueursTrouves = compteJoueur.JoueursTrouves ?? new LibreViesCompte.Membre[0];
+        adminMessageJoueur = adminJoueursTrouves.Length == 0 ? "Aucun joueur trouve."
+            : "Cliquez sur un pseudo pour consulter ses caracteristiques.";
+    }
+
+    private IEnumerator ChargerJoueurAdministration(int id)
+    {
+        if (!CompteAdministrateur || adminJoueurRequeteEnCours) yield break;
+        adminJoueurRequeteEnCours = true;
+        adminJoueurSelectionne = null;
+        adminMessageJoueur = "Chargement du joueur...";
+        yield return compteJoueur.ChargerJoueurAdministration(id);
+        adminJoueurRequeteEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { adminMessageJoueur = compteJoueur.Erreur; yield break; }
+        adminJoueurSelectionne = compteJoueur.JoueurAdministratif;
+        adminJoueurBani = adminJoueurSelectionne != null && adminJoueurSelectionne.membre.bani == "oui";
+        adminCaracteristiquesScroll = Vector2.zero;
+        adminMessageJoueur = "Cochez/decochez Bannir, puis VALIDER pour enregistrer en BDD.";
+    }
+
+    private IEnumerator EnregistrerBannissementJoueur()
+    {
+        if (!CompteAdministrateur || adminJoueurRequeteEnCours || adminJoueurSelectionne == null) yield break;
+        int id = adminJoueurSelectionne.membre.id;
+        adminJoueurRequeteEnCours = true;
+        adminMessageJoueur = "Enregistrement du bannissement...";
+        yield return compteJoueur.SauvegarderBannissement(id, adminJoueurBani);
+        adminJoueurRequeteEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { adminMessageJoueur = compteJoueur.Erreur; yield break; }
+        adminJoueurSelectionne = compteJoueur.JoueurAdministratif;
+        adminJoueurBani = adminJoueurSelectionne.membre.bani == "oui";
+        for (int i = 0; i < adminJoueursTrouves.Length; i++)
+            if (adminJoueursTrouves[i].id == id) adminJoueursTrouves[i].bani = adminJoueurSelectionne.membre.bani;
+        adminMessageJoueur = "BDD confirmee : " + adminJoueurSelectionne.membre.pseudo
+            + " / bani = " + adminJoueurSelectionne.membre.bani;
+        if (!CompteAdministrateur) { adminOpen = false; ShowInfo("Votre compte est bani. Reconnectez-vous depuis le launcher."); }
+    }
+
+    private string CaracteristiquesJoueurAdministration()
+    {
+        if (adminJoueurSelectionne == null) return "Selectionnez un joueur dans les resultats ci-dessus.";
+        LibreViesCompte.Membre membre = adminJoueurSelectionne.membre;
+        StringBuilder texte = new StringBuilder();
+        texte.AppendLine("Pseudo : " + membre.pseudo + "     ID : " + membre.id);
+        texte.AppendLine("Email : " + membre.email);
+        texte.AppendLine("Droit : " + membre.droit + "     Validation email : " + membre.valider
+            + "     Bani en BDD : " + membre.bani);
+        LibreViesJoueurAdmin.Classement scores = adminJoueurSelectionne.classement;
+        texte.AppendLine(scores == null ? "Classement : aucune ligne enregistree"
+            : "Experience : " + scores.experience + "     Chasse : " + scores.chasse + "     Territoire : " + scores.territoire);
+        LibreViesPersonnage p = adminJoueurSelectionne.personnage;
+        if (p == null) texte.AppendLine("Profil : " + adminJoueurSelectionne.erreur_personnage);
+        else if (p.EstPrimitif) texte.AppendLine("Personnage non personnalise : default=1, reglages initialement NULL.");
+        else
+        {
+            texte.AppendLine("Sexe : " + p.sexe + "     Peau : " + p.teinte_peau);
+            texte.AppendLine("Coiffure : " + p.coiffure + "     Tenue : " + p.tenue);
+            texte.AppendLine("Chapeau : " + (p.chapeau ?? "Aucun") + "     Chaussures : " + (p.chaussures ?? "Aucune"));
+            string[] noms = { "Tete", "Yeux", "Nez", "Bouche", "Oreilles", "Seins", "Volume jambes",
+                "Hanche", "Ventre", "Largeur bras", "Longueur bras", "Hauteur jambes", "Pieds" };
+            float[] valeurs = { p.tete, p.yeux, p.nez, p.bouche, p.oreilles, p.seins, p.volume,
+                p.hanche, p.ventre, p.largeur_bras, p.longueur_bras, p.hauteur_jambe, p.pieds };
+            for (int i = 0; i < noms.Length; i++)
+                texte.AppendLine(noms[i] + " : " + (valeurs[i] * 100f).ToString("0.####", CultureInfo.InvariantCulture));
+            string objets = p.objets ?? "Aucun";
+            texte.AppendLine("Objets : " + (objets.Length > 500 ? objets.Substring(0, 500) + "..." : objets));
+        }
+        if (compteJoueur.Joueur != null && membre.id == compteJoueur.Joueur.id && player != null)
+        {
+            texte.AppendLine("Joueur actuel (local) : PV " + hp + "/" + MaxHp + ", niveau " + level
+                + ", or " + coins + ", cailloux " + rocks + ", position " + player.position.ToString("F1"));
+        }
+        return texte.ToString();
+    }
+
     private void DessinerAdminJoueur(Rect contenu)
     {
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 12f, 500f, 28f),
-            "JOUEUR ACTUEL", titleStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 540f, 170f),
-            player == null
-                ? "Joueur indisponible"
-                : "Pseudo : " + pseudoJoueur + "\n"
-                    + "Points de vie : " + hp + " / " + MaxHp + "\n"
-                    + "Niveau : " + level + "\n"
-                    + "Or : " + coins + "\n"
-                    + "Cailloux : " + rocks + "\n"
-                    + "Position : " + player.position.ToString("F1"), smallStyle);
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 264f, 700f, 80f),
-            "La creation de personnage se fait maintenant aupres du NPC Esthétique.\n"
-                + "L'administration conserve uniquement les informations du joueur.", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 10f, 700f, 30f), "RECHERCHE DE JOUEUR", titleStyle);
+        bool ancienEnabled = GUI.enabled;
+        GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours;
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 50f, 140f, 24f), "Pseudo :", smallStyle);
+        GUI.SetNextControlName("Admin_RecherchePseudo");
+        adminPseudoRecherche = GUI.TextField(new Rect(contenu.x + 116f, contenu.y + 48f, contenu.width - 350f, 32f),
+            adminPseudoRecherche, 50);
+        bool demanderRecherche = GUI.Button(new Rect(contenu.x + contenu.width - 218f, contenu.y + 48f, 200f, 32f),
+            "RECHERCHER", buttonStyle);
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return
+            && GUI.GetNameOfFocusedControl() == "Admin_RecherchePseudo" && GUI.enabled)
+        { demanderRecherche = true; Event.current.Use(); }
+        if (demanderRecherche) StartCoroutine(RechercherJoueursAdministration());
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 91f, 700f, 22f), "Resultats (cliquez sur un pseudo) :", smallStyle);
+        Rect liste = new Rect(contenu.x + 18f, contenu.y + 118f, contenu.width - 36f, 132f);
+        GUI.Box(liste, "", boxStyle);
+        adminRechercheScroll = GUI.BeginScrollView(liste, adminRechercheScroll,
+            new Rect(0f, 0f, liste.width - 22f, Mathf.Max(liste.height - 4f, adminJoueursTrouves.Length * 30f)));
+        for (int i = 0; i < adminJoueursTrouves.Length; i++)
+        {
+            LibreViesCompte.Membre trouve = adminJoueursTrouves[i];
+            string nom = trouve.pseudo + (trouve.bani == "oui" ? "   [BANI]" : "");
+            if (GUI.Button(new Rect(5f, i * 30f + 2f, liste.width - 38f, 27f), nom, buttonStyle))
+                StartCoroutine(ChargerJoueurAdministration(trouve.id));
+        }
+        GUI.EndScrollView();
+        GUI.enabled = ancienEnabled;
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 265f, 700f, 25f), "CARACTERISTIQUES DU JOUEUR", titleStyle);
+        Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 407f);
+        GUI.Box(details, "", boxStyle);
+        string rapport = CaracteristiquesJoueurAdministration();
+        GUIStyle style = new GUIStyle(smallStyle) { wordWrap = true, richText = false };
+        float hauteur = Mathf.Max(details.height - 4f, style.CalcHeight(new GUIContent(rapport), details.width - 35f) + 12f);
+        adminCaracteristiquesScroll = GUI.BeginScrollView(details, adminCaracteristiquesScroll,
+            new Rect(0f, 0f, details.width - 22f, hauteur));
+        GUI.Label(new Rect(6f, 6f, details.width - 35f, hauteur - 6f), rapport, style);
+        GUI.EndScrollView();
+        GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours && adminJoueurSelectionne != null;
+        adminJoueurBani = GUI.Toggle(new Rect(contenu.x + 18f, contenu.y + contenu.height - 86f, 520f, 30f),
+            adminJoueurBani, "Bannir ce joueur (coche = oui ; decoche = non)");
+        if (GUI.Button(new Rect(contenu.x + contenu.width - 218f, contenu.y + contenu.height - 88f, 200f, 32f),
+            "VALIDER", buttonStyle)) StartCoroutine(EnregistrerBannissementJoueur());
+        GUI.enabled = ancienEnabled;
+        string message = adminMessageJoueur;
+        if (!adminJoueurRequeteEnCours && adminJoueurBani && adminJoueurSelectionne != null
+            && compteJoueur.Joueur != null && adminJoueurSelectionne.membre.id == compteJoueur.Joueur.id)
+            message = "Attention : vous allez bloquer votre propre compte administrateur.";
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + contenu.height - 46f, contenu.width - 36f, 42f), message, style);
     }
 
     private void ValiderEditionHumaine()
@@ -7836,70 +7997,77 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerAdmin()
     {
         if (!CompteAdministrateur) { adminOpen = false; return; }
-        Rect fenetre = new Rect(Screen.width * 0.5f - 590f,
-            Screen.height * 0.5f - 360f, 1180f, 720f);
-        GUI.Box(fenetre, "", boxStyle);
-        GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
-            "ADMINISTRATION", titleStyle);
-        if (GUI.Button(new Rect(fenetre.x + fenetre.width - 42f, fenetre.y + 14f, 28f, 28f),
-            "X", buttonStyle))
+        Matrix4x4 ancienneMatrice = GUI.matrix;
+        float echelleAdmin = Mathf.Min(1f, Screen.width / 1200f, Screen.height / 750f);
+        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(echelleAdmin, echelleAdmin, 1f));
+        try
         {
-            adminOpen = false;
-            return;
-        }
-
-        string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre" };
-        for (int i = 0; i < onglets.Length; i++)
-        {
-            Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
-                132f, 42f);
-            GUI.color = adminTab == i ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
-            if (GUI.Button(onglet, onglets[i], buttonStyle)) adminTab = i;
-            GUI.color = Color.white;
-        }
-
-        Rect contenu = new Rect(fenetre.x + 170f, fenetre.y + 62f,
-            fenetre.width - 190f, fenetre.height - 82f);
-        GUI.Box(contenu, "", boxStyle);
-        if (adminTab == 0)
-        {
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
-                "VILLE", titleStyle);
-            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 100f),
-                "Maisons : " + batiments.Count + "\n"
-                    + "Portails : " + portails.Count + "\n"
-                    + "Objets editables : " + objetsEdition.Count,
-                smallStyle);
-            if (!razVilleConfirmation)
+            Rect fenetre = new Rect(Screen.width / echelleAdmin * 0.5f - 590f,
+                Screen.height / echelleAdmin * 0.5f - 360f, 1180f, 720f);
+            GUI.Box(fenetre, "", boxStyle);
+            GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
+                "ADMINISTRATION", titleStyle);
+            if (GUI.Button(new Rect(fenetre.x + fenetre.width - 42f, fenetre.y + 14f, 28f, 28f),
+                "X", buttonStyle))
             {
-                if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 184f, 240f, 32f),
-                    "RAZ VILLE", buttonStyle))
-                    razVilleConfirmation = true;
+                adminOpen = false;
+                return;
             }
-            else
+
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre" };
+            for (int i = 0; i < onglets.Length; i++)
             {
-                GUI.Label(new Rect(contenu.x + 18f, contenu.y + 178f, 450f, 24f),
-                    "Confirmer : annuler toutes les modifications ?", smallStyle);
-                if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 208f, 120f, 32f),
-                    "CONFIRMER", buttonStyle))
-                    RazEditionVille();
-                if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 208f, 120f, 32f),
-                    "ANNULER", buttonStyle))
-                    razVilleConfirmation = false;
+                Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
+                    132f, 42f);
+                GUI.color = adminTab == i ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+                if (GUI.Button(onglet, onglets[i], buttonStyle)) adminTab = i;
+                GUI.color = Color.white;
+            }
+
+            Rect contenu = new Rect(fenetre.x + 170f, fenetre.y + 62f,
+                fenetre.width - 190f, fenetre.height - 82f);
+            GUI.Box(contenu, "", boxStyle);
+            if (adminTab == 0)
+            {
+                GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
+                    "VILLE", titleStyle);
+                GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 370f, 100f),
+                    "Maisons : " + batiments.Count + "\n"
+                        + "Portails : " + portails.Count + "\n"
+                        + "Objets editables : " + objetsEdition.Count,
+                    smallStyle);
+                if (!razVilleConfirmation)
+                {
+                    if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 184f, 240f, 32f),
+                        "RAZ VILLE", buttonStyle))
+                        razVilleConfirmation = true;
+                }
+                else
+                {
+                    GUI.Label(new Rect(contenu.x + 18f, contenu.y + 178f, 450f, 24f),
+                        "Confirmer : annuler toutes les modifications ?", smallStyle);
+                    if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 208f, 120f, 32f),
+                        "CONFIRMER", buttonStyle))
+                        RazEditionVille();
+                    if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 208f, 120f, 32f),
+                        "ANNULER", buttonStyle))
+                        razVilleConfirmation = false;
+                }
+            }
+            else if (adminTab == 1)
+            {
+                DessinerAdminJoueur(contenu);
+            }
+            else if (adminTab == 2)
+            {
+                DessinerAdminNpc(contenu);
+            }
+            else if (adminTab == 4)
+            {
+                DessinerAdminMonstres(contenu);
             }
         }
-        else if (adminTab == 1)
-        {
-            DessinerAdminJoueur(contenu);
-        }
-        else if (adminTab == 2)
-        {
-            DessinerAdminNpc(contenu);
-        }
-        else if (adminTab == 4)
-        {
-            DessinerAdminMonstres(contenu);
-        }
+        finally { GUI.matrix = ancienneMatrice; }
     }
 
     private void OnGUI()

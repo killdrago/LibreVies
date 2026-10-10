@@ -18,7 +18,7 @@ def section(source, start, end):
 
 class AdminNpc(unittest.TestCase):
     def test_droit_vient_de_la_bdd_et_admin_est_masque(self):
-        self.assertIn("SELECT id, pseudo, valider, droit FROM membre", API)
+        self.assertIn("SELECT id, pseudo, valider, droit, bani FROM membre", API)
         self.assertIn("'droit' => (int)$membre['droit']", API)
         self.assertIn("if (!CompteAdministrateur) { adminOpen = false; return; }", GAME)
         self.assertIn("if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button", GAME)
@@ -69,7 +69,9 @@ class AdminNpc(unittest.TestCase):
         self.assertIn('AppliedBone("wrist.R")', weapon)
         self.assertIn('AppliedBone("finger3-1.R")', weapon)
         self.assertIn("Vector3.Lerp", weapon)
-        self.assertIn("garde.Hallebarde.position = prise", weapon)
+        self.assertIn("garde.Hallebarde.position = prise - garde.Hallebarde.TransformVector(garde.PriseHallebarde)", weapon)
+        self.assertIn("MesurerPriseHallebarde", GAME)
+        self.assertIn("sharedMesh.bounds", GAME)
         self.assertIn("garde.Hallebarde.rotation = garde.Root.transform.rotation", weapon)
         update = section(GAME, "private void UpdateGuards", "private void TuerEnnemiParGarde")
         self.assertLess(update.index("AnimateAppliedHuman(marche"), update.index("MettreAJourArmeGarde(garde)"))

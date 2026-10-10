@@ -45,15 +45,17 @@ php.writeFile('/tests/serveur/securite.php', source('securite.php'));
 php.writeFile('/tests/serveur/npc.php', source('npc.php'));
 const api = source('api.php');
 assert(api.includes('new PDO($dsn,'), 'Le point de remplacement du DSN a change.');
-const apiSQLite = api.replace('new PDO($dsn,', "new PDO('sqlite:/tests/test.sqlite',");
+const apiSQLite = api.replace('new PDO($dsn,', "new PDO('sqlite:/tests/test.sqlite',")
+    .replaceAll(' FOR UPDATE', ''); // SQLite ne valide pas les verrous InnoDB natifs.
 php.writeFile('/tests/serveur/api.php', apiSQLite);
 php.writeFile('/tests/serveur/personnage.php', source('personnage.php')
     .replaceAll('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO'));
 const initialization = `<?php
 $pdo = new PDO('sqlite:/tests/test.sqlite');
-$pdo->exec('CREATE TABLE membre (id INTEGER PRIMARY KEY AUTOINCREMENT,
+$pdo->exec("CREATE TABLE membre (id INTEGER PRIMARY KEY AUTOINCREMENT,
  pseudo TEXT COLLATE NOCASE NOT NULL UNIQUE, motdepasse TEXT NOT NULL,
- email TEXT COLLATE NOCASE NOT NULL UNIQUE, valider INTEGER NOT NULL DEFAULT 0, droit INTEGER NOT NULL DEFAULT 0)');
+ email TEXT COLLATE NOCASE NOT NULL UNIQUE, valider INTEGER NOT NULL DEFAULT 0,
+ droit INTEGER NOT NULL DEFAULT 0, bani TEXT NOT NULL DEFAULT 'non' CHECK(bani IN ('non', 'oui')))");
 $pdo->exec('CREATE TABLE personnage (id INTEGER PRIMARY KEY REFERENCES membre(id),
  \`default\` INTEGER NOT NULL DEFAULT 1, sexe TEXT NULL,
  ${sliders.map(name => name + ' DECIMAL(10,4) NULL').join(', ')},
@@ -102,9 +104,10 @@ const classement = async id => {
     return result;
 };
 const password = 'motdepasse-de-recette-184!';
-const a = await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password, droit: 255 });
+const a = await request('register', { email: 'alice@example.test', pseudo: 'Alice Test', password, droit: 255, bani: 'oui' });
 const b = await request('register', { email: 'bob@example.test', pseudo: 'Bob Test', password });
 const idA = a.membre.id, idB = b.membre.id;
+assert.equal(await sql(`echo json_encode($pdo->query('SELECT bani FROM membre WHERE id=${idA}')->fetchColumn());`), 'non');
 const initial = await row(idA);
 assert.equal(initial.default, 1);
 assert(Object.entries(initial).every(([key, value]) => key === 'id' || key === 'default' || value === null));
@@ -121,6 +124,7 @@ await request('login', { pseudo: 'Alice Test', password: 'incorrect' }, 401);
 const login = await request('login', { pseudo: 'alice test', password });
 assert.equal(login.membre.pseudo, 'Alice Test');
 assert.equal(login.membre.valider, 0);
+assert.equal(login.membre.bani, 'non');
 assert.deepEqual(login.personnage, { id: idA, default: 1 });
 assert(/^[0-9a-f]{64}$/.test(login.session.token) && login.session.expires_at > Date.now() / 1000);
 assert(!JSON.stringify(login).includes(password));
@@ -270,6 +274,76 @@ assert.deepEqual(await classement(idB), { id: idB, experience: 0, chasse: 0, ter
 console.log('OK ancien compte : classement manquant complete sans remise a zero des scores existants');
 
 
+// Recherche/fiches/bannissement : seuls les administrateurs NON banis droit=1.
+const adminCompte = await request('register', { email: 'admin-bani@example.test', pseudo: 'Admin Bani Test', password });
+const idAdmin = adminCompte.membre.id;
+await sql(`$pdo->exec('UPDATE membre SET droit=1 WHERE id=${idAdmin}');`);
+const adminBani = await request('login', { pseudo: 'Admin Bani Test', password });
+const sessionAdmin = adminBani.session.token;
+for (const action of ['search_players', 'get_player', 'save_player_ban']) {
+    await request(action, { search: 'Test', player_id: String(idB), bani: 'oui', droit: 1, id: idAdmin }, 401);
+    await request(action, { session_token: bobLogin.session.token, search: 'Test', player_id: String(idA), bani: 'oui', droit: 1 }, 403);
+}
+let trouves = await request('search_players', { session_token: sessionAdmin, search: 'bOb' });
+assert.equal(trouves.membre.id, idAdmin);
+assert.deepEqual(trouves.players.map(m => m.id), [idB]);
+assert.equal(trouves.players[0].bani, 'non');
+for (const search of ['', '%', '_', "' OR 1=1 --"]) {
+    assert.deepEqual((await request('search_players', { session_token: sessionAdmin, search })).players, []);
+}
+const fiche = await request('get_player', { session_token: sessionAdmin, player_id: String(idA) });
+assert.equal(fiche.membre.id, idAdmin);
+assert.equal(fiche.player.membre.id, idA);
+assert.equal(fiche.player.membre.email, 'alice@example.test');
+assert.equal(fiche.player.personnage.id, idA);
+assert.deepEqual(fiche.player.classement, { experience: '125', chasse: '7', territoire: '3' });
+assert(!JSON.stringify(fiche).includes('motdepasse') && !JSON.stringify(fiche).includes(password));
+for (const player_id of ['0', '-1', '1 OR 1=1', '4294967296']) {
+    await request('get_player', { session_token: sessionAdmin, player_id }, 400);
+}
+await request('get_player', { session_token: sessionAdmin, player_id: '424242' }, 404);
+const cibleAvant = await sql(`echo json_encode($pdo->query('SELECT * FROM membre WHERE id=${idB}')->fetch());`);
+const profilAvantBan = await row(idB), pointsAvantBan = await classement(idB);
+let bani = await request('save_player_ban', { session_token: sessionAdmin, player_id: String(idB), bani: 'oui', droit: 1, motdepasse: 'attaque' });
+assert.equal(bani.player.membre.bani, 'oui');
+const cibleApres = await sql(`echo json_encode($pdo->query('SELECT * FROM membre WHERE id=${idB}')->fetch());`);
+assert.deepEqual(cibleApres, { ...cibleAvant, bani: 'oui' });
+assert.deepEqual(await row(idB), profilAvantBan);
+assert.deepEqual(await classement(idB), pointsAvantBan);
+const bloque = await request('login', { pseudo: 'Bob Test', password }, 403);
+assert.equal(bloque.code, 'membre_bani');
+assert.equal(bloque.message, "Joueur bani veuillez contacter l'administrateur");
+assert(!('session' in bloque));
+await request('login', { pseudo: 'Bob Test', password: 'incorrect' }, 401);
+for (const action of ['get_character', 'save_character', 'get_npcs', 'save_npc', 'search_players']) {
+    const refus = await request(action, { session_token: bobLogin.session.token, personnage: JSON.stringify(draft), search: 'Test', bani: 'non' }, 403);
+    assert.equal(refus.code, 'membre_bani');
+}
+for (const invalide of ['yes', '', '1']) {
+    await request('save_player_ban', { session_token: sessionAdmin, player_id: String(idB), bani: invalide }, 400);
+}
+await request('save_player_ban', { session_token: sessionAdmin, player_id: idB, bani: true }, 400, true);
+await sql(`$pdo->exec("CREATE TRIGGER refuser_bani BEFORE UPDATE OF bani ON membre BEGIN SELECT RAISE(ABORT, 'indisponible'); END");`);
+await request('save_player_ban', { session_token: sessionAdmin, player_id: String(idB), bani: 'non' }, 500);
+assert.equal(await sql(`echo json_encode($pdo->query('SELECT bani FROM membre WHERE id=${idB}')->fetchColumn());`), 'oui');
+await sql("$pdo->exec('DROP TRIGGER refuser_bani');");
+bani = await request('save_player_ban', { session_token: sessionAdmin, player_id: idB, bani: 'non' }, 200, true);
+assert.equal(bani.player.membre.bani, 'non');
+assert.equal((await request('login', { pseudo: 'Bob Test', password })).membre.bani, 'non');
+for (const droit of [2, 0]) {
+    await sql(`$pdo->exec('UPDATE membre SET droit=${droit} WHERE id=${idAdmin}');`);
+    await request('save_player_ban', { session_token: sessionAdmin, player_id: String(idB), bani: 'oui', droit: 1 }, 403);
+}
+await sql(`$pdo->exec('UPDATE membre SET droit=1, bani="oui" WHERE id=${idAdmin}');`);
+await request('search_players', { session_token: sessionAdmin, search: 'Test' }, 403);
+await sql(`$pdo->exec('UPDATE membre SET bani="non" WHERE id=${idAdmin}');`);
+await sql(`for ($i=0; $i<35; $i++) $pdo->exec("INSERT INTO membre(pseudo,motdepasse,email) VALUES ('Limite ". $i ."', 'hash-inutilise', 'limite".$i."@example.test')");`);
+assert.equal((await request('search_players', { session_token: sessionAdmin, search: 'Limite' })).players.length, 30);
+console.log('OK admin joueurs : recherche litterale bornee, fiche compte/profil/classement sans hash ; bans/unbans persistants, seul bani modifie');
+console.log('OK comptes banis : login et anciennes sessions refuses, message exact, pas de jeton ; droits falsifies/revoques et panne SQL refuses');
+
+
+
 await sql(`$pdo->exec('DELETE FROM personnage WHERE id=${idB}');`);
 const legacy = await request('get_character', { session_token: bobLogin.session.token });
 assert.deepEqual(legacy.personnage, { id: idB, default: 1 });
@@ -280,8 +354,17 @@ session_name('LIBREVIES'); session_id('${token}'); session_start();
 $_SESSION['expire_le'] = time() - 1; session_write_close();` });
 assert.equal(expire.exitCode, 0, expire.errors);
 await request('get_character', { session_token: token }, 401);
+// Ancien schema : ne jamais supposer bani=non si la colonne est absente.
+await sql("$pdo->exec('ALTER TABLE membre RENAME COLUMN bani TO bani_absente');");
+const schemaAbsent = await request('health', {}, 500);
+assert(schemaAbsent.message.includes('bani'));
+await sql("$pdo->exec('ALTER TABLE membre RENAME COLUMN bani_absente TO bani');");
+const getInterdit = await php.run({ scriptPath: '/tests/request.php', method: 'GET',
+    relativeUri: '/serveur/api.php?action=get_player&player_id=1' });
+assert.equal(getInterdit.httpStatusCode, 405);
+console.log('OK colonne bani absente : refus explicite sans ALTER automatique ; API comptes/admin POST seulement');
 const logs = php.readFileAsText('/journal_api.log');
-for (const secret of [password, token, loginSansOpenSSL.session.token, reconnect.session.token, bobLogin.session.token])
+for (const secret of [sessionAdmin, password, token, loginSansOpenSSL.session.token, reconnect.session.token, bobLogin.session.token])
     assert(!logs.includes(secret), 'Secret present dans le journal de l API.');
 console.log('OK ancien compte initialise sans ecraser un profil ; session expiree refusee ; aucun secret dans les logs');
 php.exit();

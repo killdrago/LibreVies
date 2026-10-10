@@ -94,7 +94,62 @@ function repondre_doublon($doublons) {
 
 function membre_public($membre) {
     return array('id' => (int)$membre['id'], 'pseudo' => (string)$membre['pseudo'],
-        'valider' => (int)$membre['valider'], 'droit' => (int)$membre['droit']);
+        'valider' => (int)$membre['valider'], 'droit' => (int)$membre['droit'],
+        'bani' => (string)$membre['bani']);
+}
+
+function verifier_bannissement($membre) {
+    // Seul 'non' autorise le jeu. L'identite et ce statut viennent de MySQL,
+    // jamais d'un droit/bani envoye par le client ou d'un ancien cache.
+    if ((string)$membre['bani'] !== 'non') {
+        repondre(false, "Joueur bani veuillez contacter l'administrateur", array(
+            'code' => 'membre_bani', 'membre' => membre_public($membre)
+        ), 403);
+    }
+}
+
+function verifier_administrateur($membre) {
+    if ((int)$membre['droit'] !== 1) {
+        repondre(false, 'Administration des joueurs reservee aux administrateurs.', array(), 403);
+    }
+}
+
+function id_joueur_recu($donnees) {
+    $id = isset($donnees['player_id']) ? $donnees['player_id'] : '';
+    if (is_int($id)) $id = (string)$id; // JSON entier ou formulaire texte.
+    if (!is_string($id) || !preg_match('/^[1-9][0-9]{0,9}$/D', $id)
+        || (float)$id > 4294967295) {
+        repondre(false, 'Identifiant joueur invalide.', array(), 400);
+    }
+    return (int)$id;
+}
+
+function lire_joueur_administration($pdo, $id) {
+    // Lecture admin seulement : aucun mot de passe/hash ni session retourne.
+    $query = $pdo->prepare('SELECT id, pseudo, email, valider, droit, bani FROM membre WHERE id = :id LIMIT 1');
+    $query->execute(array(':id' => $id));
+    $membre = $query->fetch();
+    if (!$membre) return null;
+    $public = membre_public($membre);
+    $public['email'] = (string)$membre['email'];
+    $query = $pdo->prepare('SELECT * FROM personnage WHERE id = :id LIMIT 1');
+    $query->execute(array(':id' => $id));
+    $personnage = $query->fetch();
+    $erreurProfil = '';
+    try {
+        // Un vieux compte sans profil reste consultable sans INSERT implicite.
+        $personnage = $personnage ? personnage_public($personnage) : array('id' => $id, 'default' => 1);
+    } catch (InvalidArgumentException $erreur) {
+        $personnage = null;
+        $erreurProfil = $erreur->getMessage();
+    }
+    $query = $pdo->prepare('SELECT experience, chasse, territoire FROM classement WHERE id = :id LIMIT 1');
+    $query->execute(array(':id' => $id));
+    $classement = $query->fetch();
+    // Transport texte : preserve les BIGINT UNSIGNED sans arrondi JSON/Unity.
+    if ($classement) foreach ($classement as $cle => $valeur) $classement[$cle] = (string)$valeur;
+    return array('membre' => $public, 'personnage' => $personnage,
+        'classement' => $classement ?: null, 'erreur_personnage' => $erreurProfil);
 }
 
 function verifier_validation_email($membre, $config) {
@@ -144,6 +199,9 @@ function creer_session_membre($membre) {
 }
 
 function membre_authentifie($pdo, $config, $donnees) {
+    if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+        repondre(false, 'Les appels du compte exigent un POST, sans session dans une URL.', array(), 405);
+    }
     $jeton = isset($donnees['session_token']) ? $donnees['session_token'] : '';
     if (!is_string($jeton) || !preg_match('/^[a-zA-Z0-9,-]{16,128}$/D', $jeton)) {
         repondre(false, 'Session manquante : reconnectez-vous depuis le launcher.', array(), 401);
@@ -159,7 +217,7 @@ function membre_authentifie($pdo, $config, $donnees) {
     // Liberer le verrou avant les acces SQL et les autres requetes du jeu.
     session_write_close();
     try {
-        $requete = $pdo->prepare('SELECT id, pseudo, valider, droit FROM membre WHERE id = :id LIMIT 1');
+        $requete = $pdo->prepare('SELECT id, pseudo, valider, droit, bani FROM membre WHERE id = :id LIMIT 1');
         $requete->execute(array(':id' => $id));
         $membre = $requete->fetch();
     } catch (PDOException $erreur) {
@@ -168,6 +226,7 @@ function membre_authentifie($pdo, $config, $donnees) {
     if (!$membre) {
         repondre(false, 'Compte du joueur introuvable.', array(), 401);
     }
+    verifier_bannissement($membre);
     verifier_validation_email($membre, $config);
     return $membre;
 }
@@ -203,6 +262,10 @@ if ($method === 'GET') {
     $action = isset($donnees['action']) ? texte_recu($donnees['action'], 40) : '';
 }
 
+if ($method !== 'POST' && $action !== 'health') {
+    repondre(false, 'POST requis pour les comptes et leur administration.', array(), 405);
+}
+
 journal_api('REQUETE methode=' . $method . ' action=' . $action
     . ' email=' . (isset($donnees['email']) ? (string)$donnees['email'] : '')
     . ' pseudo=' . (isset($donnees['pseudo']) ? (string)$donnees['pseudo'] : ''));
@@ -221,6 +284,15 @@ try {
     ));
 } catch (Exception $erreur) {
     repondre(false, detail_erreur($erreur, $config), array(), 503);
+}
+
+// La migration est volontairement manuelle : aucun ALTER TABLE automatique.
+// Refuser plutot que lancer un jeu dont le bannissement ne serait pas verifie.
+try {
+    $pdo->query('SELECT bani FROM membre LIMIT 0');
+} catch (PDOException $erreur) {
+    journal_api('SCHEMA membre.bani indisponible');
+    repondre(false, 'Schema membre incomplet : ajoutez la colonne bani (non/oui, defaut non).', array(), 500);
 }
 
 if ($action === 'health') {
@@ -313,8 +385,8 @@ if ($action === 'register') {
         $pdo->beginTransaction();
         journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
         $requete = $pdo->prepare(
-            'INSERT INTO membre (pseudo, motdepasse, email, valider, droit) '
-            . 'VALUES (:pseudo, :motdepasse, :email, 0, 0)'
+            'INSERT INTO membre (pseudo, motdepasse, email, valider, droit, bani) '
+            . "VALUES (:pseudo, :motdepasse, :email, 0, 0, 'non')"
         );
         $requete->execute(array(
             ':pseudo' => $pseudo,
@@ -377,6 +449,63 @@ if ($action === 'register') {
             'email' => (string)$membre['email'],
         ),
     ));
+}
+
+if ($action === 'search_players' || $action === 'get_player' || $action === 'save_player_ban') {
+    $admin = membre_authentifie($pdo, $config, $donnees);
+    verifier_administrateur($admin); // Relu en BDD a chaque requete, exactement droit=1.
+    try {
+        if ($action === 'search_players') {
+            $recherche = isset($donnees['search']) ? texte_recu($donnees['search'], 50) : '';
+            $joueurs = array();
+            if ($recherche !== '') {
+                // Recherche partielle litterale : %, _ et ! ne sont pas des jokers client.
+                $motif = '%' . str_replace(array('!', '%', '_'), array('!!', '!%', '!_'), $recherche) . '%';
+                $query = $pdo->prepare("SELECT id, pseudo, valider, droit, bani FROM membre WHERE pseudo LIKE :search ESCAPE '!' ORDER BY pseudo, id LIMIT 30");
+                $query->execute(array(':search' => $motif));
+                foreach ($query->fetchAll() as $ligne) $joueurs[] = membre_public($ligne);
+            }
+            repondre(true, 'Recherche terminee.', array('membre' => membre_public($admin), 'players' => $joueurs));
+        }
+        $id = id_joueur_recu($donnees);
+        if ($action === 'save_player_ban') {
+            $bani = isset($donnees['bani']) ? $donnees['bani'] : null;
+            if (!is_string($bani) || ($bani !== 'non' && $bani !== 'oui')) {
+                repondre(false, 'Statut bani invalide : non ou oui attendu.', array(), 400);
+            }
+            $pdo->beginTransaction();
+            // Verrouiller et revalider l'acteur pendant l'ecriture (InnoDB).
+            $query = $pdo->prepare('SELECT id, pseudo, valider, droit, bani FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
+            $query->execute(array(':id' => (int)$admin['id']));
+            $acteur = $query->fetch();
+            if (!$acteur || (int)$acteur['droit'] !== 1 || (string)$acteur['bani'] !== 'non') {
+                $pdo->rollBack();
+                if ($acteur) verifier_bannissement($acteur);
+                repondre(false, 'Autorisation administrateur retiree.', array(), 403);
+            }
+            $query = $pdo->prepare('SELECT id FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
+            $query->execute(array(':id' => $id));
+            if (!$query->fetchColumn()) {
+                $pdo->rollBack();
+                repondre(false, 'Joueur introuvable.', array(), 404);
+            }
+            // Une seule colonne modifiee, jamais droit, motdepasse, scores ou profil.
+            $query = $pdo->prepare('UPDATE membre SET bani = :bani WHERE id = :id');
+            $query->execute(array(':bani' => $bani, ':id' => $id));
+        }
+        $joueur = lire_joueur_administration($pdo, $id);
+        if (!$joueur) repondre(false, 'Joueur introuvable.', array(), 404);
+        if ($action === 'save_player_ban') {
+            // Si un admin se bannit lui-meme, le client recoit aussitot le vrai statut.
+            if ((int)$admin['id'] === $id) $admin['bani'] = $bani;
+            $pdo->commit();
+        }
+        repondre(true, $action === 'save_player_ban' ? 'Bannissement enregistre.' : 'Joueur charge.',
+            array('membre' => membre_public($admin), 'player' => $joueur));
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
 }
 
 if ($action === 'save_npc') {
@@ -455,7 +584,7 @@ if ($action === 'login') {
 
     try {
         $requete = $pdo->prepare(
-            'SELECT id, pseudo, motdepasse, valider, droit FROM membre WHERE pseudo = :pseudo LIMIT 1'
+            'SELECT id, pseudo, motdepasse, valider, droit, bani FROM membre WHERE pseudo = :pseudo LIMIT 1'
         );
         $requete->execute(array(':pseudo' => $pseudo));
         $membre = $requete->fetch();
@@ -465,6 +594,7 @@ if ($action === 'login') {
     if (!$membre || !password_verify($motdepasse, (string)$membre['motdepasse'])) {
         repondre(false, 'Pseudo ou mot de passe incorrect.', array(), 401);
     }
+    verifier_bannissement($membre);
     verifier_validation_email($membre, $config);
     try {
         $personnage = lire_personnage($pdo, (int)$membre['id']);

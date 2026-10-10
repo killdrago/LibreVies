@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS membre (
   email VARCHAR(254) NOT NULL,
   valider TINYINT(1) NOT NULL DEFAULT 0,
   droit TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  bani ENUM('non', 'oui') NOT NULL DEFAULT 'non',
   PRIMARY KEY (id),
   UNIQUE KEY uq_membre_pseudo (pseudo),
   UNIQUE KEY uq_membre_email (email)
