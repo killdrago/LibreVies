@@ -74,6 +74,15 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BAT EN CRLF
+  Symptome utilisateur : après le JSON, build_launcher.bat affiche « Le système ne trouve
+  pas le nom de fichier de commandes - preparer_git » puis ECHEC de publication.
+  Cause probable : le .bat du dépôt était en fins de ligne LF ; CMD retrouve mal les
+  étiquettes (call :label) dans un .bat LF seul.
+  Correctif : compilation/build_launcher.bat converti en CRLF ; .gitattributes ajoute
+  « *.bat text eol=crlf » pour garder CRLF au checkout Windows. Contenu inchangé.
+  Non testé sur le poste Windows.
+
 MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BRANCHE DANS UN JSON
   Demande : ne plus éditer build_launcher.bat pour changer de branche.
   Ajout : compilation/config_build.json contenant {"branche": "c40ef64e"} ; le script
