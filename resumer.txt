@@ -32,7 +32,8 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    workflow et les commits préparés par l’IA. Consigner la demande, les fichiers
    concernés, le résultat réel, les incidents/résolutions, versions, tests
    effectués, limites et prochaines étapes. Inclure la mise à jour dans LE MÊME
-   commit que le changement : pas seulement dans le message de chat, pas dans
+   commit que le changement : dater chaque MAJ en JJ/MM/AAAA et préciser le
+   fuseau horaire ; pas seulement dans le message de chat, pas dans
    un fichier temporaire et pas dans un hypothétique commit ultérieur.
    Avant commit, contrôler que resumer.txt a réellement changé et qu’il est
    présent dans le diff stagé. Conserver une passation fidèle même en cas de
@@ -58,10 +59,22 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    incidents du début. Ses anciennes consignes de publication, versions,
    chemins, manifestes et tâches ne remplacent pas les décisions ci-dessus.
 
+5. DATER LA PASSATION ET LES ÉVÉNEMENTS SANS INVENTER DE PREUVES.
+   Chaque nouvelle entrée du résumé doit porter une date JJ/MM/AAAA ; les heures
+   vérifiées sont converties en Europe/Paris (heure française).
+   La date Git d’un correctif ne prouve ni la date exacte du signalement dans
+   le chat, ni un test natif réussi. Distinguer date du commit, date auteur,
+   observation utilisateur et exécution de test. Si l’horodatage de l’événement
+   manque, écrire « date exacte non disponible » plutôt qu’une date supposée.
+   La section 12 date les étapes majeures ; la section 13 date les correctifs ;
+   la section 19 répertorie TOUS les commits accessibles à la base auditée.
+   Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
+
 EXEMPLE DE STYLE « À faire » RAPPELÉ PAR L’UTILISATEUR
 
 L’utilisateur a repris un ancien message sur le diagnostic d’inscription :
-MAJ historique 4eaae48..e0cdd3a, build, fermeture du launcher, ancien journal
+MAJ historique 4eaae48..e0cdd3a (commits du 08/10/2026, de 13:08:23 à
+13:21:27 en Europe/Paris), build, fermeture du launcher, ancien journal
 éventuellement supprimé, relance et UN SEUL test, puis lecture du nouveau
 jeu\journal_auth.log. Il veut retrouver ce niveau de précision, pas une vague
 phrase « teste la MAJ ». Cet exemple est une référence de FORME : ne pas
@@ -121,8 +134,11 @@ LIBREVIES — DOSSIER DE REPRISE ACTUEL + HISTORIQUE CONSERVÉ
 Synthèse actualisée le 10/10/2026 (Europe/Paris)
 Dépôt : https://github.com/killdrago/LibreVies
 Branche de cette session : arena/01a0b32c-librevies
-Base distante auditée pour cette synthèse : d55f99f (première passation déjà publiée)
-Dernier commit fonctionnel : 9fee3f8 (jeu 0.5.86, édition/admin NPC)
+Base distante auditée : 373ac85, commit du 10/10/2026 à 07:21:48 (Europe/Paris).
+Correction demandée le 10/10/2026 : dates manquantes et reprise après interruption.
+Dernier commit fonctionnel : 9fee3f8, 09/10/2026 à 14:59:29 (jeu 0.5.86).
+Dernières coordonnées utilisateur : b70ebb8, 09/10/2026 à 15:25:50.
+Première passation : d55f99f, 10/10/2026 à 07:15:37 ; complément : 373ac85 à 07:21:48.
 Nature de la présente MAJ : documentation uniquement, aucun nouveau build requis.
 ================================================================================
 
@@ -138,13 +154,14 @@ SOMMAIRE DU BLOC ACTUEL
   09. NPC humains, profils persistants et reconstruction MakeHuman
   10. ADMIN, édition NPC, villes et armes des gardes (0.5.86)
   11. Réglages visuels validés à préserver
-  12. Chronologie depuis le début et références des commits
-  13. Incidents : symptômes, causes, solutions et fausses pistes
+  12. Chronologie datée depuis le début et références des commits
+  13. Incidents : dates des correctifs, symptômes, causes et solutions
   14. Tests effectués, commandes de recette et limites réelles
   15. Diagnostics : logs, erreurs et contrôles utiles
   16. Précautions Git et mise à jour du résumé à chaque commit
   17. Travail restant et recette utilisateur détaillée
-  18. Références documentaires et portée de cette synthèse
+  18. Références documentaires, MAJ datées et portée de cette synthèse
+  19. Journal Git daté complet (644 commits, 17/09/2026–10/10/2026)
   Puis : archive intégrale de l’ancien resumer.txt (jusqu’à MAJ 79).
 
 --------------------------------------------------------------------------------
@@ -773,119 +790,139 @@ version acceptée ; les tests d’un nouveau besoin ne justifient pas leur retou
 Les coordonnées chiffrées jeu/edition/coordonee sont des données utilisateur.
 
 --------------------------------------------------------------------------------
-12. CHRONOLOGIE DEPUIS LE DÉBUT ET RÉFÉRENCES DES COMMITS
+12. CHRONOLOGIE DATÉE DEPUIS LE DÉBUT ET RÉFÉRENCES DES COMMITS
 --------------------------------------------------------------------------------
 
 L’archive après ce bloc garde les MAJ historiques détaillées jusqu’à 79.
-La présente chronologie relie ce début au travail plus récent sans transformer
-les anciennes solutions en consignes actuelles. Les dates anciennes viennent du
-journal historique ; pour l’ordre exact des commits, utiliser Git, pas une date
-manuscrite de MAJ.
+Les dates entre crochets ci-dessous sont la DATE COMMIT Git (%cI), convertie
+exactement en Europe/Paris. Ce sont les dates d’enregistrement des correctifs,
+pas des dates inventées de messages, de captures ou de tests sur Windows.
+La section 19 fournit date commit ET date auteur pour les 644 commits accessibles,
+y compris les commits de coordonnées et les 67 fusions (merges) du dépôt.
+Les branches intégrées peuvent avoir des histoires parallèles : un journal trié
+par date ne remplace pas le graphe des parents. Les anciennes solutions ne sont
+pas des consignes actuelles ; conserver les règles en tête.
+Repère ancien vérifié : MAJ 79 / 0.5.79, feda114 [20/09/2026 11:28:01].
+Le début ci-dessous est le début de l’historique Git ; la date exacte de chaque
+message de la conversation n’est pas fournie par Git.
 
-A. RÉORGANISATION ET PREMIERS BUILDS
-  e47ada3 : point de départ du checkout, caméra de départ du village Unity.
-  8b57024 : séparation jeu (joueur) / compilation (auteur).
-  d14c200 : retrait de l’ancien moteur ; Unity seul pour ce projet.
-  0e1da6d : build bootstrap qui télécharge ses sources/outils.
-  6fbdd8f : icône PyInstaller, amorce allégée et premier resumer.txt.
-  1bb5b54 : résultat déposé dans jeu, compilation seulement pour compiler.
-  1e14528/9bc6405 : magenta/shaders manquants, caméra sous sol, souris ;
+A. 17–18/09/2026 — RÉORGANISATION ET PREMIERS BUILDS
+  e47ada3 [17/09/2026 17:54:47] : point de départ du checkout, caméra de départ du village Unity.
+  8b57024 [18/09/2026 08:28:30] : séparation jeu (joueur) / compilation (auteur).
+  d14c200 [18/09/2026 08:37:53] : retrait de l’ancien moteur ; Unity seul pour ce projet.
+  0e1da6d [18/09/2026 08:48:18] : build bootstrap qui télécharge ses sources/outils.
+  6fbdd8f [18/09/2026 09:24:57] : icône PyInstaller, amorce allégée et premier resumer.txt.
+  1bb5b54 [18/09/2026 09:38:39] : résultat déposé dans jeu, compilation seulement pour compiler.
+  1e14528 [18/09/2026 10:01:40]/9bc6405 [18/09/2026 10:03:59] : magenta/shaders manquants, caméra sous sol, souris ;
     shaders de secours embarqués et corrections de caméra/rendu.
-  31eadc7 : build met réellement les sources à jour, pas l’ancien projet local.
-  2db7fa1 : contrôles syntaxiques C# sans compilateur natif.
-  bfe6b59 : gel au démarrage dû à une boucle de clôture, pas à un simple
+  31eadc7 [18/09/2026 10:10:12] : build met réellement les sources à jour, pas l’ancien projet local.
+  2db7fa1 [18/09/2026 10:11:14] : contrôles syntaxiques C# sans compilateur natif.
+  bfe6b59 [18/09/2026 11:24:25] : gel au démarrage dû à une boucle de clôture, pas à un simple
     chargement long ; instrumentation et correction de la boucle.
 
-B. JEU, MONDE, VISUELS ET ÉDITION — MAJ HISTORIQUES
+B. 18/09–05/10/2026 — JEU, MONDE, VISUELS ET ÉDITION
   Village procédural, relief/décor, route/château/portails, gardes, collisions,
   monstres/dégâts/barres de vie, ressources, caméra/occlusion, options, shaders,
   façades/toits, sauvegarde des coordonnées et outils d’édition.
   Introduction puis réglages MakeHuman : apparence, catalogues, vêtements,
   morphologie, animations/poses, bras/mains/peau. Détail et motifs dans l’archive.
-  MAJ 79 / 0.5.79 : correction de GetInstanceID devenu obsolète bloquant sous
+  MAJ 79 / 0.5.79, feda114 [20/09/2026 11:28:01] : correction de GetInstanceID devenu obsolète sous
   Unity 6 pour le suivi des coordonnées ; ancien résumé s’arrêtait là.
 
-C. PUBLICATION — ANCIEN CIRCUIT, ABANDONNÉ ENSUITE
+C. 06/10/2026 — PUBLICATION : ANCIEN CIRCUIT, ABANDONNÉ ENSUITE
+  Repères : b1bb0fa [06/10/2026 15:13:41] (premier circuit), caf59ee [06/10/2026 15:31:39] (launcher aligné),
+  1464364 [06/10/2026 15:50:21] (dernier lot 5/5 du 06/10/2026).
   Plusieurs essais de publication dans un dossier compilé, manifests/hashes,
   lots et resynchronisations Git (conflits add/add, fichiers non suivis,
   changements hors lot, pushes concurrentiels).
   Ce circuit explique les anciens chemins/messages, mais ne doit plus être
-  rétabli : 80d4382 et la suppression utilisateur 964648e le remplacent.
+  rétabli : 80d4382 [09/10/2026 11:36:34] et la suppression utilisateur 964648e [09/10/2026 11:44:11] le remplacent.
 
-D. COMPTES PHP, INSCRIPTIONS ET DÉBOGAGE LAUNCHER
-  aea6e9d : authentification et Autolog initiaux.
-  79f4237 : validation des champs, mots de passe sécurisés.
-  1955a6e -> 68f3c1f : serveur récupéré au build puis regroupé en un seul
+D. 06–08/10/2026 — COMPTES PHP, INSCRIPTIONS ET DÉBOGAGE LAUNCHER
+  aea6e9d [06/10/2026 16:35:57] : authentification et Autolog initiaux.
+  79f4237 [06/10/2026 17:18:20] : validation des champs, mots de passe sécurisés.
+  1955a6e [06/10/2026 17:24:42] -> 68f3c1f [06/10/2026 17:57:27] : serveur récupéré au build puis regroupé en un seul
     jeu/serveur, simplification du déploiement et suppression des doublons.
-  d417f13/43f0eba/fe45f98 : diagnostic connexion, compatibilité PHP 5.6,
+  d417f13 [06/10/2026 18:06:00]/43f0eba [07/10/2026 16:58:58]/fe45f98 [07/10/2026 17:53:27] : diagnostic connexion, compatibilité PHP 5.6,
     corrections d’inscription locale.
-  Série 8acea82 -> 1501fce : inscription vérifiée avant retour/redémarrage,
+  Série 8acea82 [07/10/2026 18:03:25] -> 1501fce [08/10/2026 08:24:26] : inscription vérifiée avant retour/redémarrage,
     messages de barre, polling après INSERT et vérification email+pseudo.
-  5fffa5f/76ca750/49c71c4 : journaux diagnostic, réponse JSON PHP corrigée,
+  5fffa5f [08/10/2026 08:29:36]/76ca750 [08/10/2026 08:37:20]/49c71c4 [08/10/2026 08:45:56] : journaux diagnostic, réponse JSON PHP corrigée,
     ajout de membre.valider=0 ; validation email différée.
-  5384ae3 -> 0cee650 : plusieurs tentatives de redémarrage PyInstaller,
+  5384ae3 [08/10/2026 09:10:59] -> 0cee650 [08/10/2026 11:19:53] : plusieurs tentatives de redémarrage PyInstaller,
     isolation réelle onefile/_MEI/environnement et handles finalement retenue.
-  6e064f8/116283d : connexion et Autolog locaux, doublons/bonjour.
-  1741e10 : Autolog DPAPI chiffré, conservation des messages d’erreur.
-  9bd3225/a4e2252/4eaae48 : doublons ; finalement vérification dans la requête
+  6e064f8 [08/10/2026 11:32:03]/116283d [08/10/2026 11:44:39] : connexion et Autolog locaux, doublons/bonjour.
+  1741e10 [08/10/2026 11:51:07] : Autolog DPAPI chiffré, conservation des messages d’erreur.
+  9bd3225 [08/10/2026 12:48:33]/a4e2252 [08/10/2026 12:56:51]/4eaae48 [08/10/2026 13:08:23] : doublons ; finalement vérification dans la requête
     register unique, pas une étape réseau supplémentaire bloquante.
-  e0cdd3a : journal_auth détaillé demandes/réponses/retours UI.
-  c9eecf4 : retours traités dans le thread Tk principal.
-  93ebed7 puis 962758c : module queue embarqué puis retiré, file interne.
-  2a55cee : correction du retour UI après erreur d’inscription.
+  e0cdd3a [08/10/2026 13:21:27] : journal_auth détaillé demandes/réponses/retours UI.
+  c9eecf4 [08/10/2026 13:26:50] : retours traités dans le thread Tk principal.
+  93ebed7 [08/10/2026 13:32:35] puis 962758c [08/10/2026 13:49:03] : module queue embarqué puis retiré, file interne.
+  2a55cee [08/10/2026 13:58:50] : correction du retour UI après erreur d’inscription.
 
-E. CLASSEMENT ET PERSONNAGE
-  a3f97cb/c90552e : inscription remplacée par classement après connexion,
+E. 08/10/2026 — CLASSEMENT ET PERSONNAGE
+  a3f97cb [08/10/2026 14:14:51]/c90552e [08/10/2026 14:27:09] : inscription remplacée par classement après connexion,
     schéma personnage et panneau UI.
-  6eb0b45 : initialisation du personnage à la création du compte.
-  db51909 : chaque réglage dans sa propre colonne, pas stockage sliders JSON.
-  77d3f4e : personnage initial vide, seul id/default=1, le reste NULL.
-  a7e5ca2 / 0.5.80 : compte authentifié, session, profil sauvegardé et chargé,
+  6eb0b45 [08/10/2026 14:58:53] : initialisation du personnage à la création du compte.
+  db51909 [08/10/2026 15:05:39] : chaque réglage dans sa propre colonne, pas stockage sliders JSON.
+  77d3f4e [08/10/2026 15:12:23] : personnage initial vide, seul id/default=1, le reste NULL.
+  a7e5ca2 [08/10/2026 16:15:22] / 0.5.80 : compte authentifié, session, profil sauvegardé et chargé,
     panel via NPC Esthétique, loader/modal/pseudo ; .meta conservés/corrigés.
-  0062706 : sessions cryptographiques Windows sans OpenSSL ancien,
+  0062706 [08/10/2026 16:47:45] : sessions cryptographiques Windows sans OpenSSL ancien,
     classement SQL et initialisation transactionnelle aux trois scores à 0.
-  5fb66ce : en-tête Bonjour, Pseudo/Connexion/MDP cachés, Autolog visible.
+  5fb66ce [08/10/2026 17:39:22] : en-tête Bonjour, Pseudo/Connexion/MDP cachés, Autolog visible.
 
-F. ANCIEN BINAIRE, WORKFLOW LOCAL ET CORRECTIONS VISUELLES
-  4ee8f56 : audit PHP 8.3, diagnostic assembly publiée 0.5.79 sans nouvelles
+F. 09/10/2026 — ANCIEN BINAIRE, WORKFLOW LOCAL ET VISUELS
+  4ee8f56 [09/10/2026 10:14:32] : audit PHP 8.3, diagnostic assembly publiée 0.5.79 sans nouvelles
     méthodes compte/pseudo, protection de l’export et logs.
-  b3d1541 / 0.5.81, launcher 4.2.1 : droits compte, poignées leviers métal,
+  b3d1541 [09/10/2026 10:54:45] / 0.5.81, launcher 4.2.1 : droits compte, poignées leviers métal,
     shader profondeur façades et tentative de corriger l’ancienne publication.
-  80d4382 / 0.5.82, launcher 4.2.2 : workflow jeu LOCAL seulement,
+  80d4382 [09/10/2026 11:36:34] / 0.5.82, launcher 4.2.2 : workflow jeu LOCAL seulement,
     préparateur/vérification et arrêt de remplacement distant ; ronds blancs
     d’abord à gauche. Pas de publieur final nécessaire.
-  964648e : l’utilisateur supprime jeucompiler sur GitHub.
-  46e7dac / 0.5.83 : ronds à DROITE, diamètre du nez du maire,
+  964648e [09/10/2026 11:44:11] : l’utilisateur supprime jeucompiler sur GitHub.
+  46e7dac [09/10/2026 11:46:52] / 0.5.83 : ronds à DROITE, diamètre du nez du maire,
     pseudo taille /4 et hausse de 20 cm. Push refusé d’abord à cause d’une
     modification distante ; reprise ciblée préserve la suppression utilisateur.
-  d555fa6 / 0.5.84 : pseudo redescendu de 10 cm, réglage final +0.38 m ;
+  d555fa6 [09/10/2026 12:18:00] / 0.5.84 : pseudo redescendu de 10 cm, réglage final +0.38 m ;
     npc.sql à ID texte, sans default.
 
-G. AVATARS NPC, ERREUR DE COMPILATION ET ADMIN
-  ac40541 / 0.5.85 : seed des six profils NPC, get_npcs, DTO texte,
+G. 09/10/2026 — AVATARS NPC, ERREUR DE COMPILATION ET ADMIN
+  ac40541 [09/10/2026 12:57:02] / 0.5.85 : seed des six profils NPC, get_npcs, DTO texte,
     reconstruction MakeHuman et accessoires conservés, primitives masquées.
-  Capture utilisateur : humains/pseudo visibles, armes gardes mal tenues.
-  Log Unity utilisateur : CS1061 HumanPreview.FindBone absent.
-  386bb30 : ajoute FindBone à la bonne classe ; retire quatre SQL obsolètes,
+  Capture utilisateur 0.5.85 : humains/pseudo visibles, armes mal tenues.
+  Date exacte de cette capture : non disponible ; code 0.5.85 enregistré le
+  09/10/2026, sans confondre cela avec la date d’observation native.
+  Log Unity utilisateur : CS1061 HumanPreview.FindBone absent ; heure du
+  signalement non disponible, correctif enregistré le 09/10/2026.
+  386bb30 [09/10/2026 13:17:14] : ajoute FindBone à la bonne classe ; retire quatre SQL obsolètes,
     seed déplacé hors serveur en fixture ; doc/tests/nettoyage synchroniseur.
-  9fee3f8 / 0.5.86 : ADMIN exactement droit=1 client ET serveur, save_npc
+  9fee3f8 [09/10/2026 14:59:29] / 0.5.86 : ADMIN exactement droit=1 client ET serveur, save_npc
     transactionnel/protégé, dropdown/modal/validation, villes réelles,
     Garde Nord/Sud et hallebarde au centre de la paume après animation.
-  b70ebb8 : coordonnées d’édition utilisateur après 9fee3f8 ; base distante
-    auditée pour la première synthèse documentaire d55f99f.
+  b70ebb8 [09/10/2026 15:25:50] : coordonnées d’édition utilisateur après 9fee3f8 [09/10/2026 14:59:29] ; base distante
+    auditée pour la première synthèse documentaire d55f99f [10/10/2026 07:15:37].
 
-H. DOSSIER DE PASSATION ET NOUVEAU RAPPEL DES RÈGLES
-  d55f99f : publication du dossier de reprise complet dans resumer.txt :
+H. 10/10/2026 — DOSSIER DE PASSATION ET RAPPEL DES RÈGLES
+  d55f99f [10/10/2026 07:15:37] : publication du dossier de reprise complet dans resumer.txt :
     règles prioritaires, 18 sections actuelles, chronologie/incidents, schémas,
     tests/limites, recette et conservation intégrale de l’archive MAJ 79.
   Nouvelle demande de l’utilisateur du 10/10/2026 : réaffirmer au TOUT DÉBUT
     « À faire » à chaque réponse, avec les actions exactes après la MAJ, et
     mise à jour du résumé dans CHAQUE commit. L’ancien exemple diagnostic
-    4eaae48..e0cdd3a est cité comme modèle de précision.
-  Présent complément : règles renforcées, gabarit détaillé d’un diagnostic
+    4eaae48 [08/10/2026 13:08:23]..e0cdd3a [08/10/2026 13:21:27] est cité comme modèle de précision.
+  373ac85 [10/10/2026 07:21:48] : règles renforcées, gabarit détaillé d’un diagnostic
     inscription avec chemins/logs vérifiés, précautions et message de passation.
     Aucun changement de code, version, BDD ou ressource ; aucune compilation
     native ou nouvelle validation visuelle ne découle de cette documentation.
+
+I. 10/10/2026 — PRÉSENTE CORRECTION DES DATES APRÈS INTERRUPTION
+  L’utilisateur signale un plantage/interruption et l’absence de dates dans
+  le résumé. Vérification faite : d55f99f [10/10/2026 07:15:37] et 373ac85 [10/10/2026 07:21:48] sont bien sur GitHub ;
+  le résumé précédent n’est pas perdu. La cause du plantage signalé n’est pas
+  établie, et l’arrêt de la tentative de lecture précédente n’est pas un échec
+  prouvé de publication Git. Cette MAJ conserve le dossier et ajoute les dates,
+  les repères des incidents et l’index Git complet. Aucun changement fonctionnel.
 
 Beaucoup d’autres commits « Edition : met a jour les coordonnees » jalonnent
 cet historique. Ce sont des données utilisateur, pas des commits à écraser ou
@@ -893,25 +930,36 @@ cet historique. Ce sont des données utilisateur, pas des commits à écraser ou
 Git ne sont donc pas nécessairement le même.
 
 Pour retrouver l’historique exact :
-  git log --reverse --oneline origin/arena/01a0b32c-librevies
+  git log --reverse --date=iso-strict --format="%h %cI %s" origin/arena/01a0b32c-librevies
+  git log --graph --oneline origin/arena/01a0b32c-librevies
   git show <hash> --stat
   git show <hash>:<chemin>
 
 --------------------------------------------------------------------------------
-13. INCIDENTS : SYMPTÔMES, CAUSES, SOLUTIONS ET FAUSSES PISTES
+13. INCIDENTS DATÉS : SYMPTÔMES, CAUSES, SOLUTIONS ET FAUSSES PISTES
 --------------------------------------------------------------------------------
 
+DATES DES INCIDENTS : les lignes « Repères Git » datent les correctifs
+ou changements liés, pas forcément la première apparition du problème.
+Le chat et les recettes hors Git ne donnent pas toujours un horodatage exploitable :
+ces inconnues sont indiquées, sans attribuer à un test la date de son commit.
+Les heures ci-dessous sont en Europe/Paris.
+
 1) Jeu magenta / monde invisible / caméra sous le sol au début.
+   Repères Git de correction : 1e14528 [18/09/2026 10:01:40] ; 9bc6405 [18/09/2026 10:03:59].
    Causes : shaders non embarqués/compatibilité et caméra/rendu incorrects.
    Solution : shaders de secours Resources avec leurs .meta, corrections caméra
    et démarrage instrumenté. Voir l’archive ; ne pas supprimer ces ressources.
 
 2) Gel au chargement du village.
+   Repère Git de correction : bfe6b59 [18/09/2026 11:24:25].
    Cause réelle d’un incident initial : boucle infinie de génération de clôture.
    Solution : correction de boucle et étapes de démarrage loguées. Ne pas
    attribuer systématiquement un gel à un manque de RAM ou au téléchargement.
 
 3) Build qui compile l’ancien jeu malgré une MAJ.
+   Premier rafraîchissement : 31eadc7 [18/09/2026 10:10:12].
+   Audit récent / passage au local : 4ee8f56 [09/10/2026 10:14:32] ; 80d4382 [09/10/2026 11:36:34].
    Causes multiples rencontrées : sources non rafraîchies, mauvaise racine de
    build/publication, scripts Unity chargés obsolètes, manifeste stale et ancien
    binaire retéléchargé par le launcher.
@@ -922,47 +970,57 @@ Pour retrouver l’historique exact :
    Mauvaise solution : renommer juste le manifeste ou recommencer jeucompiler.
 
 4) Inscription insérée mais launcher bloqué / retour UI manquant.
+   Repères Git : fe45f98 [07/10/2026 17:53:27] ; 49c71c4 [08/10/2026 08:45:56] ; c9eecf4 [08/10/2026 13:26:50] ; 2a55cee [08/10/2026 13:58:50].
    Causes rencontrées : réponse JSON PHP incorrecte, ancienne API, seconde
    requête de précontrôle, verification post-INSERT et thread Tk incorrect.
    Solution : réponse PHP propre, register unique, polling status pseudo+email,
    logs précis et traitement des callbacks dans le thread principal.
 
 5) Doublons affichés incorrectement ou erreur SQL cachée.
+   Repères Git : 79f4237 [06/10/2026 17:18:20] ; 4eaae48 [08/10/2026 13:08:23] ; 0062706 [08/10/2026 16:47:45].
    Solution : vérifier les deux champs via la collation SQL, messages explicites,
    code 409 ; ne traiter 1062 comme doublon membre que pour l’INSERT membre.
    Rollback transactionnel si personnage/classement échoue.
 
 6) Redémarrage PyInstaller échoue / erreur de dossier temporaire onefile.
+   Essais / correctif retenu : 5384ae3 [08/10/2026 09:10:59] ; 0cee650 [08/10/2026 11:19:53].
    Causes : réutilisation _MEI supprimé, environnement et handles hérités.
    Plusieurs essais CMD/délai ont été insuffisants. Solution retenue : nouveau
    bootloader/environnement PYINSTALLER_RESET_ENVIRONMENT=1, handles fermés,
    conserver le comportement utilisateur attendu, pas masquer l’erreur.
 
 7) Import queue absent dans l’amorce existante.
+   Ajout puis retrait : 93ebed7 [08/10/2026 13:32:35] ; 962758c [08/10/2026 13:49:03].
    Solution finale : supprimer cette dépendance du launcher au profit d’une
    file interne ; éviter d’imposer une nouvelle amorce pour ce seul correctif.
 
 8) Autolog stocké en clair / persistant alors que décoché.
+   Repère Git DPAPI : 1741e10 [08/10/2026 11:51:07].
    Solution : Windows DPAPI, migration/suppression du JSON ancien et suppression
    des deux formats si décoché. Ne pas stocker de secrets dans un manifeste.
 
 9) Connexion/session impossible sur ancien PHP sans OpenSSL.
+   Repère Git du fallback fort : 0062706 [08/10/2026 16:47:45].
    Cause : aucune source cryptographique utilisable dans le premier chemin.
    Solution 0062706 : fallback Windows .NET PowerShell fort sous PHP 5.6 ;
    PHP 8.3 utilise random_bytes. Ne jamais remplacer par un RNG faible.
 
 10) Pseudo absent en jeu alors que le code et le compte semblaient corrects.
+   Repères audit/export puis workflow local : 4ee8f56 [09/10/2026 10:14:32] ; 80d4382 [09/10/2026 11:36:34].
     Cause prouvée : binaire 0.5.79 sans fonctionnalités récentes lancé réellement.
     Solution : vérifier/installer le bon build, puis reprendre le pseudo canonique
     PHP ; pas inventer un pseudo de fallback visible ni écrire une autre identité.
 
 11) Texte Entrepôt apparaît sur/à travers Esthétique.
+   Repère Git de correction façade : b3d1541 [09/10/2026 10:54:45].
     Cause : taille du texte et gestion de profondeur/occlusion.
     Solution : ajustement aux localBounds du panneau, shader LVFacadeText
     ZTest LEqual et raycast ; respecter la profondeur du monde.
 
 12) Push refusé pendant que l’utilisateur enregistre les coordonnées ou supprime
     un dossier.
+   Repère Git de reprise ciblée : 46e7dac [09/10/2026 11:46:52].
+   La date exacte du refus réseau n’est pas horodatée ici.
     Cause : branche distante a avancé. Solution : fetch, relecture du nouveau
     parent et réapplication des SEULS fichiers concernés ; conserver les commits
     coordonnées et la suppression jeucompiler. Un index temporaire/commit-tree
@@ -970,6 +1028,8 @@ Pour retrouver l’historique exact :
     Ne pas force-push ni ramener une ancienne arborescence supprimée.
 
 13) CS1061 HumanPreview.FindBone — ÉCHEC RÉEL DE COMPILATION.
+   Appel ajouté : ac40541 [09/10/2026 12:57:02] ; méthode corrigée : 386bb30 [09/10/2026 13:17:14].
+   Date exacte du signalement/log natif : non disponible ; correction au 09/10/2026.
     ac40541 avait ajouté l’appel mais pas la méthode dans HumanPreview.
     386bb30 corrige réellement cette omission. Le scanner tree-sitter et les
     tests de contrat n’avaient pas détecté l’erreur sémantique C#.
@@ -978,11 +1038,15 @@ Pour retrouver l’historique exact :
     Ne pas conseiller une nouvelle licence/install Unity pour corriger CS1061.
 
 14) Test SQL seed NPC refuse peau '2.0' sous SQLite.
+   Repère du code concerné : ac40541 [09/10/2026 12:57:02].
+   Date/heure exacte de l’exécution et du correctif de recette : non disponibles.
     Cause de RECETTE : FLOOR de test retournait un float, CAST CHAR donnait 2.0.
     Correction : callback FLOOR de SQLite retourne (int)floor. Pas un changement
     du seed MySQL de production ni une preuve que les profils réels sont invalides.
 
 15) Faux lint PHP WebAssembly / processus de test restant actif.
+   Repère de l’audit PHP 8.3 : 4ee8f56 [09/10/2026 10:14:32].
+   Date/heure des commandes WASM hors Git : non disponibles.
     php-wasm.js --php=8.3 -l interprétait mal l’argument ; exit=0 était trompeur.
     Analyse valide via token_get_all(..., TOKEN_PARSE) dans PHP 8.3 universal,
     quatre fichiers PHP analysés correctement. Une commande inline restait dans
@@ -990,6 +1054,8 @@ Pour retrouver l’historique exact :
     instances/processus ou utiliser la recette .mjs prévue.
 
 16) Compilation C# alternative non disponible dans le sandbox.
+   Essais d’outils hors Git : date exacte non disponible.
+   Ne pas présenter un horodatage de commit comme celui d’un essai .NET/Node.
     Ancien .NET Core 2 essayé : exit 136, libunwind.so.8 absente ; le mode
     globalisation invariant ne résout pas le problème. Ne pas réinstaller la
     même combinaison pour prétendre vérifier Unity ; utiliser la preuve native.
@@ -997,6 +1063,8 @@ Pour retrouver l’historique exact :
     environnement testé Node 22.22.3/npm 10.9.8) mais la recette a fonctionné.
 
 17) Checkout local semble revenu au commit initial avec réorganisation non stagée.
+   Reprises documentaires au 10/10/2026 : d55f99f [10/10/2026 07:15:37] ; 373ac85 [10/10/2026 07:21:48].
+   Même état local e47ada3 retrouvé le 10/10/2026 pendant la correction des dates.
     Observé pendant cette reprise : HEAD e47ada3, sources/dossiers récents dans le
     worktree, beaucoup de suppressions/modifications et fichiers non suivis.
     Solution : auditer les sources canoniques sur origin, ne pas commiter tout,
@@ -1004,6 +1072,8 @@ Pour retrouver l’historique exact :
     jamais reset --hard ni nettoyage des dossiers utilisateur.
 
 18) Armes des gardes mal prises après avatars humains.
+   Repère Git de correction des armes : 9fee3f8 [09/10/2026 14:59:29].
+   Date exacte de la capture 0.5.85 : non disponible ; rendu 0.5.86 non confirmé.
     Observation native 0.5.85. Correction 0.5.86 : paume/interpolation poignet-
     majeur, position après animation et orientation verticale du garde.
     Résultat visuel encore à confirmer, pas un incident déclaré clos nativement.
@@ -1160,6 +1230,7 @@ reset --mixed) a déjà servi avec un worktree sale ; ce n’est pas une obligat
 si un flux Git normal et sûr convient. Jamais écraser les modifications autres.
 
 Dans chaque future MAJ du résumé, mettre en tête :
+  - date JJ/MM/AAAA et fuseau horaire, source de l’horodatage si nécessaire ;
   - besoin et décisions finales de l’utilisateur ;
   - versions SOURCE et BINAIRES vérifiées séparément ;
   - commit fonctionnel de référence et chemins modifiés ;
@@ -1249,7 +1320,8 @@ POUR LA SEULE PRÉSENTE MAJ DOCUMENTAIRE :
 --------------------------------------------------------------------------------
 
 Sources principales : code et historique Git de killdrago/LibreVies,
-origin/arena/01a0b32c-librevies à d55f99f ; dernier fonctionnel 9fee3f8.
+origin/arena/01a0b32c-librevies à 373ac85 (10/10/2026, 07:21:48 Europe/Paris) ;
+dernier fonctionnel 9fee3f8 (09/10/2026, 14:59:29 Europe/Paris).
 Ancien resumer.txt : 142577 octets, 2337 lignes, daté 20/09/2026, MAJ 79,
 blob Git d75305096870f6222821c2810dc1d05e03a63c7a. Conservé intégralement ci-dessous.
 
@@ -1269,7 +1341,7 @@ passation. Le résumé ancien était obsolète : cette MAJ ajoute le bloc actuel
 les nouvelles règles, les changements depuis 0.5.79 et les limites de validation,
 sans modifier les sources/binaires de jeu ni relancer un travail déjà poussé.
 
-Contrôles de la première actualisation documentaire d55f99f du 10/10/2026 :
+Contrôles de la première actualisation d55f99f du 10/10/2026 à 07:15:37 :
   - archive comparée octet par octet au blob Git historique : inchangée ;
   - 54 références de commits vérifiées dans l’historique ;
   - 32 chemins de sources/documentation vérifiés dans l’arbre distant ;
@@ -1282,7 +1354,7 @@ Contrôles de la première actualisation documentaire d55f99f du 10/10/2026 :
   - commit limité à resumer.txt : aucun autre changement du worktree à publier ;
   - aucun nouveau build natif ni réimport SQL réalisé pour cette documentation.
 
-COMPLÉMENT DU 10/10/2026 APRÈS LE RAPPEL UTILISATEUR
+COMPLÉMENT 373ac85 DU 10/10/2026 À 07:21:48 APRÈS LE RAPPEL UTILISATEUR
   - Le contenu complet publié dans d55f99f et l’archive historique sont conservés.
   - Les règles de conclusion « À faire » et de mise à jour à chaque commit sont
     renforcées en tête, avec le niveau de précision demandé par l’utilisateur.
@@ -1296,6 +1368,30 @@ COMPLÉMENT DU 10/10/2026 APRÈS LE RAPPEL UTILISATEUR
   - Diff/index limités à resumer.txt avant commit. Les autres changements
     préexistants du worktree ne font pas partie de cette demande.
   - Aucun build Unity/Windows ni test sur la BDD réelle relancé pour cette doc.
+
+CORRECTION DATÉE DU 10/10/2026 — DEMANDE ACTUELLE
+  - Après interruption signalée et absence de dates, reprise de la version
+    réellement publiée 373ac85 ; aucune supposition de commit/push non terminé.
+  - Règles « À faire » et resumer.txt dans chaque commit toujours prioritaires ;
+    nouvelle obligation de dater les entrées et de distinguer dates/preuves.
+  - Toutes les références de la chronologie principale portent leur date Git
+    locale ; les 18 incidents ont des repères datés ou une inconnue explicite.
+  - La MAJ 79 est recoupée avec feda114 : 20/09/2026 à 11:28:01.
+  - Journal intégral de 644 commits accessibles, avec date commit et date auteur,
+    67 merges et 17 jours d’activité ; aperçu quotidien et sujet de chaque commit.
+  - Les dates de captures/tests non horodatés ne sont pas inventées. Le plantage
+    signalé n’a pas de cause établie dans les informations disponibles.
+  - Archive historique inchangée ; aucun code, binaire, BDD, coordonnées,
+    config.php ou ressource MakeHuman modifié par cette correction documentaire.
+  - Contrôles documentaires réussis : 644 lignes de journal comparées à Git
+    (date commit, date auteur, sujet), tri vérifié, 17 totaux quotidiens et
+    67 merges recoupés ; 69 références de la chronologie toutes datées et
+    99 annotations de dates contrôlées dans chronologie/incidents.
+  - 18 incidents avec repères ou inconnue explicite, 19 sections actuelles,
+    32 chemins sources et versions/API recoupés ; scan sans secret détecté.
+  - Archive originale de 142577 octets conservée octet par octet ; périmètre
+    du commit limité à resumer.txt, autres changements préexistants exclus.
+  - Aucune compilation native ni recette sur la BDD réelle pour cette MAJ.
 
 MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
 
@@ -1312,7 +1408,736 @@ MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
   Termine CHAQUE réponse par **À faire**, avec toutes mes manipulations exactes
   après ta MAJ, commandes, chemins, tests, résultats attendus, logs et précautions.
   Mets resumer.txt à jour dans CHAQUE commit, dans le même commit que tes changements.
+  Date les entrées (JJ/MM/AAAA, Europe/Paris) et n’invente pas de date de test/capture.
   Après lecture, reprends ma prochaine demande sans refaire des travaux déjà livrés.
+
+--------------------------------------------------------------------------------
+19. JOURNAL GIT DATÉ COMPLET — 644 COMMITS ACCESSIBLES À 373ac85
+--------------------------------------------------------------------------------
+
+SOURCE : git log de origin/arena/01a0b32c-librevies à 373ac85.
+PÉRIODE : 17/09/2026 à 17:54:47 -> 10/10/2026 à 07:21:48 (Europe/Paris).
+Tous les 644 commits accessibles sont listés, dont 67 merges ; ce n’est pas
+une affirmation que la conversation a produit 644 fonctionnalités distinctes.
+Les commits de coordonnées et des branches déjà intégrées ne sont pas omis.
+
+FORMAT : date commit Paris | date auteur Paris | commit | sujet historique.
+Date commit = %cI (enregistrement Git), date auteur = %aI ; conversion à partir des
+horodatages ISO Git avec leur offset d’origine.
+NOTRE DATE LOCALE = Europe/Paris, UTC+02:00 sur toute cette période.
+Les dates ne prouvent ni date de push HTTP ni exécution/test natif du jeu.
+Tri : date commit croissante, puis SHA pour égalité ; pour la filiation réelle,
+consulter git log --graph. Dates auteur et commit peuvent différer.
+
+LIMITES : instantané arrêté au parent publié 373ac85. La présente correction
+est datée du 10/10/2026 en section 18 ; son hash sera donné après commit/push,
+pas inventé dans le fichier qui détermine lui-même son propre hash.
+La prochaine MAJ complètera l’index jusqu’à sa nouvelle base connue.
+
+Les sujets servent à retrouver une étape, pas à réactiver un ancien workflow.
+Les chemins historiques, publications abandonnées et actions SQL restent NON
+NORMATIFS. Le nom du moteur retiré est remplacé par « ancien moteur » dans les
+sujets pour respecter la consigne de retrait ; les autres sujets sont conservés.
+L’archive après cette section reste intégralement inchangée.
+
+APERÇU PAR JOUR (date commit, Paris) :
+  17/09/2026 : 1 commit(s).
+  18/09/2026 : 46 commit(s).
+  19/09/2026 : 26 commit(s).
+  20/09/2026 : 60 commit(s).
+  27/09/2026 : 91 commit(s).
+  28/09/2026 : 58 commit(s).
+  29/09/2026 : 86 commit(s).
+  30/09/2026 : 41 commit(s).
+  01/10/2026 : 49 commit(s).
+  02/10/2026 : 43 commit(s).
+  03/10/2026 : 43 commit(s).
+  05/10/2026 : 2 commit(s).
+  06/10/2026 : 34 commit(s).
+  07/10/2026 : 9 commit(s).
+  08/10/2026 : 38 commit(s).
+  09/10/2026 : 15 commit(s).
+  10/10/2026 : 2 commit(s).
+
+JOURNAL INTÉGRAL :
+
+=== 17/09/2026 ===
+17/09/2026 17:54:47 | 17/09/2026 17:54:19 | e47ada3 | Show Unity village from the correct camera start
+
+=== 18/09/2026 ===
+18/09/2026 08:28:30 | 18/09/2026 08:28:30 | 8b57024 | Tri du depot : jeu/ (joueur) + compilation/ (auteur)
+18/09/2026 08:37:53 | 18/09/2026 08:37:53 | d14c200 | Unity uniquement : plus aucune trace de ancien moteur
+18/09/2026 08:48:18 | 18/09/2026 08:48:18 | 0e1da6d | build_launcher.bat : tout se telecharge tout seul
+18/09/2026 09:24:57 | 18/09/2026 09:24:57 | 6fbdd8f | Correctif icone PyInstaller + exe allege + resumer.txt
+18/09/2026 09:38:39 | 18/09/2026 09:38:39 | 1bb5b54 | Le build depose tout dans jeu/ (compilation ne sert qu'a compiler)
+18/09/2026 10:01:40 | 18/09/2026 10:01:40 | 1e14528 | Corrige le monde magenta, la camera sous le sol et la souris molle
+18/09/2026 10:03:59 | 18/09/2026 10:03:59 | 9bc6405 | Le jeu n'est plus magenta : shaders de secours embares + doc de passation
+18/09/2026 10:07:34 | 18/09/2026 10:07:34 | 8e75875 | Parite gameplay : collisions, cloture a portails et IA des monstres
+18/09/2026 10:10:12 | 18/09/2026 10:10:12 | 31eadc7 | Le build met vraiment le projet a jour (et ne peut plus compiler l'ancien jeu)
+18/09/2026 10:10:34 | 18/09/2026 10:10:34 | 6a57f7d | resumer.txt : rendre explicite l'action manuelle unique (remplacer build_launcher.bat)
+18/09/2026 10:11:14 | 18/09/2026 10:11:14 | 2db7fa1 | Outil de controle de syntaxe C# (tree-sitter) pour travailler sans compilateur
+18/09/2026 10:18:04 | 18/09/2026 10:18:04 | 5bdbe7d | Decor du village : maillage procedural, sapins a cones, herbe, rochers, lampadaires
+18/09/2026 10:19:54 | 18/09/2026 10:19:54 | 5c56645 | Gardes des portails (coup mortel) + degats flottants et etincelles d'impact
+18/09/2026 10:45:21 | 18/09/2026 10:45:21 | 191caa5 | Le launcher se met a jour tout seul (amorce + hash) et journal du jeu
+18/09/2026 11:00:16 | 18/09/2026 11:00:16 | 80f18a3 | Demarrage du jeu instrumente : journal [LV], une etape par image, ecran de chargement
+18/09/2026 11:02:30 | 18/09/2026 11:02:30 | b0dfd19 | Degats en arc, barres de vie des monstres, ressources qui reapparaissent ailleurs
+18/09/2026 11:24:25 | 18/09/2026 11:24:25 | bfe6b59 | CORRIGE le gel au demarrage : boucle infinie dans la cloture du village
+18/09/2026 11:41:20 | 18/09/2026 11:41:20 | 7a80952 | MAJ 16 : options Unity et synchronisation differentielle
+18/09/2026 11:43:51 | 18/09/2026 11:43:51 | abad0ad | MAJ 17 : route courbe, chateau ouvert et monde visuel
+18/09/2026 11:44:55 | 18/09/2026 11:44:55 | 68979b8 | MAJ 18 : camouflage et objets translucides devant la camera
+18/09/2026 11:45:39 | 18/09/2026 11:45:39 | 95cece4 | MAJ 19 : options completes et entree du chateau
+18/09/2026 11:46:04 | 18/09/2026 11:46:04 | e6bafa4 | CORRIGE le sens des faces des toits triangulaires
+18/09/2026 11:46:12 | 18/09/2026 11:46:12 | 4afcdb0 | MAJ 20 : corrige le rendu des toits triangulaires
+18/09/2026 11:47:19 | 18/09/2026 11:47:19 | b549732 | MAJ 21 : evite les recompilations inutiles du launcher
+18/09/2026 11:47:37 | 18/09/2026 11:47:37 | 109be8b | DOC : precise les etapes du build accelere
+18/09/2026 12:17:13 | 18/09/2026 12:17:13 | 498da32 | MAJ 22 : ajoute le module JSON necessaire a Unity
+18/09/2026 12:28:23 | 18/09/2026 12:28:23 | 68bc269 | MAJ 23 : corrige les portiques, le HUD et les toits
+18/09/2026 12:42:10 | 18/09/2026 12:41:59 | da07357 | MAJ 24 : ajoute camera, mort et animations des PNJ
+18/09/2026 12:46:43 | 18/09/2026 12:46:43 | 485038e | MAJ 25 : corrige le type du collider joueur
+18/09/2026 13:22:16 | 18/09/2026 13:22:16 | b644d3a | MAJ 26 : corrige la carte, les facades et le decor
+18/09/2026 13:34:54 | 18/09/2026 13:34:54 | 1bc666c | MAJ 27 : agrandit le village et corrige les affichages
+18/09/2026 13:53:47 | 18/09/2026 13:53:47 | 11d6d6a | MAJ 28 : recentre le village et corrige lendurance
+18/09/2026 14:04:19 | 18/09/2026 14:04:19 | 693adbd | MAJ 29 : corrige la transparence et le village de 40 m
+18/09/2026 14:11:48 | 18/09/2026 14:11:48 | b6f71e4 | MAJ 30 : corrige la fontaine, les PNJ et le terrain
+18/09/2026 14:29:52 | 18/09/2026 14:29:52 | a9a2431 | MAJ31: integrate realistic PBR rendering
+18/09/2026 14:49:03 | 18/09/2026 14:49:03 | b233e38 | MAJ 32 : protege lexport Unity et nettoie le warning energie
+18/09/2026 14:56:21 | 18/09/2026 14:56:21 | 92fd09f | MAJ 33 : documente lexport Unity PBR valide
+18/09/2026 15:01:43 | 18/09/2026 15:01:43 | e5b27cd | MAJ 34 : refuse les anciens jeux non publies
+18/09/2026 15:15:17 | 18/09/2026 15:15:17 | 8635543 | MAJ 35 : bootstrap autonome et versions visibles
+18/09/2026 15:23:25 | 18/09/2026 15:23:25 | 00d1fac | MAJ 36 : rend letape Unity compatible avec CMD
+18/09/2026 15:32:19 | 18/09/2026 15:32:19 | 35fe063 | MAJ 37 : ajoute un rendu de secours visible dans le player
+18/09/2026 15:41:49 | 18/09/2026 15:41:49 | 2712a6a | MAJ 38 : versionne le jeu 0.5.37 et ajoute le journal runtime
+18/09/2026 15:47:58 | 18/09/2026 15:47:58 | e91c24b | MAJ 39 : isole le shader PBR sur la route
+18/09/2026 16:08:02 | 18/09/2026 16:08:02 | ffc9ba5 | MAJ 40 : diagnostique le shader de la route
+18/09/2026 16:14:03 | 18/09/2026 16:14:03 | 1c1f15f | MAJ 41 : remplace le shader noir de la route
+18/09/2026 16:19:33 | 18/09/2026 16:19:33 | 240a16f | MAJ 42 : applique le PBR stable a toutes les surfaces
+
+=== 19/09/2026 ===
+19/09/2026 08:36:18 | 19/09/2026 08:36:18 | ea74062 | MAJ 43 : verifie StablePBR sur tout le monde
+19/09/2026 09:13:18 | 19/09/2026 09:13:18 | 9f14763 | MAJ 44 : ajoute eau nage et corrige route
+19/09/2026 09:24:23 | 19/09/2026 09:24:23 | 74bf45a | MAJ 45 : corrige la build et agrandit le monde
+19/09/2026 10:17:03 | 19/09/2026 10:17:03 | 0b0c61e | MAJ 46 : corrige eau camera et textes
+19/09/2026 10:36:19 | 19/09/2026 10:36:19 | 162b88c | MAJ 47 : suit le terrain et eloigne le chateau
+19/09/2026 10:57:42 | 19/09/2026 10:57:42 | 263fee1 | MAJ 48 : conforme eau au relief et nettoie chateau
+19/09/2026 15:12:00 | 19/09/2026 15:12:00 | c0e1c8a | MAJ 49 : stabilise eau et nettoie village
+19/09/2026 15:12:23 | 19/09/2026 15:12:23 | 890c498 | MAJ 50 : complete la dalle du chateau
+19/09/2026 15:25:56 | 19/09/2026 15:25:56 | 38f347a | MAJ 51 : raccorde berges et stabilise immersion
+19/09/2026 15:37:59 | 19/09/2026 15:37:59 | 1f214bc | MAJ 52 : retire chateau et conserve le fleuve
+19/09/2026 15:51:41 | 19/09/2026 15:51:41 | 24b73d1 | MAJ 53 : rend le fleuve continu et masque l eau
+19/09/2026 16:02:20 | 19/09/2026 16:02:20 | ae0d60e | MAJ 54 : garde le fleuve visible sans lit
+19/09/2026 16:11:01 | 19/09/2026 16:11:01 | 1d3ee3a | MAJ 55 : pose le fleuve dans le sol
+19/09/2026 16:20:14 | 19/09/2026 16:20:14 | 0d297b9 | MAJ 56 : garde le joueur en surface
+19/09/2026 16:26:50 | 19/09/2026 16:26:50 | aa9d83a | MAJ 57 : applique la texture eau au chenal
+19/09/2026 16:59:02 | 19/09/2026 16:59:02 | 51271ff | MAJ 58 : enrichit le décor avec les assets nature CC0
+19/09/2026 17:10:35 | 19/09/2026 17:10:35 | d62a2b4 | MAJ 59 : ajoute une héroïne humaine et une route pavée
+19/09/2026 17:26:57 | 19/09/2026 17:26:57 | 5635144 | MAJ 60 : corrige la compatibilité des shaders Unity 6
+19/09/2026 17:45:03 | 19/09/2026 17:45:03 | 8a1bc77 | MAJ 61 : crée une héroïne humanoïde originale sous CC0
+19/09/2026 17:45:23 | 19/09/2026 17:45:23 | ca74e24 | MAJ 62 : nettoie les anciens éléments du personnage
+19/09/2026 17:45:30 | 19/09/2026 17:45:30 | 9ec4664 | MAJ 62 : aligne la version sur le nouveau personnage
+19/09/2026 17:58:28 | 19/09/2026 17:58:28 | 5983641 | Correctif build Unity : active le module Animation
+19/09/2026 18:09:05 | 19/09/2026 18:09:05 | 3d841fd | MAJ 63 : anime l heroine et restaure la route pavee
+19/09/2026 18:19:45 | 19/09/2026 18:19:45 | 6aecfe1 | MAJ 64 : articule les personnages et importe les gardes
+19/09/2026 18:31:40 | 19/09/2026 18:31:40 | 412d2f5 | MAJ 65 : sépare les membres importés et masque les faces internes
+19/09/2026 18:44:36 | 19/09/2026 18:44:36 | 25d3b0c | MAJ 66 : corrige les faces internes et les raccords
+
+=== 20/09/2026 ===
+20/09/2026 09:06:27 | 20/09/2026 09:06:27 | 959c73f | MAJ 67 : stabilise la marche et interdit l'eau aux monstres
+20/09/2026 09:19:10 | 20/09/2026 09:19:10 | e3c2d38 | MAJ 68 : améliore les humanoïdes et décale le portique
+20/09/2026 09:35:36 | 20/09/2026 09:35:36 | 5c3405f | MAJ 69 : réaligne les portails et ajoute les dialogues PNJ
+20/09/2026 09:54:10 | 20/09/2026 09:54:10 | 93d32b8 | MAJ 70 : élargit le portail et corrige les personnages
+20/09/2026 10:06:28 | 20/09/2026 10:06:28 | d98db54 | MAJ 71 : cible les attaques et élargit les portails
+20/09/2026 10:17:55 | 20/09/2026 10:17:55 | 71b25eb | MAJ 72 : redresse la route et synchronise le marteau
+20/09/2026 10:26:48 | 20/09/2026 10:26:48 | f096df2 | MAJ 73 : attache les objets aux mains des PNJ
+20/09/2026 10:38:01 | 20/09/2026 10:38:01 | b357951 | MAJ 74 : place les objets dans la paume des PNJ
+20/09/2026 10:52:21 | 20/09/2026 10:52:21 | f41be25 | MAJ 75 : inverse les accessoires et ajoute le mode edition
+20/09/2026 10:58:49 | 20/09/2026 10:58:49 | 98dadf5 | MAJ 76 : restaure les accessoires et fiabilise les cages
+20/09/2026 11:05:18 | 20/09/2026 11:05:18 | 255774d | MAJ 77 : aligne les accessoires et souleve les maisons
+20/09/2026 11:22:44 | 20/09/2026 11:22:44 | d9b04d7 | MAJ 78 : deplace les maisons et sauvegarde les coordonnees
+20/09/2026 11:28:01 | 20/09/2026 11:28:01 | feda114 | MAJ 79 : corrige la compilation Unity 6
+20/09/2026 11:46:55 | 20/09/2026 11:46:36 | 8ceb086 | MAJ 80 : etend le mode edition
+20/09/2026 11:55:00 | 20/09/2026 11:55:00 | 048ee1b | MAJ 81 : annule les deplacements edition
+20/09/2026 12:00:49 | 20/09/2026 12:00:49 | e503ce3 | MAJ 82 : installe Git automatiquement pour l edition
+20/09/2026 12:02:57 | 20/09/2026 12:02:57 | 91c2fa8 | Edition : met a jour les coordonnees
+20/09/2026 12:06:55 | 20/09/2026 12:06:48 | 0d0a4ab | Correctif : compile la visibilite des pancartes
+20/09/2026 12:18:57 | 20/09/2026 12:18:57 | 78b0c19 | MAJ 83 : retire la cage et fiabilise annulation
+20/09/2026 12:54:40 | 20/09/2026 12:54:40 | 44cfcc0 | MAJ 84 : ajoute l historique des annulations
+20/09/2026 13:08:06 | 20/09/2026 13:08:06 | 0369548 | MAJ 85 : edite et attache les pancartes
+20/09/2026 13:21:10 | 20/09/2026 13:21:10 | 7797426 | Edition : met a jour les coordonnees
+20/09/2026 13:24:47 | 20/09/2026 13:24:47 | b867f9d | Edition : met a jour les coordonnees
+20/09/2026 13:36:43 | 20/09/2026 13:36:39 | c39f56f | MAJ 86 : redimensionne les maisons et les ouvertures
+20/09/2026 13:57:42 | 20/09/2026 13:57:42 | 8ce48ba | MAJ 87 : ajoute les fleches de redimensionnement
+20/09/2026 14:06:15 | 20/09/2026 14:06:15 | 4242c04 | MAJ 88 : reinitialise les coordonnees et bloque la porte
+20/09/2026 14:17:12 | 20/09/2026 14:17:12 | 984cc77 | MAJ 89 : separe le deplacement et les murs
+20/09/2026 14:19:38 | 20/09/2026 14:19:38 | 8aec41e | Edition : met a jour les coordonnees
+20/09/2026 14:33:40 | 20/09/2026 14:33:35 | 349488c | MAJ 90 : ajoute les variantes de maison
+20/09/2026 14:46:56 | 20/09/2026 14:46:56 | 86f728f | Corrige les appels de redimensionnement des murs
+20/09/2026 15:18:10 | 20/09/2026 15:18:10 | 15d5740 | Ajuste les revetements des maisons
+20/09/2026 15:46:07 | 20/09/2026 15:46:07 | 890b511 | Ajoute edition avancee et passages des maisons
+20/09/2026 15:59:57 | 20/09/2026 15:59:57 | 26df5c5 | Corrige les ouvertures et le rendu des maisons
+20/09/2026 16:17:44 | 20/09/2026 16:17:44 | 812fe1f | Ajuste les pancartes, vitrages et ombres
+20/09/2026 16:19:07 | 20/09/2026 16:19:07 | 87e5f87 | Edition : met a jour les coordonnees
+20/09/2026 16:34:58 | 20/09/2026 16:34:58 | 28e69f1 | Nettoie les façades et stabilise la camera intérieure
+20/09/2026 16:35:18 | 20/09/2026 16:35:18 | 234c799 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 16:37:17 | 20/09/2026 16:37:17 | f11ab8a | Fait pivoter les portes sur leurs gonds
+20/09/2026 16:42:07 | 20/09/2026 16:42:07 | 35d0431 | Edition : met a jour les coordonnees
+20/09/2026 16:47:38 | 20/09/2026 16:47:38 | a30819b | Corrige la declaration du toit Unity
+20/09/2026 16:47:43 | 20/09/2026 16:47:43 | 7bb970c | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 16:59:41 | 20/09/2026 16:59:41 | 27bd537 | Masque la structure depuis l interieur des maisons
+20/09/2026 17:14:22 | 20/09/2026 17:14:22 | 6b3f989 | Conserve la porte et abaisse les murs a l interieur
+20/09/2026 17:14:54 | 20/09/2026 17:14:54 | 462f684 | Edition : met a jour les coordonnees
+20/09/2026 17:29:16 | 20/09/2026 17:29:16 | b51b307 | Retire la plaque au-dessus du sol interieur
+20/09/2026 17:29:21 | 20/09/2026 17:29:21 | 7b32905 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 17:30:28 | 20/09/2026 17:30:28 | 8ac0714 | Edition : met a jour les coordonnees
+20/09/2026 17:37:23 | 20/09/2026 17:37:23 | f28146c | Ferme le dessus des murs interieurs sans couvrir le sol
+20/09/2026 17:37:27 | 20/09/2026 17:37:27 | f7a9f34 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 17:37:58 | 20/09/2026 17:37:58 | 3e9adb8 | Edition : met a jour les coordonnees
+20/09/2026 17:46:35 | 20/09/2026 17:46:35 | 30aa97c | Supprime le jour entre les murs et la dalle
+20/09/2026 17:46:38 | 20/09/2026 17:46:38 | 3e06c05 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 17:47:52 | 20/09/2026 17:47:52 | dc8e21e | Edition : met a jour les coordonnees
+20/09/2026 17:54:37 | 20/09/2026 17:54:37 | 5256d8c | Etend la dalle sous les murs de la maison
+20/09/2026 17:54:41 | 20/09/2026 17:54:41 | d1c9204 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 17:54:54 | 20/09/2026 17:54:54 | 2c3da99 | Ajuste le recouvrement de la dalle
+20/09/2026 17:55:21 | 20/09/2026 17:55:21 | 0b73e1c | Edition : met a jour les coordonnees
+20/09/2026 18:02:43 | 20/09/2026 18:02:43 | 6e570d9 | Place la dalle au milieu de l epaisseur des murs
+20/09/2026 18:02:46 | 20/09/2026 18:02:46 | 495ee90 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+20/09/2026 18:03:18 | 20/09/2026 18:03:18 | b0cb2a5 | Edition : met a jour les coordonnees
+
+=== 27/09/2026 ===
+27/09/2026 12:56:17 | 27/09/2026 12:56:17 | 3c7cc84 | Corrige eau marteau HUD pancartes et fleches des murs
+27/09/2026 12:58:47 | 27/09/2026 12:58:47 | d9c4b9b | Edition : met a jour les coordonnees
+27/09/2026 13:00:59 | 27/09/2026 13:00:59 | aad06e4 | Corrige la taille du texte et le soulignement
+27/09/2026 13:01:02 | 27/09/2026 13:01:02 | e36dfb8 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 13:08:39 | 27/09/2026 13:08:39 | 759ff8e | Fiabilise la mise a jour des sources Unity
+27/09/2026 13:11:21 | 27/09/2026 13:11:21 | 3d90806 | Corrige la syntaxe PowerShell du synchroniseur
+27/09/2026 13:34:26 | 27/09/2026 13:34:26 | 2a18e9a | Corrige course HUD pancartes et attaches aux murs
+27/09/2026 13:34:37 | 27/09/2026 13:34:37 | cff1770 | Synchronise aussi la frappe du marteau
+27/09/2026 13:35:27 | 27/09/2026 13:35:27 | 61f3fce | Edition : met a jour les coordonnees
+27/09/2026 13:57:49 | 27/09/2026 13:57:49 | 67348de | Anime les accessoires des PNJ et simplifie les pancartes
+27/09/2026 13:58:05 | 27/09/2026 13:58:05 | ba45e03 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 13:58:46 | 27/09/2026 13:58:46 | b410930 | Edition : met a jour les coordonnees
+27/09/2026 14:10:02 | 27/09/2026 14:10:02 | bad9e05 | Ajoute luminosite et corrige animation des accessoires
+27/09/2026 14:10:06 | 27/09/2026 14:10:06 | 70d64bc | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:12:01 | 27/09/2026 14:12:01 | 9f417e5 | Edition : met a jour les coordonnees
+27/09/2026 14:20:36 | 27/09/2026 14:20:36 | 0d56ead | Limite le mouvement des bras des PNJ
+27/09/2026 14:20:39 | 27/09/2026 14:20:39 | 4bdd7dd | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:21:15 | 27/09/2026 14:21:15 | daa1478 | Edition : met a jour les coordonnees
+27/09/2026 14:29:59 | 27/09/2026 14:29:59 | 10f94c3 | Corrige les bras animes et le marteau du joueur
+27/09/2026 14:30:04 | 27/09/2026 14:30:04 | 595b320 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:30:55 | 27/09/2026 14:30:55 | eef7dad | Edition : met a jour les coordonnees
+27/09/2026 14:36:03 | 27/09/2026 14:36:03 | bc325ac | Corrige le bras droit visible des PNJ
+27/09/2026 14:36:07 | 27/09/2026 14:36:07 | 577ab1e | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:36:29 | 27/09/2026 14:36:29 | 47c0fe3 | Edition : met a jour les coordonnees
+27/09/2026 14:43:01 | 27/09/2026 14:43:01 | 8d2ed65 | Restaure les accessoires et enrichit le ciel
+27/09/2026 14:43:08 | 27/09/2026 14:43:08 | 6887a7d | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:47:02 | 27/09/2026 14:47:02 | 8c13121 | Edition : met a jour les coordonnees
+27/09/2026 14:51:54 | 27/09/2026 14:51:54 | e1a6a14 | Colle les accessoires aux mains animees
+27/09/2026 14:51:59 | 27/09/2026 14:51:59 | 7202415 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 14:54:27 | 27/09/2026 14:54:27 | 915bc83 | Edition : met a jour les coordonnees
+27/09/2026 15:00:45 | 27/09/2026 15:00:45 | e80d8e5 | Place les objets a droite et ajoute le menu admin
+27/09/2026 15:00:48 | 27/09/2026 15:00:48 | 9c033c9 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:00:59 | 27/09/2026 15:00:59 | 4044668 | Place aussi le marteau du joueur a droite
+27/09/2026 15:03:42 | 27/09/2026 15:03:42 | 304ecb9 | Edition : met a jour les coordonnees
+27/09/2026 15:13:36 | 27/09/2026 15:13:36 | 9b4d50a | Etiquette les bras du forgeron
+27/09/2026 15:13:39 | 27/09/2026 15:13:39 | 992d73d | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:14:14 | 27/09/2026 15:14:14 | 860eaa7 | Edition : met a jour les coordonnees
+27/09/2026 15:19:40 | 27/09/2026 15:19:40 | 22fcb3e | Anime le bras droit des PNJ
+27/09/2026 15:19:43 | 27/09/2026 15:19:43 | 7a7381e | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:20:48 | 27/09/2026 15:20:48 | fdf225a | Edition : met a jour les coordonnees
+27/09/2026 15:23:48 | 27/09/2026 15:23:48 | 2baaadd | Fige le bras gauche des PNJ
+27/09/2026 15:23:51 | 27/09/2026 15:23:51 | bada47e | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:24:39 | 27/09/2026 15:24:39 | 0a6f63a | Edition : met a jour les coordonnees
+27/09/2026 15:26:39 | 27/09/2026 15:26:39 | ace6c4b | Fiabilise la synchronisation des sources
+27/09/2026 15:26:42 | 27/09/2026 15:26:42 | f5b92a0 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:29:05 | 27/09/2026 15:29:05 | 8239831 | Rend toutes les resolutions selectionnables
+27/09/2026 15:44:54 | 27/09/2026 15:44:54 | 11c7285 | Attache les objets aux bras droits
+27/09/2026 15:45:21 | 27/09/2026 15:45:21 | 2f53045 | Edition : met a jour les coordonnees
+27/09/2026 15:52:08 | 27/09/2026 15:52:08 | 2421c2d | Ajoute le diagnostic NPC dans le menu admin
+27/09/2026 15:52:11 | 27/09/2026 15:52:11 | 41c5a1f | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 15:52:38 | 27/09/2026 15:52:38 | 726ddd3 | Edition : met a jour les coordonnees
+27/09/2026 15:59:56 | 27/09/2026 15:59:56 | 07a3d9a | Corrige le miroir G D du diagnostic NPC
+27/09/2026 16:00:01 | 27/09/2026 16:00:01 | 62f5281 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:00:38 | 27/09/2026 16:00:38 | bd94c68 | Edition : met a jour les coordonnees
+27/09/2026 16:04:57 | 27/09/2026 16:04:57 | 3cf0f10 | Corrige le cote du placement NPC
+27/09/2026 16:05:01 | 27/09/2026 16:05:01 | 40dfc40 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:08:21 | 27/09/2026 16:08:21 | 3abf424 | Edition : met a jour les coordonnees
+27/09/2026 16:15:31 | 27/09/2026 16:15:31 | a0d7523 | Corrige les libelles et modes G D du menu NPC
+27/09/2026 16:15:36 | 27/09/2026 16:15:36 | 8b03500 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:16:11 | 27/09/2026 16:16:11 | 60a88aa | Edition : met a jour les coordonnees
+27/09/2026 16:19:11 | 27/09/2026 16:19:11 | d9f3b89 | Rend le choix des bras direct dans l admin
+27/09/2026 16:19:16 | 27/09/2026 16:19:16 | 53ecb15 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:19:36 | 27/09/2026 16:19:36 | 950c14c | Edition : met a jour les coordonnees
+27/09/2026 16:22:08 | 27/09/2026 16:22:08 | 97fe18e | Revert "Rend le choix des bras direct dans l admin"
+27/09/2026 16:22:21 | 27/09/2026 16:22:21 | 0d5ca43 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:22:42 | 27/09/2026 16:22:42 | 5865f25 | Edition : met a jour les coordonnees
+27/09/2026 16:27:29 | 27/09/2026 16:27:29 | af70f67 | Corrige le mapping visuel des bras NPC
+27/09/2026 16:27:31 | 27/09/2026 16:27:31 | 3a1a0fe | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:28:03 | 27/09/2026 16:28:03 | 32126d0 | Edition : met a jour les coordonnees
+27/09/2026 16:33:08 | 27/09/2026 16:33:08 | 019ca72 | Colle les lettres de diagnostic aux avant-bras
+27/09/2026 16:33:11 | 27/09/2026 16:33:11 | 2438d3b | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:33:29 | 27/09/2026 16:33:29 | 5529d3b | Edition : met a jour les coordonnees
+27/09/2026 16:45:02 | 27/09/2026 16:45:02 | b113735 | Ajoute l editeur d apparence des personnages
+27/09/2026 16:45:06 | 27/09/2026 16:45:06 | 2ef7667 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:45:31 | 27/09/2026 16:45:31 | c790760 | Edition : met a jour les coordonnees
+27/09/2026 16:49:22 | 27/09/2026 16:49:22 | 8c2a647 | Revert "Ajoute l editeur d apparence des personnages"
+27/09/2026 16:49:30 | 27/09/2026 16:49:30 | b623ef4 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:49:54 | 27/09/2026 16:49:54 | faefa3b | Edition : met a jour les coordonnees
+27/09/2026 16:55:24 | 27/09/2026 16:55:24 | 40754cc | Fixe les PNJ et regle la quantite de monstres
+27/09/2026 16:55:28 | 27/09/2026 16:55:28 | 20f8316 | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 16:56:03 | 27/09/2026 16:56:03 | 81b1b12 | Edition : met a jour les coordonnees
+27/09/2026 17:02:43 | 27/09/2026 17:02:43 | 73f3bed | Corrige le maire les monstres et le reset ville
+27/09/2026 17:02:47 | 27/09/2026 17:02:47 | 5c9095e | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 17:03:40 | 27/09/2026 17:03:40 | 99c78c4 | Edition : met a jour les coordonnees
+27/09/2026 17:49:54 | 27/09/2026 17:49:54 | f890a42 | Ajoute le createur autonome de personnages humains
+27/09/2026 17:50:15 | 27/09/2026 17:50:15 | c4b518e | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies
+27/09/2026 17:50:38 | 27/09/2026 17:50:38 | f8008eb | Affiche le chemin du createur apres le build
+27/09/2026 17:56:15 | 27/09/2026 17:56:15 | e45df33 | Edition : met a jour les coordonnees
+27/09/2026 18:00:09 | 27/09/2026 18:00:09 | 809b679 | Place le createur compile dans jeu/personnage
+27/09/2026 18:00:20 | 27/09/2026 18:00:20 | 5e32f0d | Merge branch 'arena/01a0b32c-librevies' of https://github.com/killdrago/LibreVies into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+27/09/2026 18:14:46 | 27/09/2026 18:14:46 | f1628a9 | Passe le createur en fenetre et nettoie la base humaine
+
+=== 28/09/2026 ===
+28/09/2026 06:58:19 | 28/09/2026 06:58:19 | 792ca5e | Migre le socle vers Unreal et retire Unity
+28/09/2026 06:58:36 | 28/09/2026 06:58:36 | 40a016a | Charge les cibles morphologiques MakeHuman dans Unreal
+28/09/2026 07:36:36 | 28/09/2026 07:36:36 | 78e9f15 | Precise la version Visual Studio compatible avec Unreal 5.6
+28/09/2026 08:04:36 | 28/09/2026 08:04:36 | 07e9677 | Restaure le projet Unity apres le test Unreal
+28/09/2026 08:19:32 | 28/09/2026 08:19:32 | 73996bf | Edition : met a jour les coordonnees
+28/09/2026 08:42:16 | 28/09/2026 08:42:16 | 578c9af | Integre le createur humain MakeHuman dans ADMIN Unity
+28/09/2026 08:42:58 | 28/09/2026 08:42:58 | a46d56e | Edition : met a jour les coordonnees
+28/09/2026 08:44:36 | 28/09/2026 08:44:30 | 61a3eaa | Corrige le parseur OBJ du createur MakeHuman
+28/09/2026 08:47:49 | 28/09/2026 08:47:49 | bc2ad27 | Corrige la conversion des coordonnees du rig MakeHuman
+28/09/2026 13:11:53 | 28/09/2026 13:11:53 | c181128 | Ameliore les panneaux ADMIN des humains, NPC et objets
+28/09/2026 13:12:49 | 28/09/2026 13:12:49 | 13560ef | Edition : met a jour les coordonnees
+28/09/2026 13:15:57 | 28/09/2026 13:15:53 | ab7a8ad | Ajoute les teintes claires et le menu joueur runtime
+28/09/2026 13:25:41 | 28/09/2026 13:25:41 | b912285 | Ameliore l apercu humain et prepare l atelier d objets
+28/09/2026 13:28:40 | 28/09/2026 13:28:40 | 91e7bb5 | Edition : met a jour les coordonnees
+28/09/2026 13:34:22 | 28/09/2026 13:34:18 | ef3ccda | Ajoute la camera de preview et applique le personnage joueur
+28/09/2026 13:45:09 | 28/09/2026 13:45:09 | ebea5c9 | Edition : met a jour les coordonnees
+28/09/2026 14:01:08 | 28/09/2026 14:01:08 | 490941c | Corrige l evenement de molette Unity
+28/09/2026 14:05:53 | 28/09/2026 14:05:53 | 75c06cd | Anime et oriente le personnage humain applique
+28/09/2026 14:07:44 | 28/09/2026 14:07:44 | 845f276 | Edition : met a jour les coordonnees
+28/09/2026 14:11:22 | 28/09/2026 14:11:22 | c36b202 | Replace les membres humains en pose naturelle
+28/09/2026 14:21:47 | 28/09/2026 14:21:47 | 53ab563 | Ajoute morphes vetements coiffures et luminosite par defaut
+28/09/2026 14:23:06 | 28/09/2026 14:23:06 | 9b34482 | Edition : met a jour les coordonnees
+28/09/2026 14:29:39 | 28/09/2026 14:29:39 | e03ee8d | Corrige les coiffures vetements et le reglage de luminosite
+28/09/2026 14:33:14 | 28/09/2026 14:33:14 | 2efe79d | Edition : met a jour les coordonnees
+28/09/2026 14:38:00 | 28/09/2026 14:37:59 | b04232f | Rend la luminosite progressive autour de 50 pourcent
+28/09/2026 14:49:46 | 28/09/2026 14:49:46 | 018c558 | Edition : met a jour les coordonnees
+28/09/2026 14:56:03 | 28/09/2026 14:56:02 | fff84bc | Affine les vetements et les coiffures du personnage
+28/09/2026 14:56:44 | 28/09/2026 14:56:44 | 1d261bb | Edition : met a jour les coordonnees
+28/09/2026 15:05:04 | 28/09/2026 15:05:03 | 88b5e54 | Corrige la forme des sous vetements et le volume des seins
+28/09/2026 15:14:18 | 28/09/2026 15:14:18 | 9d240a1 | Edition : met a jour les coordonnees
+28/09/2026 15:57:31 | 28/09/2026 15:57:31 | 8fe90b5 | Ajoute des bretelles et limite le volume minimal des seins
+28/09/2026 16:00:37 | 28/09/2026 16:00:37 | 5ebf89f | Edition : met a jour les coordonnees
+28/09/2026 16:15:12 | 28/09/2026 16:15:11 | e5b25ef | Respecte la limite minimale du volume de poitrine
+28/09/2026 16:15:45 | 28/09/2026 16:15:45 | 6123e99 | Edition : met a jour les coordonnees
+28/09/2026 16:20:54 | 28/09/2026 16:20:54 | 00695a4 | Reproduit les sous vetements CC0 de la base Quaternius
+28/09/2026 16:21:54 | 28/09/2026 16:21:54 | 9b097d1 | Edition : met a jour les coordonnees
+28/09/2026 16:27:55 | 28/09/2026 16:27:54 | d224b79 | Ajuste la position de la poitrine et des sous vetements
+28/09/2026 16:28:58 | 28/09/2026 16:28:58 | 35fa7f1 | Edition : met a jour les coordonnees
+28/09/2026 16:33:41 | 28/09/2026 16:33:41 | dc4b661 | Attache les sous vetements au squelette humain
+28/09/2026 16:36:08 | 28/09/2026 16:36:08 | 60e3b6b | Edition : met a jour les coordonnees
+28/09/2026 16:59:39 | 28/09/2026 16:59:38 | 1c2154d | Masque le corps sous les vetements skines
+28/09/2026 17:07:09 | 28/09/2026 17:07:09 | 8e195b5 | Integre les sous vetements dans le maillage du corps
+28/09/2026 17:08:06 | 28/09/2026 17:08:06 | 1a8f9cd | Edition : met a jour les coordonnees
+28/09/2026 17:13:13 | 28/09/2026 17:13:13 | 4899eaa | Colorie les sous vetements directement sur le corps
+28/09/2026 17:16:59 | 28/09/2026 17:16:59 | 5388911 | Edition : met a jour les coordonnees
+28/09/2026 17:22:13 | 28/09/2026 17:22:12 | 0c62cd3 | Dessine les sous vetements avec des pixels geometriques
+28/09/2026 17:23:04 | 28/09/2026 17:23:04 | 9888e8f | Edition : met a jour les coordonnees
+28/09/2026 17:28:40 | 28/09/2026 17:28:40 | 5830a46 | Peint les sous vetements pixel par pixel dans la texture
+28/09/2026 17:29:24 | 28/09/2026 17:29:24 | 7cdb72a | Edition : met a jour les coordonnees
+28/09/2026 17:31:37 | 28/09/2026 17:31:36 | 7fc700b | Evite le preview noir pendant la peinture pixel
+28/09/2026 17:31:51 | 28/09/2026 17:31:51 | 37ce44b | Rend le fond du preview neutre et lisible
+28/09/2026 17:35:26 | 28/09/2026 17:35:26 | 7bae063 | Edition : met a jour les coordonnees
+28/09/2026 17:43:29 | 28/09/2026 17:43:28 | 687095b | Peint les vetements en espace objet pour eviter les UV melanges
+28/09/2026 17:43:57 | 28/09/2026 17:43:57 | 2bf6e89 | Edition : met a jour les coordonnees
+28/09/2026 17:48:51 | 28/09/2026 17:48:50 | b7aaf4c | Teste la position de la poitrine avec deux ronds jaunes
+28/09/2026 17:49:15 | 28/09/2026 17:49:15 | cf7f2d0 | Edition : met a jour les coordonnees
+28/09/2026 17:53:20 | 28/09/2026 17:53:20 | 1a22626 | Remplace la poitrine par deux pastilles de couleur
+28/09/2026 17:54:47 | 28/09/2026 17:54:47 | 13e52c3 | Edition : met a jour les coordonnees
+
+=== 29/09/2026 ===
+29/09/2026 08:01:53 | 29/09/2026 08:01:53 | d687bc0 | Retire les sous vetements du personnage
+29/09/2026 08:02:22 | 29/09/2026 08:02:22 | 99b61b1 | Edition : met a jour les coordonnees
+29/09/2026 08:05:06 | 29/09/2026 08:05:05 | b926726 | Supprime le halo de la coupe de base
+29/09/2026 08:05:42 | 29/09/2026 08:05:42 | 266ec83 | Edition : met a jour les coordonnees
+29/09/2026 08:48:05 | 29/09/2026 08:48:05 | d399748 | Ajoute l atelier Python de creation de vetements
+29/09/2026 09:01:05 | 29/09/2026 09:01:05 | bedf7e2 | Edition : met a jour les coordonnees
+29/09/2026 09:09:09 | 29/09/2026 09:09:09 | 6b3cbd2 | Add files via upload
+29/09/2026 09:12:47 | 29/09/2026 09:12:47 | f2f0050 | Rend transparent le fond noir du soutien gorge
+29/09/2026 09:20:58 | 29/09/2026 09:20:58 | 8286ac5 | Ajoute le placement du soutien-gorge dans l'ADMIN
+29/09/2026 09:29:27 | 29/09/2026 09:29:27 | ce9ea70 | Masque la peau sous le soutien-gorge
+29/09/2026 09:29:39 | 29/09/2026 09:29:39 | 6403eb4 | Garde le shader de masquage dans les ressources Unity
+29/09/2026 09:35:30 | 29/09/2026 09:35:30 | 2de984a | Edition : met a jour les coordonnees
+29/09/2026 09:41:35 | 29/09/2026 09:41:35 | 575fa6c | Remplace la texture de peau sous le soutien-gorge
+29/09/2026 09:41:53 | 29/09/2026 09:41:53 | a7bc191 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 09:42:18 | 29/09/2026 09:42:18 | bf3b27a | Charge explicitement le shader de remplacement
+29/09/2026 09:43:50 | 29/09/2026 09:43:50 | 1c468cf | Edition : met a jour les coordonnees
+29/09/2026 09:48:42 | 29/09/2026 09:48:42 | c3edeb3 | Ajoute culotte calecon et bretelles dorsales
+29/09/2026 09:48:49 | 29/09/2026 09:48:49 | 6479d68 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 09:49:55 | 29/09/2026 09:49:55 | 06ad196 | Edition : met a jour les coordonnees
+29/09/2026 09:54:02 | 29/09/2026 09:54:02 | 2691a12 | Garde seulement les bretelles dorsales
+29/09/2026 09:54:08 | 29/09/2026 09:54:08 | b059b4c | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 10:02:44 | 29/09/2026 10:02:44 | e7e906b | Edition : met a jour les coordonnees
+29/09/2026 10:09:09 | 29/09/2026 10:09:09 | 9da54cd | Remplace les bretelles arriere sur la peau
+29/09/2026 10:09:16 | 29/09/2026 10:09:16 | e75404c | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 10:48:30 | 29/09/2026 10:48:30 | 0fe5b21 | Edition : met a jour les coordonnees
+29/09/2026 11:22:14 | 29/09/2026 11:22:14 | 75bf15b | Evite le rendu blanc de la peau
+29/09/2026 11:23:18 | 29/09/2026 11:23:18 | e0a6ccf | Edition : met a jour les coordonnees
+29/09/2026 11:27:54 | 29/09/2026 11:27:54 | 5f93c3c | Corrige le blanc du personnage et fixe les gardes
+29/09/2026 11:28:02 | 29/09/2026 11:28:02 | 7c466a0 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 11:29:16 | 29/09/2026 11:29:16 | a0a576a | Edition : met a jour les coordonnees
+29/09/2026 11:34:21 | 29/09/2026 11:34:21 | 91ea54f | Restaure la peau Standard et replace les vetements
+29/09/2026 11:34:31 | 29/09/2026 11:34:31 | a0b5241 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 11:37:21 | 29/09/2026 11:37:21 | 45f7f03 | Edition : met a jour les coordonnees
+29/09/2026 11:41:29 | 29/09/2026 11:41:29 | e1af908 | Retire la peau sous le soutien-gorge
+29/09/2026 11:41:36 | 29/09/2026 11:41:36 | 5599007 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 11:43:56 | 29/09/2026 11:43:56 | 9c965bd | Edition : met a jour les coordonnees
+29/09/2026 11:49:51 | 29/09/2026 11:49:51 | 73e0091 | Integre le soutien gorge dans le maillage skine
+29/09/2026 11:49:53 | 29/09/2026 11:49:53 | 78a20a1 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 11:50:00 | 29/09/2026 11:50:00 | 0636d37 | Securise le shader de surface du vetement
+29/09/2026 11:50:30 | 29/09/2026 11:50:30 | b2bf0de | Edition : met a jour les coordonnees
+29/09/2026 11:57:58 | 29/09/2026 11:57:58 | 053f889 | Corrige les bretelles et ajoute la bande dorsale
+29/09/2026 11:58:02 | 29/09/2026 11:58:02 | 0ed43e3 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 11:58:19 | 29/09/2026 11:58:19 | 19c3846 | Evite les decoupes dans les bretelles
+29/09/2026 12:08:33 | 29/09/2026 12:08:33 | a5d6543 | Edition : met a jour les coordonnees
+29/09/2026 13:02:18 | 29/09/2026 13:02:18 | c9f7b4d | Restaure le rendu frontal simple du soutien gorge
+29/09/2026 13:03:52 | 29/09/2026 13:03:52 | 37500d0 | Edition : met a jour les coordonnees
+29/09/2026 13:25:26 | 29/09/2026 13:25:26 | a9178ae | Remplace la peau par le soutien gorge sur la surface
+29/09/2026 13:25:26 | 29/09/2026 13:25:26 | bca7df6 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 13:25:52 | 29/09/2026 13:25:52 | 2628578 | Edition : met a jour les coordonnees
+29/09/2026 16:09:52 | 29/09/2026 16:09:52 | 2cbe685 | Cree les sous vetements avec le personnage
+29/09/2026 16:11:55 | 29/09/2026 16:11:55 | a3bdd66 | Edition : met a jour les coordonnees
+29/09/2026 16:29:27 | 29/09/2026 16:29:27 | b257c75 | Edition : met a jour les coordonnees
+29/09/2026 16:34:48 | 29/09/2026 16:34:48 | 05ed879 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 16:34:48 | 29/09/2026 16:34:48 | 60ddc24 | Corrige la surface des vetements integres
+29/09/2026 16:35:55 | 29/09/2026 16:35:55 | c6ca044 | Edition : met a jour les coordonnees
+29/09/2026 16:44:25 | 29/09/2026 16:44:25 | 3985498 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 16:44:25 | 29/09/2026 16:44:25 | f1ab9be | Construit un soutien gorge opaque et une culotte
+29/09/2026 16:46:52 | 29/09/2026 16:46:52 | 6324752 | Edition : met a jour les coordonnees
+29/09/2026 16:55:37 | 29/09/2026 16:55:37 | a4f12cf | Edition : met a jour les coordonnees
+29/09/2026 17:01:04 | 29/09/2026 17:01:04 | 2d5eadb | Supprime la peau sous les vetements opaques
+29/09/2026 17:01:05 | 29/09/2026 17:01:05 | a620f13 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:03:07 | 29/09/2026 17:03:07 | c2715d6 | Edition : met a jour les coordonnees
+29/09/2026 17:14:58 | 29/09/2026 17:14:58 | eed8c07 | Integre les sous vetements dans le maillage du corps
+29/09/2026 17:14:59 | 29/09/2026 17:14:59 | 26554f4 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:15:38 | 29/09/2026 17:15:38 | f94e5f3 | Edition : met a jour les coordonnees
+29/09/2026 17:28:25 | 29/09/2026 17:28:25 | 833f3d4 | Aplati la poitrine et abaisse la culotte
+29/09/2026 17:28:26 | 29/09/2026 17:28:26 | d136c00 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:30:55 | 29/09/2026 17:30:55 | 8dd4f1b | Edition : met a jour les coordonnees
+29/09/2026 17:32:41 | 29/09/2026 17:32:41 | 933147f | Corrige le split du masque alpha
+29/09/2026 17:32:42 | 29/09/2026 17:32:42 | 6503467 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:35:47 | 29/09/2026 17:35:47 | 0e0fb82 | Edition : met a jour les coordonnees
+29/09/2026 17:42:15 | 29/09/2026 17:42:15 | 033a761 | Lisse le soutien gorge et la culotte sur le corps
+29/09/2026 17:42:15 | 29/09/2026 17:42:15 | c9c6363 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:42:47 | 29/09/2026 17:42:47 | 60c2849 | Edition : met a jour les coordonnees
+29/09/2026 17:45:16 | 29/09/2026 17:45:16 | e7d4b63 | Charge le shader des vetements depuis Resources
+29/09/2026 17:45:17 | 29/09/2026 17:45:17 | a7fb0c0 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:45:52 | 29/09/2026 17:45:52 | c9344f4 | Edition : met a jour les coordonnees
+29/09/2026 17:48:17 | 29/09/2026 17:48:17 | b7bdb62 | Restaure le rendu opaque avec bretelles fines
+29/09/2026 17:48:18 | 29/09/2026 17:48:18 | 6e86dc4 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:50:08 | 29/09/2026 17:50:08 | c57d205 | Edition : met a jour les coordonnees
+29/09/2026 17:54:43 | 29/09/2026 17:54:43 | 7800b06 | Lisse les contours des sous-vetements au pixel
+29/09/2026 17:54:55 | 29/09/2026 17:54:55 | 231eeaf | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 17:55:48 | 29/09/2026 17:55:48 | 4580024 | Edition : met a jour les coordonnees
+29/09/2026 18:01:05 | 29/09/2026 18:01:05 | 24bb7fd | Restaure le rendu opaque par sous-maillages
+29/09/2026 18:01:11 | 29/09/2026 18:01:11 | 82968b6 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+29/09/2026 18:01:51 | 29/09/2026 18:01:51 | 3f003ef | Edition : met a jour les coordonnees
+
+=== 30/09/2026 ===
+30/09/2026 14:14:37 | 30/09/2026 14:14:37 | 4a7b2c3 | Prepare le mannequin feminin blanc et sans poitrine
+30/09/2026 14:18:05 | 30/09/2026 14:18:05 | fb9e9ce | Edition : met a jour les coordonnees
+30/09/2026 14:22:43 | 30/09/2026 14:22:43 | 4e99ad7 | Retablit le volume du torse et applique les textures
+30/09/2026 14:22:56 | 30/09/2026 14:22:56 | 3b98acf | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 14:24:36 | 30/09/2026 14:24:36 | 6a56d77 | Edition : met a jour les coordonnees
+30/09/2026 14:30:19 | 30/09/2026 14:30:19 | 7d581fd | Supprime les pointes et masque les tetons par texture UV
+30/09/2026 14:30:25 | 30/09/2026 14:30:25 | 1e0e086 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 14:33:54 | 30/09/2026 14:33:54 | 6c98dd2 | Edition : met a jour les coordonnees
+30/09/2026 14:39:28 | 30/09/2026 14:39:28 | 7b8858e | Corrige le soutien gorge et supprime les contours en dents de scie
+30/09/2026 14:39:35 | 30/09/2026 14:39:35 | d43c0e7 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 14:41:48 | 30/09/2026 14:41:48 | f827aaa | Edition : met a jour les coordonnees
+30/09/2026 14:46:47 | 30/09/2026 14:46:47 | 22eaf63 | Restaure la version de 14h23 et masque les points
+30/09/2026 14:46:54 | 30/09/2026 14:46:54 | b1e4236 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 14:48:16 | 30/09/2026 14:48:16 | 742084e | Edition : met a jour les coordonnees
+30/09/2026 14:52:24 | 30/09/2026 14:52:24 | ca28ca4 | Masque les points de poitrine dans les triangles voisins
+30/09/2026 14:52:32 | 30/09/2026 14:52:32 | ca5d26a | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 14:56:56 | 30/09/2026 14:56:56 | 1d86df0 | Edition : met a jour les coordonnees
+30/09/2026 15:00:13 | 30/09/2026 15:00:13 | ee543b5 | Retire les deux points du torse
+30/09/2026 15:00:20 | 30/09/2026 15:00:20 | dd461f5 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 15:00:45 | 30/09/2026 15:00:45 | 0a11fce | Edition : met a jour les coordonnees
+30/09/2026 15:07:51 | 30/09/2026 15:07:51 | a86ba77 | Edition : met a jour les coordonnees
+30/09/2026 15:10:43 | 30/09/2026 15:10:43 | 16740e4 | Aplati uniquement les deux points de poitrine
+30/09/2026 15:10:50 | 30/09/2026 15:10:50 | 0dac66a | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 15:30:36 | 30/09/2026 15:30:36 | 19aa2ed | Edition : met a jour les coordonnees
+30/09/2026 15:33:39 | 30/09/2026 15:33:39 | fe6effc | Donne au torse feminin la base sans tetons de l homme
+30/09/2026 15:33:49 | 30/09/2026 15:33:49 | 6aa752f | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 15:37:25 | 30/09/2026 15:37:25 | d52cb03 | Edition : met a jour les coordonnees
+30/09/2026 15:41:44 | 30/09/2026 15:41:44 | d189e56 | Supprime definitivement les points du soutien gorge
+30/09/2026 15:41:52 | 30/09/2026 15:41:52 | a40df7f | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 15:45:31 | 30/09/2026 15:45:31 | 73525a8 | Edition : met a jour les coordonnees
+30/09/2026 15:47:56 | 30/09/2026 15:47:56 | 476ef91 | Edition : met a jour les coordonnees
+30/09/2026 15:50:37 | 30/09/2026 15:50:37 | acb1f6b | Restaure exactement la version de 14h23
+30/09/2026 15:50:45 | 30/09/2026 15:50:45 | 0bac544 | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 15:51:57 | 30/09/2026 15:51:57 | 9466bf8 | Edition : met a jour les coordonnees
+30/09/2026 16:03:50 | 30/09/2026 16:03:50 | f01cbc4 | Integre le soutien gorge GLB sur le meme rig
+30/09/2026 16:03:58 | 30/09/2026 16:03:58 | 9d6d46b | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+30/09/2026 16:06:50 | 30/09/2026 16:06:50 | 1fca1ec | Edition : met a jour les coordonnees
+30/09/2026 16:59:02 | 30/09/2026 16:59:02 | 0d670a0 | Ajoute un atelier 3D de vetements sans Blender
+30/09/2026 17:03:37 | 30/09/2026 17:03:37 | de2ae66 | Edition : met a jour les coordonnees
+30/09/2026 17:07:32 | 30/09/2026 17:07:32 | c9740bf | Ajoute la mise a jour automatique de l atelier
+30/09/2026 17:07:38 | 30/09/2026 17:07:38 | 8e74f9c | Merge remote-tracking branch 'origin/arena/01a0b32c-librevies' into arena/01a0b32c-librevies Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+
+=== 01/10/2026 ===
+01/10/2026 13:17:27 | 01/10/2026 13:17:27 | 2486200 | Remplace les vetements proceduraux par les proxies MakeHuman
+01/10/2026 13:26:34 | 01/10/2026 13:26:34 | 1fb54f3 | Corrige les cheveux et lissage des tenues MakeHuman
+01/10/2026 13:26:57 | 01/10/2026 13:26:57 | 436dfe9 | Donne une masse complete a la coupe longue
+01/10/2026 14:11:27 | 01/10/2026 14:11:27 | b142ee1 | Edition : met a jour les coordonnees
+01/10/2026 14:19:56 | 01/10/2026 14:19:56 | 7b2c3f1 | Corrige orientation des cheveux et normales MakeHuman
+01/10/2026 14:22:23 | 01/10/2026 14:22:23 | efcf5f6 | Edition : met a jour les coordonnees
+01/10/2026 14:26:32 | 01/10/2026 14:26:25 | 5510baa | Corrige les triangles transparents des vetements
+01/10/2026 14:28:05 | 01/10/2026 14:28:05 | 257372a | Edition : met a jour les coordonnees
+01/10/2026 14:38:40 | 01/10/2026 14:38:36 | 080a962 | Ajoute les vetements et accessoires MakeHuman disponibles
+01/10/2026 15:33:14 | 01/10/2026 15:32:29 | de7b8ab | Integrate CC0 MakeHuman hair proxies
+01/10/2026 15:41:44 | 01/10/2026 15:41:44 | 5080645 | Edition : met a jour les coordonnees
+01/10/2026 15:51:40 | 01/10/2026 15:51:30 | 1bbeb79 | Clean obsolete assets and fix body volume morphs
+01/10/2026 16:07:31 | 01/10/2026 16:07:31 | a702c1c | Restore breast-targeted morph and extend face sliders
+01/10/2026 16:08:16 | 01/10/2026 16:08:16 | ce9bb9a | Edition : met a jour les coordonnees
+01/10/2026 16:16:07 | 01/10/2026 16:16:03 | 361be85 | Separate MakeHuman outfits hats and shoes
+01/10/2026 16:16:44 | 01/10/2026 16:16:44 | 294a933 | Edition : met a jour les coordonnees
+01/10/2026 16:27:37 | 01/10/2026 16:27:29 | 265bde8 | Polish human editor preview controls
+01/10/2026 16:28:09 | 01/10/2026 16:28:09 | 9dd487f | Edition : met a jour les coordonnees
+01/10/2026 16:40:42 | 01/10/2026 16:40:36 | 658be5b | Simplify human editor equipment layout
+01/10/2026 16:54:08 | 01/10/2026 16:54:08 | 43caca1 | Edition : met a jour les coordonnees
+01/10/2026 17:05:50 | 01/10/2026 17:05:45 | 6e51dc8 | Restore human editor sliders and refine fedora trim
+01/10/2026 17:06:34 | 01/10/2026 17:06:34 | 2246abc | Edition : met a jour les coordonnees
+01/10/2026 17:13:06 | 01/10/2026 17:13:02 | 3dafe46 | Lower fedora and make human sliders one-sided
+01/10/2026 17:13:45 | 01/10/2026 17:13:45 | 1152569 | Edition : met a jour les coordonnees
+01/10/2026 17:17:49 | 01/10/2026 17:17:45 | f628efc | Raise fedora above front hairline
+01/10/2026 17:18:52 | 01/10/2026 17:18:52 | 9f725a1 | Edition : met a jour les coordonnees
+01/10/2026 17:21:37 | 01/10/2026 17:21:33 | 420be2b | Lower fedora to hairline reference
+01/10/2026 17:23:09 | 01/10/2026 17:23:09 | b2c6581 | Edition : met a jour les coordonnees
+01/10/2026 17:26:54 | 01/10/2026 17:26:50 | 4c171b3 | Align fedora brim with hairline reference
+01/10/2026 17:27:36 | 01/10/2026 17:27:36 | ec5fac1 | Edition : met a jour les coordonnees
+01/10/2026 17:29:37 | 01/10/2026 17:29:32 | badf395 | Lower fedora to eyebrow line
+01/10/2026 17:30:58 | 01/10/2026 17:30:58 | 419e523 | Edition : met a jour les coordonnees
+01/10/2026 17:36:39 | 01/10/2026 17:36:33 | c0de3ac | Align fedora and fix hair alpha preview
+01/10/2026 17:38:51 | 01/10/2026 17:38:51 | 06c6027 | Edition : met a jour les coordonnees
+01/10/2026 17:48:38 | 01/10/2026 17:48:34 | e588466 | Add interactive fedora height guide
+01/10/2026 17:49:02 | 01/10/2026 17:49:02 | 1de20b8 | Edition : met a jour les coordonnees
+01/10/2026 17:55:05 | 01/10/2026 17:55:00 | 2baf014 | Make fedora height adjustment directly draggable
+01/10/2026 17:57:33 | 01/10/2026 17:57:33 | b6759a4 | Edition : met a jour les coordonnees
+01/10/2026 18:00:07 | 01/10/2026 18:00:01 | e6782ee | Set fedora height to reference value
+01/10/2026 18:00:24 | 01/10/2026 18:00:24 | 6bdf04b | Edition : met a jour les coordonnees
+01/10/2026 18:04:16 | 01/10/2026 18:04:16 | 988aabf | Edition : met a jour les coordonnees
+01/10/2026 18:09:04 | 01/10/2026 18:09:00 | 7422338 | Make fedora placement directly visible
+01/10/2026 18:09:28 | 01/10/2026 18:09:28 | 212db31 | Edition : met a jour les coordonnees
+01/10/2026 18:11:29 | 01/10/2026 18:11:23 | 7d96241 | Fix fedora field shadowing compile error
+01/10/2026 18:14:54 | 01/10/2026 18:14:54 | 4afba47 | Apply fedora movement directly to generated mesh
+01/10/2026 18:15:14 | 01/10/2026 18:15:14 | acaa900 | Edition : met a jour les coordonnees
+01/10/2026 18:18:37 | 01/10/2026 18:18:32 | 7a13286 | Set fedora reference height and hide scalp
+01/10/2026 18:18:52 | 01/10/2026 18:18:52 | ad4b5cf | Edition : met a jour les coordonnees
+01/10/2026 18:32:33 | 01/10/2026 18:32:33 | 1749fdf | Edition : met a jour les coordonnees
+
+=== 02/10/2026 ===
+02/10/2026 10:17:49 | 02/10/2026 10:17:49 | 02465b4 | Edition : met a jour les coordonnees
+02/10/2026 10:23:34 | 02/10/2026 10:23:34 | 6e6ad03 | Edition : met a jour les coordonnees
+02/10/2026 10:24:41 | 02/10/2026 10:24:41 | 59e82ca | Edition : met a jour les coordonnees
+02/10/2026 10:27:04 | 02/10/2026 10:27:04 | 7482a52 | Edition : met a jour les coordonnees
+02/10/2026 10:29:52 | 02/10/2026 10:29:52 | 6be72e4 | Edition : met a jour les coordonnees
+02/10/2026 10:32:12 | 02/10/2026 10:32:12 | 40921e0 | Update AdminHumanCreator.cs
+02/10/2026 10:32:18 | 02/10/2026 10:32:18 | c6b9b05 | Edition : met a jour les coordonnees
+02/10/2026 10:36:30 | 02/10/2026 10:36:30 | 2505064 | Update AdminHumanCreator.cs
+02/10/2026 10:38:28 | 02/10/2026 10:38:28 | 5450e4f | Update AdminHumanCreator.cs
+02/10/2026 10:43:14 | 02/10/2026 10:42:56 | 7f2a4d7 | Refine walking motion and preserve skull under fedora
+02/10/2026 11:17:55 | 02/10/2026 11:17:55 | 906675b | Edition : met a jour les coordonnees
+02/10/2026 11:25:50 | 02/10/2026 11:25:50 | b1afd33 | Keep male face and close limbs during movement
+02/10/2026 11:27:48 | 02/10/2026 11:27:48 | d507527 | Edition : met a jour les coordonnees
+02/10/2026 11:34:21 | 02/10/2026 11:34:21 | 679b6d9 | Edition : met a jour les coordonnees
+02/10/2026 11:37:28 | 02/10/2026 11:37:21 | 2a91b38 | Remove fedora placement editor and uncross legs
+02/10/2026 11:42:20 | 02/10/2026 11:42:20 | 916d783 | Edition : met a jour les coordonnees
+02/10/2026 11:44:46 | 02/10/2026 11:44:39 | cc571ac | Straighten the walking legs
+02/10/2026 11:45:31 | 02/10/2026 11:45:31 | a42f01e | Edition : met a jour les coordonnees
+02/10/2026 11:49:07 | 02/10/2026 11:48:59 | a4f66c7 | Align female short hair under the fedora
+02/10/2026 11:50:23 | 02/10/2026 11:50:23 | 915382c | Edition : met a jour les coordonnees
+02/10/2026 11:53:25 | 02/10/2026 11:53:18 | aeba192 | Align female fedora hair and raise player inside houses
+02/10/2026 14:20:12 | 02/10/2026 14:20:12 | c7a7128 | Edition : met a jour les coordonnees
+02/10/2026 14:27:29 | 02/10/2026 14:27:29 | 765ae3e | Restore original limb animation and keep rear skull
+02/10/2026 14:28:01 | 02/10/2026 14:28:01 | 76b7f5c | Edition : met a jour les coordonnees
+02/10/2026 14:33:34 | 02/10/2026 14:33:24 | fdc55e8 | Align female fedora and keep knees straight
+02/10/2026 14:35:12 | 02/10/2026 14:35:12 | 3426b2c | Edition : met a jour les coordonnees
+02/10/2026 14:41:53 | 02/10/2026 14:41:47 | 439232a | Preserve rear skull and match fedora placement
+02/10/2026 14:43:48 | 02/10/2026 14:43:48 | c2188ca | Edition : met a jour les coordonnees
+02/10/2026 14:52:24 | 02/10/2026 14:52:18 | 3ce6c98 | Keep ears and forehead hair visible
+02/10/2026 14:52:45 | 02/10/2026 14:52:45 | 01b9453 | Preserve the ear area under the fedora
+02/10/2026 14:54:03 | 02/10/2026 14:54:03 | 0f97082 | Edition : met a jour les coordonnees
+02/10/2026 14:59:10 | 02/10/2026 14:59:04 | 08a52a7 | Widen fedora and straighten legs
+02/10/2026 15:00:55 | 02/10/2026 15:00:55 | ac70d20 | Edition : met a jour les coordonnees
+02/10/2026 15:08:19 | 02/10/2026 15:08:14 | 1f7a7b3 | Add live fedora size control and align legs
+02/10/2026 15:09:49 | 02/10/2026 15:09:49 | 34fd502 | Edition : met a jour les coordonnees
+02/10/2026 15:18:02 | 02/10/2026 15:17:56 | 78244f0 | Apply shared pose to accessories and refresh fedora scale
+02/10/2026 15:18:35 | 02/10/2026 15:18:35 | 8e6c098 | Edition : met a jour les coordonnees
+02/10/2026 15:26:29 | 02/10/2026 15:26:25 | 340944d | Trim hair above fedora and level shoes
+02/10/2026 15:27:49 | 02/10/2026 15:27:49 | 77bde9b | Edition : met a jour les coordonnees
+02/10/2026 15:37:58 | 02/10/2026 15:37:55 | e1c51d2 | Remove fedora size editor and trim protruding hair
+02/10/2026 15:50:28 | 02/10/2026 15:50:28 | c836873 | Edition : met a jour les coordonnees
+02/10/2026 15:56:33 | 02/10/2026 15:56:30 | 86b7a36 | Remove only hair under the fedora
+02/10/2026 15:58:27 | 02/10/2026 15:58:27 | f2a71fe | Edition : met a jour les coordonnees
+
+=== 03/10/2026 ===
+03/10/2026 06:04:03 | 03/10/2026 06:04:03 | 39a3bca | Edition : met a jour les coordonnees
+03/10/2026 06:11:30 | 03/10/2026 06:11:30 | d7d6d98 | Trim remaining male fedora hair only
+03/10/2026 06:19:01 | 03/10/2026 06:19:01 | 4534de1 | Edition : met a jour les coordonnees
+03/10/2026 06:20:27 | 03/10/2026 06:20:19 | e2d08ca | Restore fedora bounds declaration
+03/10/2026 06:31:07 | 03/10/2026 06:31:07 | 4ed1f4f | Reduce male fedora hair trim
+03/10/2026 06:32:24 | 03/10/2026 06:32:24 | 2ca133e | Edition : met a jour les coordonnees
+03/10/2026 06:36:02 | 03/10/2026 06:35:58 | d7544b0 | Extend male fedora brim hair filter
+03/10/2026 06:36:40 | 03/10/2026 06:36:40 | d1452b7 | Edition : met a jour les coordonnees
+03/10/2026 06:41:03 | 03/10/2026 06:40:58 | 78e60e4 | Cover male fedora brim and center head zoom
+03/10/2026 06:41:39 | 03/10/2026 06:41:39 | 7d3f575 | Edition : met a jour les coordonnees
+03/10/2026 06:46:27 | 03/10/2026 06:46:23 | 76005e7 | Center female nose zoom and extend male trim vertically
+03/10/2026 06:46:50 | 03/10/2026 06:46:50 | 087fcf7 | Edition : met a jour les coordonnees
+03/10/2026 06:55:51 | 03/10/2026 06:55:51 | 9b7493e | Edition : met a jour les coordonnees
+03/10/2026 06:58:49 | 03/10/2026 06:58:45 | 2d98fde | Set male fedora trim test dimensions
+03/10/2026 06:58:58 | 03/10/2026 06:58:58 | 04d1847 | Edition : met a jour les coordonnees
+03/10/2026 07:05:18 | 03/10/2026 07:05:13 | 76a792a | Reset full preview and enlarge male fedora
+03/10/2026 07:06:26 | 03/10/2026 07:06:26 | de0a211 | Edition : met a jour les coordonnees
+03/10/2026 07:13:20 | 03/10/2026 07:13:16 | ae2d29b | Match fedora settings and animate human torso
+03/10/2026 07:13:50 | 03/10/2026 07:13:50 | fca5ed5 | Edition : met a jour les coordonnees
+03/10/2026 07:19:16 | 03/10/2026 07:19:13 | 43c2777 | Straighten idle human arms
+03/10/2026 07:19:36 | 03/10/2026 07:19:36 | 28c7a48 | Edition : met a jour les coordonnees
+03/10/2026 07:23:32 | 03/10/2026 07:23:29 | 3da6043 | Align human idle arms vertically
+03/10/2026 07:24:03 | 03/10/2026 07:24:03 | 15dbe12 | Edition : met a jour les coordonnees
+03/10/2026 07:28:25 | 03/10/2026 07:28:22 | af9bc2c | Restore open arms and neutral idle forearms
+03/10/2026 07:32:31 | 03/10/2026 07:32:31 | c4e664d | Restore 7:13 arm pose and orient hands
+03/10/2026 07:32:53 | 03/10/2026 07:32:53 | 3ab373d | Edition : met a jour les coordonnees
+03/10/2026 07:37:19 | 03/10/2026 07:37:16 | abb6f67 | Keep base arm swing and hang arms vertically at idle
+03/10/2026 07:38:25 | 03/10/2026 07:38:25 | f445fd0 | Edition : met a jour les coordonnees
+03/10/2026 07:42:10 | 03/10/2026 07:42:06 | 09b1da5 | Restore 7:05 arm behavior only
+03/10/2026 07:42:26 | 03/10/2026 07:42:26 | fa41f84 | Edition : met a jour les coordonnees
+03/10/2026 07:45:52 | 03/10/2026 07:45:48 | b24e89e | Set upper arms at thirty degrees and curl hands
+03/10/2026 07:46:12 | 03/10/2026 07:46:12 | 4ae7137 | Edition : met a jour les coordonnees
+03/10/2026 07:50:52 | 03/10/2026 07:50:49 | c2e0c33 | Align idle forearms and hands vertically
+03/10/2026 07:56:13 | 03/10/2026 07:56:13 | add1be7 | Hang complete idle arm chain vertically
+03/10/2026 07:56:34 | 03/10/2026 07:56:34 | 4f936a6 | Edition : met a jour les coordonnees
+03/10/2026 08:17:16 | 03/10/2026 08:17:13 | c622d1a | Open idle arms away from hips
+03/10/2026 08:21:49 | 03/10/2026 08:21:49 | c1d0e1b | Restore shoulders and widen idle arm clearance
+03/10/2026 08:22:18 | 03/10/2026 08:22:18 | 348b320 | Edition : met a jour les coordonnees
+03/10/2026 08:26:07 | 03/10/2026 08:26:04 | 81a7704 | Move idle hands forward and slightly closer
+03/10/2026 08:29:26 | 03/10/2026 08:29:26 | 5431c6b | Keep idle arm spacing without forward bend
+03/10/2026 08:29:42 | 03/10/2026 08:29:42 | 33383e4 | Edition : met a jour les coordonnees
+03/10/2026 08:32:54 | 03/10/2026 08:32:50 | 1499e8f | Turn idle hands toward character front
+03/10/2026 08:33:07 | 03/10/2026 08:33:07 | a5f2d4b | Edition : met a jour les coordonnees
+
+=== 05/10/2026 ===
+05/10/2026 15:50:44 | 05/10/2026 15:50:44 | cd16be3 | Corrige teinte de peau et proportions des bras
+05/10/2026 16:07:15 | 05/10/2026 16:07:15 | b7bd74f | Edition : met a jour les coordonnees
+
+=== 06/10/2026 ===
+06/10/2026 15:03:33 | 06/10/2026 15:03:33 | 8f65db5 | Add files via upload
+06/10/2026 15:13:21 | 06/10/2026 15:13:21 | 0ac6df9 | Add files via upload
+06/10/2026 15:13:41 | 06/10/2026 15:13:30 | b1bb0fa | Publie les builds dans jeu compiler et vide l onglet Monde
+06/10/2026 15:14:04 | 06/10/2026 15:14:04 | 88b35c0 | Add files via upload
+06/10/2026 15:21:00 | 06/10/2026 15:20:56 | 4950f16 | Place le publieur de jeu a la racine
+06/10/2026 15:25:41 | 06/10/2026 15:25:41 | b8f9a91 | Delete jeu compiler directory
+06/10/2026 15:26:09 | 06/10/2026 15:26:09 | 6e304b3 | Add files via upload
+06/10/2026 15:30:52 | 06/10/2026 15:30:50 | 4dc8e75 | Resynchronise automatiquement avant la publication GitHub
+06/10/2026 15:31:39 | 06/10/2026 15:31:39 | caf59ee | Aligne le launcher sur le dossier jeucompiler
+06/10/2026 15:36:02 | 06/10/2026 15:36:02 | 233eb23 | Autorise la resynchronisation avec changements locaux
+06/10/2026 15:40:33 | 06/10/2026 15:40:33 | 05652ab | Protege les fichiers non suivis pendant la resynchronisation
+06/10/2026 15:44:35 | 06/10/2026 15:44:35 | 2041297 | Resout les conflits add add du dossier publie
+06/10/2026 15:48:18 | 06/10/2026 15:48:18 | e6ac43d | Ignore les modifications hors du lot publie
+06/10/2026 15:49:41 | 06/10/2026 15:27:34 | 0d39548 | Publication jeu compiler - lot 1/9
+06/10/2026 15:49:41 | 06/10/2026 15:33:39 | ad3da70 | Publication jeu compiler - lot 1/8
+06/10/2026 15:49:42 | 06/10/2026 15:37:28 | 3483868 | Publication jeu compiler - lot 1/7
+06/10/2026 15:49:42 | 06/10/2026 15:42:14 | 35a11ac | Publication jeu compiler - lot 1/6
+06/10/2026 15:49:42 | 06/10/2026 15:49:37 | 6b5423e | Publication jeu compiler - lot 1/5
+06/10/2026 15:50:01 | 06/10/2026 15:50:01 | db13855 | Publication jeu compiler - lot 2/5
+06/10/2026 15:50:09 | 06/10/2026 15:50:09 | b610a8b | Publication jeu compiler - lot 3/5
+06/10/2026 15:50:14 | 06/10/2026 15:50:14 | 482e326 | Publication jeu compiler - lot 4/5
+06/10/2026 15:50:21 | 06/10/2026 15:50:21 | 1464364 | Publication jeu compiler - lot 5/5
+06/10/2026 15:51:07 | 06/10/2026 15:51:07 | 61979fd | Delete jeucompiler/build_launcher - Raccourci.lnk
+06/10/2026 15:51:20 | 06/10/2026 15:51:20 | 141a2bf | Delete jeucompiler/LibreViesGame - Raccourci.lnk
+06/10/2026 15:55:10 | 06/10/2026 15:54:47 | b93326d | Simplifie l URL par defaut du launcher
+06/10/2026 16:06:34 | 06/10/2026 16:06:34 | 0a0d5ea | Corrige l installation du jeu distribue par fichiers
+06/10/2026 16:35:57 | 06/10/2026 16:35:57 | aea6e9d | Ajoute authentification et autolog au launcher
+06/10/2026 17:08:18 | 06/10/2026 17:08:18 | 47ab3fb | Edition : met a jour les coordonnees
+06/10/2026 17:18:20 | 06/10/2026 17:18:20 | 79f4237 | Valide les inscriptions et securise les mots de passe
+06/10/2026 17:24:42 | 06/10/2026 17:24:42 | 1955a6e | Telecharge le dossier serveur pendant le build
+06/10/2026 17:49:20 | 06/10/2026 17:49:20 | 204783e | Regroupe le serveur dans le dossier du jeu
+06/10/2026 17:49:52 | 06/10/2026 17:49:52 | f3a66ba | Simplifie le depot du serveur chez l hebergeur
+06/10/2026 17:57:27 | 06/10/2026 17:57:27 | 68f3c1f | Garde un seul dossier serveur dans le jeu
+06/10/2026 18:06:00 | 06/10/2026 18:06:00 | d417f13 | Ajoute un diagnostic graphique de connexion
+
+=== 07/10/2026 ===
+07/10/2026 16:58:58 | 07/10/2026 16:58:58 | 43f0eba | Rend l API compatible avec PHP 5.6
+07/10/2026 17:53:27 | 07/10/2026 17:53:27 | fe45f98 | Corrige l inscription locale du launcher
+07/10/2026 17:56:54 | 07/10/2026 17:56:54 | b884e83 | Actualise le hash du launcher distribue
+07/10/2026 18:03:25 | 07/10/2026 18:03:25 | 8acea82 | Redemarre le launcher apres inscription
+07/10/2026 18:03:46 | 07/10/2026 18:03:46 | a1046e3 | Masque l inscription apres connexion reussie
+07/10/2026 18:14:05 | 07/10/2026 18:14:05 | 5e0312b | Verifie l inscription avant redemarrage
+07/10/2026 18:18:58 | 07/10/2026 18:18:58 | b2f5a5c | Affiche l erreur d inscription dans la barre
+07/10/2026 18:26:57 | 07/10/2026 18:26:57 | 2cb041a | Redemarre apres insertion verifiee
+07/10/2026 18:30:10 | 07/10/2026 18:30:10 | 1bf1d3a | Evite les hashes obsoletes du launcher
+
+=== 08/10/2026 ===
+08/10/2026 08:18:29 | 08/10/2026 08:18:29 | 475044b | Verifie l inscription par sondage avant redemarrage
+08/10/2026 08:24:26 | 08/10/2026 08:24:26 | 1501fce | Verifie inscription par email et pseudo
+08/10/2026 08:29:36 | 08/10/2026 08:29:36 | 5fffa5f | Ajoute des journaux de diagnostic inscription
+08/10/2026 08:37:20 | 08/10/2026 08:37:20 | 76ca750 | Journalise la reponse API d inscription
+08/10/2026 08:45:56 | 08/10/2026 08:45:56 | 49c71c4 | Corrige la reponse PHP et ajoute la validation membre
+08/10/2026 09:10:59 | 08/10/2026 09:10:59 | 5384ae3 | Evite le conflit des dossiers temporaires PyInstaller
+08/10/2026 09:25:26 | 08/10/2026 09:25:26 | 06aab32 | Utilise le redemarrage standard apres inscription
+08/10/2026 09:30:11 | 08/10/2026 09:30:11 | 9417fdb | Attend la fermeture avant le redemarrage CMD
+08/10/2026 10:37:15 | 08/10/2026 10:37:15 | 537b271 | Renforce la validation des champs d authentification
+08/10/2026 10:50:19 | 08/10/2026 10:50:19 | 4d4cdac | Restaure le redemarrage historique du launcher
+08/10/2026 10:53:47 | 08/10/2026 10:53:47 | 4ea4d33 | Aligne le launcher et son hash de distribution
+08/10/2026 11:03:50 | 08/10/2026 11:03:50 | 2b785f6 | Ignore l ancienne amorce exe dans les mises a jour
+08/10/2026 11:12:49 | 08/10/2026 11:12:49 | 54d1e7a | Evite le verrouillage du dossier PyInstaller au redemarrage
+08/10/2026 11:19:53 | 08/10/2026 11:19:53 | 0cee650 | Isole les redemarrages PyInstaller en mode onefile
+08/10/2026 11:32:03 | 08/10/2026 11:32:03 | 6e064f8 | Ajoute la connexion et l Autolog local
+08/10/2026 11:44:39 | 08/10/2026 11:44:39 | 116283d | Affiche les doublons et le bonjour apres connexion
+08/10/2026 11:45:36 | 08/10/2026 11:45:36 | eb8ac50 | Edition : met a jour les coordonnees
+08/10/2026 11:51:07 | 08/10/2026 11:50:58 | 1741e10 | Chiffre Autolog et conserve les messages d inscription
+08/10/2026 12:10:00 | 08/10/2026 12:10:00 | c9813d1 | Edition : met a jour les coordonnees
+08/10/2026 12:48:33 | 08/10/2026 12:48:33 | 9bd3225 | Verifie les doublons avant inscription
+08/10/2026 12:56:51 | 08/10/2026 12:56:51 | a4e2252 | Affiche la verification d inscription et gere les anciennes API
+08/10/2026 13:08:23 | 08/10/2026 13:08:23 | 4eaae48 | Verifie les doublons dans la requete dinscription
+08/10/2026 13:21:27 | 08/10/2026 13:21:27 | e0cdd3a | Ajoute un journal detaille pour les requetes d inscription
+08/10/2026 13:26:50 | 08/10/2026 13:26:50 | c9eecf4 | Traite les resultats auth dans le thread Tk principal
+08/10/2026 13:32:35 | 08/10/2026 13:32:35 | 93ebed7 | Embarque le module queue dans l amorce
+08/10/2026 13:49:03 | 08/10/2026 13:49:03 | 962758c | Supprime la dependance queue du launcher
+08/10/2026 13:58:50 | 08/10/2026 13:58:50 | 2a55cee | Corrige le retour UI apres erreur d inscription
+08/10/2026 14:14:51 | 08/10/2026 14:14:51 | a3f97cb | Remplace inscription par le classement du joueur
+08/10/2026 14:27:09 | 08/10/2026 14:27:09 | c90552e | Ajoute le schema personnage et le panneau de classement
+08/10/2026 14:58:53 | 08/10/2026 14:58:53 | 6eb0b45 | Initialise le personnage lors de la creation du compte
+08/10/2026 15:05:39 | 08/10/2026 15:05:39 | db51909 | Stocke chaque reglage du personnage dans sa colonne
+08/10/2026 15:12:23 | 08/10/2026 15:12:23 | 77d3f4e | Laisse le personnage initial vide
+08/10/2026 16:15:22 | 08/10/2026 16:15:22 | a7e5ca2 | Relie le personnage au NPC Esthetique et au compte authentifie
+08/10/2026 16:21:19 | 08/10/2026 16:21:19 | 6485433 | Edition : met a jour les coordonnees
+08/10/2026 16:47:45 | 08/10/2026 16:47:44 | 0062706 | Corrige les sessions sans OpenSSL et initialise le classement
+08/10/2026 17:02:02 | 08/10/2026 17:02:02 | 84ae792 | Edition : met a jour les coordonnees
+08/10/2026 17:39:22 | 08/10/2026 17:39:22 | 5fb66ce | Simplifie l entete du launcher apres connexion
+08/10/2026 17:45:29 | 08/10/2026 17:45:29 | 3ce80ea | Edition : met a jour les coordonnees
+
+=== 09/10/2026 ===
+09/10/2026 10:14:32 | 09/10/2026 10:14:32 | 4ee8f56 | Verifie PHP 8.3 et refuse les exports Unity sans pseudo du compte
+09/10/2026 10:20:57 | 09/10/2026 10:20:57 | 07eda6b | Edition : met a jour les coordonnees
+09/10/2026 10:54:45 | 09/10/2026 10:54:45 | b3d1541 | Corrige publication jeucompiler, versions, poignees et droits du compte
+09/10/2026 10:59:04 | 09/10/2026 10:59:04 | 6f0b71c | Edition : met a jour les coordonnees
+09/10/2026 11:36:34 | 09/10/2026 11:36:34 | 80d4382 | Travaille dans jeu local et ajoute les poignees rondes blanches
+09/10/2026 11:37:49 | 09/10/2026 11:37:49 | 8648a40 | Edition : met a jour les coordonnees
+09/10/2026 11:44:11 | 09/10/2026 11:44:11 | 964648e | Delete jeucompiler directory
+09/10/2026 11:46:52 | 09/10/2026 11:46:52 | 46e7dac | Deplace les poignees a droite et ajuste le pseudo du joueur
+09/10/2026 11:48:12 | 09/10/2026 11:48:12 | f765cbb | Edition : met a jour les coordonnees
+09/10/2026 12:18:00 | 09/10/2026 12:18:00 | d555fa6 | Abaisse le pseudo de 10 cm et ajoute le schema NPC a identifiant texte
+09/10/2026 12:57:02 | 09/10/2026 12:57:02 | ac40541 | Initialise les six NPC et charge leurs avatars MakeHuman depuis la BDD
+09/10/2026 12:59:03 | 09/10/2026 12:59:03 | 6bdb98f | Edition : met a jour les coordonnees
+09/10/2026 13:17:14 | 09/10/2026 13:17:14 | 386bb30 | Corrige FindBone manquant et retire les anciens scripts SQL du serveur
+09/10/2026 14:59:29 | 09/10/2026 14:59:29 | 9fee3f8 | Reserve ADMIN aux comptes autorises et ajoute l edition des NPC par ville
+09/10/2026 15:25:50 | 09/10/2026 15:25:50 | b70ebb8 | Edition : met a jour les coordonnees
+
+=== 10/10/2026 ===
+10/10/2026 07:15:37 | 10/10/2026 07:15:37 | d55f99f | Actualise resumer.txt avec le dossier de reprise et les regles de travail
+10/10/2026 07:21:48 | 10/10/2026 07:21:48 | 373ac85 | Renforce les regles A faire et la passation complete dans resumer.txt
 
 FIN DU BLOC ACTUEL — LES CONSIGNES EN TÊTE RESTENT PRIORITAIRES.
 
