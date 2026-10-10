@@ -7351,7 +7351,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 + "La valeur par defaut reste 18.", smallStyle);
     }
 
-    private IEnumerator RechercherJoueursAdministration()
+    private System.Collections.IEnumerator RechercherJoueursAdministration()
     {
         if (!CompteAdministrateur || adminJoueurRequeteEnCours) yield break;
         adminJoueurRequeteEnCours = true;
@@ -7368,7 +7368,7 @@ public sealed class LibreViesGame : MonoBehaviour
             : "Cliquez sur un pseudo pour consulter ses caracteristiques.";
     }
 
-    private IEnumerator ChargerJoueurAdministration(int id)
+    private System.Collections.IEnumerator ChargerJoueurAdministration(int id)
     {
         if (!CompteAdministrateur || adminJoueurRequeteEnCours) yield break;
         adminJoueurRequeteEnCours = true;
@@ -7384,7 +7384,7 @@ public sealed class LibreViesGame : MonoBehaviour
         adminMessageJoueur = "Cochez/decochez Bannir, puis VALIDER pour enregistrer en BDD.";
     }
 
-    private IEnumerator EnregistrerBannissementJoueur()
+    private System.Collections.IEnumerator EnregistrerBannissementJoueur()
     {
         if (!CompteAdministrateur || adminJoueurRequeteEnCours || adminJoueurSelectionne == null) yield break;
         int id = adminJoueurSelectionne.membre.id;

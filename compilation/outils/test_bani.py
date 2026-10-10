@@ -210,6 +210,15 @@ class BaniLauncher(unittest.TestCase):
 
 
 class ContratsBaniEtArmes(unittest.TestCase):
+    def test_coroutines_non_generiques_regression_cs0305(self):
+        # Unity StartCoroutine attend System.Collections.IEnumerator, sans <T>.
+        # Le scanner syntaxique n'avait pas detecte la resolution vers Generic.
+        for nom in ['ConstruireMonde', 'RechercherJoueursAdministration',
+                    'ChargerJoueurAdministration', 'EnregistrerBannissementJoueur',
+                    'EnregistrerEtAppliquerPersonnage', 'EnregistrerEtAppliquerNpc']:
+            self.assertIn('private System.Collections.IEnumerator ' + nom + '(', GAME)
+        self.assertNotRegex(GAME, r'\b(?:private|public|protected)\s+IEnumerator\s+\w+\s*\(')
+
     def test_schema_non_et_registre_ignore_statut_client(self):
         sql = (ROOT / 'jeu/serveur/membre.sql').read_text()
         self.assertIn("bani ENUM('non', 'oui') NOT NULL DEFAULT 'non'", sql)

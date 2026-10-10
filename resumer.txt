@@ -1,10 +1,14 @@
 RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
 
-1. CHAQUE RÉPONSE À L’UTILISATEUR DOIT SE TERMINER PAR « À faire ».
-   C’est une consigne EXPLICITE, rappelée à nouveau par l’utilisateur : à la fin
-   de chaque message de réponse, remettre un bloc **À faire** comme avant.
-   Elle vaut pour une MAJ, une correction, un diagnostic encore bloqué ou une
-   simple mise à jour de documentation. Ne pas oublier ce bloc au changement d’IA.
+1. « À faire » UNIQUEMENT À LA FIN DE LA RÉPONSE FINALE.
+   Correction EXPLICITE de l’utilisateur le 10/10/2026 : ce bloc est destiné à
+   lui dire quoi faire APRÈS la MAJ. Il ne doit PAS apparaître dans les messages
+   intermédiaires, commentaires d’avancement ou annonces de vérification.
+   Terminer chaque réponse finale complète par **À faire**, après le résultat
+   de la MAJ/correction/diagnostic/documentation, et ne rien écrire ensuite.
+   Les messages d’avancement restent de simples informations, sans ce bloc.
+   Cette règle remplace les anciennes formulations « chaque message » ou
+   « chaque réponse » de l’historique ; ne pas les réappliquer au changement d’IA.
 
    Le bloc doit énumérer TOUT ce que l’utilisateur doit exécuter ensuite,
    dans l’ordre, avec les informations concrètes :
@@ -69,6 +73,45 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    La section 12 date les étapes majeures ; la section 13 date les correctifs ;
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
+
+CORRECTIF DE COMPILATION DU 10/10/2026 — CS0305 / RÈGLE « À faire »
+
+ÉTAT ACTUEL PRIORITAIRE : hotfix C# de 0.5.87, launcher inchangé 4.2.3.
+Log natif utilisateur daté 2026-10-10T10:35:22Z, soit 10/10/2026 12:35:22
+Europe/Paris, Unity 6000.6.1f1 / Windows 10 x64. Compilation Csc arrêtée,
+return code 1 : CS0305 aux lignes 7354, 7371, 7387 de LibreViesGame.cs.
+Méthodes : RechercherJoueursAdministration, ChargerJoueurAdministration,
+EnregistrerBannissementJoueur. Elles avaient été ajoutées dans cc5a8e1 avec
+IEnumerator non qualifié, alors que seul System.Collections.Generic était
+importé. C# résolvait IEnumerator<T> (argument type absent) : oubli de l’IA.
+
+Solution : les trois signatures sont maintenant explicitement
+System.Collections.IEnumerator, comme les autres coroutines de ce fichier.
+Aucun changement de logique ban/recherche/armes/pseudo, de version ou de schéma.
+Licence Unity Personal Unlimited résolue dans ce même log : les avertissements
+licence ne sont pas la cause du blocage ; ne pas réinstaller Unity/licence.
+
+Test de régression CS0305 ajouté : les six coroutines attendues doivent nommer
+l’interface non générique ; aucune signature IEnumerator nue dans ce fichier.
+42 contrôles ciblés passent : 26 bani, 5 admin NPC, 3 schema NPC et 8 en-tête
+launcher ; le nouveau test échoue sur l’ancienne version et passe sur le hotfix.
+Comme pour FindBone, syntaxe et tests
+statiques seuls n’avaient PAS garanti la résolution sémantique C#. Ce hotfix
+reste à recompiler sur le poste Windows ; ne pas déclarer le build natif réussi.
+
+Consigne de réponse corrigée tout en tête : « À faire » exclusivement en fin
+de réponse FINALE, pas dans mes commentaires d’avancement. Résumé daté dans
+le même commit. L’utilisateur a publié ses coordonnées a8f153d le 10/10/2026
+à 12:33:39, avant ce build ; elles sont préservées dans le parent du correctif.
+
+Recette après ce hotfix : fermer jeu/launcher/éditeur Unity, lancer
+compilation\build_launcher.bat qui télécharge le correctif, attendre réussite,
+puis jeu\LibreVies.exe. Versions encore attendues : jeu 0.5.87, launcher 4.2.3.
+Ne pas rejouer l’ALTER bani si déjà appliqué ; si pas encore fait pour 0.5.87,
+voir la recette SQL précédente et §17. Aucun autre import/reset BDD, aucune
+suppression de logs, coordonnées, Library ou ressource MakeHuman demandée.
+Si nouveau blocage : compilation\build\unity.log, premières erreurs C# et fin.
+Armes/pseudo/ADMIN joueur/ban-unban restent à vérifier après compilation réussie.
 
 MAJ FONCTIONNELLE DU 10/10/2026 — JEU 0.5.87 / LAUNCHER 4.2.3
 
@@ -193,13 +236,13 @@ LIBREVIES — DOSSIER DE REPRISE ACTUEL + HISTORIQUE CONSERVÉ
 Synthèse actualisée le 10/10/2026 (Europe/Paris)
 Dépôt : https://github.com/killdrago/LibreVies
 Branche de cette session : arena/01a0b32c-librevies
-Base distante auditée : a3bd4e5, commit du 10/10/2026 à 08:11:07 (Europe/Paris).
+Base distante auditée : a8f153d, coordonnées du 10/10/2026 à 12:33:39 (Europe/Paris).
 Correction demandée le 10/10/2026 : dates manquantes et reprise après interruption.
 Base fonctionnelle précédente : 9fee3f8, 09/10/2026 à 14:59:29 (0.5.86).
 Présente MAJ fonctionnelle : 0.5.87 / 4.2.3, 10/10/2026, native encore à vérifier.
-Dernières coordonnées utilisateur : b70ebb8, 09/10/2026 à 15:25:50.
+Dernières coordonnées utilisateur : a8f153d, 10/10/2026 à 12:33:39.
 Première passation : d55f99f, 10/10/2026 à 07:15:37 ; complément : 373ac85 à 07:21:48.
-Nature de la présente MAJ : fonctionnelle ; SQL bani puis nouveau build requis.
+Nature de la présente MAJ : hotfix CS0305 ; rebuild requis, aucun nouvel ALTER si bani existe.
 ================================================================================
 
 SOMMAIRE DU BLOC ACTUEL
@@ -221,12 +264,15 @@ SOMMAIRE DU BLOC ACTUEL
   16. Précautions Git et mise à jour du résumé à chaque commit
   17. Travail restant et recette utilisateur détaillée
   18. Références documentaires, MAJ datées et portée de cette synthèse
-  19. Journal Git daté complet (645 commits, 17/09/2026–10/10/2026)
+  19. Journal Git daté complet (647 commits, 17/09/2026–10/10/2026)
   Puis : archive intégrale de l’ancien resumer.txt (jusqu’à MAJ 79).
 
 --------------------------------------------------------------------------------
 01. REPRENDRE IMMÉDIATEMENT : ÉTAT RÉEL, PREUVES ET PRIORITÉS
 --------------------------------------------------------------------------------
+
+Dernier build NATIF connu : échec CS0305 le 10/10/2026 à 12:35:22 Paris ;
+hotfix des trois signatures nongen IEnumerator décrit en tête. Pas un problème licence.
 
 Versions SOURCES actuelles : LibreViesGame.VersionJeu, bundleVersion et
 LOCAL_GAME_VERSION = 0.5.87 ; launcher = 4.2.3 ; Unity 6000.6.1f1.
@@ -268,7 +314,7 @@ puis il ouvre jeu/LibreVies.exe. Il ne veut pas une chaîne supplémentaire de
 publication, de copie ou de « dossier compilé » à maintenir.
 
 Consignes durables :
-  - Expliquer les actions utilisateur à la fin de CHAQUE réponse : « À faire ».
+  - « À faire » seulement au terme de CHAQUE réponse FINALE, jamais dans les messages d’avancement.
   - Mettre ce résumé à jour dans chaque commit, y compris si une piste échoue.
   - Travailler sur la branche de la session, pousser uniquement celle-ci.
     Pour cette reprise : arena/01a0b32c-librevies, pas main ni une autre branche.
@@ -1021,6 +1067,15 @@ J. 10/10/2026 — PRÉSENTE MAJ 0.5.87 / LAUNCHER 4.2.3
   Cette entrée est datée avant commit ; son hash dépend du fichier et sera donné
   dans la réponse après push, pas inventé ni créé par un second commit de résumé.
 
+K. 10/10/2026 — BUILD 0.5.87 REFUSÉ (CS0305), HOTFIX ET CONCLUSION FINALE
+  Log utilisateur 10:35:22 UTC / 12:35:22 Paris, Unity 6000.6.1f1, trois erreurs
+  IEnumerator<T> sans argument dans les nouvelles coroutines ADMIN Joueur.
+  Oubli de qualification dans cc5a8e1 ; correction System.Collections.IEnumerator.
+  Test dédié ajouté ; versions inchangées. Licence Personal Unlimited résolue,
+  ne pas tenter de réparer la licence ou effacer la BDD pour une erreur C#.
+  L’utilisateur précise : À faire seulement à la fin du message final, pas en
+  cours d’intervention. Nouvelle règle prioritaire et prompt de passation corrigés.
+
 Pour retrouver l’historique exact :
   git log --reverse --date=iso-strict --format="%h %cI %s" origin/arena/01a0b32c-librevies
   git log --graph --oneline origin/arena/01a0b32c-librevies
@@ -1174,6 +1229,15 @@ Les heures ci-dessous sont en Europe/Paris.
     Résultat visuel encore à confirmer, pas un incident déclaré clos nativement.
 
 --------------------------------------------------------------------------------
+19) CS0305 sur les trois coroutines ADMIN Joueur du build 0.5.87.
+    Signalement daté 10/10/2026 12:35:22 Paris (log UTC 10:35:22).
+    Type IEnumerator<T> visible via System.Collections.Generic, non générique
+    absent de l’import ; les autres méthodes utilisaient le nom pleinement qualifié.
+    Hotfix : System.Collections.IEnumerator aux trois signatures. Test de
+    régression nongen ajouté ; pas une preuve de compilation native réussie.
+    Ne modifier ni licence, ni assets, ni version, ni BAN SQL pour cette erreur.
+
+--------------------------------------------------------------------------------
 14. TESTS EFFECTUÉS, COMMANDES DE RECETTE ET LIMITES RÉELLES
 --------------------------------------------------------------------------------
 
@@ -1223,6 +1287,9 @@ CAMPAGNE DE CETTE MAJ 0.5.87, LE 10/10/2026 :
     processId=1 ajoutée au lint WASM. Node émet EBADENGINE mais recettes passent.
   - Aucune preuve native Unity/Windows/MySQL ni de verrous InnoDB : FOR UPDATE
     supprimé seulement dans la copie SQLite ; toutes ces limites restent explicites.
+
+HOTFIX CS0305 DU 10/10 : 26 tests bani passent, dont nouveau contrôle des
+interfaces de coroutines non génériques. Nouveau build Unity natif attendu.
 
 COMMANDES DE RECETTE DEPUIS LA RACINE DU PROJET :
   python -B compilation/outils/test_bani.py
@@ -1520,19 +1587,20 @@ MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
   sources et compile dans jeu, puis je lance jeu\LibreVies.exe.
   Garde EasyPHP/API/BDD, config.php et mes coordonnées ; ne recrée pas jeucompiler.
   Distingue toujours tests statiques, build natif et validation réellement vue.
-  Termine CHAQUE réponse par **À faire**, avec toutes mes manipulations exactes
+  Termine uniquement la réponse FINALE par **À faire**, jamais les messages intermédiaires ;
+  indique toutes mes manipulations exactes
   après ta MAJ, commandes, chemins, tests, résultats attendus, logs et précautions.
   Mets resumer.txt à jour dans CHAQUE commit, dans le même commit que tes changements.
   Date les entrées (JJ/MM/AAAA, Europe/Paris) et n’invente pas de date de test/capture.
   Après lecture, reprends ma prochaine demande sans refaire des travaux déjà livrés.
 
 --------------------------------------------------------------------------------
-19. JOURNAL GIT DATÉ COMPLET — 645 COMMITS ACCESSIBLES À a3bd4e5
+19. JOURNAL GIT DATÉ COMPLET — 647 COMMITS ACCESSIBLES À a8f153d
 --------------------------------------------------------------------------------
 
-SOURCE : git log de origin/arena/01a0b32c-librevies à a3bd4e5.
-PÉRIODE : 17/09/2026 à 17:54:47 -> 10/10/2026 à 08:11:07 (Europe/Paris).
-Tous les 645 commits accessibles sont listés, dont 67 merges ; ce n’est pas
+SOURCE : git log de origin/arena/01a0b32c-librevies à a8f153d.
+PÉRIODE : 17/09/2026 à 17:54:47 -> 10/10/2026 à 12:33:39 (Europe/Paris).
+Tous les 647 commits accessibles sont listés, dont 67 merges ; ce n’est pas
 une affirmation que la conversation a produit 644 fonctionnalités distinctes.
 Les commits de coordonnées et des branches déjà intégrées ne sont pas omis.
 
@@ -1544,7 +1612,7 @@ Les dates ne prouvent ni date de push HTTP ni exécution/test natif du jeu.
 Tri : date commit croissante, puis SHA pour égalité ; pour la filiation réelle,
 consulter git log --graph. Dates auteur et commit peuvent différer.
 
-LIMITES : instantané arrêté au parent publié a3bd4e5. La présente correction
+LIMITES : instantané arrêté au parent publié a8f153d. La présente correction
 est datée du 10/10/2026 en section 18 ; son hash sera donné après commit/push,
 pas inventé dans le fichier qui détermine lui-même son propre hash.
 La prochaine MAJ complètera l’index jusqu’à sa nouvelle base connue.
@@ -1572,7 +1640,7 @@ APERÇU PAR JOUR (date commit, Paris) :
   07/10/2026 : 9 commit(s).
   08/10/2026 : 38 commit(s).
   09/10/2026 : 15 commit(s).
-  10/10/2026 : 3 commit(s).
+  10/10/2026 : 5 commit(s).
 
 JOURNAL INTÉGRAL :
 
@@ -2255,6 +2323,9 @@ JOURNAL INTÉGRAL :
 10/10/2026 07:21:48 | 10/10/2026 07:21:48 | 373ac85 | Renforce les regles A faire et la passation complete dans resumer.txt
 
 10/10/2026 08:11:07 | 10/10/2026 08:11:07 | a3bd4e5 | Date la chronologie et les incidents dans resumer.txt
+
+10/10/2026 09:49:24 | 10/10/2026 09:49:24 | cc5a8e1 | Ajoute recherche et bannissement des joueurs et corrige pseudo et armes des gardes
+10/10/2026 12:33:39 | 10/10/2026 12:33:39 | a8f153d | Edition : met a jour les coordonnees
 
 FIN DU BLOC ACTUEL — LES CONSIGNES EN TÊTE RESTENT PRIORITAIRES.
 
