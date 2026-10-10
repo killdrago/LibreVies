@@ -166,6 +166,7 @@ def texturer(mesh, resolution=1024):
     Les couleurs viennent des sommets calcules par TripoSR (issues de la photo).
     Retourne (mesh_uv, image_PIL).
     """
+    import numpy as np
     import xatlas
     from PIL import Image as _Image
 
