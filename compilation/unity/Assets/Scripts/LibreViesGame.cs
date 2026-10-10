@@ -199,6 +199,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform brasHeroineDroit;
     private Transform mainHeroine;
     private Transform marteauHeroine;
+    // Réglage du marteau importé (outil IA 3D) dans la main droite de l'héroïne.
+    // Le modèle a son origine à la base du manche : ces deux valeurs servent
+    // à le recaler visuellement sans toucher au maillage.
+    private static readonly Vector3 DecalageMarteauHeroine = new Vector3(0f, -0.15f, 0f);
+    private static readonly Vector3 RotationMarteauHeroine = Vector3.zero;
     private Transform coudeHeroineGauche;
     private Transform coudeHeroineDroit;
     private Transform jambeHeroineGauche;
@@ -5595,8 +5600,9 @@ public sealed class LibreViesGame : MonoBehaviour
         mainHeroine.SetParent(coudeHeroineDroit, false);
         mainHeroine.localPosition = new Vector3(0.14f, -0.35f, 0.04f);
         mainHeroine.localRotation = Quaternion.identity;
-        // Le personnage joueur n'a plus de marteau visuel pour le moment.
-        marteauHeroine = null;
+        // Marteau importé depuis l'outil photo vers 3D (Resources/Items/Marteaux).
+        // S'il est absent, l'héroïne reste sans marteau visuel.
+        marteauHeroine = CreerMarteauImporteHeroine(mainHeroine);
         jambeHeroineGauche = CreerPivotImporte(heroineModel, dossier,
             new Vector3(-0.18f, 1.12f, 0f), "Pivot_Cuisse_Gauche", "JeansUpper_L");
         jambeHeroineDroite = CreerPivotImporte(heroineModel, dossier,
@@ -5633,6 +5639,26 @@ public sealed class LibreViesGame : MonoBehaviour
     private void JouerAnimationHeroine(string recherche, bool boucle)
     {
         heroineAnimationActuelle = recherche;
+    }
+
+    private Transform CreerMarteauImporteHeroine(Transform main)
+    {
+        if (main == null) return null;
+        GameObject prefab = Resources.Load<GameObject>("Items/Marteaux/Marteaux");
+        if (prefab == null)
+        {
+            Debug.LogWarning("[LV] marteau 3D introuvable : Resources/Items/Marteaux/Marteaux");
+            return null;
+        }
+        GameObject instance = Instantiate(prefab);
+        instance.name = "Marteau_IA_Heroine";
+        Transform marteau = instance.transform;
+        marteau.SetParent(main, false);
+        marteau.localPosition = DecalageMarteauHeroine;
+        marteau.localRotation = Quaternion.Euler(RotationMarteauHeroine);
+        marteau.localScale = Vector3.one;
+        Debug.Log("[LV] marteau 3D importé dans la main de l'héroïne");
+        return marteau;
     }
 
     private void MettreAJourMarteauHeroine()
