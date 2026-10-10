@@ -1,5 +1,5 @@
 """
-LibreVies — Launcher joueur (version 4.2.3)
+LibreVies — Launcher joueur (version 4.2.4)
 
 Travail courant : dossier jeu en mode LOCAL.
   1. le build fabrique jeu/game et son marqueur de version verifie ;
@@ -107,9 +107,9 @@ AUTH_TIMEOUT = 15
 CORE_PATH = os.path.normcase(os.path.abspath(__file__))
 ETAT_PATH = os.path.join(GAME_DIR, "etat_jeu.json")
 
-LAUNCHER_VERSION = "4.2.3"
+LAUNCHER_VERSION = "4.2.4"
 GAME_VERSION = "0.5.79"  # Ancienne version distribuee, jamais un numero invente pour le binaire.
-LOCAL_GAME_VERSION = "0.5.87"
+LOCAL_GAME_VERSION = "0.5.88"
 # Travail courant : dossier jeu uniquement. En mode local, aucun fichier
 # compile distant ne peut remplacer l'export de compilation.
 DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"

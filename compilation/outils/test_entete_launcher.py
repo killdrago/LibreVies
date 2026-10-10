@@ -183,7 +183,7 @@ class EnteteLauncher(unittest.TestCase):
 
     def test_titre_windows_affiche_les_deux_versions(self):
         self.app._set_version("0.5.79")
-        self.assertEqual(self.app.window_title, "LibreVies - Launcher v4.2.3 - Jeu v0.5.79")
+        self.assertEqual(self.app.window_title, "LibreVies - Launcher v4.2.4 - Jeu v0.5.79")
         self.app._set_version("0.5.81")
         self.assertTrue(self.app.window_title.endswith("Jeu v0.5.81"))
         self.assertEqual(self.app.canvas.items[self.app.brand_item]["text"], "LibreVies")

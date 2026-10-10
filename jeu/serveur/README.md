@@ -40,10 +40,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File compilation\outils\synchroni
 
 ## Parcours du joueur
 
-- Inscription : transaction unique pour `membre` (`valider=0`, `droit=0`),
+- Inscription : transaction unique pour `membre` (`valider='oui'`, `droit=0`, `bani='non'`, `position=NULL`),
   `personnage` au meme ID (`default=1`, tous les autres champs NULL) et
   `classement` au meme ID (experience/chasse/territoire a zero).
-- Aucun email n'est encore envoye. Les comptes `valider=0` peuvent se connecter.
+- Aucun email n'est encore envoye. Les anciens comptes `valider='non'` restent autorisés tant que require_email_validation est désactivé.
 - Connexion : `password_verify` cote PHP/BDD. Bcrypt existant reste compatible ;
   Argon2id est choisi pour les nouveaux mots de passe lorsque PHP le propose.
 - `default=1` garde le personnage de base ; `default=0` reconstruit le profil
@@ -128,7 +128,7 @@ credentials dans les diagnostics/Git.
 Flux actif : **Git -> compilation/build_launcher.bat -> jeu/LibreVies.exe**.
 Aucune publication ou copie dans un autre dossier n'est necessaire. Le marqueur
 `jeu/game/version_jeu.json` verifie l'assembly ; un ancien jeu 0.5.79 n'est jamais
-renomme artificiellement en nouvelle version. Sources actuelles : **0.5.87**.
+renomme artificiellement en nouvelle version. Sources actuelles : **0.5.88**.
 Pseudo visible en troisieme personne. Les avatars NPC utilisent le meme
 createur MakeHuman que le joueur, en conservant roots/positions/fonctions.
 
@@ -242,3 +242,59 @@ miroité). Compensation TransformVector après animation, hauteur du pseudo inch
 texte du pseudo réduit de 0.035 à 0.0175. Aucune ressource MakeHuman modifiée.
 
 Recette complémentaire : `python -B compilation/outils/test_bani.py`.
+
+## Validation texte, position et fiche joueur (0.5.88 — 10/10/2026)
+
+`membre.valider` représente toujours la validation email, mais devient
+`ENUM('non','oui') NOT NULL DEFAULT 'oui'`. L'API force `oui` à l'inscription
+**temporairement**, sans envoyer un email. Les anciens états sont conservés :
+0 devient non, 1 devient oui. Le droit et le bannissement ne changent pas.
+
+Après sauvegarde de la BDD et fermeture des clients, exécuter dans phpMyAdmin :
+
+```sql
+USE librevies;
+ALTER TABLE membre MODIFY COLUMN valider VARCHAR(3) NOT NULL DEFAULT 'oui';
+UPDATE membre SET valider = CASE
+  WHEN valider = '0' THEN 'non'
+  WHEN valider = '1' THEN 'oui'
+  ELSE valider
+END;
+ALTER TABLE membre MODIFY COLUMN valider ENUM('non', 'oui') NOT NULL DEFAULT 'oui';
+ALTER TABLE membre ADD COLUMN position TEXT NULL;
+```
+
+Vérifier `SHOW COLUMNS FROM membre LIKE 'position';` avant la dernière ligne :
+ne pas ajouter une colonne déjà présente. Ne pas réimporter/recréer les tables,
+ne pas remettre les bans à non et ne pas remplacer le vrai config.php.
+Une valeur valider anormale doit être examinée avant le passage à ENUM ; les
+valeurs reconnues sont 0, 1, non, oui. La migration n'est pas automatique.
+
+`position` est une seule colonne TEXT, contenant un JSON x/y/z (compatibilité
+MySQL anciens, pas besoin du type JSON). NULL signifie départ normal du village.
+POST `save_position` exige une vraie session non bannie ; seul le compte de la
+session est modifié, jamais un id fourni par le client. Validation nombres finis,
+x/z dans [-125,125], y dans [-500,500], arrondi à 4 décimales, transaction/relecture.
+Login/get_character/get_player admin renvoient la position structurée ; aucun
+secret dans ce JSON. Un ancien JSON invalide est ignoré sans écrasement.
+
+Le jeu restaure la position après construction du monde/chargement des coordonnées.
+Il garde le joueur au-dessus d'un terrain éventuellement modifié, dans les limites
+jouables. Sauvegarde toutes les 20 secondes, à la perte de focus/pause et avant
+fermeture normale via Application.wantsToQuit. Le jeu reste vivant pour envoyer
+le POST avant de quitter, attend au plus 8 secondes (HTTP timeout 5 s), puis ferme
+même si le serveur est en panne. Les coordonnées EDITION/options continuent d'être
+sauvées par leur chemin existant. Arrêt forcé/coupure/crash : dernière sauvegarde
+réussie seulement, pas une garantie de sauvegarde de la dernière image.
+Le personnage vivant est immobilisé pendant la dernière requête de fermeture.
+
+La sauvegarde background possède ErreurPosition distincte : elle n'efface pas
+les messages d'une opération ADMIN simultanée. Pas de sauvegarde locale en clair
+ni de jeton dans un fichier/log. Seule la position est persistée : pas les PV,
+l'or, l'inventaire ou le niveau, qui ne gagnent pas une persistance par cette MAJ.
+
+Fiche ADMIN : une caractéristique par ligne, position BDD et position actuelle
+séparées ; marge basse 32 et défilement vertical pour la dernière ligne. Pseudo
+0.02625 (100 -> 50 -> 75), hauteur/couleur inchangées. Launcher 4.2.4 / jeu 0.5.88.
+Les tests PHP/WASM/SQLite ne remplacent pas la validation Unity/Windows/MySQL réelle.
+Recette : `python -B compilation/outils/test_position.py` + test_api_personnage.mjs.

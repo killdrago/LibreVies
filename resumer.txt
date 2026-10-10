@@ -74,6 +74,82 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 — JEU 0.5.88 / LAUNCHER 4.2.4 — VALIDATION ET POSITION
+
+DEMANDE ACTUELLE : pseudo 100 -> 50 -> 75 ; validation email non/oui avec oui
+à l’inscription pour le moment ; une caractéristique par ligne ; bas de fiche
+rogné ; sauvegarder/reprendre la position du joueur en BDD lors de fermeture.
+La nouvelle capture montre ADMIN > Joueur en fonctionnement après CS0305,
+mais la version n’est pas visible ; ne pas prétendre une preuve native de 0.5.88.
+Aucune donnée personnelle de cette capture n’est recopiée dans cette passation.
+
+ÉTAT PRIORITAIRE (remplace les états source/binaire attendu des anciennes MAJ) :
+  - Sources, bundle et LOCAL_GAME_VERSION : 0.5.88 ; launcher : 4.2.4.
+  - Pseudo : 0.02625 = 0.0175 * 1.5 = 75 % de 0.035 ; hauteur +0.38 m inchangée.
+  - ADMIN : Pseudo, ID, Email, Droit, Validation, Bani, XP, Chasse, Territoire,
+    profil/choix/sliders et stats chacun sur une ligne. Position BDD distincte
+    de position courante. Texte mesuré avec hauteur libre, marge basse 32,
+    défilement vertical forcé ; pas de suppression des dernières lignes.
+  - Colonne EXISTANTE membre.valider : ENUM('non','oui') DEFAULT 'oui'.
+    API/DTO valider devient texte. Ancien 0 -> non, 1 -> oui ; nouvelle inscription
+    imposée oui temporairement, pas d’email envoyé ni rôle admin donné.
+  - Nouvelle colonne membre.position : TEXT NULL, JSON x/y/z (compatible vieux
+    MySQL sans type JSON). Nouvelle inscription position=NULL ; spawn village
+    tant qu’aucune sauvegarde personnelle n’est enregistrée.
+  - POST save_position : session opaque/non bani, id exclusivement serveur,
+    nombres finis/bornés, arrondi 4 décimales, transaction/relecture et contrôle
+    ban concurrent par verrou. Seule la position du compte est modifiée.
+  - Position structurée lue dans login/get_character et fiche admin get_player.
+    JSON ancien invalide : spawn par défaut sans écraser la BDD. Secret/jeton
+    jamais dans cette colonne ni dans un fichier de sauvegarde local.
+  - Restauration après monde/coordonnées ; x/z limites du monde, y au moins
+    hauteur terrain (+0.05) si le décor a changé. Pas de sauvegarde PV/or/niveau.
+  - Autosave 20 secondes, perte de focus/pause ; fermeture normale interceptée
+    par Application.wantsToQuit avant d’arrêter les coroutines. Joueur immobilisé,
+    POST timeout 5 s, attente globale au plus 8 s puis fermeture même sans serveur.
+    Options et coordonnées EDITION restent sauvegardées comme avant.
+  - ErreurPosition indépendante de Erreur du panel : autosave ne masque pas une
+    réponse ADMIN. Retour stale de session ignoré ; pas de réattribution de droits
+    depuis un ancien retour d’autosave. Coroutines pleinement qualifiées (CS0305).
+  - Crash, arrêt forcé, coupure : dernière autosave RÉUSSIE seulement ; aucune
+    promesse de dernière image sauvegardée si aucune requête réseau ne peut finir.
+
+SQL EXISTANT À MIGRER MANUELLEMENT APRÈS SAUVEGARDE ET FERMETURE DES CLIENTS :
+  USE librevies;
+  ALTER TABLE membre MODIFY COLUMN valider VARCHAR(3) NOT NULL DEFAULT 'oui';
+  UPDATE membre SET valider = CASE
+    WHEN valider = '0' THEN 'non'
+    WHEN valider = '1' THEN 'oui'
+    ELSE valider END;
+  ALTER TABLE membre MODIFY COLUMN valider ENUM('non', 'oui') NOT NULL DEFAULT 'oui';
+  ALTER TABLE membre ADD COLUMN position TEXT NULL;
+Vérifier d’abord SHOW COLUMNS FROM membre LIKE 'position'; si la colonne existe,
+ne pas rejouer le ADD ni supprimer les positions. Examiner une validation inconnue
+avant conversion ; valeurs reconnues : 0,1,non,oui. Pas de conversion directe
+TINYINT -> ENUM qui pourrait interpréter un index numérique à l’envers.
+Pas de DROP/TRUNCATE/recréation/import complet de membre.sql. Ne pas modifier bani,
+droit, motdepasse, config.php ou coordonnées. Aucun SQL exécuté automatiquement.
+
+Tests du 10/10/2026 : 85 tests Python actifs en fixture ciblée, dont 10 nouveaux
+position/fiche/coroutines ; 10 contrôles EDITION + recette amorce. Exécution API
+PHP WASM 7.4.33/8.3.33 et SQLite : save/load/reconnexion/admin, usurpation id sans
+effet, invalides/rollback, JSON stocké invalide, inscription oui forcée et anciens
+non compatibles validation email désactivée, ban/session/droits préservés.
+Syntaxe C# tree-sitter et Python ; pas compilation sémantique/rendu Unity natifs.
+Verrous FOR UPDATE omis seulement dans la copie SQLite, pas dans le code MySQL.
+Migrations ALTER et fermeture Windows/AltF4 restent à valider sur le vrai poste.
+Dépendances installées seulement sous compilation/build/arena-position (ignoré).
+Aucune ressource MakeHuman, arme, poignée, coordinate ou secret modifié/commité.
+
+Recette utilisateur : sauvegarder BDD, fermer jeu/launcher, migrer valider/position,
+build_launcher.bat, vérifier API health, puis jeu/LibreVies.exe : 4.2.4/0.5.88.
+Lire chaque champ/faire défiler jusqu’à la dernière ligne, tester inscription oui,
+déplacer le joueur, attendre 20 s, fermer normalement et reconnecter au même endroit.
+Ne pas bannir son propre admin ; ne pas rejouer ALTER bani si déjà appliqué.
+Logs : compilation/build/unity.log, jeu/journal_auth.log, jeu/game/logs/LibreVies.log,
+LibreViesRuntime.log et journal_api.log côté EasyPHP ; pas de secrets/PII à envoyer.
+« À faire » toujours seulement au terme de la réponse FINALE et résumé daté même commit.
+
 CORRECTIF DE COMPILATION DU 10/10/2026 — CS0305 / RÈGLE « À faire »
 
 ÉTAT ACTUEL PRIORITAIRE : hotfix C# de 0.5.87, launcher inchangé 4.2.3.
@@ -236,13 +312,13 @@ LIBREVIES — DOSSIER DE REPRISE ACTUEL + HISTORIQUE CONSERVÉ
 Synthèse actualisée le 10/10/2026 (Europe/Paris)
 Dépôt : https://github.com/killdrago/LibreVies
 Branche de cette session : arena/01a0b32c-librevies
-Base distante auditée : a8f153d, coordonnées du 10/10/2026 à 12:33:39 (Europe/Paris).
+Base distante auditée : 50f90de, correctif du 10/10/2026 à 13:00:28 (Europe/Paris).
 Correction demandée le 10/10/2026 : dates manquantes et reprise après interruption.
 Base fonctionnelle précédente : 9fee3f8, 09/10/2026 à 14:59:29 (0.5.86).
 Présente MAJ fonctionnelle : 0.5.87 / 4.2.3, 10/10/2026, native encore à vérifier.
 Dernières coordonnées utilisateur : a8f153d, 10/10/2026 à 12:33:39.
 Première passation : d55f99f, 10/10/2026 à 07:15:37 ; complément : 373ac85 à 07:21:48.
-Nature de la présente MAJ : hotfix CS0305 ; rebuild requis, aucun nouvel ALTER si bani existe.
+Nature de la présente MAJ : 0.5.88 fonctionnelle ; migration valider/position puis rebuild.
 ================================================================================
 
 SOMMAIRE DU BLOC ACTUEL
@@ -264,45 +340,31 @@ SOMMAIRE DU BLOC ACTUEL
   16. Précautions Git et mise à jour du résumé à chaque commit
   17. Travail restant et recette utilisateur détaillée
   18. Références documentaires, MAJ datées et portée de cette synthèse
-  19. Journal Git daté complet (647 commits, 17/09/2026–10/10/2026)
+  19. Journal Git daté complet (648 commits, 17/09/2026–10/10/2026)
   Puis : archive intégrale de l’ancien resumer.txt (jusqu’à MAJ 79).
 
 --------------------------------------------------------------------------------
 01. REPRENDRE IMMÉDIATEMENT : ÉTAT RÉEL, PREUVES ET PRIORITÉS
 --------------------------------------------------------------------------------
 
-Dernier build NATIF connu : échec CS0305 le 10/10/2026 à 12:35:22 Paris ;
-hotfix des trois signatures nongen IEnumerator décrit en tête. Pas un problème licence.
+État prioritaire : bloc MAJ 0.5.88 / 4.2.4 en tête. La capture actuelle prouve
+l’ouverture de la fiche ADMIN (version non visible), pas le résultat de 0.5.88.
+Nouvelle demande du 10/10 : pseudo 75 %, valider non/oui/inscription oui, mise
+en page par ligne sans rognage, position BDD sauvegardée/restaurée.
+La dernière erreur native CS0305 a été corrigée dans 50f90de ; nouvelle logique
+utilise System.Collections.IEnumerator. Pas de build Unity/Windows exécuté ici.
 
-Versions SOURCES actuelles : LibreViesGame.VersionJeu, bundleVersion et
-LOCAL_GAME_VERSION = 0.5.87 ; launcher = 4.2.3 ; Unity 6000.6.1f1.
-La version effective du binaire reste prouvée par le build/version_jeu.json,
-pas par un simple renommage de manifeste. Source version_url.json garde encore
-honnêtement game_version=0.5.79 avant build, launcher_version=4.2.3, mode_local=true.
+Avant tester : sauvegarder la BDD, fermer les clients, migration valider/position
+(manuel, script en tête), build depuis Git -> jeu, API health, lancer LibreVies.exe.
+Valider versions jeu 0.5.88 / launcher 4.2.4 ; nouvelle inscription valider=oui,
+position=NULL, default personnage 1/autres NULL/classement 0, bani=non/droit=0.
+Vérifier fiche complète et sauvegarde/reconnexion : autosave20s + fermeture normale.
+Réseau indisponible ou arrêt brutal ne garantissent pas les dernières coordonnées.
 
-Dernières preuves natives conservées : capture 0.5.85 (humains/pseudo), puis
-nouvelle capture utilisateur du 10/10/2026 (version non visible) montrant encore
-les hallebardes hors des mains. La correction 0.5.86 du pivot n’était donc pas
-une validation visuelle du problème : 0.5.87 mesure maintenant le vrai mesh.
-Le pseudo est de nouveau divisé par 2, taille finale 0.0175, hauteur inchangée.
-
-La nouvelle administration des joueurs et le bannissement sont codés/testés
-sur recettes, pas encore confirmés sur Windows/Unity/MySQL réels. Ne jamais
-annoncer compilation native/rendu validés depuis un scanner syntaxique.
-L’ancien CS1061 HumanPreview.FindBone a été corrigé dans 386bb30 ; ce n’est pas
-une raison de retoucher la licence, MakeHuman ou de supprimer les coordonnées.
-
-Priorité :
-  1) Préserver config.php/BDD/coordonnées, sauvegarder la base puis ajouter bani
-     UNE FOIS avec l’ALTER en tête (membre, pas membres ; défaut non).
-  2) Fermer jeu/launcher ; compilation\build_launcher.bat télécharge les sources,
-     compile jeu et synchronise l’API EasyPHP, sans importer SQL.
-  3) Health doit répondre OK ; ouvrir jeu\LibreVies.exe ; versions 4.2.3/0.5.87.
-  4) Vérifier armes Nord/Sud et pseudo ; ADMIN > Joueur avec droit=1, recherche,
-     choix/fiches/case/VALIDER sur un AUTRE compte de test.
-  5) Test oui : BDD oui, JOUER bloqué + message exact, même si déjà connecté
-     (poll puis contrôle au clic). Test non : déban, connexion/JOUER autorisés.
-  6) Fournir les vrais logs/captures en cas d’échec ; ne rien réinitialiser.
+Le manifeste source conserve game_version=0.5.79 avant build (honnêteté du binaire),
+launcher_version=4.2.4, mode_local=true ; build écrit la version vérifiée 0.5.88.
+Ne pas falsifier un manifeste pour transformer un ancien exécutable en nouveau jeu.
+Ne pas retoucher MakeHuman, armes, poignées, poses ou coordonnées validées sans demande.
 
 --------------------------------------------------------------------------------
 02. MANIÈRE DE TRAVAILLER ET CONTRAINTES DE L’UTILISATEUR
@@ -334,8 +396,8 @@ Consignes durables :
     le build synchronise ce qui est nécessaire vers la racine web locale.
   - Autolog uniquement chiffré et local dans GAME_DIR, jamais en clair ni dans
     version_url.json. Une case décochée supprime les formats ancien et nouveau.
-  - Inscription : valider=0, droit=0, bani=non ; aucun email actuellement,
-    aucune interdiction de connexion pour valider=0 pendant le développement.
+  - Inscription : valider=oui temporairement, droit=0, bani=non, position=NULL ; aucun email,
+    anciens valider=non encore autorisés si validation email obligatoire désactivée.
   - Personnage initial : même ID que membre, default=1 ; TOUT le reste NULL,
     notamment aucun sexe homme imposé et aucun profil prérempli.
   - Un personnage par compte. default=0 signifie profil personnalisé de la
@@ -466,7 +528,7 @@ compilation/unity/Assets/Scripts/LibreViesNpc.cs (+ .meta)
 compilation/unity/Assets/Editor/LibreViesBuild.cs
   Build Mono Windows, contrôles de cohérence et marqueur du jeu exporté.
 compilation/unity/ProjectSettings/ProjectSettings.asset
-  bundleVersion actuelle 0.5.87.
+  bundleVersion actuelle 0.5.88.
 compilation/unity/ProjectSettings/ProjectVersion.txt
   Éditeur 6000.6.1f1.
 compilation/unity/Assets/Resources/LVShaders/
@@ -475,7 +537,7 @@ compilation/unity/Assets/Resources/LVShaders/
 jeu/LibreVies.exe
   Amorce utilisateur ; le jeu est lancé depuis le launcher authentifié.
 jeu/launcher.pyw
-  Launcher 4.2.3, jeu attendu 0.5.87, bani/contrôle PHP, Autolog DPAPI, mode local.
+  Launcher 4.2.4, jeu attendu 0.5.88, bani/contrôle PHP, Autolog DPAPI, mode local.
 jeu/auth_config.json
   URL API locale http://localhost/serveur/api.php, timeout de configuration.
 jeu/version_url.json
@@ -621,7 +683,7 @@ npc (jeu/serveur/npc.sql) :
   les colonnes de personnalisation ajoutées ici.
 
 INSCRIPTION ACTUELLE : UNE TRANSACTION POUR LES TROIS LIGNES
-  1) INSERT membre avec valider=0, droit=0 et bani=non (imposé serveur).
+  1) INSERT membre valider=oui temporairement, droit=0, bani=non et position=NULL (imposé serveur).
   2) Récupération du nouvel ID canonique de membre.
   3) INSERT personnage au même ID, default=1, tous les autres champs NULL.
   4) INSERT classement au même ID, experience=0, chasse=0, territoire=0.
@@ -669,6 +731,10 @@ Actions utiles :
   search_players       session_token + search -> 30 joueurs max, ADMIN non bani.
   get_player           session_token + player_id -> compte/profil/classement BDD.
   save_player_ban       session_token + player_id + bani oui/non -> état relu.
+  save_position         session_token + position JSON x/y/z -> position relue.
+Position en membre.position, jamais dans la table personnage/NPC ; membres.id de
+session, pas id reçu. Nouvelle inscription oui pour valider, aucun email effectif.
+Non/oui en sortie ; BANI/API/dropdown existants conservés. Voir tête et §17.
 
 Tous les comptes/admin utilisent POST, health reste GET ; aucun jeton en URL.
 BAN : membre.bani est relu en BDD à chaque requête. Oui refuse login sans session
@@ -892,7 +958,7 @@ réels ou publier une commande de promotion automatique indiscriminée.
 
 PSEUDO JOUEUR :
   vrai pseudo PHP/BDD, en troisième personne ; masqué mort / première personne.
-  characterSize final 0.0175 (0.14 /4 puis 0.035 /2 au 10/10), bold, richText=false.
+  characterSize final 0.02625 (0.035 -> 0.0175 -> 0.02625, 100 -> 50 -> 75), bold, richText=false.
   Position finale : hauteur des bounds de l’avatar avec minimum player.y+2.35,
   puis +0.38 m. Référence initiale de création à 2.80 m avant actualisation.
   Le passage +20 cm puis -10 cm est déjà intégré au résultat final ; ne pas
@@ -1075,6 +1141,13 @@ K. 10/10/2026 — BUILD 0.5.87 REFUSÉ (CS0305), HOTFIX ET CONCLUSION FINALE
   ne pas tenter de réparer la licence ou effacer la BDD pour une erreur C#.
   L’utilisateur précise : À faire seulement à la fin du message final, pas en
   cours d’intervention. Nouvelle règle prioritaire et prompt de passation corrigés.
+
+L. 10/10/2026 — FICHE JOUEUR, VALIDATION TEXTE ET POSITION (0.5.88)
+  Après capture de fiche : pseudo 75, champs chacun leur ligne et marge basse,
+  valider non/oui avec oui temporaire inscription, membre.position JSON x/y/z.
+  Sauvegarde automatique20s/focus/pause/fermeture bornée, restauration au login.
+  SQL de conversion conserve0/non et1/oui, pas d’envoi email ni persistance des PV.
+  Capture preuve de fiche ADMIN fonctionnelle, version non visible ; 0.5.88 native à tester.
 
 Pour retrouver l’historique exact :
   git log --reverse --date=iso-strict --format="%h %cI %s" origin/arena/01a0b32c-librevies
@@ -1424,64 +1497,38 @@ Dans chaque future MAJ du résumé, mettre en tête :
 Ne pas réécrire l’archive comme si ses anciennes consignes étaient actuelles.
 
 --------------------------------------------------------------------------------
-17. TRAVAIL RESTANT ET RECETTE UTILISATEUR DÉTAILLÉE — 0.5.87
+17. TRAVAIL RESTANT ET RECETTE UTILISATEUR DÉTAILLÉE — 0.5.88
 --------------------------------------------------------------------------------
 
-À FAIRE APRÈS LA PRÉSENTE MAJ FONCTIONNELLE (SQL OBLIGATOIRE SI COLONNE ABSENTE) :
+1) Fermer jeu/launcher/créateur, sauvegarder la BDD. Config.php, Autolog DPAPI et
+   jeu/edition/coordonee préservés ; aucune suppression de log/Library.
+2) Dans phpMyAdmin sur librevies : migrer valider non/oui avec la conversion
+   VARCHAR puis CASE puis ENUM du bloc actuel. Ancien 0 non/1 oui conservés.
+   Ajouter position TEXT NULL seulement si la colonne manque ; ne pas remettre
+   toutes les positions à NULL, ni les bans à non. Aucun import complet SQL.
+3) Apache/MySQL EasyPHP actifs, lancer compilation\build_launcher.bat depuis
+   la racine projet ; récupère sources + compile jeu + copie API, pas SQL automatique.
+   Pas de builds parallèles. Attendre succès ; si erreur compilation/build/unity.log.
+4) Health http://localhost/serveur/api.php?action=health ; puis jeu\LibreVies.exe.
+   Attentes : launcher 4.2.4, jeu 0.5.88 (export réel, pas manifeste renommé).
+5) ADMIN droit1/non bani : fiche un champ par ligne, Validation non/oui, texte
+   complet jusqu’à dernière ligne en défilant ; voir position BDD/current séparées.
+   Vérifier pseudo légèrement plus grand (75), hauteur unchanged ; ne pas toucher
+   poses/armes. Nouvelle inscription sur compte de test : valider oui, position NULL.
+6) Déplacer joueur, attendre20s ; vérifier la colonne position JSON en BDD, fermer
+   normalement (menu/croix/AltF4 : attente au plus8s), relancer/reconnecter : même x/z,
+   y sûr au-dessus terrain. La sauvegarde de position ne modifie pas profil, scores,
+   droits, bannissement, autres comptes ni coordonnées EDITION.
+7) Simuler perte réseau : fermeture finit, dernière autosave réussie conservée ;
+   ne pas prétendre qu’un kill brutal garantit la dernière image. Pas de sauvegarde
+   PV/inventaire/niveau fournie par cette seule colonne position.
+8) Refaire ban/unban sur AUTRE compte si nécessaire, pas son admin. Avec bani oui,
+   login/API/save_position refusés. Si panne : extraits unité/php/auth/runtimes,
+   pas config.php ou passwords ; masquer les données personnelles inutiles.
 
-1) Fermer jeu, launcher et créateur autonome. Sauvegarder la BDD, préserver
-   config.php, Autolog DPAPI et jeu/edition/coordonee. Pas de suppression de log.
-
-2) EasyPHP : démarrer MySQL/Apache ; phpMyAdmin, sélectionner librevies.
-   Vérifier SHOW COLUMNS FROM membre LIKE 'bani';
-   Si absente, exécuter UNE FOIS :
-     ALTER TABLE membre
-       ADD COLUMN bani ENUM('non', 'oui') NOT NULL DEFAULT 'non';
-   Si déjà présente, ne pas rejouer ni remettre les bani=oui existants à non.
-   Aucun DROP/TRUNCATE, réimport de membre.sql ou fichier config.php à remplacer.
-
-3) Depuis la racine du projet Windows : compilation\build_launcher.bat.
-   Le build télécharge les sources, compile jeu et synchronise l’API locale ;
-   il n’exécute pas l’ALTER. Ne pas lancer plusieurs builds en parallèle.
-   Si erreur : compilation\build\unity.log ; ne pas tester un ancien export.
-
-4) Health : http://localhost/serveur/api.php?action=health doit répondre OK.
-   Erreur bani absente : mauvaise base/colonne, appliquer SQL sur la vraie BDD.
-   Si racine web non détectée : LIBREVIES_WEB_ROOT (racine réelle, procédure §05).
-   Ouvrir jeu\LibreVies.exe ; attentes : launcher 4.2.3, jeu compilé 0.5.87.
-
-5) Compte normal : connexion possible valider=0, bani=non ; JOUER autorisé quand
-   export prêt et état vérifié. ADMIN absent droit=0/2. Pseudo réellement divisé /2,
-   hauteur inchangée, troisième personne seulement. Armes Nord/Sud dans la paume
-   en idle/marche puis après édition NPC ; capture si décalage persiste.
-
-6) Compte ADMIN : bani=non/droit=1, rechercher un AUTRE compte de test par pseudo,
-   cliquer son nom ; vérifier caractéristiques en dessous. Cocher puis VALIDER :
-   seule sa colonne membre.bani devient oui. Vérifier dans phpMyAdmin en lecture :
-     SELECT id, pseudo, bani FROM membre ORDER BY id;
-   Ne pas tester sur son propre admin (avertissement, perte de permissions réelle).
-   Fermer/cocher sans VALIDER ne doit pas écrire ; personnage/scores/droits intacts.
-
-7) Launcher du compte ciblé : tester oui avec connexion manuelle ou Autolog :
-   JOUER désactivé, message « Joueur bani veuillez contacter l'administrateur ».
-   Tester aussi launcher resté connecté avant le ban : poll 10 s et contrôle
-   obligatoire au clic JOUER, jamais lancement depuis un ancien cache.
-   Depuis l’admin décocher puis VALIDER : non en BDD ; relancer/reconnecter le
-   compte test et vérifier JOUER à nouveau possible. Un serveur inaccessible
-   ou une session 401 ne doit pas permettre un lancement non vérifié.
-
-8) Si blocage, extraits pertinents après cette tentative, sans secrets :
-   compilation\build\unity.log (build), jeu\journal_auth.log (launcher),
-   jeu\game\logs\LibreVies.log et LibreViesRuntime.log (jeu),
-   journal_api.log sur le serveur EasyPHP (placement §15).
-   Ne transmettre ni config.php ni mot de passe/jeton ; masquer les emails inutiles.
-
-PLUS TARD, PAS LIVRÉ PAR 0.5.87 :
-  - validation email/envoi réel ; classement launcher/live complet ;
-  - multi-ville persistante/extension des ID NPC ; kick serveur multijoueur ;
-  - futur hébergement HTTP manuel, pas réactivation jeucompiler ;
-  - automatisation de resumer.txt pour les anciens commits de coordonnées.
-Les règles de passation/À faire restent prioritaires, résumé daté chaque commit.
+Logs : compilation\build\unity.log, jeu\journal_auth.log,
+jeu\game\logs\LibreVies.log et LibreViesRuntime.log ; journal_api.log serveur (§15).
+Les preuves natives de fermeture, restauration et clipping restent à recueillir.
 
 --------------------------------------------------------------------------------
 18. RÉFÉRENCES DOCUMENTAIRES ET PORTÉE DE CETTE SYNTHÈSE
@@ -1575,6 +1622,9 @@ MAJ FONCTIONNELLE 0.5.87 / 4.2.3 DU 10/10/2026
   La capture du 10/10 prouve un défaut d’armes, pas une version ni le résultat
   du nouveau correctif ; validation native demandée après SQL + build.
 
+Présente MAJ du10/10/2026 : bloc 0.5.88/4.2.4 prioritaire en tête, SQL manuel
+valider/position, tests85 et limites natives explicites ; résumé dans le même commit.
+
 MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
 
   Tu reprends mon projet LibreVies : https://github.com/killdrago/LibreVies.
@@ -1595,12 +1645,12 @@ MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
   Après lecture, reprends ma prochaine demande sans refaire des travaux déjà livrés.
 
 --------------------------------------------------------------------------------
-19. JOURNAL GIT DATÉ COMPLET — 647 COMMITS ACCESSIBLES À a8f153d
+19. JOURNAL GIT DATÉ COMPLET — 648 COMMITS ACCESSIBLES À 50f90de
 --------------------------------------------------------------------------------
 
-SOURCE : git log de origin/arena/01a0b32c-librevies à a8f153d.
-PÉRIODE : 17/09/2026 à 17:54:47 -> 10/10/2026 à 12:33:39 (Europe/Paris).
-Tous les 647 commits accessibles sont listés, dont 67 merges ; ce n’est pas
+SOURCE : git log de origin/arena/01a0b32c-librevies à 50f90de.
+PÉRIODE : 17/09/2026 à 17:54:47 -> 10/10/2026 à 13:00:28 (Europe/Paris).
+Tous les 648 commits accessibles sont listés, dont 67 merges ; ce n’est pas
 une affirmation que la conversation a produit 644 fonctionnalités distinctes.
 Les commits de coordonnées et des branches déjà intégrées ne sont pas omis.
 
@@ -1612,7 +1662,7 @@ Les dates ne prouvent ni date de push HTTP ni exécution/test natif du jeu.
 Tri : date commit croissante, puis SHA pour égalité ; pour la filiation réelle,
 consulter git log --graph. Dates auteur et commit peuvent différer.
 
-LIMITES : instantané arrêté au parent publié a8f153d. La présente correction
+LIMITES : instantané arrêté au parent publié 50f90de. La présente correction
 est datée du 10/10/2026 en section 18 ; son hash sera donné après commit/push,
 pas inventé dans le fichier qui détermine lui-même son propre hash.
 La prochaine MAJ complètera l’index jusqu’à sa nouvelle base connue.
@@ -1640,7 +1690,7 @@ APERÇU PAR JOUR (date commit, Paris) :
   07/10/2026 : 9 commit(s).
   08/10/2026 : 38 commit(s).
   09/10/2026 : 15 commit(s).
-  10/10/2026 : 5 commit(s).
+  10/10/2026 : 6 commit(s).
 
 JOURNAL INTÉGRAL :
 
@@ -2326,6 +2376,8 @@ JOURNAL INTÉGRAL :
 
 10/10/2026 09:49:24 | 10/10/2026 09:49:24 | cc5a8e1 | Ajoute recherche et bannissement des joueurs et corrige pseudo et armes des gardes
 10/10/2026 12:33:39 | 10/10/2026 12:33:39 | a8f153d | Edition : met a jour les coordonnees
+
+10/10/2026 13:00:28 | 10/10/2026 13:00:28 | 50f90de | Corrige CS0305 des coroutines ADMIN et precise A faire final uniquement
 
 FIN DU BLOC ACTUEL — LES CONSIGNES EN TÊTE RESTENT PRIORITAIRES.
 

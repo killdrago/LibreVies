@@ -15,7 +15,7 @@ public sealed class LibreViesCompte
     {
         public int id;
         public string pseudo;
-        public int valider;
+        public string valider;
         public int droit;
         public string bani;
         // Renseigne seulement dans la consultation admin du joueur choisi.
@@ -33,6 +33,7 @@ public sealed class LibreViesCompte
         public LibreViesNpc[] npcs;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
+        public LibreViesPosition position;
     }
 
     [Serializable]
@@ -50,6 +51,8 @@ public sealed class LibreViesCompte
     public Membre Joueur { get; private set; }
     public LibreViesPersonnage Personnage { get; private set; }
     public string Erreur { get; private set; }
+    public string ErreurPosition { get; private set; }
+    public LibreViesPosition Position { get; private set; }
     public LibreViesNpc[] Npcs { get; private set; }
     public Membre[] JoueursTrouves { get; private set; }
     public LibreViesJoueurAdmin JoueurAdministratif { get; private set; }
@@ -112,6 +115,44 @@ public sealed class LibreViesCompte
         });
     }
 
+    public System.Collections.IEnumerator SauvegarderPosition(LibreViesPosition position)
+    {
+        // Erreur distincte : les autosaves ne doivent pas effacer le retour du panel ADMIN.
+        ErreurPosition = "";
+        if (!Authentifie || position == null || !position.EstValide)
+        { ErreurPosition = "Position/compte indisponible."; yield break; }
+        string tokenRequete = jeton;
+        int idRequete = Joueur.id;
+        string formulaire = "action=save_position&session_token=" + UnityWebRequest.EscapeURL(tokenRequete)
+            + "&position=" + UnityWebRequest.EscapeURL(JsonUtility.ToJson(position));
+        using (UnityWebRequest requete = new UnityWebRequest(url, "POST"))
+        {
+            requete.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(formulaire));
+            requete.downloadHandler = new DownloadHandlerBuffer();
+            requete.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
+            requete.SetRequestHeader("Accept", "application/json");
+            requete.timeout = 5; // La fermeture ne doit pas attendre un serveur en panne.
+            yield return requete.SendWebRequest();
+            ReponseApi reponse = null;
+            try { reponse = JsonUtility.FromJson<ReponseApi>(requete.downloadHandler.text); }
+            catch (Exception) { }
+            if (jeton != tokenRequete) { ErreurPosition = "Connexion changee pendant la sauvegarde."; yield break; }
+            if (requete.result != UnityWebRequest.Result.Success || reponse == null || !reponse.ok)
+            {
+                ErreurPosition = reponse != null && !String.IsNullOrEmpty(reponse.message)
+                    ? reponse.message : "Sauvegarde position inaccessible.";
+                if (requete.responseCode == 401 || (reponse != null && reponse.code == "membre_bani"))
+                { jeton = null; Joueur = null; }
+                yield break;
+            }
+            if (reponse.membre == null || reponse.membre.id != idRequete || reponse.membre.bani != "non"
+                || reponse.position == null || !reponse.position.EstValide)
+            { ErreurPosition = "Reponse position invalide."; yield break; }
+            // Une reponse d'autosave ne doit pas reaccorder un ancien droit client.
+            Position = reponse.position;
+        }
+    }
+
     private IEnumerator Envoyer(string action, LibreViesPersonnage profil, string idNpc = null,
         Dictionary<string, string> champs = null)
     {
@@ -155,6 +196,7 @@ public sealed class LibreViesCompte
             }
             if (reponse.membre == null || reponse.membre.id <= 0
                 || String.IsNullOrEmpty(reponse.membre.pseudo)
+                || (reponse.membre.valider != "non" && reponse.membre.valider != "oui")
                 || (reponse.membre.bani != "non" && reponse.membre.bani != "oui"))
             {
                 Erreur = "Reponse du compte invalide : statut bani requis, mettez l'API a jour.";
@@ -222,8 +264,11 @@ public sealed class LibreViesCompte
                 Erreur = String.IsNullOrEmpty(erreurProfil) ? "Reponse du compte invalide." : erreurProfil;
                 yield break;
             }
+            if (reponse.position != null && !reponse.position.EstValide)
+            { Erreur = "Position du compte invalide."; yield break; }
             Joueur = reponse.membre;
             Personnage = reponse.personnage;
+            Position = reponse.position;
         }
     }
 

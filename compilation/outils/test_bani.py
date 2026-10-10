@@ -222,7 +222,7 @@ class ContratsBaniEtArmes(unittest.TestCase):
     def test_schema_non_et_registre_ignore_statut_client(self):
         sql = (ROOT / 'jeu/serveur/membre.sql').read_text()
         self.assertIn("bani ENUM('non', 'oui') NOT NULL DEFAULT 'non'", sql)
-        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 0, 0, 'non')", API)
+        self.assertIn("VALUES (:pseudo, :motdepasse, :email, 'oui', 0, 'non', NULL)", API)
         self.assertNotIn('ALTER TABLE', API.split('// La migration est volontairement manuelle')[0])
 
     def test_identite_bdd_et_bans_reverifies(self):
@@ -251,10 +251,10 @@ class ContratsBaniEtArmes(unittest.TestCase):
         self.assertIn('Joueur.bani == "non"', COMPTE)
         self.assertIn('finally { GUI.matrix = ancienneMatrice; }', GAME)
 
-    def test_pseudo_divise2_sans_changer_hauteur(self):
+    def test_pseudo_75pourcent_sans_changer_hauteur(self):
         nom = GAME.split('private void CreerNomJoueur()', 1)[1].split('private void MettreAJourNomJoueur', 1)[0]
-        self.assertIn('0.0175f', nom)
-        self.assertAlmostEqual(0.035 / 2, 0.0175)
+        self.assertIn('0.02625f', nom)
+        self.assertAlmostEqual(0.035 * 0.75, 0.02625)
         position = GAME.split('private void MettreAJourNomJoueur', 1)[1].split('private ', 1)[0]
         self.assertIn('0.38f', position)
 

@@ -94,8 +94,44 @@ function repondre_doublon($doublons) {
 
 function membre_public($membre) {
     return array('id' => (int)$membre['id'], 'pseudo' => (string)$membre['pseudo'],
-        'valider' => (int)$membre['valider'], 'droit' => (int)$membre['droit'],
+        'valider' => (string)$membre['valider'], 'droit' => (int)$membre['droit'],
         'bani' => (string)$membre['bani']);
+}
+
+function valider_position_joueur($valeur) {
+    if (is_string($valeur)) {
+        if (strlen($valeur) > 512) throw new InvalidArgumentException('Position trop volumineuse.');
+        $valeur = json_decode($valeur, true);
+    }
+    if (!is_array($valeur)) throw new InvalidArgumentException('Position x/y/z attendue.');
+    $resultat = array();
+    foreach (array('x', 'y', 'z') as $axe) {
+        if (!isset($valeur[$axe]) || (!is_int($valeur[$axe]) && !is_float($valeur[$axe]))
+            || !is_finite((float)$valeur[$axe])) {
+            throw new InvalidArgumentException('Coordonnee de position invalide : ' . $axe);
+        }
+        $nombre = (float)$valeur[$axe];
+        $limite = $axe === 'y' ? 500.0 : 125.0;
+        if (abs($nombre) > $limite) throw new InvalidArgumentException('Position hors du monde.');
+        $resultat[$axe] = round($nombre, 4);
+    }
+    return $resultat; // Les id/droit/autres champs recus sont ignores.
+}
+
+function position_publique($valeur) {
+    if ($valeur === null || $valeur === '') return null;
+    try { return valider_position_joueur($valeur); }
+    catch (InvalidArgumentException $erreur) {
+        // Un vieux JSON corrompu ne doit pas bloquer le compte ni ecraser la BDD.
+        journal_api('POSITION stockee invalide : depart par defaut');
+        return null;
+    }
+}
+
+function lire_position_joueur($pdo, $id) {
+    $query = $pdo->prepare('SELECT position FROM membre WHERE id = :id LIMIT 1');
+    $query->execute(array(':id' => $id));
+    return position_publique($query->fetchColumn());
 }
 
 function verifier_bannissement($membre) {
@@ -126,7 +162,7 @@ function id_joueur_recu($donnees) {
 
 function lire_joueur_administration($pdo, $id) {
     // Lecture admin seulement : aucun mot de passe/hash ni session retourne.
-    $query = $pdo->prepare('SELECT id, pseudo, email, valider, droit, bani FROM membre WHERE id = :id LIMIT 1');
+    $query = $pdo->prepare('SELECT id, pseudo, email, valider, droit, bani, position FROM membre WHERE id = :id LIMIT 1');
     $query->execute(array(':id' => $id));
     $membre = $query->fetch();
     if (!$membre) return null;
@@ -149,13 +185,14 @@ function lire_joueur_administration($pdo, $id) {
     // Transport texte : preserve les BIGINT UNSIGNED sans arrondi JSON/Unity.
     if ($classement) foreach ($classement as $cle => $valeur) $classement[$cle] = (string)$valeur;
     return array('membre' => $public, 'personnage' => $personnage,
-        'classement' => $classement ?: null, 'erreur_personnage' => $erreurProfil);
+        'classement' => $classement ?: null, 'erreur_personnage' => $erreurProfil,
+        'position' => position_publique($membre['position']));
 }
 
 function verifier_validation_email($membre, $config) {
-    // La validation email sera branchee plus tard. Par defaut, valider=0
-    // n'empeche pas encore de se connecter pendant le developpement.
-    if (!empty($config['require_email_validation']) && (int)$membre['valider'] !== 1) {
+    // Inscription temporairement validee ('oui'), pas d'envoi d'email encore.
+    // Les anciens non restent autorises quand require_email_validation est false.
+    if (!empty($config['require_email_validation']) && (string)$membre['valider'] !== 'oui') {
         repondre(false, 'Validez votre compte par email avant de vous connecter.', array(), 403);
     }
 }
@@ -289,10 +326,10 @@ try {
 // La migration est volontairement manuelle : aucun ALTER TABLE automatique.
 // Refuser plutot que lancer un jeu dont le bannissement ne serait pas verifie.
 try {
-    $pdo->query('SELECT bani FROM membre LIMIT 0');
+    $pdo->query('SELECT bani, valider, position FROM membre LIMIT 0');
 } catch (PDOException $erreur) {
-    journal_api('SCHEMA membre.bani indisponible');
-    repondre(false, 'Schema membre incomplet : ajoutez la colonne bani (non/oui, defaut non).', array(), 500);
+    journal_api('SCHEMA membre bani/valider/position indisponible');
+    repondre(false, 'Schema membre incomplet : bani, valider non/oui et position requis.', array(), 500);
 }
 
 if ($action === 'health') {
@@ -385,8 +422,8 @@ if ($action === 'register') {
         $pdo->beginTransaction();
         journal_api('INSCRIPTION tentative INSERT email=' . $email . ' pseudo=' . $pseudo);
         $requete = $pdo->prepare(
-            'INSERT INTO membre (pseudo, motdepasse, email, valider, droit, bani) '
-            . "VALUES (:pseudo, :motdepasse, :email, 0, 0, 'non')"
+            'INSERT INTO membre (pseudo, motdepasse, email, valider, droit, bani, position) '
+            . "VALUES (:pseudo, :motdepasse, :email, 'oui', 0, 'non', NULL)"
         );
         $requete->execute(array(
             ':pseudo' => $pseudo,
@@ -547,6 +584,31 @@ if ($action === 'get_npcs') {
     repondre(true, 'Profils NPC charges.', array('membre' => membre_public($membre), 'npcs' => $npcs));
 }
 
+if ($action === 'save_position') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    try {
+        $position = valider_position_joueur(isset($donnees['position']) ? $donnees['position'] : null);
+        $pdo->beginTransaction();
+        // Bloquer aussi un ban concurrent entre l'authentification et l'UPDATE.
+        $query = $pdo->prepare('SELECT id, pseudo, valider, droit, bani FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
+        $query->execute(array(':id' => (int)$membre['id']));
+        $actuel = $query->fetch();
+        if (!$actuel) { $pdo->rollBack(); repondre(false, 'Compte introuvable.', array(), 401); }
+        if ((string)$actuel['bani'] !== 'non') { $pdo->rollBack(); verifier_bannissement($actuel); }
+        $query = $pdo->prepare('UPDATE membre SET position = :position WHERE id = :id');
+        $query->execute(array(':position' => json_encode($position), ':id' => (int)$membre['id']));
+        $position = lire_position_joueur($pdo, (int)$membre['id']);
+        $pdo->commit();
+    } catch (InvalidArgumentException $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, $erreur->getMessage(), array(), 400);
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'Position enregistree.', array('membre' => membre_public($actuel), 'position' => $position));
+}
+
 if ($action === 'get_character' || $action === 'save_character') {
     // L'id et le pseudo fournis par le client ne sont jamais une preuve
     // d'identite. Seule la session ouverte apres password_verify fait foi.
@@ -572,6 +634,7 @@ if ($action === 'get_character' || $action === 'save_character') {
     repondre(true, $action === 'save_character' ? 'Personnage enregistre.' : 'Personnage charge.', array(
         'membre' => membre_public($membre),
         'personnage' => $personnage,
+        'position' => lire_position_joueur($pdo, (int)$membre['id']),
     ));
 }
 
@@ -608,6 +671,7 @@ if ($action === 'login') {
         'membre' => membre_public($membre),
         'session' => $session,
         'personnage' => $personnage,
+        'position' => lire_position_joueur($pdo, (int)$membre['id']),
     ));
 }
 

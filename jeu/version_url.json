@@ -1,5 +1,5 @@
 {
-  "launcher_version": "4.2.3",
+  "launcher_version": "4.2.4",
   "game_version": "0.5.79",
   "notes": "Mode local : lancer le build verifie de jeu/game, sans remplacement distant.",
   "game_url": "https://github.com/killdrago/LibreVies/tree/arena/01a0b32c-librevies/jeu",

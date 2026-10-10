@@ -17,4 +17,5 @@ public sealed class LibreViesJoueurAdmin
     public LibreViesPersonnage personnage;
     public Classement classement;
     public string erreur_personnage;
+    public LibreViesPosition position;
 }

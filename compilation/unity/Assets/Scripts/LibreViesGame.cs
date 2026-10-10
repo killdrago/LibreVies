@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public sealed class LibreViesGame : MonoBehaviour
 {
-    private const string VersionJeu = "0.5.87";
+    private const string VersionJeu = "0.5.88";
     private const float WorldSize = 125f;
     // Le village occupe maintenant un rayon de 40 m : assez large pour
     // respirer, sans revenir a la taille excessive de la MAJ 27.
@@ -110,6 +110,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+    private bool positionSauvegardeEnCours;
+    private float prochainEnregistrementPosition;
+    private bool fermetureEnCours;
+    private bool fermetureAutorisee;
     private string adminPseudoRecherche = "";
     private LibreViesCompte.Membre[] adminJoueursTrouves = new LibreViesCompte.Membre[0];
     private LibreViesJoueurAdmin adminJoueurSelectionne;
@@ -682,6 +686,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         InitialiserJournalRuntime();
         InitialiserPseudoJoueur();
+        Application.wantsToQuit += AutoriserFermetureAvecPosition;
         SupprimerFichierHistoriqueEdition();
         chrono.Start();
         AfficherVersionDansTitre();
@@ -718,6 +723,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void OnDestroy()
     {
         Application.logMessageReceived -= EcrireLogRuntime;
+        Application.wantsToQuit -= AutoriserFermetureAvecPosition;
     }
 
     // Le monde se construit une etape par image : l'ecran de chargement reste
@@ -780,6 +786,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
+        RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
+        prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
         Renderer[] renderers = FindObjectsByType<Renderer>();
@@ -854,6 +862,12 @@ public sealed class LibreViesGame : MonoBehaviour
             prochainBattement = Time.realtimeSinceStartup + 60f;
             Journal("jeu en cours : image " + imagesAffichees + ", "
                     + Mathf.RoundToInt(1f / Mathf.Max(Time.deltaTime, 0.0001f)) + " i/s");
+        }
+        if (fermetureEnCours) return; // Immobiliser pendant la derniere sauvegarde.
+        if (Time.realtimeSinceStartup >= prochainEnregistrementPosition)
+        {
+            prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
+            DemanderSauvegardePosition();
         }
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
         UpdateClouds(dt);
@@ -5784,9 +5798,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreerNomJoueur()
     {
-        // Nouvelle demande : 0.035 / 2, sans changer couleur ni hauteur.
+        // 100 -> 50 -> 75 : 0.0175 * 1.5, hauteur/couleur inchangees.
         GameObject objet = CreerTexte3D(pseudoJoueur, Vector3.zero,
-            new Color(1f, 0.90f, 0.35f), 0.0175f);
+            new Color(1f, 0.90f, 0.35f), 0.02625f);
         if (objet == null)
         {
             Journal("pseudo joueur indisponible : police 3D absente");
@@ -7408,21 +7422,39 @@ public sealed class LibreViesGame : MonoBehaviour
         if (adminJoueurSelectionne == null) return "Selectionnez un joueur dans les resultats ci-dessus.";
         LibreViesCompte.Membre membre = adminJoueurSelectionne.membre;
         StringBuilder texte = new StringBuilder();
-        texte.AppendLine("Pseudo : " + membre.pseudo + "     ID : " + membre.id);
+        texte.AppendLine("Pseudo : " + membre.pseudo);
+        texte.AppendLine("ID : " + membre.id);
         texte.AppendLine("Email : " + membre.email);
-        texte.AppendLine("Droit : " + membre.droit + "     Validation email : " + membre.valider
-            + "     Bani en BDD : " + membre.bani);
+        texte.AppendLine("Droit : " + membre.droit);
+        texte.AppendLine("Validation : " + membre.valider);
+        texte.AppendLine("Bani en BDD : " + membre.bani);
         LibreViesJoueurAdmin.Classement scores = adminJoueurSelectionne.classement;
-        texte.AppendLine(scores == null ? "Classement : aucune ligne enregistree"
-            : "Experience : " + scores.experience + "     Chasse : " + scores.chasse + "     Territoire : " + scores.territoire);
-        LibreViesPersonnage p = adminJoueurSelectionne.personnage;
-        if (p == null) texte.AppendLine("Profil : " + adminJoueurSelectionne.erreur_personnage);
-        else if (p.EstPrimitif) texte.AppendLine("Personnage non personnalise : default=1, reglages initialement NULL.");
+        if (scores == null) texte.AppendLine("Classement : aucune ligne enregistree");
         else
         {
-            texte.AppendLine("Sexe : " + p.sexe + "     Peau : " + p.teinte_peau);
-            texte.AppendLine("Coiffure : " + p.coiffure + "     Tenue : " + p.tenue);
-            texte.AppendLine("Chapeau : " + (p.chapeau ?? "Aucun") + "     Chaussures : " + (p.chaussures ?? "Aucune"));
+            texte.AppendLine("Experience : " + scores.experience);
+            texte.AppendLine("Chasse : " + scores.chasse);
+            texte.AppendLine("Territoire : " + scores.territoire);
+        }
+        LibreViesPosition sauvegardee = adminJoueurSelectionne.position;
+        texte.AppendLine("Position en BDD : " + (sauvegardee == null ? "aucune sauvegarde"
+            : sauvegardee.Point.ToString("F4")));
+        LibreViesPersonnage p = adminJoueurSelectionne.personnage;
+        if (p == null) texte.AppendLine("Profil : " + adminJoueurSelectionne.erreur_personnage);
+        else if (p.EstPrimitif)
+        {
+            texte.AppendLine("Personnage : non personnalise");
+            texte.AppendLine("Default : 1");
+            texte.AppendLine("Reglages : initialement NULL");
+        }
+        else
+        {
+            texte.AppendLine("Sexe : " + p.sexe);
+            texte.AppendLine("Peau : " + p.teinte_peau);
+            texte.AppendLine("Coiffure : " + p.coiffure);
+            texte.AppendLine("Tenue : " + p.tenue);
+            texte.AppendLine("Chapeau : " + (p.chapeau ?? "Aucun"));
+            texte.AppendLine("Chaussures : " + (p.chaussures ?? "Aucune"));
             string[] noms = { "Tete", "Yeux", "Nez", "Bouche", "Oreilles", "Seins", "Volume jambes",
                 "Hanche", "Ventre", "Largeur bras", "Longueur bras", "Hauteur jambes", "Pieds" };
             float[] valeurs = { p.tete, p.yeux, p.nez, p.bouche, p.oreilles, p.seins, p.volume,
@@ -7434,8 +7466,11 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (compteJoueur.Joueur != null && membre.id == compteJoueur.Joueur.id && player != null)
         {
-            texte.AppendLine("Joueur actuel (local) : PV " + hp + "/" + MaxHp + ", niveau " + level
-                + ", or " + coins + ", cailloux " + rocks + ", position " + player.position.ToString("F1"));
+            texte.AppendLine("PV actuels : " + hp + "/" + MaxHp);
+            texte.AppendLine("Niveau actuel : " + level);
+            texte.AppendLine("Or actuel : " + coins);
+            texte.AppendLine("Cailloux actuels : " + rocks);
+            texte.AppendLine("Position actuelle : " + player.position.ToString("F4"));
         }
         return texte.ToString();
     }
@@ -7473,11 +7508,14 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 407f);
         GUI.Box(details, "", boxStyle);
         string rapport = CaracteristiquesJoueurAdministration();
-        GUIStyle style = new GUIStyle(smallStyle) { wordWrap = true, richText = false };
-        float hauteur = Mathf.Max(details.height - 4f, style.CalcHeight(new GUIContent(rapport), details.width - 35f) + 12f);
+        GUIStyle style = new GUIStyle(smallStyle) { wordWrap = true, richText = false,
+            fixedHeight = 0f, fixedWidth = 0f, alignment = TextAnchor.UpperLeft };
+        float largeurTexte = details.width - 42f;
+        float hauteurTexte = style.CalcHeight(new GUIContent(rapport), largeurTexte);
+        float hauteur = Mathf.Max(details.height, hauteurTexte + 32f); // Marge basse contre le rognage.
         adminCaracteristiquesScroll = GUI.BeginScrollView(details, adminCaracteristiquesScroll,
-            new Rect(0f, 0f, details.width - 22f, hauteur));
-        GUI.Label(new Rect(6f, 6f, details.width - 35f, hauteur - 6f), rapport, style);
+            new Rect(0f, 0f, details.width - 22f, hauteur), false, true);
+        GUI.Label(new Rect(8f, 8f, largeurTexte, hauteurTexte + 4f), rapport, style);
         GUI.EndScrollView();
         GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours && adminJoueurSelectionne != null;
         adminJoueurBani = GUI.Toggle(new Rect(contenu.x + 18f, contenu.y + contenu.height - 86f, 520f, 30f),
@@ -8073,6 +8111,12 @@ public sealed class LibreViesGame : MonoBehaviour
     private void OnGUI()
     {
         EnsureStyles();
+        if (fermetureEnCours)
+        {
+            GUI.Box(new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 35f, 520f, 70f),
+                "Enregistrement de la position avant fermeture...", boxStyle);
+            return;
+        }
         if (focusCreationAReinitialiser)
         {
             GUIUtility.hotControl = 0;
@@ -8590,6 +8634,67 @@ public sealed class LibreViesGame : MonoBehaviour
         PlayerPrefs.SetFloat("cameraSensitivity", cameraSensitivity);
         PlayerPrefs.Save();
     }
+
+    private void RestaurerPositionJoueur()
+    {
+        if (player == null || compteJoueur == null || !compteJoueur.Authentifie
+            || compteJoueur.Position == null || !compteJoueur.Position.EstValide) return;
+        Vector3 position = compteJoueur.Position.Point;
+        position.x = Mathf.Clamp(position.x, -WorldSize + 2f, WorldSize - 2f);
+        position.z = Mathf.Clamp(position.z, -WorldSize + 2f, WorldSize - 2f);
+        // Ne pas remettre sous un terrain modifie entre deux connexions.
+        position.y = Mathf.Max(position.y, TerrainHeight(position.x, position.z) + 0.05f);
+        player.position = position;
+        playerVelocity = Vector3.zero;
+        Journal("position du compte restauree depuis la BDD");
+    }
+
+    private void DemanderSauvegardePosition()
+    {
+        if (!Application.isPlaying || !mondePret || player == null || positionSauvegardeEnCours
+            || compteJoueur == null || !compteJoueur.Authentifie || fermetureEnCours) return;
+        StartCoroutine(EnregistrerPositionJoueur(LibreViesPosition.Depuis(player.position)));
+    }
+
+    private System.Collections.IEnumerator EnregistrerPositionJoueur(LibreViesPosition position)
+    {
+        positionSauvegardeEnCours = true;
+        try
+        {
+            yield return compteJoueur.SauvegarderPosition(position);
+            if (String.IsNullOrEmpty(compteJoueur.ErreurPosition)) Journal("position du compte sauvegardee en BDD");
+            else Debug.LogWarning("[LV] " + compteJoueur.ErreurPosition);
+        }
+        finally { positionSauvegardeEnCours = false; }
+    }
+
+    private bool AutoriserFermetureAvecPosition()
+    {
+        if (!Application.isPlaying || fermetureAutorisee || !mondePret || player == null
+            || compteJoueur == null || !compteJoueur.Authentifie) return true;
+        if (!fermetureEnCours)
+        {
+            fermetureEnCours = true;
+            StartCoroutine(EnregistrerPositionEtFermer());
+        }
+        return false; // Garder les frames/coroutines vivantes jusqu'a la reponse ou au delai.
+    }
+
+    private System.Collections.IEnumerator EnregistrerPositionEtFermer()
+    {
+        LibreViesPosition derniere = LibreViesPosition.Depuis(player.position);
+        float limite = Time.realtimeSinceStartup + 8f;
+        while (positionSauvegardeEnCours && Time.realtimeSinceStartup < limite) yield return null;
+        if (!positionSauvegardeEnCours && compteJoueur.Authentifie && Time.realtimeSinceStartup < limite)
+            StartCoroutine(EnregistrerPositionJoueur(derniere));
+        while (positionSauvegardeEnCours && Time.realtimeSinceStartup < limite) yield return null;
+        if (positionSauvegardeEnCours) Debug.LogWarning("[LV] fermeture : sauvegarde position non confirmee, derniere autosave conservee.");
+        fermetureAutorisee = true;
+        Application.Quit();
+    }
+
+    private void OnApplicationPause(bool pause) { if (pause) DemanderSauvegardePosition(); }
+    private void OnApplicationFocus(bool focus) { if (!focus) DemanderSauvegardePosition(); }
 
     private void OnApplicationQuit()
     {
