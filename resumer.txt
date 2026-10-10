@@ -74,6 +74,14 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BRANCHE DANS UN JSON
+  Demande : ne plus éditer build_launcher.bat pour changer de branche.
+  Ajout : compilation/config_build.json contenant {"branche": "c40ef64e"} ; le script
+  construit arena/<valeur>-librevies. Un nom complet arena/... est aussi accepté.
+  Priorité : argument du script > variable LIBREVIES_BRANCHE > config_build.json >
+  défaut 01a0b32c. Lecture via PowerShell (ConvertFrom-Json), présent sur Windows.
+  Non testé sur le poste Windows. Le correctif symbolic-ref de la MAJ précédente est conservé.
+
 MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BUILD : BRANCHE LOCALE
   Constat utilisateur : avec BRANCHE=arena/c40ef64e-librevies, build_launcher.bat
   fetchait bien la branche, puis le commit « Edition : met a jour les coordonnees »

@@ -22,9 +22,20 @@ rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
 rem  Travail LOCAL : lancer jeu\LibreVies.exe apres le build, sans publication.
 rem ==========================================================================
 
-rem --- Ou lire les sources (change la branche si besoin) -------------------
+rem --- Ou lire les sources : la branche se regle dans config_build.json ----
+rem Dans config_build.json, on ne met que l'identifiant, par exemple :
+rem   {"branche": "c40ef64e"}   ->   branche arena/c40ef64e-librevies
+rem Un nom complet commencant par arena/ est aussi accepte.
 set "DEPOT=killdrago/LibreVies"
-set "BRANCHE=arena/01a0b32c-librevies"
+set "LV_CONFIG=%~dp0config_build.json"
+set "BRANCHE_ID="
+for /f "usebackq delims=" %%B in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (ConvertFrom-Json (Get-Content -Raw -Encoding UTF8 -LiteralPath $env:LV_CONFIG)).branche } catch { }"`) do if not defined BRANCHE_ID set "BRANCHE_ID=%%B"
+if not defined BRANCHE_ID (
+    echo AVERTISSEMENT : config_build.json absent ou illisible, branche par defaut 01a0b32c.
+    set "BRANCHE_ID=01a0b32c"
+)
+set "BRANCHE=arena/%BRANCHE_ID%-librevies"
+if /I "%BRANCHE_ID:~0,6%"=="arena/" set "BRANCHE=%BRANCHE_ID%"
 if defined LIBREVIES_BRANCHE set "BRANCHE=%LIBREVIES_BRANCHE%"
 if not "%~1"=="" set "BRANCHE=%~1"
 
