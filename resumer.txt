@@ -1,25 +1,50 @@
 RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
 
-1. CHAQUE RÉPONSE FINALE DOIT SE TERMINER PAR UNE SECTION « À faire ».
-   Elle doit énumérer TOUT ce que l’utilisateur doit encore exécuter après la
-   mise à jour : fermer les programmes, build éventuel, chemins et commandes,
-   relance, tests attendus, logs à transmettre et précautions. Ne jamais
-   supposer qu’une manipulation manuelle est évidente. Si aucune action
-   technique n’est nécessaire, le dire explicitement dans cette section.
-   Aucun texte ne doit être ajouté après cette section dans la réponse finale.
+1. CHAQUE RÉPONSE À L’UTILISATEUR DOIT SE TERMINER PAR « À faire ».
+   C’est une consigne EXPLICITE, rappelée à nouveau par l’utilisateur : à la fin
+   de chaque message de réponse, remettre un bloc **À faire** comme avant.
+   Elle vaut pour une MAJ, une correction, un diagnostic encore bloqué ou une
+   simple mise à jour de documentation. Ne pas oublier ce bloc au changement d’IA.
 
-2. resumer.txt DOIT ÊTRE MIS À JOUR DANS CHAQUE COMMIT.
-   Cela vaut pour les fonctionnalités, corrections, documentation et changements
-   de workflow. Consigner la demande, les fichiers concernés, le résultat réel,
-   les incidents/résolutions, versions, tests effectués, limites et prochaines
-   étapes. Inclure cette mise à jour dans LE MÊME commit que le changement,
-   pas dans un hypothétique commit ultérieur. Un test statique vert ne permet
-   jamais d’écrire « compilation Unity validée ».
-   Attention : les anciens commits automatiques « Edition : met a jour les
-   coordonnees » n’actualisent pas automatiquement ce fichier. Cette nouvelle
-   obligation est ici documentée ; aucun hook ni automatisme de résumé n’est
-   ajouté par la présente MAJ documentaire. Il faudra traiter explicitement
-   ce point si ce mécanisme automatique de commit est modifié/utilisé à nouveau.
+   Le bloc doit énumérer TOUT ce que l’utilisateur doit exécuter ensuite,
+   dans l’ordre, avec les informations concrètes :
+     - quel programme fermer, à quel moment, puis quoi relancer ;
+     - quel commit/quelle version récupérer, si une MAJ de code le nécessite ;
+     - quel build lancer, avec commande et chemin Windows exacts ;
+     - si Apache/MySQL EasyPHP doivent être démarrés ou vérifiés ;
+     - quel fichier sauvegarder/renommer/supprimer UNIQUEMENT si nécessaire,
+       pourquoi, et comment préserver les données existantes ;
+     - quel test ciblé faire et quel résultat/version attendre ;
+     - quel log sera créé, son chemin exact et les lignes utiles à transmettre ;
+     - les précautions : config.php, BDD, coordonnées, mots de passe et jetons.
+
+   « Relance et teste », « voir le résumé » ou « voir section 17 » seuls ne
+   suffisent PAS : écrire les manipulations nécessaires directement dans la
+   réponse. Distinguer clairement les actions obligatoires des options et
+   celles qui ne sont nécessaires que si une ancienne MAJ reste non testée.
+   Ne pas transformer un exemple historique en opération à refaire aujourd’hui.
+   Si aucune action technique n’est nécessaire, écrire explicitement dans ce
+   bloc : aucun build, import SQL ou changement serveur pour cette MAJ.
+   Aucun texte ne doit être ajouté après le bloc « À faire » dans la réponse.
+
+2. resumer.txt DOIT ÊTRE MIS À JOUR DANS CHAQUE COMMIT, SANS EXCEPTION.
+   Cela vaut pour fonctionnalités, corrections, documentation, changements de
+   workflow et les commits préparés par l’IA. Consigner la demande, les fichiers
+   concernés, le résultat réel, les incidents/résolutions, versions, tests
+   effectués, limites et prochaines étapes. Inclure la mise à jour dans LE MÊME
+   commit que le changement : pas seulement dans le message de chat, pas dans
+   un fichier temporaire et pas dans un hypothétique commit ultérieur.
+   Avant commit, contrôler que resumer.txt a réellement changé et qu’il est
+   présent dans le diff stagé. Conserver une passation fidèle même en cas de
+   tentative abandonnée ou de blocage non résolu. Un test statique vert ne
+   permet jamais d’écrire « compilation Unity validée ».
+
+   Limite existante à ne pas masquer : les anciens commits automatiques
+   « Edition : met a jour les coordonnees » n’actualisent pas automatiquement
+   ce fichier. Cette obligation est une règle de travail ; aucun hook ni
+   automatisme de résumé n’est ajouté par cette MAJ documentaire. Si la
+   prochaine IA touche/utilise ce mécanisme, elle doit traiter explicitement
+   la conformité de ces commits, sans annoncer une automatisation inexistante.
 
 3. LE WORKFLOW ACTUEL EST : GIT -> BUILD -> jeu -> jeu/LibreVies.exe.
    L’IA pousse les sources sur GitHub ; l’utilisateur lance le build qui les
@@ -33,12 +58,70 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    incidents du début. Ses anciennes consignes de publication, versions,
    chemins, manifestes et tâches ne remplacent pas les décisions ci-dessus.
 
+EXEMPLE DE STYLE « À faire » RAPPELÉ PAR L’UTILISATEUR
+
+L’utilisateur a repris un ancien message sur le diagnostic d’inscription :
+MAJ historique 4eaae48..e0cdd3a, build, fermeture du launcher, ancien journal
+éventuellement supprimé, relance et UN SEUL test, puis lecture du nouveau
+jeu\journal_auth.log. Il veut retrouver ce niveau de précision, pas une vague
+phrase « teste la MAJ ». Cet exemple est une référence de FORME : ne pas
+récupérer ces anciens commits ni supprimer ce journal pour la présente MAJ.
+
+Pour une future correction de l’inscription, adapter par exemple ainsi :
+
+  **À faire**
+
+  1) Ferme le jeu et le launcher, puis lance depuis la racine du projet :
+       compilation\build_launcher.bat
+     Précise dans la réponse le VRAI commit poussé et les versions attendues.
+     Attends la fin réussie du build ; ne lance pas un ancien jeu si le build échoue.
+
+  2) Vérifie Apache et MySQL dans EasyPHP si le test utilise les comptes.
+     Si nécessaire, contrôle sans écriture la réponse de :
+       http://localhost/serveur/api.php?action=health
+     Ne réimporte pas les SQL et ne remplace pas config.php pour vider un log.
+
+  3) Si le diagnostic nécessite un journal neuf, garde d’abord une copie de :
+       jeu\journal_auth.log
+     Ferme le launcher avant de renommer/supprimer l’ancienne copie active.
+     Explique cette opération seulement si elle est utile ; ce n’est pas une
+     étape obligatoire à chaque MAJ. Ne détruis pas les traces du blocage.
+
+  4) Relance :
+       jeu\LibreVies.exe
+     Fais un seul test d’inscription avec des valeurs de test inédites.
+     Attention : une inscription réussie crée réellement membre/personnage/
+     classement ; ne multiplie pas les comptes ni les clics pour diagnostiquer.
+
+  5) Le nouveau journal est créé automatiquement au prochain événement auth :
+       jeu\journal_auth.log
+     Les libellés réellement présents dans le launcher actuel sont notamment :
+       DEMANDE UI action=register
+       REQUETE action=register
+       HTTP DEBUT action=register
+       HTTP FIN action=register
+       REPONSE action=register
+       RESULTAT INSCRIPTION
+     Le libellé « REPONSE API » du message cité décrivait la réponse ; ce n’est
+     pas le texte exact de la ligne actuelle, qui commence par « REPONSE ».
+     Aucun mot de passe ni jeton ne doit être écrit/partagé. Le journal peut
+     contenir pseudo/email : masque les données personnelles inutiles.
+
+  6) En cas d’échec de compilation, demande : compilation\build\unity.log.
+     En cas d’échec de l’API, demande journal_api.log SUR LE SERVEUR (placement
+     expliqué plus bas), pas un fichier supposé dans le dossier joueur.
+
+Ce gabarit illustre un diagnostic AUTH : il ne doit pas imposer un test
+INSCRIPTION, un effacement de log ou un build à chaque changement d’un autre
+sujet. Pour une MAJ documentaire comme celle-ci, le bon « À faire » indique
+qu’aucun build/SQL n’est nécessaire, puis explique comment passer le relais.
+
 ================================================================================
 LIBREVIES — DOSSIER DE REPRISE ACTUEL + HISTORIQUE CONSERVÉ
 Synthèse actualisée le 10/10/2026 (Europe/Paris)
 Dépôt : https://github.com/killdrago/LibreVies
 Branche de cette session : arena/01a0b32c-librevies
-Base distante auditée pour cette synthèse : b70ebb8
+Base distante auditée pour cette synthèse : d55f99f (première passation déjà publiée)
 Dernier commit fonctionnel : 9fee3f8 (jeu 0.5.86, édition/admin NPC)
 Nature de la présente MAJ : documentation uniquement, aucun nouveau build requis.
 ================================================================================
@@ -118,7 +201,7 @@ puis il ouvre jeu/LibreVies.exe. Il ne veut pas une chaîne supplémentaire de
 publication, de copie ou de « dossier compilé » à maintenir.
 
 Consignes durables :
-  - Expliquer les actions utilisateur à la fin de chaque réponse : « À faire ».
+  - Expliquer les actions utilisateur à la fin de CHAQUE réponse : « À faire ».
   - Mettre ce résumé à jour dans chaque commit, y compris si une piste échoue.
   - Travailler sur la branche de la session, pousser uniquement celle-ci.
     Pour cette reprise : arena/01a0b32c-librevies, pas main ni une autre branche.
@@ -788,8 +871,21 @@ G. AVATARS NPC, ERREUR DE COMPILATION ET ADMIN
   9fee3f8 / 0.5.86 : ADMIN exactement droit=1 client ET serveur, save_npc
     transactionnel/protégé, dropdown/modal/validation, villes réelles,
     Garde Nord/Sud et hallebarde au centre de la paume après animation.
-  b70ebb8 : coordonnées d’édition utilisateur après 9fee3f8 ; dernière base
-    distante auditée pour la présente synthèse documentaire.
+  b70ebb8 : coordonnées d’édition utilisateur après 9fee3f8 ; base distante
+    auditée pour la première synthèse documentaire d55f99f.
+
+H. DOSSIER DE PASSATION ET NOUVEAU RAPPEL DES RÈGLES
+  d55f99f : publication du dossier de reprise complet dans resumer.txt :
+    règles prioritaires, 18 sections actuelles, chronologie/incidents, schémas,
+    tests/limites, recette et conservation intégrale de l’archive MAJ 79.
+  Nouvelle demande de l’utilisateur du 10/10/2026 : réaffirmer au TOUT DÉBUT
+    « À faire » à chaque réponse, avec les actions exactes après la MAJ, et
+    mise à jour du résumé dans CHAQUE commit. L’ancien exemple diagnostic
+    4eaae48..e0cdd3a est cité comme modèle de précision.
+  Présent complément : règles renforcées, gabarit détaillé d’un diagnostic
+    inscription avec chemins/logs vérifiés, précautions et message de passation.
+    Aucun changement de code, version, BDD ou ressource ; aucune compilation
+    native ou nouvelle validation visuelle ne découle de cette documentation.
 
 Beaucoup d’autres commits « Edition : met a jour les coordonnees » jalonnent
 cet historique. Ce sont des données utilisateur, pas des commits à écraser ou
@@ -1153,7 +1249,7 @@ POUR LA SEULE PRÉSENTE MAJ DOCUMENTAIRE :
 --------------------------------------------------------------------------------
 
 Sources principales : code et historique Git de killdrago/LibreVies,
-origin/arena/01a0b32c-librevies à b70ebb8 ; dernier fonctionnel 9fee3f8.
+origin/arena/01a0b32c-librevies à d55f99f ; dernier fonctionnel 9fee3f8.
 Ancien resumer.txt : 142577 octets, 2337 lignes, daté 20/09/2026, MAJ 79,
 blob Git d75305096870f6222821c2810dc1d05e03a63c7a. Conservé intégralement ci-dessous.
 
@@ -1173,7 +1269,7 @@ passation. Le résumé ancien était obsolète : cette MAJ ajoute le bloc actuel
 les nouvelles règles, les changements depuis 0.5.79 et les limites de validation,
 sans modifier les sources/binaires de jeu ni relancer un travail déjà poussé.
 
-Contrôles documentaires effectués pour cette MAJ du 10/10/2026 :
+Contrôles de la première actualisation documentaire d55f99f du 10/10/2026 :
   - archive comparée octet par octet au blob Git historique : inchangée ;
   - 54 références de commits vérifiées dans l’historique ;
   - 32 chemins de sources/documentation vérifiés dans l’arbre distant ;
@@ -1185,6 +1281,38 @@ Contrôles documentaires effectués pour cette MAJ du 10/10/2026 :
   - règles prioritaires et absence de secrets détectables contrôlées ;
   - commit limité à resumer.txt : aucun autre changement du worktree à publier ;
   - aucun nouveau build natif ni réimport SQL réalisé pour cette documentation.
+
+COMPLÉMENT DU 10/10/2026 APRÈS LE RAPPEL UTILISATEUR
+  - Le contenu complet publié dans d55f99f et l’archive historique sont conservés.
+  - Les règles de conclusion « À faire » et de mise à jour à chaque commit sont
+    renforcées en tête, avec le niveau de précision demandé par l’utilisateur.
+  - Le gabarit du diagnostic d’inscription est adapté au code actuel : bonnes
+    commandes, vrai chemin du journal et libellés présents ; aucun ancien commit
+    à récupérer, aucun journal à supprimer pour cette MAJ documentaire.
+  - Aucun changement du jeu, serveur, BDD, coordonnées ou ressources MakeHuman.
+  - Contrôles documentaires réussis : archive inchangée octet par octet,
+    18 sections de reprise conservées, 55 références de commits, 32 chemins de
+    sources et les six libellés auth vérifiés ; aucun secret détecté par le scan.
+  - Diff/index limités à resumer.txt avant commit. Les autres changements
+    préexistants du worktree ne font pas partie de cette demande.
+  - Aucun build Unity/Windows ni test sur la BDD réelle relancé pour cette doc.
+
+MESSAGE DE PASSATION PRÊT À COPIER À UNE NOUVELLE IA
+
+  Tu reprends mon projet LibreVies : https://github.com/killdrago/LibreVies.
+  La branche de cette session est arena/01a0b32c-librevies.
+  Lis d’abord les règles en tête et le bloc actuel de resumer.txt sur GitHub,
+  puis vérifie les sources et l’historique avant de continuer. L’archive à la
+  fin sert au contexte ancien ; elle ne remplace pas les décisions récentes.
+  Je veux continuer sur les acquis, pas recommencer le projet ni une ancienne
+  chaîne de publication : tu pousses les corrections, mon build télécharge les
+  sources et compile dans jeu, puis je lance jeu\LibreVies.exe.
+  Garde EasyPHP/API/BDD, config.php et mes coordonnées ; ne recrée pas jeucompiler.
+  Distingue toujours tests statiques, build natif et validation réellement vue.
+  Termine CHAQUE réponse par **À faire**, avec toutes mes manipulations exactes
+  après ta MAJ, commandes, chemins, tests, résultats attendus, logs et précautions.
+  Mets resumer.txt à jour dans CHAQUE commit, dans le même commit que tes changements.
+  Après lecture, reprends ma prochaine demande sans refaire des travaux déjà livrés.
 
 FIN DU BLOC ACTUEL — LES CONSIGNES EN TÊTE RESTENT PRIORITAIRES.
 
