@@ -1,3 +1,1203 @@
+RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
+
+1. CHAQUE RÉPONSE FINALE DOIT SE TERMINER PAR UNE SECTION « À faire ».
+   Elle doit énumérer TOUT ce que l’utilisateur doit encore exécuter après la
+   mise à jour : fermer les programmes, build éventuel, chemins et commandes,
+   relance, tests attendus, logs à transmettre et précautions. Ne jamais
+   supposer qu’une manipulation manuelle est évidente. Si aucune action
+   technique n’est nécessaire, le dire explicitement dans cette section.
+   Aucun texte ne doit être ajouté après cette section dans la réponse finale.
+
+2. resumer.txt DOIT ÊTRE MIS À JOUR DANS CHAQUE COMMIT.
+   Cela vaut pour les fonctionnalités, corrections, documentation et changements
+   de workflow. Consigner la demande, les fichiers concernés, le résultat réel,
+   les incidents/résolutions, versions, tests effectués, limites et prochaines
+   étapes. Inclure cette mise à jour dans LE MÊME commit que le changement,
+   pas dans un hypothétique commit ultérieur. Un test statique vert ne permet
+   jamais d’écrire « compilation Unity validée ».
+   Attention : les anciens commits automatiques « Edition : met a jour les
+   coordonnees » n’actualisent pas automatiquement ce fichier. Cette nouvelle
+   obligation est ici documentée ; aucun hook ni automatisme de résumé n’est
+   ajouté par la présente MAJ documentaire. Il faudra traiter explicitement
+   ce point si ce mécanisme automatique de commit est modifié/utilisé à nouveau.
+
+3. LE WORKFLOW ACTUEL EST : GIT -> BUILD -> jeu -> jeu/LibreVies.exe.
+   L’IA pousse les sources sur GitHub ; l’utilisateur lance le build qui les
+   télécharge puis compile dans jeu. NE PLUS gérer, recréer ou publier dans
+   jeucompiler : l’utilisateur a expressément rejeté ce circuit et supprimé
+   ce dossier sur GitHub. Le transfert futur vers un hébergement HTTP EasyPHP
+   sera manuel et n’est pas un chantier à relancer sans nouvelle demande.
+
+4. CE BLOC ACTUEL FAIT FOI. L’ancienne synthèse est conservée en fin de fichier
+   comme ARCHIVE HISTORIQUE NON NORMATIVE, pour ne pas perdre les demandes et
+   incidents du début. Ses anciennes consignes de publication, versions,
+   chemins, manifestes et tâches ne remplacent pas les décisions ci-dessus.
+
+================================================================================
+LIBREVIES — DOSSIER DE REPRISE ACTUEL + HISTORIQUE CONSERVÉ
+Synthèse actualisée le 10/10/2026 (Europe/Paris)
+Dépôt : https://github.com/killdrago/LibreVies
+Branche de cette session : arena/01a0b32c-librevies
+Base distante auditée pour cette synthèse : b70ebb8
+Dernier commit fonctionnel : 9fee3f8 (jeu 0.5.86, édition/admin NPC)
+Nature de la présente MAJ : documentation uniquement, aucun nouveau build requis.
+================================================================================
+
+SOMMAIRE DU BLOC ACTUEL
+  01. Reprendre immédiatement : état réel, preuves et priorités
+  02. Manière de travailler et contraintes de l’utilisateur
+  03. Circuit Git -> téléchargement/build -> jeu
+  04. Carte des dossiers et fichiers
+  05. Serveur local EasyPHP / Apache / PHP / MySQL / phpMyAdmin
+  06. Schémas SQL et inscription transactionnelle
+  07. Identité, API, sessions et Autolog chiffré
+  08. Personnage joueur et créateur chez le NPC Esthétique
+  09. NPC humains, profils persistants et reconstruction MakeHuman
+  10. ADMIN, édition NPC, villes et armes des gardes (0.5.86)
+  11. Réglages visuels validés à préserver
+  12. Chronologie depuis le début et références des commits
+  13. Incidents : symptômes, causes, solutions et fausses pistes
+  14. Tests effectués, commandes de recette et limites réelles
+  15. Diagnostics : logs, erreurs et contrôles utiles
+  16. Précautions Git et mise à jour du résumé à chaque commit
+  17. Travail restant et recette utilisateur détaillée
+  18. Références documentaires et portée de cette synthèse
+  Puis : archive intégrale de l’ancien resumer.txt (jusqu’à MAJ 79).
+
+--------------------------------------------------------------------------------
+01. REPRENDRE IMMÉDIATEMENT : ÉTAT RÉEL, PREUVES ET PRIORITÉS
+--------------------------------------------------------------------------------
+
+Versions dans les sources actuelles :
+  - LibreViesGame.cs / constante VersionJeu : 0.5.86.
+  - ProjectSettings.asset / bundleVersion : 0.5.86.
+  - jeu/launcher.pyw / LOCAL_GAME_VERSION : 0.5.86.
+  - Launcher : 4.2.2.
+  - Projet et dernier log utilisateur : Unity 6000.6.1f1, Windows.
+
+ATTENTION AUX TROIS NIVEAUX DE PREUVE :
+  A. Les sources et recettes automatisées correspondent à 0.5.86.
+  B. Le dernier retour VISUEL natif connu est une capture du jeu 0.5.85 :
+     avatars humains et pseudo visibles ; les gardes tenaient mal leurs armes.
+  C. Le nouveau build natif après le correctif FindBone, l’ADMIN 0.5.86,
+     l’édition NPC et la nouvelle prise de hallebarde ne sont PAS encore
+     confirmés visuellement dans les échanges conservés. Ne pas les déclarer
+     validés sur Windows simplement parce que les tests de code passent.
+
+Le dernier incident de compilation réellement rapporté était :
+  AdminHumanCreator.cs(148,59) : CS1061, HumanPreview.FindBone absent.
+  Corrigé dans 386bb30 : la méthode a réellement été ajoutée à la classe
+  imbriquée HumanPreview. Ce correctif n’est pas une preuve de recompilation
+  native réussie ; il faut le prochain log du poste utilisateur pour cela.
+
+Priorité de reprise si l’utilisateur continue sur les derniers changements :
+  1) Faire compiler les dernières sources via compilation/build_launcher.bat.
+  2) Vérifier que le jeu affiché est réellement 0.5.86 et launcher 4.2.2.
+  3) Contrôler ADMIN pour droit=0/1, édition/persistance des NPC et armes.
+  4) Ne corriger que les régressions constatées, sans retoucher MakeHuman,
+     poses, rendu, coordonnées ou gameplay déjà acceptés sans demande.
+
+Ce fichier n’est pas une nouvelle fonctionnalité : une simple lecture ou cette
+MAJ documentaire n’impose ni réimport SQL, ni rebuild, ni réinstallation PHP.
+Le build 0.5.86 reste nécessaire seulement si les derniers changements de code
+n’ont pas encore été compilés/testés sur le poste de l’utilisateur.
+
+Le fichier source jeu/version_url.json annonce encore honnêtement
+  game_version=0.5.79, launcher_version=4.2.2, mode_local=true.
+Ce n’est PAS une preuve que le nouvel exécutable est 0.5.79 ou 0.5.86. Le build
+écrit le manifeste local à partir du binaire effectivement compilé et vérifié.
+Ne jamais transformer un ancien jeu en 0.5.86 en changeant uniquement ce JSON.
+
+--------------------------------------------------------------------------------
+02. MANIÈRE DE TRAVAILLER ET CONTRAINTES DE L’UTILISATEUR
+--------------------------------------------------------------------------------
+
+L’utilisateur préfère un circuit très simple : l’IA fait les corrections et
+les pousse ; il lance son build, qui télécharge les sources, compile dans jeu,
+puis il ouvre jeu/LibreVies.exe. Il ne veut pas une chaîne supplémentaire de
+publication, de copie ou de « dossier compilé » à maintenir.
+
+Consignes durables :
+  - Expliquer les actions utilisateur à la fin de chaque réponse : « À faire ».
+  - Mettre ce résumé à jour dans chaque commit, y compris si une piste échoue.
+  - Travailler sur la branche de la session, pousser uniquement celle-ci.
+    Pour cette reprise : arena/01a0b32c-librevies, pas main ni une autre branche.
+  - Ne pas utiliser git add . ; sélectionner explicitement les fichiers utiles.
+  - Ne pas ajouter les fichiers non suivis sans rapport ni le dossier
+    user-worktree-backup-20261004/.
+  - Préserver les changements locaux et les commits de coordonnées utilisateur.
+  - Ne pas recréer jeucompiler, supprimé par l’utilisateur (964648e).
+  - Ne pas modifier les ressources MakeHuman ou les réglages visuels/gameplay
+    déjà validés sans nouvelle demande.
+  - Un seul paquet serveur public : jeu/serveur. Pas de copies serveur parallèles.
+  - Le vrai config.php ne doit jamais être versionné, distribué ou écrasé.
+  - Utiliser l’API PHP/BDD pour les comptes ; aucun MySQL direct dans le launcher.
+  - Conserver l’URL locale http://localhost/serveur/api.php.
+  - Ne pas demander à l’utilisateur de récupérer manuellement des vieux fichiers
+    serveur depuis un autre environnement : les sources sont dans le projet et
+    le build synchronise ce qui est nécessaire vers la racine web locale.
+  - Autolog uniquement chiffré et local dans GAME_DIR, jamais en clair ni dans
+    version_url.json. Une case décochée supprime les formats ancien et nouveau.
+  - Inscription : membre.valider=0 et membre.droit=0 ; aucun email actuellement,
+    aucune interdiction de connexion pour valider=0 pendant le développement.
+  - Personnage initial : même ID que membre, default=1 ; TOUT le reste NULL,
+    notamment aucun sexe homme imposé et aucun profil prérempli.
+  - Un personnage par compte. default=0 signifie profil personnalisé de la
+    même ligne, pas une liste de plusieurs personnages.
+  - Classement : même ID que membre, experience/chasse/territoire initialisés à 0.
+  - Créateur JOUEUR uniquement via le NPC Esthétique, pas via ADMIN.
+  - Nouvelle demande distincte : ADMIN peut modifier l’esthétique des NPC,
+    exclusivement si membre.droit vaut exactement 1.
+  - npc : identifiant texte (maire, etc.), mêmes réglages que personnage,
+    aucune colonne default et aucun lien membre.id pour ces NPC.
+  - Tous les humains actuels, y compris les deux gardes, doivent utiliser les
+    avatars MakeHuman sauvegardés, pas le vieux personnage primitif.
+  - Poignées : la dernière demande remplace « gauche » par « droite ».
+    Ronds blancs, mi-hauteur, petite marge au bord, diamètre du nez du maire.
+  - Pseudo : vrai pseudo du compte au-dessus de la tête, taille divisée par 4 ;
+    rehaussé de 20 cm puis redescendu de 10 cm (réglage final décrit plus bas).
+  - Nettoyer les SQL obsolètes du paquet serveur, pas effacer les données BDD.
+  - ADMIN masqué sauf droit=1 ; NPC via dropdown, modification et validation
+    en BDD ; gardes nommés Nord/Sud ; barre des villes réelle et non fictive.
+
+Toujours distinguer : « code ajouté », « tests automatisés réussis »,
+« build natif réussi », « résultat observé par l’utilisateur ». Demander les
+logs/captures ciblés si la preuve manque, pas des secrets ni un dump complet.
+
+--------------------------------------------------------------------------------
+03. CIRCUIT GIT -> TÉLÉCHARGEMENT/BUILD -> JEU
+--------------------------------------------------------------------------------
+
+CIRCUIT ACTIF :
+  IA : modification des sources + tests + resumer.txt + commit + push GitHub.
+  Utilisateur Windows : ferme le jeu/launcher -> lance le build -> ouvre le jeu.
+
+Depuis la racine du projet, commande Windows habituelle :
+  compilation\build_launcher.bat
+Puis :
+  jeu\LibreVies.exe
+
+Le build principal :
+  - lit la branche configurée et récupère ses sources depuis GitHub ;
+  - préserve/sauvegarde les données locales prévues par le workflow, dont les
+    coordonnées d’édition, et peut publier les coordonnées avant synchronisation ;
+  - synchronise les sources différentiellement par blob SHA et commit immuable,
+    pas en mélangeant des téléchargements provenant de HEAD différents ;
+  - remet le projet Unity à jour, évitant de recompiler silencieusement l’ancien ;
+  - compile le jeu Unity Windows en Mono ;
+  - vérifie l’export temporaire AVANT de remplacer le jeu installé ;
+  - prépare jeu/game et les informations locales de version ;
+  - synchronise jeu/serveur vers la racine web EasyPHP/Apache détectée, sans
+    remplacer config.php ni exécuter les SQL ;
+  - conserve le créateur autonome compilation/personnage comme outil séparé ;
+  - n’a plus de publication finale obligatoire vers jeucompiler.
+
+compilation/build_unity_game.bat existe comme build/diagnostic local :
+  il ne télécharge pas les nouvelles sources. Pour une MAJ poussée par l’IA,
+  le point d’entrée normal reste build_launcher.bat.
+
+Le synchroniseur actuel télécharge les préfixes compilation/ et jeu/ : il ne
+rafraîchit pas automatiquement resumer.txt à la racine du poste Windows.
+Pour une passation, lire la version du résumé sur la branche GitHub actuelle,
+pas supposer qu’une copie locale ancienne a été mise à jour par le build.
+
+Validation contre le problème « ancien jeu lancé malgré nouveau code » :
+  - LibreViesBuild.cs compare la constante des sources, les scripts réellement
+    chargés dans l’éditeur (réflexion) et bundleVersion ;
+  - l’export vérifie l’assembly Mono, sa version et les méthodes attendues ;
+  - le build Unity crée game/version_jeu.json avec version et SHA256 d’assembly ;
+  - preparer_jeu_local.py contrôle sources, exécutable, assembly, méthodes,
+    marqueur et SHA256 ; --verifier-seulement permet de refuser un export avant
+    remplacement ;
+  - le préparateur écrit les fichiers locaux de manifeste/état atomiquement
+    avec la version réellement compilée, pas une simple étiquette inventée.
+
+mode_local=true signifie que le launcher lance le build vérifié présent dans
+jeu/game et ne le remplace plus par d’anciens binaires téléchargés sur HTTP.
+Cela NE coupe PAS l’authentification PHP ni les lectures/sauvegardes BDD.
+Le launcher reste en deux morceaux : amorce LibreVies.exe + logique launcher.pyw.
+Une modification de launcher.pyw n’oblige pas normalement à recompiler l’amorce.
+Si un nouvel import doit être embarqué, vérifier compilation/amorce : l’amorce
+ancienne ne devine pas un module chargé dynamiquement dans launcher.pyw.
+
+Ne jamais supprimer ni réinitialiser la BDD, Autolog, config.php ou les
+coordonnées pour « forcer une MAJ ». Ni le préparateur ni le synchroniseur
+serveur ne sont des outils de migration destructive.
+
+--------------------------------------------------------------------------------
+04. CARTE DES DOSSIERS ET FICHIERS
+--------------------------------------------------------------------------------
+
+Racine du checkout de cette session : /home/user/LibreVies.
+Les chemins ci-dessous sont relatifs à la racine ; sous Windows remplacer / par \.
+
+resumer.txt
+  Dossier de passation : bloc actuel en tête, ancienne archive en fin.
+README.md
+  Vue d’ensemble du projet ; vérifier le code actuel si une documentation est
+  en retard sur le workflow local.
+
+compilation/build_launcher.bat
+  Point d’entrée complet téléchargement/build sur le poste utilisateur.
+compilation/build_unity_game.bat
+  Build Unity depuis les sources locales, sans télécharger la dernière MAJ.
+compilation/outils/synchroniser_sources.ps1
+  Synchronisation différentielle des sources ; préfixes compilation et jeu.
+compilation/outils/preparer_jeu_local.py
+  Vérification d’export/version/assembly/SHA256 et préparation locale atomique.
+compilation/outils/synchroniser_serveur_local.ps1
+  Synchronisation du paquet PHP vers le serveur local ; config.php protégé.
+compilation/outils/fixtures/npc_profiles_fixture.sql
+  Ancien SQL de tirage des six NPC, déplacé en fixture de recette ; hors serveur.
+compilation/amorce/amorce_launcher.py
+  Amorce PyInstaller : embarque les modules et exécute launcher.pyw.
+compilation/personnage/
+  Créateur humain autonome séparé ; ne pas le confondre avec le panel en jeu.
+
+compilation/unity/Assets/Scripts/LibreViesGame.cs
+  Monde, joueur, NPC, interaction Esthétique, pseudo, portes, ADMIN, villes,
+  reconstruction des humains et synchronisation des armes.
+compilation/unity/Assets/Scripts/AdminHumanCreator.cs
+  Créateur MakeHuman, aperçu/rig, application du profil ; HumanPreview.FindBone.
+compilation/unity/Assets/Scripts/LibreViesCompte.cs
+  Session RAM, identité du membre, HTTP personnage/NPC, permission admin.
+compilation/unity/Assets/Scripts/LibreViesPersonnage.cs
+  Profil transportable, 13 sliders et mapping des colonnes SQL/catalogues.
+compilation/unity/Assets/Scripts/LibreViesNpc.cs (+ .meta)
+  DTO NPC à ID texte ; adaptation vers le profil humain sans default SQL.
+compilation/unity/Assets/Editor/LibreViesBuild.cs
+  Build Mono Windows, contrôles de cohérence et marqueur du jeu exporté.
+compilation/unity/ProjectSettings/ProjectSettings.asset
+  bundleVersion actuelle 0.5.86.
+compilation/unity/ProjectSettings/ProjectVersion.txt
+  Éditeur 6000.6.1f1.
+compilation/unity/Assets/Resources/LVShaders/
+  Shaders de secours/texte, dont la gestion de profondeur de façade.
+
+jeu/LibreVies.exe
+  Amorce utilisateur ; le jeu est lancé depuis le launcher authentifié.
+jeu/launcher.pyw
+  Launcher 4.2.2, jeu attendu 0.5.86, connexion, UI, Autolog DPAPI, mode local.
+jeu/auth_config.json
+  URL API locale http://localhost/serveur/api.php, timeout de configuration.
+jeu/version_url.json
+  Manifeste public/local ; ne contient ni compte, ni mot de passe, ni jeton.
+jeu/etat_jeu.json
+  État généré localement, ignoré par Git.
+jeu/autolog.dat
+  Données Autolog chiffrées locales ; jamais versionnées.
+jeu/edition/coordonee
+  Coordonnées d’édition utilisateur, fichier chiffré ; PRESERVER.
+jeu/game/
+  Jeu natif compilé, données Unity et marqueur version_jeu.json.
+jeu/serveur/
+  UNIQUE source du paquet serveur PHP/SQL public (voir sections 05/06).
+
+Logs :
+  jeu/journal_auth.log
+  compilation/build/unity.log
+  jeu/game/logs/LibreVies.log
+  jeu/game/logs/LibreViesRuntime.log
+  journal_api.log sur le poste serveur (placement expliqué en section 15).
+
+Les scratchs/dépendances/tests temporaires de l’IA restent dans des emplacements
+ignorés, notamment compilation/build/arena-* ; ne pas commiter leurs contenus.
+Préserver les .meta des ressources Unity et leurs GUID, pas de régénération massive.
+
+--------------------------------------------------------------------------------
+05. SERVEUR LOCAL EASYPHP / APACHE / PHP / MYSQL / PHPMYADMIN
+--------------------------------------------------------------------------------
+
+Pile indiquée par l’utilisateur :
+  Windows 10 x64, PHP 8.3.3, phpMyAdmin 5.2.3, Apache 2.4.43.
+L’API continue à utiliser PHP/PDO/MySQL ; phpMyAdmin n’est que l’outil de gestion.
+
+Adresse locale contractuelle :
+  http://localhost/serveur/api.php
+Vérification non destructive :
+  http://localhost/serveur/api.php?action=health
+
+Paquet public actuel : 10 fichiers sous jeu/serveur :
+  README.md, api.php, securite.php, personnage.php, npc.php,
+  config.php.example, membre.sql, personnage.sql, classement.sql, npc.sql.
+
+Sur le serveur réel, config.php est créé/configuré localement depuis l’exemple
+si installation neuve. Une configuration existante doit être conservée.
+Aucun identifiant BDD réel ne doit entrer dans Git, les manifestes ou ce résumé.
+
+Synchronisation autonome, depuis la racine du projet Windows :
+  powershell -NoProfile -ExecutionPolicy Bypass -File compilation\outils\synchroniser_serveur_local.ps1
+Le build principal l’appelle déjà : pas besoin d’en faire une action manuelle
+systématique si la sortie du build confirme la copie vers le bon serveur.
+
+Détection : Apache/EasyPHP/XAMPP/WAMP, ou variable LIBREVIES_WEB_ROOT.
+Cette variable désigne la RACINE WEB, pas le sous-dossier serveur.
+Si le chemin n’est pas détecté ou si plusieurs racines sont possibles, ne pas
+copier au hasard. Seulement dans ce cas, définir dans la même fenêtre cmd :
+  set "LIBREVIES_WEB_ROOT=<chemin réel de la racine web EasyPHP>"
+puis relancer le build/synchroniseur. Remplacer le texte entre chevrons par le
+vrai chemin du poste ; ne pas inventer un emplacement EasyPHP.
+
+Le synchroniseur :
+  - copie les helpers avant api.php, compare les empreintes des fichiers ;
+  - ne remplace JAMAIS config.php ;
+  - ne touche pas aux fichiers locaux inconnus ;
+  - n’importe AUCUN SQL, ne supprime aucune table/donnée ;
+  - retire seulement les anciennes copies publiques connues :
+    ajouter_droit.sql, remplir_npc.sql, mettre_a_jour_personnage.sql,
+    corriger_membre.sql.
+
+Ces quatre SQL ont été retirés de jeu/serveur. Le seed NPC reste uniquement en
+fixture de test, pas dans le paquet à déposer chez l’hébergeur.
+Ne pas demander à l’utilisateur de réimporter ces scripts supprimés.
+
+Vérifications de configuration si l’API ne répond pas :
+  - démarrer Apache et MySQL dans EasyPHP ;
+  - utiliser le PHP réellement chargé par Apache, pas seulement celui du PATH ;
+  - activer pdo_mysql et garantir l’écriture des sessions PHP ;
+  - architectures/module Apache/PHP cohérents (TS pour module Apache,
+    NTS généralement pour FastCGI) ;
+  - config.php pointe vers la base/table actuelle et le compte MySQL local ;
+  - consulter journal_api.log et les logs Apache/PHP, sans publier les secrets.
+
+PHP 8.3 possède random_bytes nativement : OpenSSL n’est pas requis pour les
+jetons de notre API dans cette version. phpMyAdmin a ses propres dépendances
+(mysqli/OpenSSL, entre autres). Son manifeste officiel 5.2.3 accepte
+PHP ^7.2.5 || ^8.0 : ne pas attribuer un incident jeu à une incompatibilité
+imaginaire phpMyAdmin/PHP 8.3.
+
+Pas de changement de PHP/Apache/Unity/licence demandé pour le correctif actuel.
+Pour une exposition Internet future : HTTPS, debug=false, versions maintenues,
+MySQL/phpMyAdmin non exposés publiquement. HTTP localhost reste le choix de
+travail local explicite ; ne pas le remplacer sans demande.
+
+--------------------------------------------------------------------------------
+06. SCHÉMAS SQL ET INSCRIPTION TRANSACTIONNELLE
+--------------------------------------------------------------------------------
+
+Base des scripts : librevies, InnoDB, utf8mb4/utf8mb4_unicode_ci.
+Les fichiers SQL actuels décrivent une installation neuve ; CREATE TABLE IF
+NOT EXISTS ne transforme pas magiquement une ancienne table incompatible.
+Sur une installation neuve, importer membre.sql avant personnage.sql/classement.sql,
+puis npc.sql ; aucun de ces schémas ne fournit les profils NPC complets.
+Pour une base existante, examiner son schéma et les données avant toute
+migration ; faire une sauvegarde. Aucun DROP/recréation/réimport inutile.
+
+membre (jeu/serveur/membre.sql) :
+  id INT UNSIGNED AUTO_INCREMENT, PK ;
+  pseudo VARCHAR(50) NOT NULL UNIQUE ;
+  motdepasse VARCHAR(255) NOT NULL (hash, jamais mot de passe en clair) ;
+  email VARCHAR(254) NOT NULL UNIQUE ;
+  valider TINYINT(1) NOT NULL DEFAULT 0 ;
+  droit TINYINT UNSIGNED NOT NULL DEFAULT 0.
+
+personnage (jeu/serveur/personnage.sql) :
+  id INT UNSIGNED, PK et FK vers membre.id, cascades update/delete ;
+  default TINYINT(1) NOT NULL DEFAULT 1 ;
+  sexe ENUM('homme','femme') NULL ;
+  13 colonnes DECIMAL(10,4) NULL :
+    tete, yeux, nez, bouche, oreilles, seins, volume, hanche, ventre,
+    largeur_bras, longueur_bras, hauteur_jambe, pieds ;
+  teinte_peau VARCHAR(32) NULL ;
+  coiffure, chaussures, chapeau, tenue VARCHAR(100) NULL ;
+  objets TEXT NULL.
+  Toutes les colonnes autres que id/default restent NULL à l’inscription.
+
+classement (jeu/serveur/classement.sql) :
+  id INT UNSIGNED, PK/FK vers membre.id ;
+  experience BIGINT UNSIGNED NOT NULL DEFAULT 0 ;
+  chasse BIGINT UNSIGNED NOT NULL DEFAULT 0 ;
+  territoire BIGINT UNSIGNED NOT NULL DEFAULT 0.
+  Le script complète seulement les membres sans classement via INSERT IGNORE
+  et LEFT JOIN ; il ne remet pas à zéro les scores existants.
+
+npc (jeu/serveur/npc.sql) :
+  id VARCHAR(100), PK (texte comme 'maire') ;
+  exactement les mêmes champs de personnalisation que personnage ;
+  AUCUNE colonne default, AUCUNE FK vers membre ;
+  champs de personnalisation NULL tant que non renseignés.
+  21 colonnes au total, ID compris ; personnage en a 22 avec default.
+  Ni métier, ville, coordonnées ni accessoires runtime ne sont stockés dans
+  les colonnes de personnalisation ajoutées ici.
+
+INSCRIPTION ACTUELLE : UNE TRANSACTION POUR LES TROIS LIGNES
+  1) INSERT membre avec valider=0 et droit=0.
+  2) Récupération du nouvel ID canonique de membre.
+  3) INSERT personnage au même ID, default=1, tous les autres champs NULL.
+  4) INSERT classement au même ID, experience=0, chasse=0, territoire=0.
+  5) COMMIT seulement si tout réussit, sinon ROLLBACK.
+
+Les doublons pseudo/email sont vérifiés avec des requêtes SQL préparées et
+la collation de MySQL. Le traitement 1062 ne doit appeler « doublon de membre »
+que ce cas précis, pas masquer une erreur d’insertion personnage/classement.
+La demande initiale sans classement a été remplacée par la demande explicite
+ultérieure d’ajouter cette table et les trois scores à 0.
+
+Email : aucun envoi et aucun flux de validation email implémentés actuellement.
+valider=0 est normal et permet la connexion. Ne pas activer par défaut une
+option require_email_validation qui bloquerait les comptes de développement.
+
+Le panneau « Votre classement » remplace l’inscription après connexion, avec
+Experience/Chasse/Territoire. ATTENTION : la table et son initialisation sont
+faites, mais le launcher n’est PAS déjà un classement live complet : ses pages
+publiques affichent encore « Aucune donnee pour le moment ». Pas de nouveau
+contrat API de classement temps réel livré dans les derniers changements.
+
+--------------------------------------------------------------------------------
+07. IDENTITÉ, API, SESSIONS ET AUTOLOG CHIFFRÉ
+--------------------------------------------------------------------------------
+
+Le launcher ne fait jamais de SQL. Les comptes passent par api.php, qui vérifie
+la BDD avec PDO et password_verify. Les bcrypt existants restent valables ;
+les nouveaux hashes utilisent Argon2id si disponible, sinon le mécanisme fort
+supporté par PHP. Pas de conversion des mots de passe existants en clair.
+
+Réponse type API : ok, message et données métier (membre/personnage/npcs/session
+selon action). Formulaire POST classique ou JSON accepté côté API ; Unity
+transporte le profil en JSON dans un POST formulaire. JSON de TRANSPORT ne
+signifie pas colonnes JSON supplémentaires en BDD.
+
+Actions utiles :
+  health               diagnostic serveur/BDD non destructif ;
+  register             création transactionnelle membre/personnage/classement ;
+  registration_status  vérification après inscription via pseudo + email ;
+  login                vérifie pseudo/password et fournit session + identité ;
+  get_character        session_token -> identité et profil joueur ;
+  save_character       session_token + personnage -> profil enregistré/relu ;
+  get_npcs             session_token -> les six profils humains ;
+  save_npc             session_token + npc_id + personnage, droit BDD EXACTEMENT 1.
+
+Règle de sécurité : ID, pseudo ou droit envoyés par un client ne sont JAMAIS
+une preuve d’identité/permission. PHP relit le membre depuis la session et la
+BDD à chaque requête authentifiée. Le pseudo Unity vient de cette identité,
+pas d’un champ libre local. Modifier le client ne confère pas le droit admin.
+
+Session :
+  - jeton opaque de 32 octets cryptographiques, 64 caractères hex, 256 bits ;
+  - expiration 24 h, renouvelé à chaque connexion ;
+  - sessions PHP strictes, sans cookies ni jeton dans une URL ;
+  - jeton seulement en RAM du launcher puis dans l’environnement du processus
+    du jeu (LIBREVIES_SESSION_TOKEN, URL via LIBREVIES_API_URL) ;
+  - Unity efface la variable jeton de son environnement après lecture et garde
+    la session en RAM ; le singleton compte survit à un rechargement de scène ;
+  - pas de fichier de session, pas de jeton dans Autolog/manifeste/logs.
+
+Génération (securite.php) : random_bytes sur PHP moderne ; compatibilité ancienne
+par OpenSSL fort, puis /dev/urandom Unix ou Windows .NET via PowerShell si
+proc_open est autorisé. L’ancien poste PHP 5.6 sans OpenSSL bloquait la création
+sécurisée des sessions ; 0062706 a ajouté le fallback Windows cryptographique.
+JAMAIS rand/mt_rand/uniqid/microtime comme générateur de jetons. Si aucune source
+forte n’est possible, refuser proprement plutôt que fabriquer un jeton faible.
+
+Statuts :
+  400 : profil/valeur/ID refusé ;
+  401 : session absente/expirée/invalide (Unity réinitialise l’identité) ;
+  403 : sauvegarde NPC interdite (Unity retire le droit admin local) ;
+  409 : doublon de compte ou profil NPC absent/incomplet selon action ;
+  500/503 : incident BDD/serveur (consulter le log, pas réinitialiser les tables).
+
+AUTOLOG :
+  - jeu/autolog.dat dans GAME_DIR, chiffré Windows DPAPI ;
+  - le JSON historique en clair est migré puis supprimé ;
+  - décocher Autolog efface les deux formats ;
+  - aucune donnée Autolog dans version_url.json ou sur GitHub ;
+  - jamais de mot de passe ni jeton journalisé ;
+  - ne pas revenir à « simple encodage » base64 ou à du JSON plaintext.
+
+Inscription et UI launcher : une requête register vérifie les doublons et
+insère ; ensuite registration_status vérifie jusqu’à dix fois, environ une
+seconde entre essais. On ne rajoute pas un appel de précontrôle qui bloquerait
+le retour UI. Les résultats passent par une file interne et sont traités dans
+le thread principal Tk, pas dans le worker réseau. L’import queue ajouté puis
+retiré évite de dépendre d’une nouvelle amorce embarquant ce module.
+
+Le bouton Jouer du launcher exige une connexion réussie ; mode local ne signifie
+pas compte invité ni droit administrateur sans identité.
+
+Après connexion : Bonjour <pseudo>, champs/titres Pseudo/Connexion/Mot de passe
+masqués et inscription remplacée par le panneau de classement ; Autolog reste
+visible. Une erreur doit revenir clairement dans la barre, pas rester figée.
+Les redémarrages PyInstaller onefile ont été isolés avec nouvelle extraction/
+PYINSTALLER_RESET_ENVIRONMENT=1 et fermeture des handles, pour ne pas dépendre
+d’un ancien dossier temporaire _MEI déjà supprimé ou verrouillé.
+
+--------------------------------------------------------------------------------
+08. PERSONNAGE JOUEUR ET CRÉATEUR CHEZ LE NPC ESTHÉTIQUE
+--------------------------------------------------------------------------------
+
+Le profil est chargé depuis PHP après authentification. default=1 conserve le
+personnage de base. Le joueur doit aller au NPC Esthétique pour personnaliser
+et valider ; ce panel a été retiré du parcours ADMIN joueur.
+
+Tous les réglages utilisent la même ligne personnage.id = membre.id.
+VALIDER / ENREGISTRER -> save_character -> transaction et relecture BDD ->
+application du profil serveur confirmé avec default=0. Annuler/fermer n’écrit
+rien. Un refus réseau/serveur garde le brouillon et l’avatar actuel.
+
+Mapping complet des 13 sliders :
+  SQL                 Createur
+  tete                headShape
+  yeux                eyesShape
+  nez                 noseShape
+  bouche              mouthShape
+  oreilles            earsShape
+  seins               chestShape
+  volume              legThickness
+  hanche              hipShape
+  ventre              belly
+  largeur_bras        armThickness
+  longueur_bras       armLength
+  hauteur_jambe       legLength
+  pieds               feetSize
+
+Valeurs internes 0 à 5, affichage du panel 0 à 500, quatre décimales SQL.
+Ne pas remplacer ces 13 colonnes par sliders JSON ni ajouter cree_le/modifie_le.
+
+Choix persistés par ID du catalogue (pas par indice du dropdown) :
+  sexe homme/femme ; peau IDs 0..6 ; coiffures catalogue MakeHuman ;
+  tenues homme/femme ; chapeau NULL ou fedora01 ;
+  chaussures NULL ou shoes01..shoes06.
+« Aucun » doit rester NULL pour chapeau/chaussures. objets TEXT est préservé,
+le créateur ne l’écrase pas sous prétexte qu’il ne le gère pas encore.
+
+AdminHumanCreator.ApplyTo sert maintenant aussi à reconstruire un humain sur
+un root existant. Le créateur autonome dans compilation/personnage est un autre
+outil : modifier seulement celui-ci ne mettrait pas à jour le salon en jeu.
+
+--------------------------------------------------------------------------------
+09. NPC HUMAINS, PROFILS PERSISTANTS ET RECONSTRUCTION MAKEHUMAN
+--------------------------------------------------------------------------------
+
+Six ID contractuels actuels :
+  maire, forgeron, marchand, esthetique, garde_nord, garde_sud.
+
+Les profils ont été tirés aléatoirement une fois et enregistrés en BDD, puis
+get_npcs les charge/reconstruit avec le même créateur MakeHuman que le joueur.
+Ils ne sont PAS rerandomisés à chaque connexion. Les tables ne doivent pas
+être réensemencées à chaque build/import/API. Les anciennes formes primitives
+ne sont plus le rendu attendu des humains du village.
+
+Historique du seed : le SQL ponctuel remplir_npc.sql existait dans ac40541,
+puis a été retiré du paquet serveur dans 386bb30 à la demande de l’utilisateur.
+Il est maintenant seulement sous :
+  compilation/outils/fixtures/npc_profiles_fixture.sql
+C’est une fixture hors serveur, jamais importée automatiquement. Une table npc
+vide/incomplète n’est pas automatiquement remplie par le build actuel ; traiter
+ce cas explicitement et conserver les profils déjà existants.
+
+Le DTO LibreViesNpc porte l’ID texte et les réglages. Son adaptateur de profil
+utilise un default=0 EN MÉMOIRE pour le créateur ; ce n’est pas une colonne
+ajoutée à npc ni une relation vers un joueur.
+
+Reconstruction :
+  - conserver le root, la position/rotation, le métier, les dialogues et gameplay ;
+  - masquer/remplacer les visuels primitifs sans supprimer les contrôles utiles ;
+  - détacher les accessoires de l’ancien squelette AVANT de détruire son root ;
+  - reconstruire mesh/rig MakeHuman et rattacher les accessoires au nouveau rig ;
+  - garder marteau, équipement et hallebarde au bon personnage ;
+  - ne pas modifier le profil/ID du joueur pendant l’édition d’un NPC.
+
+FindBone : le wrapper AppliedBone existait mais la classe imbriquée HumanPreview
+n’avait pas FindBone, d’où CS1061. 386bb30 ajoute public FindBone dans CETTE
+classe, avec vérifications null/bornes et TryGetValue. Ne pas « réparer » en
+ajoutant seulement un wrapper au mauvais niveau de classe.
+
+La capture utilisateur du jeu 0.5.85 confirme que les humains et le pseudo
+s’affichaient réellement. Elle ne prouve pas à elle seule toutes les opérations
+BDD, et montrait la mauvaise prise des armes des gardes.
+
+--------------------------------------------------------------------------------
+10. ADMIN, ÉDITION NPC, VILLES ET ARMES DES GARDES (0.5.86)
+--------------------------------------------------------------------------------
+
+Implémentation fonctionnelle la plus récente : 9fee3f8.
+
+Permission :
+  - Membre.droit est reçu depuis PHP dans LibreViesCompte ;
+  - EstAdministrateur = authentifié ET droit == 1 ;
+  - bouton/panneau ADMIN invisible pour droit=0, droit=2 et toute autre valeur ;
+  - lancement direct sans compte n’accorde aucun droit ;
+  - aucun compte n’est promu automatiquement ;
+  - save_npc relit le droit en BDD à CHAQUE requête, même avec ancienne session ;
+  - falsifier droit/ID côté client est refusé ; révocation -> 403 ;
+  - modal NPC fermé si la permission est perdue ;
+  - la demande ne constitue PAS un nouveau verrouillage par droits du mode EDITION.
+
+Parcours admin NPC :
+  barre horizontale des villes réelles -> dropdown des NPC filtrés -> MODIFIER ->
+  même créateur esthétique (13 sliders + sexe/peau/cheveux/tenue/chapeau/chaussures)
+  -> VALIDER / ENREGISTRER -> save_npc -> transaction, relecture, reconstruction.
+  Annuler/fermer = aucune écriture. Positions/objets/profil joueur sont préservés.
+  Un échec conserve le brouillon/ancien rendu plutôt que d’afficher une fausse
+  réussite de sauvegarde.
+
+La phrase « Le NPC Esthétique propose... » a été supprimée du panneau concerné.
+Les noms Garde 01/02 sont remplacés par Garde Nord/Garde Sud. Le choix utilise
+le vrai indicateur Nord/Sud du garde, pas une dépendance à l’ordre de la liste.
+
+VILLES — LIMITE IMPORTANTE :
+  La barre vient des valeurs Ville des NPC présents, distinctes et réelles.
+  Actuellement le code crée UN SEUL village : « Village de depart ».
+  Aucun faux second/ troisième onglet n’a été inventé.
+  Ce n’est pas encore un système complet de création/persistance de villes :
+  aucune table/colonne SQL ville ajoutée, aucun CRUD multi-ville terminé,
+  contrat API toujours limité aux six ID humains actuels. Un futur NPC/garde
+  peut fournir un nom ville runtime, mais l’extension BDD/ID est un chantier
+  distinct si l’utilisateur demande réellement d’autres villes.
+
+HALLEBARDES 0.5.86 :
+  Les armes sont repositionnées APRÈS l’animation. Prise au centre de la paume :
+    Lerp(wrist.R, finger3-1.R, 0.65).
+  Orientation verticale du garde dans le monde, pas celle de son poignet.
+  But : supprimer l’arme flottante/traversant la main vue en 0.5.85.
+  Cette correction a des tests statiques, PAS encore une validation visuelle
+  native connue : inspecter Nord et Sud, en idle et pendant leur animation.
+
+Si un compte doit légitimement être administrateur, il faut décider explicitement
+avec l’utilisateur quel membre recevoir, modifier seulement sa colonne droit en
+BDD à 1, puis le reconnecter. Ne jamais donner droit=1 à tous les comptes/tests
+réels ou publier une commande de promotion automatique indiscriminée.
+
+--------------------------------------------------------------------------------
+11. RÉGLAGES VISUELS VALIDÉS À PRÉSERVER
+--------------------------------------------------------------------------------
+
+PSEUDO JOUEUR :
+  vrai pseudo PHP/BDD, en troisième personne ; masqué mort / première personne.
+  characterSize final 0.035 (ancien 0.14 divisé par quatre), bold, richText=false.
+  Position finale : hauteur des bounds de l’avatar avec minimum player.y+2.35,
+  puis +0.38 m. Référence initiale de création à 2.80 m avant actualisation.
+  Le passage +20 cm puis -10 cm est déjà intégré au résultat final ; ne pas
+  appliquer encore ces décalages une deuxième fois.
+
+POIGNÉES DE PORTE :
+  sphères/ronds blancs, À DROITE, mi-hauteur, petite marge ;
+  x local final 1.06 pour porte de largeur 1.20 m (14 cm du bord droit) ;
+  y local 0 (mi-hauteur dans ce repère), z local +/-0.10 selon face ;
+  diamètre 0.11 * 1.02 = 0.1122 m, référence du nez du maire ;
+  sens d’ouverture inchangé.
+  Les leviers métal et la variante à gauche sont des étapes REMPLACÉES.
+
+AFFICHES / FAÇADES :
+  texte dimensionné d’après localBounds avec marge pour rester dans le panneau ;
+  shader LVFacadeText avec profondeur ZTest LEqual, plus contrôle raycast ;
+  correction du texte Entrepôt qui apparaissait à travers/au-dessus d’Esthétique.
+  Ne pas annuler ces réglages en cherchant à rendre tous les textes au premier plan.
+
+MakeHuman, proportions, poses idle, bras, rendu peau, vêtements et positionnements
+ont fait l’objet de beaucoup d’allers-retours dans l’archive. Conserver la dernière
+version acceptée ; les tests d’un nouveau besoin ne justifient pas leur retouche.
+Les coordonnées chiffrées jeu/edition/coordonee sont des données utilisateur.
+
+--------------------------------------------------------------------------------
+12. CHRONOLOGIE DEPUIS LE DÉBUT ET RÉFÉRENCES DES COMMITS
+--------------------------------------------------------------------------------
+
+L’archive après ce bloc garde les MAJ historiques détaillées jusqu’à 79.
+La présente chronologie relie ce début au travail plus récent sans transformer
+les anciennes solutions en consignes actuelles. Les dates anciennes viennent du
+journal historique ; pour l’ordre exact des commits, utiliser Git, pas une date
+manuscrite de MAJ.
+
+A. RÉORGANISATION ET PREMIERS BUILDS
+  e47ada3 : point de départ du checkout, caméra de départ du village Unity.
+  8b57024 : séparation jeu (joueur) / compilation (auteur).
+  d14c200 : retrait de l’ancien moteur ; Unity seul pour ce projet.
+  0e1da6d : build bootstrap qui télécharge ses sources/outils.
+  6fbdd8f : icône PyInstaller, amorce allégée et premier resumer.txt.
+  1bb5b54 : résultat déposé dans jeu, compilation seulement pour compiler.
+  1e14528/9bc6405 : magenta/shaders manquants, caméra sous sol, souris ;
+    shaders de secours embarqués et corrections de caméra/rendu.
+  31eadc7 : build met réellement les sources à jour, pas l’ancien projet local.
+  2db7fa1 : contrôles syntaxiques C# sans compilateur natif.
+  bfe6b59 : gel au démarrage dû à une boucle de clôture, pas à un simple
+    chargement long ; instrumentation et correction de la boucle.
+
+B. JEU, MONDE, VISUELS ET ÉDITION — MAJ HISTORIQUES
+  Village procédural, relief/décor, route/château/portails, gardes, collisions,
+  monstres/dégâts/barres de vie, ressources, caméra/occlusion, options, shaders,
+  façades/toits, sauvegarde des coordonnées et outils d’édition.
+  Introduction puis réglages MakeHuman : apparence, catalogues, vêtements,
+  morphologie, animations/poses, bras/mains/peau. Détail et motifs dans l’archive.
+  MAJ 79 / 0.5.79 : correction de GetInstanceID devenu obsolète bloquant sous
+  Unity 6 pour le suivi des coordonnées ; ancien résumé s’arrêtait là.
+
+C. PUBLICATION — ANCIEN CIRCUIT, ABANDONNÉ ENSUITE
+  Plusieurs essais de publication dans un dossier compilé, manifests/hashes,
+  lots et resynchronisations Git (conflits add/add, fichiers non suivis,
+  changements hors lot, pushes concurrentiels).
+  Ce circuit explique les anciens chemins/messages, mais ne doit plus être
+  rétabli : 80d4382 et la suppression utilisateur 964648e le remplacent.
+
+D. COMPTES PHP, INSCRIPTIONS ET DÉBOGAGE LAUNCHER
+  aea6e9d : authentification et Autolog initiaux.
+  79f4237 : validation des champs, mots de passe sécurisés.
+  1955a6e -> 68f3c1f : serveur récupéré au build puis regroupé en un seul
+    jeu/serveur, simplification du déploiement et suppression des doublons.
+  d417f13/43f0eba/fe45f98 : diagnostic connexion, compatibilité PHP 5.6,
+    corrections d’inscription locale.
+  Série 8acea82 -> 1501fce : inscription vérifiée avant retour/redémarrage,
+    messages de barre, polling après INSERT et vérification email+pseudo.
+  5fffa5f/76ca750/49c71c4 : journaux diagnostic, réponse JSON PHP corrigée,
+    ajout de membre.valider=0 ; validation email différée.
+  5384ae3 -> 0cee650 : plusieurs tentatives de redémarrage PyInstaller,
+    isolation réelle onefile/_MEI/environnement et handles finalement retenue.
+  6e064f8/116283d : connexion et Autolog locaux, doublons/bonjour.
+  1741e10 : Autolog DPAPI chiffré, conservation des messages d’erreur.
+  9bd3225/a4e2252/4eaae48 : doublons ; finalement vérification dans la requête
+    register unique, pas une étape réseau supplémentaire bloquante.
+  e0cdd3a : journal_auth détaillé demandes/réponses/retours UI.
+  c9eecf4 : retours traités dans le thread Tk principal.
+  93ebed7 puis 962758c : module queue embarqué puis retiré, file interne.
+  2a55cee : correction du retour UI après erreur d’inscription.
+
+E. CLASSEMENT ET PERSONNAGE
+  a3f97cb/c90552e : inscription remplacée par classement après connexion,
+    schéma personnage et panneau UI.
+  6eb0b45 : initialisation du personnage à la création du compte.
+  db51909 : chaque réglage dans sa propre colonne, pas stockage sliders JSON.
+  77d3f4e : personnage initial vide, seul id/default=1, le reste NULL.
+  a7e5ca2 / 0.5.80 : compte authentifié, session, profil sauvegardé et chargé,
+    panel via NPC Esthétique, loader/modal/pseudo ; .meta conservés/corrigés.
+  0062706 : sessions cryptographiques Windows sans OpenSSL ancien,
+    classement SQL et initialisation transactionnelle aux trois scores à 0.
+  5fb66ce : en-tête Bonjour, Pseudo/Connexion/MDP cachés, Autolog visible.
+
+F. ANCIEN BINAIRE, WORKFLOW LOCAL ET CORRECTIONS VISUELLES
+  4ee8f56 : audit PHP 8.3, diagnostic assembly publiée 0.5.79 sans nouvelles
+    méthodes compte/pseudo, protection de l’export et logs.
+  b3d1541 / 0.5.81, launcher 4.2.1 : droits compte, poignées leviers métal,
+    shader profondeur façades et tentative de corriger l’ancienne publication.
+  80d4382 / 0.5.82, launcher 4.2.2 : workflow jeu LOCAL seulement,
+    préparateur/vérification et arrêt de remplacement distant ; ronds blancs
+    d’abord à gauche. Pas de publieur final nécessaire.
+  964648e : l’utilisateur supprime jeucompiler sur GitHub.
+  46e7dac / 0.5.83 : ronds à DROITE, diamètre du nez du maire,
+    pseudo taille /4 et hausse de 20 cm. Push refusé d’abord à cause d’une
+    modification distante ; reprise ciblée préserve la suppression utilisateur.
+  d555fa6 / 0.5.84 : pseudo redescendu de 10 cm, réglage final +0.38 m ;
+    npc.sql à ID texte, sans default.
+
+G. AVATARS NPC, ERREUR DE COMPILATION ET ADMIN
+  ac40541 / 0.5.85 : seed des six profils NPC, get_npcs, DTO texte,
+    reconstruction MakeHuman et accessoires conservés, primitives masquées.
+  Capture utilisateur : humains/pseudo visibles, armes gardes mal tenues.
+  Log Unity utilisateur : CS1061 HumanPreview.FindBone absent.
+  386bb30 : ajoute FindBone à la bonne classe ; retire quatre SQL obsolètes,
+    seed déplacé hors serveur en fixture ; doc/tests/nettoyage synchroniseur.
+  9fee3f8 / 0.5.86 : ADMIN exactement droit=1 client ET serveur, save_npc
+    transactionnel/protégé, dropdown/modal/validation, villes réelles,
+    Garde Nord/Sud et hallebarde au centre de la paume après animation.
+  b70ebb8 : coordonnées d’édition utilisateur après 9fee3f8 ; dernière base
+    distante auditée pour la présente synthèse documentaire.
+
+Beaucoup d’autres commits « Edition : met a jour les coordonnees » jalonnent
+cet historique. Ce sont des données utilisateur, pas des commits à écraser ou
+à ignorer lors d’un push. Le dernier changement fonctionnel et le dernier commit
+Git ne sont donc pas nécessairement le même.
+
+Pour retrouver l’historique exact :
+  git log --reverse --oneline origin/arena/01a0b32c-librevies
+  git show <hash> --stat
+  git show <hash>:<chemin>
+
+--------------------------------------------------------------------------------
+13. INCIDENTS : SYMPTÔMES, CAUSES, SOLUTIONS ET FAUSSES PISTES
+--------------------------------------------------------------------------------
+
+1) Jeu magenta / monde invisible / caméra sous le sol au début.
+   Causes : shaders non embarqués/compatibilité et caméra/rendu incorrects.
+   Solution : shaders de secours Resources avec leurs .meta, corrections caméra
+   et démarrage instrumenté. Voir l’archive ; ne pas supprimer ces ressources.
+
+2) Gel au chargement du village.
+   Cause réelle d’un incident initial : boucle infinie de génération de clôture.
+   Solution : correction de boucle et étapes de démarrage loguées. Ne pas
+   attribuer systématiquement un gel à un manque de RAM ou au téléchargement.
+
+3) Build qui compile l’ancien jeu malgré une MAJ.
+   Causes multiples rencontrées : sources non rafraîchies, mauvaise racine de
+   build/publication, scripts Unity chargés obsolètes, manifeste stale et ancien
+   binaire retéléchargé par le launcher.
+   Preuve : assembly publiée 0.5.79 ne contenait pas les méthodes compte/pseudo.
+   Solution actuelle : sources différentielles cohérentes, contrôles source/
+   scripts/bundleVersion, version_jeu.json/SHA256, export contrôlé avant remplacement,
+   mode local et aucun écrasement par des binaires HTTP anciens.
+   Mauvaise solution : renommer juste le manifeste ou recommencer jeucompiler.
+
+4) Inscription insérée mais launcher bloqué / retour UI manquant.
+   Causes rencontrées : réponse JSON PHP incorrecte, ancienne API, seconde
+   requête de précontrôle, verification post-INSERT et thread Tk incorrect.
+   Solution : réponse PHP propre, register unique, polling status pseudo+email,
+   logs précis et traitement des callbacks dans le thread principal.
+
+5) Doublons affichés incorrectement ou erreur SQL cachée.
+   Solution : vérifier les deux champs via la collation SQL, messages explicites,
+   code 409 ; ne traiter 1062 comme doublon membre que pour l’INSERT membre.
+   Rollback transactionnel si personnage/classement échoue.
+
+6) Redémarrage PyInstaller échoue / erreur de dossier temporaire onefile.
+   Causes : réutilisation _MEI supprimé, environnement et handles hérités.
+   Plusieurs essais CMD/délai ont été insuffisants. Solution retenue : nouveau
+   bootloader/environnement PYINSTALLER_RESET_ENVIRONMENT=1, handles fermés,
+   conserver le comportement utilisateur attendu, pas masquer l’erreur.
+
+7) Import queue absent dans l’amorce existante.
+   Solution finale : supprimer cette dépendance du launcher au profit d’une
+   file interne ; éviter d’imposer une nouvelle amorce pour ce seul correctif.
+
+8) Autolog stocké en clair / persistant alors que décoché.
+   Solution : Windows DPAPI, migration/suppression du JSON ancien et suppression
+   des deux formats si décoché. Ne pas stocker de secrets dans un manifeste.
+
+9) Connexion/session impossible sur ancien PHP sans OpenSSL.
+   Cause : aucune source cryptographique utilisable dans le premier chemin.
+   Solution 0062706 : fallback Windows .NET PowerShell fort sous PHP 5.6 ;
+   PHP 8.3 utilise random_bytes. Ne jamais remplacer par un RNG faible.
+
+10) Pseudo absent en jeu alors que le code et le compte semblaient corrects.
+    Cause prouvée : binaire 0.5.79 sans fonctionnalités récentes lancé réellement.
+    Solution : vérifier/installer le bon build, puis reprendre le pseudo canonique
+    PHP ; pas inventer un pseudo de fallback visible ni écrire une autre identité.
+
+11) Texte Entrepôt apparaît sur/à travers Esthétique.
+    Cause : taille du texte et gestion de profondeur/occlusion.
+    Solution : ajustement aux localBounds du panneau, shader LVFacadeText
+    ZTest LEqual et raycast ; respecter la profondeur du monde.
+
+12) Push refusé pendant que l’utilisateur enregistre les coordonnées ou supprime
+    un dossier.
+    Cause : branche distante a avancé. Solution : fetch, relecture du nouveau
+    parent et réapplication des SEULS fichiers concernés ; conserver les commits
+    coordonnées et la suppression jeucompiler. Un index temporaire/commit-tree
+    a déjà été utilisé pour éviter stash/restauration massive d’un worktree sale.
+    Ne pas force-push ni ramener une ancienne arborescence supprimée.
+
+13) CS1061 HumanPreview.FindBone — ÉCHEC RÉEL DE COMPILATION.
+    ac40541 avait ajouté l’appel mais pas la méthode dans HumanPreview.
+    386bb30 corrige réellement cette omission. Le scanner tree-sitter et les
+    tests de contrat n’avaient pas détecté l’erreur sémantique C#.
+    Le log contenait aussi des avertissements licence Unity : la licence
+    Personal Unlimited avait été résolue, ce n’était pas la cause du return 1.
+    Ne pas conseiller une nouvelle licence/install Unity pour corriger CS1061.
+
+14) Test SQL seed NPC refuse peau '2.0' sous SQLite.
+    Cause de RECETTE : FLOOR de test retournait un float, CAST CHAR donnait 2.0.
+    Correction : callback FLOOR de SQLite retourne (int)floor. Pas un changement
+    du seed MySQL de production ni une preuve que les profils réels sont invalides.
+
+15) Faux lint PHP WebAssembly / processus de test restant actif.
+    php-wasm.js --php=8.3 -l interprétait mal l’argument ; exit=0 était trompeur.
+    Analyse valide via token_get_all(..., TOKEN_PARSE) dans PHP 8.3 universal,
+    quatre fichiers PHP analysés correctement. Une commande inline restait dans
+    sa boucle Node après les OK et a été arrêtée ; nettoyer explicitement les
+    instances/processus ou utiliser la recette .mjs prévue.
+
+16) Compilation C# alternative non disponible dans le sandbox.
+    Ancien .NET Core 2 essayé : exit 136, libunwind.so.8 absente ; le mode
+    globalisation invariant ne résout pas le problème. Ne pas réinstaller la
+    même combinaison pour prétendre vérifier Unity ; utiliser la preuve native.
+    Les recettes npm PHP-WASM ont averti EBADENGINE (Node 24/npm 11 demandés,
+    environnement testé Node 22.22.3/npm 10.9.8) mais la recette a fonctionné.
+
+17) Checkout local semble revenu au commit initial avec réorganisation non stagée.
+    Observé pendant cette reprise : HEAD e47ada3, sources/dossiers récents dans le
+    worktree, beaucoup de suppressions/modifications et fichiers non suivis.
+    Solution : auditer les sources canoniques sur origin, ne pas commiter tout,
+    éventuellement recalage HEAD/index par reset --mixed APRÈS vérifications,
+    jamais reset --hard ni nettoyage des dossiers utilisateur.
+
+18) Armes des gardes mal prises après avatars humains.
+    Observation native 0.5.85. Correction 0.5.86 : paume/interpolation poignet-
+    majeur, position après animation et orientation verticale du garde.
+    Résultat visuel encore à confirmer, pas un incident déclaré clos nativement.
+
+--------------------------------------------------------------------------------
+14. TESTS EFFECTUÉS, COMMANDES DE RECETTE ET LIMITES RÉELLES
+--------------------------------------------------------------------------------
+
+RECETTES DÉJÀ EXÉCUTÉES PENDANT LES CHANGEMENTS FONCTIONNELS :
+  - tests Python du launcher, Autolog/amorce, UI et en-tête connecté ;
+  - contrôles workflow local, source/version/binaire/SHA256 et synchronisation ;
+  - tests schémas personnage/NPC, mapping des sliders, catalogues et fixtures ;
+  - tests NPC avatars/accessoires, permission ADMIN et sauvegarde côté code ;
+  - scanner syntaxique C# / contrats de ressources ;
+  - vraie exécution PHP WebAssembly 7.4.33 et 8.3.33, avec SQLite de test :
+    inscription, sessions, profil joueur, get_npcs, save_npc, précision,
+    validation, rollback, refus droit=0/2, droits falsifiés et révocation.
+  - analyse syntaxique PHP 8.3 correcte des quatre fichiers API/helpers.
+
+Derniers rapports de la phase fonctionnelle 0.5.86 :
+  5 tests ADMIN, 7 NPC, 9 workflow local, 8 UI/en-tête, 8 correctifs,
+  14 personnage en fixture, 10 édition/scanner C# ; recettes API PHP 7.4/8.3.
+Ces nombres décrivent les campagnes précédentes, PAS une compilation native
+et PAS une prétendue réexécution de tout pour cette MAJ de documentation.
+
+LIMITES QUI DOIVENT RESTER EXPLICITES :
+  - Unity et la pile PHP/MySQL Windows réelle ne sont pas disponibles dans le
+    sandbox de ces recettes.
+  - PHP-WASM 8.3.33 n’est pas exactement PHP 8.3.3 Windows de l’utilisateur.
+  - SQLite adapté n’est pas MySQL/InnoDB réel (collation, DDL, drivers, etc.).
+  - tree-sitter analyse la syntaxe, pas la résolution sémantique des méthodes,
+    ni le rendu GPU, ni les licences, ni le fonctionnement final de l’exécutable.
+  - tests d’accès admin/API ne prouvent pas l’aspect du modal en jeu.
+  - aucune preuve native de 0.5.86 connue à la rédaction de cette synthèse.
+
+COMMANDES DE RECETTE DEPUIS LA RACINE DU PROJET :
+  python -B compilation/outils/test_jeu_local.py
+  python -B compilation/outils/test_entete_launcher.py
+  python -B compilation/outils/test_npc_schema.py
+  python -B compilation/outils/test_npc_avatars.py
+  python -B compilation/outils/test_admin_npc.py
+  python -B compilation/outils/test_personnage.py
+  python -B compilation/outils/test_edition.py
+  python -B compilation/outils/test_launcher.py
+  python -B compilation/outils/test_amorce.py
+
+Certaines recettes Python exigent des dépendances de test (notamment scanner
+C#) ou un checkout complet ; voir le début des fichiers avant de relancer.
+Une exécution en fixture, même verte, doit être annoncée comme telle.
+
+Recette PHP API (environnement de test, jamais la base utilisateur) :
+  node compilation/outils/test_api_personnage.mjs
+Vérifier les prérequis npm et options du fichier, installer dans un dossier
+ignoré si nécessaire ; ne pas commiter node_modules/package temporaires.
+Le fichier test_securite.php est également fourni pour la sécurité des jetons.
+
+Pour cette MAJ documentaire : contrôler versions/chemins contre origin,
+conservation intégrale de l’archive, absence de secrets ajoutés et diff/index
+limités à resumer.txt. Ne pas changer les numéros de version du jeu/launcher
+pour un commit qui n’a changé que ce dossier de reprise.
+
+--------------------------------------------------------------------------------
+15. DIAGNOSTICS : LOGS, ERREURS ET CONTRÔLES UTILES
+--------------------------------------------------------------------------------
+
+COMPILATION :
+  compilation/build/unity.log
+  Lire la PREMIÈRE erreur C# et la fin de l’export ; pas seulement un warning.
+  L’empreinte de branche du build est compilation/build/branche_actuelle.txt.
+
+AUTHENTIFICATION LAUNCHER :
+  jeu/journal_auth.log
+  Journal des demandes, appels HTTP, réponses, vérification inscription,
+  erreurs, callbacks/retours UI. Pas de mot de passe/jeton/corps POST complet.
+  Il peut contenir pseudo/email : masquer les données personnelles inutiles
+  avant partage public.
+
+API PHP :
+  journal_api.log
+  Calcul principal : dirname(dirname(dirname(__FILE__))) / journal_api.log,
+  pour rester hors de la racine web habituelle EasyPHP.
+  Si ce parent n’est pas inscriptible : secours __DIR__/journal_api.log, donc
+  dans le dossier de l’API. Vérifier l’emplacement réel ; s’il est web-accessible,
+  bloquer son téléchargement ou corriger les droits/placement côté serveur.
+  Ne pas inventer un chemin journal différent ou demander journal_api.log dans
+  le checkout joueur quand il est sur la racine du serveur local.
+
+JEU / RUNTIME :
+  jeu/game/logs/LibreVies.log
+  jeu/game/logs/LibreViesRuntime.log
+  Pour un profil/chargement NPC refusé, rechercher le message API/HTTP sans
+  publier la session. Pour une arme/occlusion : capture + contexte/angle/version.
+
+Contrôles BDD EN LECTURE SEULE utiles dans phpMyAdmin (base librevies) :
+  SHOW COLUMNS FROM membre;
+  SHOW COLUMNS FROM personnage;
+  SHOW COLUMNS FROM classement;
+  SHOW COLUMNS FROM npc;
+  SELECT id, pseudo, valider, droit FROM membre ORDER BY id;
+  SELECT id, `default`, sexe FROM personnage ORDER BY id;
+  SELECT id, experience, chasse, territoire FROM classement ORDER BY id;
+  SELECT id, sexe, teinte_peau, coiffure, tenue FROM npc ORDER BY id;
+Ne pas transmettre motdepasse/email privés inutiles ni config.php.
+
+Conduite de diagnostic :
+  - demander le bon log daté après la dernière tentative, la version réellement
+    affichée et l’erreur exacte ;
+  - corriger un seul blocage à la fois et documenter ce qui a réellement changé ;
+  - si l’auth échoue, vérifier health/PHP/BDD avant de toucher MakeHuman ;
+  - si les méthodes manquent en build, vérifier les sources synchronisées et
+    le code C# avant d’accuser Apache ou la licence ;
+  - si un texte traverse une façade, ne pas lui donner ZTest Always ;
+  - si des NPC n’existent pas en table, ne pas supprimer/rerandomiser les profils
+    existants pour masquer le message 409.
+
+--------------------------------------------------------------------------------
+16. PRÉCAUTIONS GIT ET MISE À JOUR DU RÉSUMÉ À CHAQUE COMMIT
+--------------------------------------------------------------------------------
+
+Dans cette session :
+  dépôt killdrago/LibreVies, branche arena/01a0b32c-librevies.
+Commandes de vérification :
+  git branch --show-current
+  git status --short
+  git diff --cached --name-only
+  git fetch origin arena/01a0b32c-librevies
+  git log -5 --oneline origin/arena/01a0b32c-librevies
+
+Puis travail ciblé, tests, mise à jour de CE bloc, et staging explicite :
+  git add -- resumer.txt <uniquement les fichiers de la demande>
+  git diff --cached --check
+  git diff --cached --stat
+  git commit -m "<description de la MAJ>"
+  git push origin arena/01a0b32c-librevies
+
+Pas de git add ., reset --hard, git clean massif, restauration générale,
+force-push ou changement de branche pour faciliter un commit.
+Ne jamais supprimer/déplacer la racine du dépôt ni son .git.
+
+Cas de cette reprise documentaire :
+  - initialement HEAD local e47ada3, index propre, beaucoup de changements de
+    réorganisation préexistants, dont des dossiers non suivis ;
+  - origin auditée b70ebb8, ancien résumé local = résumé GitHub ;
+  - ces autres fichiers ne font PAS partie de la demande resumer.txt ;
+  - un reset --mixed vers origin peut réaligner HEAD/index sans toucher au
+    worktree, mais seulement après contrôle des commits locaux et de l’index ;
+  - ce commit documentaire ne doit contenir QUE resumer.txt.
+
+En cas de race/push refusé : fetch de nouveau, lire les changements distants,
+puis refaire l’application ciblée sur leur nouveau parent. Préserver les blobs
+coordonee et les suppressions utilisateur. La méthode index temporaire
+(GIT_INDEX_FILE, read-tree, patch cached, write-tree/commit-tree, update-ref puis
+reset --mixed) a déjà servi avec un worktree sale ; ce n’est pas une obligation
+si un flux Git normal et sûr convient. Jamais écraser les modifications autres.
+
+Dans chaque future MAJ du résumé, mettre en tête :
+  - besoin et décisions finales de l’utilisateur ;
+  - versions SOURCE et BINAIRES vérifiées séparément ;
+  - commit fonctionnel de référence et chemins modifiés ;
+  - résultats des tests réellement exécutés ;
+  - incidents, causes prouvées, correctifs ou tentative abandonnée ;
+  - ce qui n’a PAS pu être validé ;
+  - prochaine recette et section « À faire » à communiquer.
+Ne pas réécrire l’archive comme si ses anciennes consignes étaient actuelles.
+
+--------------------------------------------------------------------------------
+17. TRAVAIL RESTANT ET RECETTE UTILISATEUR DÉTAILLÉE
+--------------------------------------------------------------------------------
+
+À VALIDER MAINTENANT SI 0.5.86 N’A PAS ENCORE ÉTÉ TESTÉ NATIVEMENT :
+
+1) Fermer le launcher, le jeu et le créateur autonome avant compilation.
+   Sauvegarder la BDD avant toute modification SQL ; préserver config.php,
+   Autolog chiffré et jeu/edition/coordonee. Ne pas supprimer ces fichiers.
+
+2) Depuis la racine Windows, lancer :
+     compilation\build_launcher.bat
+   Laisser le téléchargement des sources et le build se terminer correctement.
+   Ne pas relancer en parallèle un deuxième build sur les mêmes dossiers.
+   Si erreur : fournir compilation/build/unity.log ; ne pas lancer l’ancien
+   exécutable en affirmant que le dernier correctif a été testé.
+
+3) Vérifier que le build a synchronisé l’API locale ; démarrer Apache/MySQL.
+   Vérifier health si nécessaire :
+     http://localhost/serveur/api.php?action=health
+   Si racine web non détectée, utiliser la procédure LIBREVIES_WEB_ROOT décrite
+   plus haut. Ne pas importer les anciens scripts SQL supprimés ni remplacer
+   la configuration existante.
+
+4) Ouvrir : jeu\LibreVies.exe.
+   Attendus : launcher 4.2.2, jeu 0.5.86 réellement compilé, connexion API.
+   Le mode local est préparé par le build ; il n’y a pas de deuxième dossier
+   à publier ni de « jeucompiler à copier ».
+
+5) Avec un compte droit=0 :
+   - connexion possible même si valider=0 ;
+   - Bonjour/pseudo correct, Autolog visible, champs de connexion masqués ;
+   - aucun bouton/panneau ADMIN ;
+   - accès au salon Esthétique pour SON personnage, 13 sliders/choix ;
+   - valider, quitter/reconnecter et vérifier le profil sauvegardé.
+
+6) Avec un compte administrateur explicitement autorisé (droit=1 en BDD) :
+   - se reconnecter après un changement de droit ;
+   - ADMIN présent, barre « Village de depart », dropdown des six humains ;
+   - nommer/select Garde Nord et Garde Sud correctement ;
+   - MODIFIER un NPC, changer un réglage de façon identifiable, VALIDER ;
+   - vérifier la ligne npc correspondante en lecture seule et la persistance
+     après relance ; pas de changement du joueur ni des autres NPC ;
+   - annuler une modification suivante : aucune écriture BDD ;
+   - vérifier armes/accessoires/positions après reconstruction.
+
+7) Vérifier les six avatars humains, hallebardes Nord/Sud dans la paume en idle
+   et animation, pseudo en troisième personne/caché première personne et mort,
+   ronds de porte blancs à droite et façade Entrepôt/Esthétique non traversée.
+   Garder les réglages validés ; une régression doit être signalée avec capture.
+
+8) Si blocage : transmettre les extraits pertinents, datés après la tentative :
+     compilation/build/unity.log (compilation)
+     jeu/journal_auth.log (connexion/inscription)
+     jeu/game/logs/LibreVies.log et LibreViesRuntime.log (jeu)
+     journal_api.log côté serveur (API)
+   Masquer mots de passe, jetons, identifiants BDD et données personnelles inutiles.
+
+RESTE À FAIRE PLUS TARD, PAS LIVRÉ PAR 0.5.86 :
+  - envoyer les emails et implémenter une vraie validation email, quand demandé ;
+  - classement live complet/lecture et affichage effectifs des scores API ;
+  - création/persistance de plusieurs villes et extension des ID NPC, si demandée ;
+  - préparer un futur hébergement HTTP manuel selon une nouvelle demande, pas
+    relancer une chaîne jeucompiler ;
+  - prendre en compte la nouvelle règle resumer.txt dans les commits automatiques
+    de coordonnées si ce flux de commit est maintenu ; aucun hook ajouté ici ;
+  - obtenir une preuve native des nouveaux builds après les tests statiques.
+
+POUR LA SEULE PRÉSENTE MAJ DOCUMENTAIRE :
+  « À faire » doit dire qu’il n’y a aucun build, import SQL ou changement serveur
+  obligatoire. Pour passer le relais : donner cette branche/le dépôt et demander
+  à l’IA de lire d’abord les règles et le bloc actuel, puis les sources, puis
+  l’archive selon besoin. Les vérifications 0.5.86 ci-dessus restent à effectuer
+  uniquement si elles n’ont pas déjà été faites entre-temps sur le poste utilisateur.
+
+--------------------------------------------------------------------------------
+18. RÉFÉRENCES DOCUMENTAIRES ET PORTÉE DE CETTE SYNTHÈSE
+--------------------------------------------------------------------------------
+
+Sources principales : code et historique Git de killdrago/LibreVies,
+origin/arena/01a0b32c-librevies à b70ebb8 ; dernier fonctionnel 9fee3f8.
+Ancien resumer.txt : 142577 octets, 2337 lignes, daté 20/09/2026, MAJ 79,
+blob Git d75305096870f6222821c2810dc1d05e03a63c7a. Conservé intégralement ci-dessous.
+
+Références techniques utilisées pendant les diagnostics précédents :
+  PyInstaller, Common issues :
+    https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html
+  PyInstaller, Advanced topics :
+    https://pyinstaller.org/en/stable/advanced-topics.html
+  PyInstaller 6.11, variables de redémarrage :
+    https://pyinstaller.org/en/v6.11.0/CHANGES.html
+  phpMyAdmin 5.2.3, composer.json officiel :
+    https://github.com/phpmyadmin/phpmyadmin/blob/RELEASE_5_2_3/composer.json
+
+Ces références expliquent les choix ; elles ne remplacent pas la vérification
+du code actuel et les logs du poste. Aucun secret réel n’est nécessaire à cette
+passation. Le résumé ancien était obsolète : cette MAJ ajoute le bloc actuel,
+les nouvelles règles, les changements depuis 0.5.79 et les limites de validation,
+sans modifier les sources/binaires de jeu ni relancer un travail déjà poussé.
+
+Contrôles documentaires effectués pour cette MAJ du 10/10/2026 :
+  - archive comparée octet par octet au blob Git historique : inchangée ;
+  - 54 références de commits vérifiées dans l’historique ;
+  - 32 chemins de sources/documentation vérifiés dans l’arbre distant ;
+  - marqueurs locaux générés distingués des fichiers suivis (branche/état) ;
+  - nom réel de la constante VersionJeu, versions 0.5.86/4.2.2 et manifeste
+    source ancien/mode_local recoupés avec le code ;
+  - paquet serveur, colonnes SQL, FindBone, droit=1 et suppression distante
+    jeucompiler recoupés ;
+  - règles prioritaires et absence de secrets détectables contrôlées ;
+  - commit limité à resumer.txt : aucun autre changement du worktree à publier ;
+  - aucun nouveau build natif ni réimport SQL réalisé pour cette documentation.
+
+FIN DU BLOC ACTUEL — LES CONSIGNES EN TÊTE RESTENT PRIORITAIRES.
+
+================================================================================
+ARCHIVE HISTORIQUE INTÉGRALE — ANCIEN RÉSUMÉ, NON NORMATIF
+État conservé : 20/09/2026, MAJ 79, jeu 0.5.79 / launcher 4.1.0.
+Blob original : d75305096870f6222821c2810dc1d05e03a63c7a.
+Ne pas appliquer ses consignes contredites par le bloc actuel en tête.
+En particulier : anciens chemins/publications/versions/manifeste distant
+et anciennes tâches ne sont pas des actions à refaire aujourd’hui.
+L’archive est conservée mot pour mot pour les besoins de reprise.
+================================================================================
+
 ================================================================================
 LibreVies - RESUME DU PROJET, JOURNAL DES MISES A JOUR ET DES INCIDENTS
 Fichier de reprise : destine a un autre assistant IA (ou au meme, plus tard)
