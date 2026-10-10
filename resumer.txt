@@ -74,6 +74,16 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BAT REVENU A LA VERSION D'ORIGINE + JSON
+  Constat utilisateur : après les ajouts (symbolic-ref, CRLF), build_launcher.bat affiche
+  « Le système ne trouve pas le nom de fichier de commandes - preparer_git » avant la
+  publication des coordonnées. Le fichier a donc été repris de d93cb20 ; la seule
+  modification restante est la lecture de la branche dans compilation/config_build.json.
+  Le correctif symbolic-ref est retiré : la branche locale doit être renommée une fois
+  dans le dépôt utilisateur (git branch -m) pour que le push aille vers arena/c40ef64e-librevies.
+  Le CRLF/.gitattributes de la MAJ précédente est conservé.
+  Non testé sur le poste Windows.
+
 MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BAT EN CRLF
   Symptome utilisateur : après le JSON, build_launcher.bat affiche « Le système ne trouve
   pas le nom de fichier de commandes - preparer_git » puis ECHEC de publication.
