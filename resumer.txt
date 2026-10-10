@@ -74,6 +74,21 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — TEXTES UTILISATEUR
+  Demande : retirer le message « Un garde du village a repoussé ... » ; dans le
+  launcher, en mode jeu local, n'afficher que « Cliquez sur JOUER » (sans « Jeu local
+  vX prêt ! ») ; à la fermeture, remplacer « Enregistrement de la position avant
+  fermeture... » par « Fermeture en cours... ».
+  Fichiers : compilation/unity/Assets/Scripts/LibreViesGame.cs (suppression de
+  l'appel ShowInfo du garde, texte de l'écran de fermeture) ; jeu/launcher.pyw
+  (message local, variable version inutilisée retirée).
+  Aucun changement de logique de sauvegarde position, de version, de schéma SQL.
+  Tests : py_compile du launcher OK (statique). Aucune compilation Unity effectuée ;
+  le rendu réel reste à vérifier sur le poste (build_launcher.bat puis jeu).
+  Migration BDD : l'utilisateur indique que la sauvegarde de position fonctionne
+  parfaitement ; la migration décrite plus haut (valider ENUM, colonne position) est
+  donc considérée comme déjà appliquée sur sa base. Aucun SQL à rejouer.
+
 MAJ DU 10/10/2026 — JEU 0.5.88 / LAUNCHER 4.2.4 — VALIDATION ET POSITION
 
 DEMANDE ACTUELLE : pseudo 100 -> 50 -> 75 ; validation email non/oui avec oui

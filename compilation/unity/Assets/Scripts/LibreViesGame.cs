@@ -4623,7 +4623,6 @@ public sealed class LibreViesGame : MonoBehaviour
                     if (cible.Hp <= 0)
                     {
                         TuerEnnemiParGarde(cible);
-                        ShowInfo("Un garde du village a repousse " + cible.Root.name + " !");
                     }
                 }
             }
@@ -8114,7 +8113,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (fermetureEnCours)
         {
             GUI.Box(new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 35f, 520f, 70f),
-                "Enregistrement de la position avant fermeture...", boxStyle);
+                "Fermeture en cours...", boxStyle);
             return;
         }
         if (focusCreationAReinitialiser)

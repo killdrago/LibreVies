@@ -1917,8 +1917,7 @@ class App(tk.Tk):
             self.play_btn.config(state='normal', bg=GREEN)
             message = getattr(self, 'diagnostic_ancien_jeu', '') or 'Pret ! Cliquez sur JOUER'
             if mode_local_actif():
-                version = informations_export_jeu(self.game)['version']
-                message = 'Jeu local v%s pret ! Cliquez sur JOUER' % version
+                message = 'Cliquez sur JOUER'
             self._upd_bar(100, message)
             return
         self.play_btn.config(state='disabled', bg='#444444')
