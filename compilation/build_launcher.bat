@@ -403,6 +403,14 @@ if errorlevel 1 (
 rem Le poste peut avoir un ancien commit local d'edition apres un push
 rem refuse. On recale uniquement HEAD et l'index sur GitHub, sans toucher
 rem aux fichiers de travail : coordonee sera donc republiee proprement.
+rem Si le depot local est deja sur une autre branche (ex. arena/01a0b32c-librevies),
+rem le push vers %BRANCHE% echouait (refspec introuvable). symbolic-ref change
+rem seulement le nom de la branche courante, sans toucher aux fichiers de travail.
+"%GIT%" -C "%LV_GIT_ROOT%" symbolic-ref HEAD "refs/heads/%BRANCHE%"
+if errorlevel 1 (
+    echo ERREUR : impossible de positionner HEAD sur %BRANCHE%.
+    exit /b 1
+)
 "%GIT%" -C "%LV_GIT_ROOT%" fetch --no-tags origin "%BRANCHE%"
 if errorlevel 1 (
     echo ERREUR : impossible de recuperer la branche distante avant publication.

@@ -74,6 +74,20 @@ RÈGLES PRIORITAIRES POUR L’IA QUI REPREND — À LIRE AVANT TOUT
    la section 19 répertorie TOUS les commits accessibles à la base auditée.
    Sur la période 17/09/2026–10/10/2026, Europe/Paris est à UTC+02:00.
 
+MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — BUILD : BRANCHE LOCALE
+  Constat utilisateur : avec BRANCHE=arena/c40ef64e-librevies, build_launcher.bat
+  fetchait bien la branche, puis le commit « Edition : met a jour les coordonnees »
+  est parti sur la branche locale arena/01a0b32c-librevies (d9b6257, local seulement)
+  et le push a echoue : « src refspec arena/c40ef64e-librevies does not match any ».
+  Cause : en voie « depot Git deja existant », le script ne renomme pas la branche
+  locale (branch -M n'est exécuté qu'à l'initialisation).
+  Correctif : git symbolic-ref HEAD refs/heads/%BRANCHE% avant le reset --mixed
+  (compilation/build_launcher.bat). Fichiers de travail non modifiés.
+  Non testé sur le poste Windows. Le commit d9b6257 local reste sur 01a0b32c, sans
+  effet sur GitHub.
+  Note : le script publie jeu/edition/coordonee sur la branche GitHub ; à confirmer
+  que c'est voulu (dépôt public ?).
+
 MAJ DU 10/10/2026 (fuseau Europe/Paris, UTC+02:00, heure exacte non disponible) — TEXTES UTILISATEUR
   Demande : retirer le message « Un garde du village a repoussé ... » ; dans le
   launcher, en mode jeu local, n'afficher que « Cliquez sur JOUER » (sans « Jeu local
