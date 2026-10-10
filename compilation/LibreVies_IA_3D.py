@@ -44,6 +44,7 @@ PAQUETS = [
     "torchvision",
     "numpy<2",
     "pillow",
+    "xatlas",
     "einops",
     "omegaconf",
     "transformers==4.35.0",
@@ -106,7 +107,7 @@ def lancer(cmd, log, cwd=None):
 
 def paquets_presents():
     """Vrai si tous les modules importants sont deja installes dans l'environnement IA."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL"
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas"
     return subprocess.call([venv_python(), "-c", test], env=env_ia(),
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
 
@@ -158,6 +159,84 @@ def installer(log):
 # ---------------------------------------------------------------------------
 # Generation (execute par l'environnement IA, avec --worker)
 # ---------------------------------------------------------------------------
+
+def texturer(mesh, resolution=1024):
+    """Deplie le maillage (UV, xatlas) et cuit les couleurs de la photo dans une texture.
+
+    Les couleurs viennent des sommets calcules par TripoSR (issues de la photo).
+    Retourne (mesh_uv, image_PIL).
+    """
+    import xatlas
+    from PIL import Image as _Image
+
+    if mesh.visual.kind != "vertex":
+        raise RuntimeError("pas de couleurs de sommets dans le modele")
+    V = np.asarray(mesh.vertices, dtype=np.float32)
+    F = np.asarray(mesh.faces, dtype=np.uint32)
+    couleurs = np.asarray(mesh.visual.vertex_colors)[:, :3].astype(np.float32) / 255.0
+
+    vmap, idx, uv = xatlas.parametrize(V, F)
+    V2 = V[vmap]
+    C2 = couleurs[vmap]
+    F2 = idx.astype(np.int64)
+    uv = uv.astype(np.float32)
+
+    img = np.zeros((resolution, resolution, 3), dtype=np.float32)
+    img[:, :] = np.clip(couleurs.mean(axis=0), 0, 1)
+    for a, b, c in F2:
+        pa = uv[a] * (resolution - 1)
+        pb = uv[b] * (resolution - 1)
+        pc = uv[c] * (resolution - 1)
+        xmin = max(int(np.floor(min(pa[0], pb[0], pc[0]))), 0)
+        xmax = min(int(np.ceil(max(pa[0], pb[0], pc[0]))), resolution - 1)
+        ymin = max(int(np.floor(min(pa[1], pb[1], pc[1]))), 0)
+        ymax = min(int(np.ceil(max(pa[1], pb[1], pc[1]))), resolution - 1)
+        if xmax < xmin or ymax < ymin:
+            continue
+        xs, ys = np.meshgrid(np.arange(xmin, xmax + 1), np.arange(ymin, ymax + 1))
+        px = xs.ravel().astype(np.float32)
+        py = ys.ravel().astype(np.float32)
+        den = (pb[1] - pc[1]) * (pa[0] - pc[0]) + (pc[0] - pb[0]) * (pa[1] - pc[1])
+        if abs(den) < 1e-9:
+            continue
+        l1 = ((pb[1] - pc[1]) * (px - pc[0]) + (pc[0] - pb[0]) * (py - pc[1])) / den
+        l2 = ((pc[1] - pa[1]) * (px - pc[0]) + (pa[0] - pc[0]) * (py - pc[1])) / den
+        l3 = 1.0 - l1 - l2
+        dedans = (l1 >= -1e-4) & (l2 >= -1e-4) & (l3 >= -1e-4)
+        if not dedans.any():
+            continue
+        col = (l1[dedans, None] * C2[a] + l2[dedans, None] * C2[b] + l3[dedans, None] * C2[c])
+        img[py[dedans].astype(np.int64), px[dedans].astype(np.int64)] = col
+
+    # Convention UV OBJ / glTF : image retournee verticalement.
+    image = _Image.fromarray(np.clip(img * 255, 0, 255).astype(np.uint8), "RGB")
+    image = image.transpose(_Image.FLIP_TOP_BOTTOM)
+    import trimesh as _trimesh
+    mesh_uv = _trimesh.Trimesh(vertices=V2, faces=F2, process=False)
+    mesh_uv.visual = _trimesh.visual.TextureVisuals(
+        uv=uv, material=_trimesh.visual.material.SimpleMaterial(image=image))
+    return mesh_uv, image, uv, F2, V2
+
+
+def exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom):
+    """Ecrit OBJ + MTL + texture PNG (logiciel 3D) et GLB (texture incluse)."""
+    png = nom + "_texture.png"
+    image.save(os.path.join(dossier, png))
+    lignes = ["mtllib " + nom + ".mtl", "o " + nom, "usemtl Texture"]
+    for p in V2:
+        lignes.append("v %.6f %.6f %.6f" % (p[0], p[1], p[2]))
+    for t in uv:
+        lignes.append("vt %.6f %.6f" % (t[0], t[1]))
+    for a, b, c in F2:
+        a, b, c = int(a) + 1, int(b) + 1, int(c) + 1
+        lignes.append("f %d/%d %d/%d %d/%d" % (a, a, b, b, c, c))
+    with open(os.path.join(dossier, nom + ".obj"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lignes) + "\n")
+    with open(os.path.join(dossier, nom + ".mtl"), "w", encoding="utf-8") as f:
+        f.write("newmtl Texture\nKa 1 1 1\nKd 1 1 1\nKs 0.1 0.1 0.1\nNs 20\nmap_Kd " + png + "\n")
+    mesh_uv.export(os.path.join(dossier, nom + ".glb"))
+
+
 
 def generer(args):
     os.environ.update(env_ia())
@@ -216,9 +295,16 @@ def generer(args):
 
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
-    mesh.export(os.path.join(dossier, args.nom + ".glb"))
-    mesh.export(os.path.join(dossier, args.nom + ".obj"))
     image.save(os.path.join(dossier, "photo_traitee.png"))
+    print("Depliage UV et cuisson de la texture (couleurs de la photo)...", flush=True)
+    try:
+        mesh_uv, image_tex, uv, F2, V2 = texturer(mesh)
+        exporter_texture(mesh_uv, image_tex, uv, F2, V2, dossier, args.nom)
+        print("Texture creee : " + args.nom + "_texture.png", flush=True)
+    except Exception as erreur:
+        print("Texture impossible (" + str(erreur) + ") : export sans texture.", flush=True)
+        mesh.export(os.path.join(dossier, args.nom + ".glb"))
+        mesh.export(os.path.join(dossier, args.nom + ".obj"))
 
     print("Fichiers crees dans : " + dossier, flush=True)
     print("  %d sommets, %d faces" % (len(mesh.vertices), len(mesh.faces)), flush=True)
@@ -226,7 +312,10 @@ def generer(args):
     if os.path.isdir(os.path.join(ROOT, "unity")):
         cible = os.path.join(UNITY_ITEMS, args.nom)
         os.makedirs(cible, exist_ok=True)
-        shutil.copy2(os.path.join(dossier, args.nom + ".obj"), os.path.join(cible, args.nom + ".obj"))
+        for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_texture.png"):
+            source = os.path.join(dossier, nom_fichier)
+            if os.path.isfile(source):
+                shutil.copy2(source, os.path.join(cible, nom_fichier))
         print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/" + args.nom + ".obj", flush=True)
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
