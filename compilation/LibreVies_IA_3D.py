@@ -820,6 +820,34 @@ def telecharger_image(url, chemin):
         f.write(donnees)
 
 
+APERCU_SCRIPT = (
+    "import sys\n"
+    "from PIL import Image\n"
+    "im = Image.open(sys.argv[1]).convert('RGBA')\n"
+    "im.thumbnail((200, 200))\n"
+    "im.save(sys.argv[2])\n"
+)
+
+
+def preparer_apercus(res):
+    """Telecharge une miniature PNG par resultat. Retourne le chemin, ou None si echec."""
+    dossier = os.path.join(IA, "images", "apercus")
+    os.makedirs(dossier, exist_ok=True)
+    chemins = []
+    for i, r in enumerate(res, 1):
+        brut = os.path.join(dossier, "apercu_%d.bin" % i)
+        png = os.path.join(dossier, "apercu_%d.png" % i)
+        try:
+            telecharger_image(r["url"], brut)
+            code = subprocess.call([venv_python(), "-c", APERCU_SCRIPT, brut, png],
+                                   env=env_ia(), stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+            chemins.append(png if code == 0 and os.path.isfile(png) else None)
+        except Exception:
+            chemins.append(None)
+    return chemins
+
+
 def ecrire_credits(nom, choisi):
     dossier = os.path.join(SORTIES, nom)
     os.makedirs(dossier, exist_ok=True)
@@ -898,7 +926,7 @@ def interface():
                     if not res and "angel" in requete:
                         res = chercher_images_libres("hammer wings")
                     if res:
-                        file_chat.put(("choix", params, res))
+                        file_chat.put(("choix", params, res, preparer_apercus(res)))
                     else:
                         file_chat.put(("msg", "Aucune image libre trouvee pour cette demande. "
                                               "Decrivez autrement, ou repondez « sans ailes »."))
@@ -936,6 +964,40 @@ def interface():
 
             threading.Thread(target=travail, daemon=True).start()
 
+        def choisir(numero):
+            choisi = contexte["choix"][numero - 1]
+            params = contexte["params"]
+            contexte["choix"] = None
+            fen = contexte.get("fenetre_apercu")
+            if fen is not None:
+                try:
+                    fen.destroy()
+                except tk.TclError:
+                    pass
+            afficher("Assistant : je telecharge l'image n° %d puis je la modelise." % numero)
+            lancer_depuis_image(choisi, params)
+
+        def ouvrir_apercus(res, chemins):
+            fen = tk.Toplevel(fenetre_chat)
+            fen.title("Images libres proposees")
+            contexte["fenetre_apercu"] = fen
+            contexte["photos"] = []
+            cadre_ap = ttk.Frame(fen, padding=8)
+            cadre_ap.pack(fill="both", expand=True)
+            for i, (r, chemin) in enumerate(zip(res, chemins), 1):
+                col = ttk.Frame(cadre_ap, padding=4)
+                col.grid(row=0, column=i - 1, padx=4, sticky="n")
+                if chemin:
+                    photo = tk.PhotoImage(file=chemin)
+                    contexte["photos"].append(photo)
+                    tk.Label(col, image=photo).pack()
+                else:
+                    tk.Label(col, text="(apercu indisponible)", width=24, height=8).pack()
+                tk.Label(col, text="%d. %s" % (i, r["titre"][:40]), wraplength=190).pack()
+                tk.Label(col, text=r["licence"], fg="gray", wraplength=190).pack()
+                ttk.Button(col, text="Modeliser %d" % i,
+                           command=lambda n=i: choisir(n)).pack(pady=4)
+
         def envoyer(event=None):
             message = saisie.get().strip()
             if not message:
@@ -943,11 +1005,7 @@ def interface():
             saisie.set("")
             afficher("Vous : " + message)
             if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
-                choisi = contexte["choix"][int(message) - 1]
-                params = contexte["params"]
-                contexte["choix"] = None
-                afficher("Assistant : je telecharge l'image n° %s puis je la modelise." % message)
-                lancer_depuis_image(choisi, params)
+                choisir(int(message))
                 return
             contexte["choix"] = None
             contexte["texte"] += " " + message
@@ -973,12 +1031,14 @@ def interface():
                     if item[0] == "msg":
                         afficher("Assistant : " + item[1])
                     elif item[0] == "choix":
-                        _, params, res = item
+                        _, params, res, chemins = item
                         contexte["choix"] = res
                         contexte["params"] = params
-                        afficher("Assistant : voici des images libres. Tapez le numero a modeliser :")
+                        afficher("Assistant : voici des images libres. Cliquez sur « Modeliser n » "
+                                 "dans la fenetre des images, ou tapez le numero ici :")
                         for i, r in enumerate(res, 1):
                             afficher("  %d. %s  [%s]" % (i, r["titre"], r["licence"]))
+                        ouvrir_apercus(res, chemins)
             except queue.Empty:
                 pass
             try:
@@ -1102,7 +1162,7 @@ def interface():
             pass
         fenetre.after(150, poll)
 
-    ecrire("Version : assistant avec recherche d'images libres (ailes).")
+    ecrire("Version : assistant avec apercu des images libres (ailes).")
     threading.Thread(target=installation, daemon=True).start()
     fenetre.after(150, poll)
     fenetre.mainloop()
