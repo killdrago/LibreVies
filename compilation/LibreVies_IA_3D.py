@@ -633,7 +633,7 @@ def generer(args):
     image.save(os.path.join(dossier, "photo_traitee.png"))
 
     # Etape 1 : forme TripoSR + couleurs de la photo (texture gardee sous le nom _brut).
-    print("Etape 1/3 : forme TripoSR et couleurs de la photo...", flush=True)
+    print("Etape 1/2 : forme TripoSR et couleurs de la photo...", flush=True)
     try:
         colorer_depuis_photo(mesh, image)
         mesh_uv, image_tex, uv, F2, V2 = texturer(mesh)
@@ -643,29 +643,29 @@ def generer(args):
         print("  texture brute impossible (" + str(erreur) + ")", flush=True)
     print("  %d sommets, %d faces (TripoSR)" % (len(mesh.vertices), len(mesh.faces)), flush=True)
 
-    # Etapes 2 et 3 : dimensions mesurees sur TripoSR -> modele lisse, texture de la photo.
+    # Etape 2 : forme TripoSR conservee, surface lissee (Taubin : le volume et les
+    # dimensions ne changent pas), puis couleurs de la photo et texture.
+    print("Etape 2/2 : lissage de la forme TripoSR et texture...", flush=True)
     try:
-        dims = _parametres_depuis_triposr(mesh)
-        print("Etape 2/3 : dimensions mesurees (rayon du manche %.1f mm, longueur %.1f cm)" % (
-            dims["r_col"] * 1000, dims["L_manche"] * 100 + abs(dims["tete_x0"]) * 100), flush=True)
-        sauvegarde = dict(PARAM)
-        PARAM.update(dims)
-        try:
-            generer_parametrique(args, photo_pil=image)
-        finally:
-            PARAM.clear()
-            PARAM.update(sauvegarde)
-        print("Etape 3/3 : modele lisse termine.", flush=True)
-    except Exception as erreur:
-        import traceback
-        print("Modele lisse impossible (" + str(erreur) + ") : export TripoSR seul.", flush=True)
-        print(traceback.format_exc(), flush=True)
-        mesh.export(os.path.join(dossier, args.nom + ".glb"))
-        mesh.export(os.path.join(dossier, args.nom + ".obj"))
+        from trimesh.smoothing import filter_taubin
+        lisse = mesh.copy()
+        filter_taubin(lisse, lamb=0.5, nu=0.53, iterations=60)
+        colorer_depuis_photo(lisse, image)
+        mesh_uv, image_fin, uv, F2, V2 = texturer(lisse)
+        exporter_texture(mesh_uv, image_fin, uv, F2, V2, dossier, args.nom)
+        print("  forme lissee et texturee : " + args.nom + ".obj / .glb", flush=True)
         if os.path.isdir(os.path.join(ROOT, "unity")):
             cible = os.path.join(UNITY_ITEMS, args.nom)
             os.makedirs(cible, exist_ok=True)
-            shutil.copy2(os.path.join(dossier, args.nom + ".obj"), os.path.join(cible, args.nom + ".obj"))
+            for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_texture.png"):
+                shutil.copy2(os.path.join(dossier, nom_fichier), os.path.join(cible, nom_fichier))
+            print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
+    except Exception as erreur:
+        import traceback
+        print("Lissage impossible (" + str(erreur) + ") : export TripoSR sans lissage.", flush=True)
+        print(traceback.format_exc(), flush=True)
+        mesh.export(os.path.join(dossier, args.nom + ".glb"))
+        mesh.export(os.path.join(dossier, args.nom + ".obj"))
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
 
