@@ -444,14 +444,20 @@ def _parametres_depuis_triposr(mesh):
     mn, mx = V.min(0), V.max(0)
     T = mx[1] - mn[1]
     # Rayon du manche : mediane de la distance a l'axe sur une tranche au milieu du manche.
+    # Valeurs de secours (manche de 30 cm, tete de 12 x 6 cm) si la mesure echoue.
+    r_col = 0.0147
     tranche = V[np.abs(V[:, 1] - (mn[1] + 0.55 * T)) < 0.01 * T]
-    cx, cz = tranche[:, 0].mean(), tranche[:, 2].mean()
-    r_col = float(np.median(np.hypot(tranche[:, 0] - cx, tranche[:, 2] - cz)))
-    # Tete : bas du modele (10 % de la longueur).
+    if len(tranche) >= 20:
+        cx, cz = tranche[:, 0].mean(), tranche[:, 2].mean()
+        r_col = float(np.median(np.hypot(tranche[:, 0] - cx, tranche[:, 2] - cz)))
+    demi_hauteur, demi_largeur, epaisseur = 0.058, 0.031, 0.04
     bas = V[V[:, 1] < mn[1] + 0.10 * T]
-    demi_hauteur = (bas[:, 0].max() - bas[:, 0].min()) / 2.0
-    demi_largeur = (bas[:, 2].max() - bas[:, 2].min()) / 2.0
-    epaisseur = max(float(bas[:, 1].max() - bas[:, 1].min()), 0.035)
+    if len(bas) >= 20:
+        demi_hauteur = (bas[:, 0].max() - bas[:, 0].min()) / 2.0
+        demi_largeur = (bas[:, 2].max() - bas[:, 2].min()) / 2.0
+        epaisseur = max(float(bas[:, 1].max() - bas[:, 1].min()), 0.035)
+    if not np.isfinite([r_col, demi_hauteur, demi_largeur, epaisseur]).all():
+        raise RuntimeError("mesures du modele TripoSR invalides")
     r_col = min(max(r_col, 0.008), 0.03)
     r_arr = min(0.006, 0.4 * epaisseur, 0.4 * demi_largeur)
     return {
@@ -651,7 +657,9 @@ def generer(args):
             PARAM.update(sauvegarde)
         print("Etape 3/3 : modele lisse termine.", flush=True)
     except Exception as erreur:
+        import traceback
         print("Modele lisse impossible (" + str(erreur) + ") : export TripoSR seul.", flush=True)
+        print(traceback.format_exc(), flush=True)
         mesh.export(os.path.join(dossier, args.nom + ".glb"))
         mesh.export(os.path.join(dossier, args.nom + ".obj"))
         if os.path.isdir(os.path.join(ROOT, "unity")):
