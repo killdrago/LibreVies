@@ -347,7 +347,278 @@ def recadrer_objet(image, taille_sortie=1024):
     return carre.resize((taille_sortie, taille_sortie), _Image.LANCZOS)
 
 
+# ---------------------------------------------------------------------------
+# Generateur parametrique (sans IA) : marteau de mecanicien, lisse, avec textures
+# ---------------------------------------------------------------------------
+
+PARAM = {
+    # Manche : axe X, la tete est a x < 0.
+    "L_manche": 0.27, "r_col": 0.0175, "r_bout": 0.0140, "r_bout_arr": 0.012, "x_debut": -0.040,
+    # Tete : fine dans l'axe du manche (X), haute (Y), large (Z), angles arrondis.
+    "tete_x0": -0.060, "tete_x1": -0.022, "tete_y": 0.040, "tete_z": 0.021, "rayon_arr": 0.006,
+    # Panne : monte au-dessus de la tete, comme sur la photo.
+    "panne_y": 0.040,
+}
+TEX_PARAM = 512
+
+
+def _manche_param(n_angle=96, n_station=140):
+    import numpy as np
+    p = PARAM
+    t = np.linspace(0.0, 1.0, n_station)
+    xs = p["x_debut"] + (p["L_manche"] - p["x_debut"]) * (0.5 - 0.5 * np.cos(np.pi * t))
+    rs = []
+    for x in xs:
+        u = np.clip(x / p["L_manche"], 0.0, 1.0)
+        r = p["r_col"] + (p["r_bout"] - p["r_col"]) * u
+        if x < 0:
+            r = p["r_col"]
+        debut = p["L_manche"] - p["r_bout_arr"]
+        if x > debut:
+            k = min((x - debut) / p["r_bout_arr"], 1.0)
+            r = (p["r_bout"] - p["r_bout_arr"]) + p["r_bout_arr"] * np.sqrt(max(0.0, 1.0 - k * k))
+        rs.append(r)
+    th = np.linspace(0, 2 * np.pi, n_angle + 1)
+    V, UV = [], []
+    for x, r in zip(xs, rs):
+        v = (x - p["x_debut"]) / (p["L_manche"] - p["x_debut"])
+        for a in th:
+            V.append([x, r * np.cos(a), r * np.sin(a)])
+            UV.append([a / (2 * np.pi), v])
+    cols = n_angle + 1
+    F = []
+    for i in range(n_station - 1):
+        for j in range(n_angle):
+            a = i * cols + j
+            b = a + 1
+            c = a + cols
+            d = c + 1
+            F.append([a, b, d])
+            F.append([a, d, c])
+    c0 = len(V)
+    V.append([xs[0], 0, 0])
+    UV.append([0.5, 0.0])
+    c1 = len(V)
+    V.append([xs[-1], 0, 0])
+    UV.append([0.5, 1.0])
+    last = (n_station - 1) * cols
+    for j in range(n_angle):
+        F.append([c0, j + 1, j])
+        F.append([c1, last + j, last + j + 1])
+    return np.array(V), np.array(UV), np.array(F)
+
+
+def _sphere_param(c, r):
+    import trimesh
+    s = trimesh.creation.icosphere(subdivisions=3, radius=r)
+    s.apply_translation(c)
+    return s
+
+
+def _hull_param(pieces):
+    import numpy as np
+    import trimesh
+    m = trimesh.util.concatenate(pieces).convex_hull
+    V = np.asarray(m.vertices)
+    F = np.asarray(m.faces)
+    mn, mx = V.min(0), V.max(0)
+    UV = np.column_stack([
+        (V[:, 1] - mn[1]) / (mx[1] - mn[1] + 1e-9),
+        (V[:, 2] - mn[2]) / (mx[2] - mn[2] + 1e-9),
+    ])
+    return V, UV, F
+
+
+def _tete_param():
+    p = PARAM
+    r = p["rayon_arr"]
+    pts = []
+    for x in (p["tete_x0"] + r, p["tete_x1"] - r):
+        for y in (-p["tete_y"] + r, p["tete_y"] - r):
+            for z in (-p["tete_z"] + r, p["tete_z"] - r):
+                pts.append([x, y, z])
+    return _hull_param([_sphere_param(q, r) for q in pts])
+
+
+def _panne_param():
+    p = PARAM
+    h = p["tete_y"]
+    c = (p["tete_x0"] + p["tete_x1"]) / 2.0
+    return _hull_param([
+        _sphere_param((c - 0.005, h - 0.006, -0.012), 0.0080),
+        _sphere_param((c - 0.005, h - 0.006, 0.012), 0.0080),
+        _sphere_param((c - 0.009, h + 0.015, 0.0), 0.0060),
+        _sphere_param((c - 0.013, h + 0.034, 0.0), 0.0035),
+    ])
+
+
+def _texture_bois_param(seed=7):
+    import numpy as np
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    u = np.linspace(0, 1, TEX_PARAM, endpoint=False)[None, :]
+    v = np.linspace(0, 1, TEX_PARAM, endpoint=False)[:, None]
+    deform = np.zeros((TEX_PARAM, 1))
+    for _ in range(3):
+        f = rng.integers(1, 4)
+        ph = rng.uniform(0, 2 * np.pi)
+        amp = rng.uniform(0.02, 0.05)
+        deform += amp * np.sin(2 * np.pi * f * v + ph)
+    cernes = np.zeros((TEX_PARAM, TEX_PARAM))
+    for _ in range(4):
+        k = rng.integers(3, 14)
+        ph = rng.uniform(0, 2 * np.pi)
+        cernes += np.sin(2 * np.pi * (k * u + deform) + ph)
+    cernes = (cernes - cernes.min()) / (cernes.max() - cernes.min())
+    veine = cernes ** 3
+    claire = np.array([0.91, 0.82, 0.63])
+    fonce = np.array([0.74, 0.60, 0.42])
+    mix = veine[..., None] * fonce + (1 - veine[..., None]) * claire
+    mix *= (1.0 + 0.015 * rng.standard_normal((TEX_PARAM, TEX_PARAM, 1)))
+    return Image.fromarray(np.clip(mix * 255, 0, 255).astype(np.uint8), "RGB")
+
+
+def _texture_acier_param(seed=3):
+    import numpy as np
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    base = np.array([0.13, 0.13, 0.14])
+    bruit = 1.0 + 0.03 * rng.standard_normal((TEX_PARAM, TEX_PARAM, 1))
+    return Image.fromarray(np.clip(base * bruit * 255, 0, 255).astype(np.uint8), "RGB")
+
+
+def _parametres_depuis_triposr(mesh):
+    """Mesure le maillage TripoSR (manche sur Y, tete en bas) pour caler le modele lisse."""
+    import numpy as np
+    V = np.asarray(mesh.vertices, dtype=np.float64)
+    mn, mx = V.min(0), V.max(0)
+    T = mx[1] - mn[1]
+    # Rayon du manche : mediane de la distance a l'axe sur une tranche au milieu du manche.
+    tranche = V[np.abs(V[:, 1] - (mn[1] + 0.55 * T)) < 0.01 * T]
+    cx, cz = tranche[:, 0].mean(), tranche[:, 2].mean()
+    r_col = float(np.median(np.hypot(tranche[:, 0] - cx, tranche[:, 2] - cz)))
+    # Tete : bas du modele (10 % de la longueur).
+    bas = V[V[:, 1] < mn[1] + 0.10 * T]
+    demi_hauteur = (bas[:, 0].max() - bas[:, 0].min()) / 2.0
+    demi_largeur = (bas[:, 2].max() - bas[:, 2].min()) / 2.0
+    epaisseur = max(float(bas[:, 1].max() - bas[:, 1].min()), 0.035)
+    r_col = min(max(r_col, 0.008), 0.03)
+    r_arr = min(0.006, 0.4 * epaisseur, 0.4 * demi_largeur)
+    return {
+        "L_manche": T - epaisseur, "r_col": r_col, "r_bout": 0.8 * r_col,
+        "r_bout_arr": 0.7 * r_col, "x_debut": -0.5 * epaisseur,
+        "tete_x0": -epaisseur, "tete_x1": 0.0,
+        # La panne depasse la tete de ~0.034 m : on retire cette saillie pour rester
+        # dans l'enveloppe mesuree sur TripoSR.
+        "tete_y": float(max(demi_hauteur - 0.03, 0.02)), "tete_z": float(demi_largeur),
+        "rayon_arr": float(r_arr), "panne_y": float(max(demi_hauteur - 0.03, 0.02)),
+    }
+
+
+def _generer_forme_texturee_photo(parties, photo, dossier, nom):
+    """Forme parametrique lisse + couleurs projetees depuis la photo (texture)."""
+    import numpy as np
+    import trimesh
+
+    V = np.vstack([p[1] for p in parties])
+    faces, off = [], 0
+    for _, Vp, _, Fp in parties:
+        faces.append(np.asarray(Fp) + off)
+        off += len(Vp)
+    # Meme orientation que TripoSR : manche sur Y, tete en bas (y minimum).
+    # (x, y, z) -> (y, x, z) est une symetrie : on inverse le sens des faces.
+    V = V[:, [1, 0, 2]]
+    F = np.vstack(faces)[:, [0, 2, 1]]
+    mesh = trimesh.Trimesh(vertices=V, faces=F, process=False)
+    mesh.visual.vertex_colors = np.full((len(V), 4), 255, dtype=np.uint8)
+    colorer_depuis_photo(mesh, photo)
+    mesh_uv, image, uv, F2, V2 = texturer(mesh)
+    exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom)
+    print("Forme parametrique texturee avec les couleurs de la photo.", flush=True)
+
+
+
+def generer_parametrique(args, photo_pil=None):
+    import numpy as np
+    import trimesh
+
+    debut = time.time()
+    print("=== Generateur parametrique (sans IA) : marteau ===", flush=True)
+    parties = [("Bois", *_manche_param()), ("Acier", *_tete_param()), ("Acier", *_panne_param())]
+
+    # Mise a l'echelle : la plus grande dimension devient la taille reelle (en metres).
+    tout = np.vstack([p[1] for p in parties])
+    etendue = tout.max(0) - tout.min(0)
+    echelle = (args.taille / 100.0) / float(etendue.max())
+    bas = tout.min(0) * echelle
+    decalage = np.array([-(tout[:, 0].min() + tout[:, 0].max()) / 2.0 * echelle,
+                         -bas[1],
+                         -(tout[:, 2].min() + tout[:, 2].max()) / 2.0 * echelle])
+    parties = [(m, V * echelle + decalage, UV, F) for m, V, UV, F in parties]
+
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    if photo_pil is not None or (args.image and os.path.isfile(args.image)):
+        try:
+            if photo_pil is None:
+                from PIL import Image
+                photo_pil = Image.open(args.image).convert("RGB")
+            _generer_forme_texturee_photo(parties, photo_pil, dossier, args.nom)
+            if os.path.isdir(os.path.join(ROOT, "unity")):
+                cible = os.path.join(UNITY_ITEMS, args.nom)
+                os.makedirs(cible, exist_ok=True)
+                for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_texture.png"):
+                    shutil.copy2(os.path.join(dossier, nom_fichier), os.path.join(cible, nom_fichier))
+                print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
+            print("Termine en %d secondes." % int(time.time() - debut), flush=True)
+            return
+        except Exception as erreur:
+            print("Couleurs de la photo impossibles (" + str(erreur) + ") : textures bois et acier.", flush=True)
+    img_bois = _texture_bois_param()
+    img_acier = _texture_acier_param()
+    img_bois.save(os.path.join(dossier, args.nom + "_bois.png"))
+    img_acier.save(os.path.join(dossier, args.nom + "_acier.png"))
+
+    lignes = ["mtllib " + args.nom + ".mtl", "o " + args.nom]
+    off = 0
+    for materiel, V, UV, F in parties:
+        lignes.append("usemtl " + materiel)
+        for p in V:
+            lignes.append("v %.6f %.6f %.6f" % (p[0], p[1], p[2]))
+        for t in UV:
+            lignes.append("vt %.6f %.6f" % (t[0], t[1]))
+        for f in F:
+            a, b, c = [int(i) + off + 1 for i in f]
+            lignes.append("f %d/%d %d/%d %d/%d" % (a, a, b, b, c, c))
+        off += len(V)
+    with open(os.path.join(dossier, args.nom + ".obj"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lignes) + "\n")
+    with open(os.path.join(dossier, args.nom + ".mtl"), "w", encoding="utf-8") as f:
+        f.write("newmtl Bois\nKa 1 1 1\nKd 1 1 1\nKs 0.05 0.05 0.05\nNs 10\nmap_Kd " + args.nom + "_bois.png\n\n")
+        f.write("newmtl Acier\nKa 1 1 1\nKd 1 1 1\nKs 0.4 0.4 0.4\nNs 60\nmap_Kd " + args.nom + "_acier.png\n")
+
+    morceaux = []
+    for materiel, V, UV, F in parties:
+        img = img_bois if materiel == "Bois" else img_acier
+        vis = trimesh.visual.TextureVisuals(uv=UV, material=trimesh.visual.material.SimpleMaterial(image=img))
+        morceaux.append(trimesh.Trimesh(vertices=V, faces=F, visual=vis, process=False))
+    trimesh.Scene(morceaux).export(os.path.join(dossier, args.nom + ".glb"))
+
+    print("Fichiers crees dans : " + dossier, flush=True)
+    print("  %d sommets, %d faces" % (len(tout), sum(len(p[3]) for p in parties)), flush=True)
+    if os.path.isdir(os.path.join(ROOT, "unity")):
+        cible = os.path.join(UNITY_ITEMS, args.nom)
+        os.makedirs(cible, exist_ok=True)
+        for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_bois.png", args.nom + "_acier.png"):
+            shutil.copy2(os.path.join(dossier, nom_fichier), os.path.join(cible, nom_fichier))
+        print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
+    print("Termine en %d secondes." % int(time.time() - debut), flush=True)
+
+
+
 def generer(args):
+    if args.parametrique:
+        return generer_parametrique(args)
     os.environ.update(env_ia())
     sys.path.insert(0, TRIPO)
 
@@ -448,6 +719,40 @@ def generer(args):
 # Interface graphique
 # ---------------------------------------------------------------------------
 
+def analyser_demande(texte):
+    """Lit la demande de l'utilisateur et renvoie (params, questions).
+
+    params : objet, taille (cm), nom ; questions : liste de questions a poser.
+    Une demande est prete quand questions est vide.
+    """
+    import re
+    t = texte.lower()
+    params = {"objet": None, "taille": None, "nom": "marteau_assistant"}
+    questions = []
+
+    if "marteau" in t:
+        params["objet"] = "marteau"
+    else:
+        questions.append("Quel objet voulez-vous ? Pour l'instant je sais fabriquer un marteau.")
+
+    trouve = re.search(r"(\d+(?:[.,]\d+)?)\s*(cm|mm|m)\b", t)
+    if trouve:
+        valeur = float(trouve.group(1).replace(",", "."))
+        unite = trouve.group(2)
+        cm = valeur * {"cm": 1.0, "mm": 0.1, "m": 100.0}[unite]
+        if 5 <= cm <= 100:
+            params["taille"] = round(cm, 1)
+        else:
+            questions.append("La taille doit etre entre 5 et 100 cm. Quelle taille reelle voulez-vous ?")
+    else:
+        questions.append("Quelle taille reelle voulez-vous (la plus grande dimension, en cm) ?")
+
+    if re.search(r"\bailes?\b", t) and not re.search(r"\bsans\s+ailes\b", t):
+        questions.append("Les ailes ne sont pas encore modelisees. Repondez « sans ailes » pour un marteau normal.")
+
+    return params, questions
+
+
 def interface():
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
@@ -490,6 +795,62 @@ def interface():
     bouton_generer = ttk.Button(cadre, text="Generer le modele 3D", state="disabled",
                                 command=lambda: generer_modele())
     bouton_generer.grid(row=5, column=1, sticky="w", pady=8, padx=5)
+
+    def ouvrir_assistant():
+        fenetre_chat = tk.Toplevel(fenetre)
+        fenetre_chat.title("Assistant LibreVies")
+        fenetre_chat.geometry("560x420")
+        historique = tk.Text(fenetre_chat, wrap="word", height=20, state="disabled")
+        historique.pack(fill="both", expand=True, padx=8, pady=8)
+        saisie = tk.StringVar(value="")
+        entree = ttk.Entry(fenetre_chat, textvariable=saisie, width=70)
+        entree.pack(side="left", fill="x", expand=True, padx=(8, 4), pady=(0, 8))
+        contexte = {"texte": ""}
+
+        def afficher(msg):
+            historique.config(state="normal")
+            historique.insert("end", msg + "\n")
+            historique.see("end")
+            historique.config(state="disabled")
+
+        def envoyer(event=None):
+            message = saisie.get().strip()
+            if not message:
+                return
+            saisie.set("")
+            afficher("Vous : " + message)
+            contexte["texte"] += " " + message
+            params, questions = analyser_demande(contexte["texte"])
+            if questions:
+                for q in questions:
+                    afficher("Assistant : " + q)
+                return
+            afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
+            lancer_parametrique(params["nom"], params["taille"])
+            contexte["texte"] = ""
+
+        ttk.Button(fenetre_chat, text="Envoyer", command=envoyer).pack(side="right", padx=(0, 8), pady=(0, 8))
+        entree.bind("<Return>", envoyer)
+        afficher("Assistant : decrivez l'objet (pour l'instant : un marteau).")
+
+    def lancer_parametrique(nom, taille):
+        cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--parametrique",
+               "--nom", nom, "--taille", str(taille), "--mc", "256"]
+
+        def travail():
+            log("=== Generation parametrique de '" + nom + "' ===")
+            proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True,
+                                    encoding="utf-8", errors="replace")
+            for ligne in proc.stdout:
+                log(ligne.rstrip())
+            code = proc.wait()
+            log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
+
+        threading.Thread(target=travail, daemon=True).start()
+
+    ttk.Button(cadre, text="Assistant (discussion)...", command=ouvrir_assistant).grid(
+        row=6, column=1, sticky="w", padx=5)
 
     ttk.Button(cadre, text="Ouvrir le dossier des sorties",
                command=lambda: ouvrir_sorties()).grid(row=5, column=2, sticky="e")
@@ -592,7 +953,8 @@ def main():
     if "--worker" in sys.argv:
         parseur = argparse.ArgumentParser()
         parseur.add_argument("--worker", action="store_true")
-        parseur.add_argument("--image", required=True)
+        parseur.add_argument("--image", default="")
+        parseur.add_argument("--parametrique", action="store_true")
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
         parseur.add_argument("--mc", type=int, default=256)
