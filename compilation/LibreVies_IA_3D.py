@@ -902,8 +902,8 @@ DEFAUT_TAILLE_PIECE = 30  # cm, taille de chaque piece (modifiable plus tard)
 
 TRADUCTIONS = {
     "marteau": "hammer", "marteaux": "hammer", "armure": "armor", "ours": "bear",
-    "baskets": "sneakers", "basket": "sneakers", "souris": "computer mouse",
-    "table": "table", "chaise": "chair", "ailes": "wings", "ange": "angel",
+    "baskets": "sneakers", "basket": "sneakers", "souris": "mouse",
+    "table": "table", "chaise": "chair", "ailes": "wings", "ange": "angel", "chapeau": "hat", "chapeaux": "hat", "chien": "dog", "chat": "cat", "voiture": "car", "arbre": "tree", "maison": "house", "poisson": "fish", "pomme": "apple", "lunettes": "glasses", "fleur": "flower",
     "cheval": "horse", "bouteille": "bottle", "casque": "helmet", "epee": "sword",
     "bouclier": "shield", "lampe": "lamp", "vase": "vase", "livre": "book", "tasse": "mug",
 }
@@ -915,7 +915,12 @@ DETERMINANTS = r"^(d'une\s*|d'un\s*|l'|un\s+|une\s+|des\s+|de\s+|du\s+|le\s+|la\
 def decouper_demande(texte):
     """Repere les pieces d'une demande : [{nom, relation}] ; relation = 'sur' ou 'cote'."""
     import re
-    morceaux = re.split(PIECE_SEPARATEURS, texte.lower().strip())
+    t = texte.lower().strip()
+    # Formules de politesse et verbes : ne font pas partie des pieces
+    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|je|moi|nous|svp|stp)\b", " ", t)
+    # « sur la tete », « sur le dos »... : le petit objet est pose dessus
+    t = re.sub(r"\bsur\s+(la\s+|le\s+|sa\s+|son\s+|ses\s+|les\s+)?(tete|tête|dos|epaule|épaule|main|mains)\b", " dessus ", t)
+    morceaux = re.split(PIECE_SEPARATEURS, re.sub(r"\s+", " ", t))
     pieces, relation = [], "cote"
     inverser = False
     for k, morceau in enumerate(morceaux):
@@ -944,11 +949,14 @@ def decouper_demande(texte):
 
 
 def requete_en(nom):
-    """Traduit le nom d'une piece pour Wikimedia Commons, ou None si un mot est inconnu."""
+    """Requete Wikimedia Commons pour une piece, et mots a retrouver dans les titres.
+
+    Un mot sans traduction garde son nom francais (la recherche le tente quand meme)."""
     mots = nom.split()
-    if mots and all(m in TRADUCTIONS for m in mots):
-        return " ".join(TRADUCTIONS[m] for m in mots)
-    return None
+    if not mots:
+        return None, ()
+    traduits = [TRADUCTIONS.get(m, m) for m in mots]
+    return " ".join(traduits), tuple(set(" ".join(traduits + mots).split()))
 
 
 def executer_worker(cmd, log):
@@ -1164,15 +1172,12 @@ def interface():
             piece = contexte["pieces"][contexte["i"]]
             contexte["attente"] = "source_piece"
             options = "1 = ma photo (je l'ouvre)"
-            if piece.get("requete"):
-                options += ", 2 = recherche web (images libres)"
-            else:
-                options += " (pas de recherche web pour ce mot)"
+            options += ", 2 = recherche web (images libres)"
             afficher("Assistant : pour « %s » : %s" % (piece["nom"], options))
 
         def lancer_pieces(pieces):
             for piece in pieces:
-                piece["requete"] = requete_en(piece["nom"])
+                piece["requete"], piece["mots"] = requete_en(piece["nom"])
                 piece["fichier"] = None
                 piece["url"] = None
             contexte["pieces"] = pieces
@@ -1190,8 +1195,7 @@ def interface():
                 contexte["pieces"] = None
                 contexte["attente"] = None
 
-        def lancer_recherche_piece(requete):
-            mots = tuple(requete.split())
+        def lancer_recherche_piece(requete, mots):
 
             def travail():
                 try:
@@ -1233,10 +1237,10 @@ def interface():
                     afficher("Assistant : photo de %s enregistree." % piece["nom"])
                     piece_suivante()
                     return
-                if message == "2" and piece.get("requete"):
+                if message == "2":
                     contexte["attente"] = "attente_recherche"
                     afficher("Assistant : je cherche « %s » sur Wikimedia Commons..." % piece["requete"])
-                    lancer_recherche_piece(piece["requete"])
+                    lancer_recherche_piece(piece["requete"], piece["mots"])
                     return
                 afficher("Assistant : tapez 1 (ma photo) ou 2 (recherche web).")
                 return
