@@ -538,6 +538,35 @@ def _generer_forme_texturee_photo(parties, photo, dossier, nom):
 
 
 
+def _plume_param(base, direction, longueur, largeur):
+    """Une plume : enveloppe convexe de 3 spheres le long de la direction."""
+    import numpy as np
+    d = np.asarray(direction, dtype=float)
+    d = d / np.linalg.norm(d)
+    base = np.asarray(base, dtype=float)
+    return _hull_param([
+        _sphere_param(base, largeur * 0.4),
+        _sphere_param(base + d * longueur * 0.5, largeur),
+        _sphere_param(base + d * longueur, largeur * 0.3),
+    ])
+
+
+def _ailes_param(x_attache, y_attache, z_centre, rayon, longueur=0.10, position=0.5):
+    """Deux ailes en eventail, une de chaque cote du manche. Dimensions reelles (m)."""
+    import numpy as np
+    parties = []
+    for signe in (1.0, -1.0):
+        base = np.array([x_attache, y_attache, z_centre + signe * rayon * 0.6])
+        for i in range(5):
+            t = i / 4.0
+            phi = 0.15 + 1.05 * t  # de la pointe basse vers le haut, en s'ecartant du manche
+            direction = (-0.25, np.sin(phi), signe * np.cos(phi))
+            longueur_plume = longueur * (0.55 + 0.45 * t)
+            V, UV, F = _plume_param(base, direction, longueur_plume, 0.010)
+            parties.append(("Acier", V, UV, F))
+    return parties
+
+
 def generer_parametrique(args, photo_pil=None):
     import numpy as np
     import trimesh
@@ -555,6 +584,16 @@ def generer_parametrique(args, photo_pil=None):
                          -bas[1],
                          -(tout[:, 2].min() + tout[:, 2].max()) / 2.0 * echelle])
     parties = [(m, V * echelle + decalage, UV, F) for m, V, UV, F in parties]
+
+    if getattr(args, "ailes", False):
+        p = PARAM
+        position = min(max(float(getattr(args, "position_ailes", 0.5)), 0.05), 0.95)
+        x_pre = p["x_debut"] + position * (p["L_manche"] - p["x_debut"])
+        u = np.clip(x_pre / p["L_manche"], 0.0, 1.0)
+        r_pre = p["r_col"] + (p["r_bout"] - p["r_col"]) * u
+        x_final = x_pre * echelle + decalage[0]
+        parties += _ailes_param(x_final, decalage[1], decalage[2], r_pre * echelle, position=position)
+        print("Ailes ajoutees : 2 x 10 cm, position %.2f du manche." % position, flush=True)
 
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
@@ -911,7 +950,7 @@ def interface():
         saisie = tk.StringVar(value="")
         entree = ttk.Entry(fenetre_chat, textvariable=saisie, width=70)
         entree.pack(side="left", fill="x", expand=True, padx=(8, 4), pady=(0, 8))
-        contexte = {"texte": "", "choix": None, "params": None}
+        contexte = {"texte": "", "choix": None, "params": None, "attente": None}
         file_chat = queue.Queue()
 
         def afficher(msg):
@@ -1012,6 +1051,28 @@ def interface():
             if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir(int(message))
                 return
+            if contexte.get("attente") == "source" and message in ("1", "2"):
+                params = contexte["params"]
+                if message == "1":
+                    contexte["attente"] = "place"
+                    afficher("Assistant : ou placer les ailes sur le manche ?")
+                    afficher("  1 = milieu du manche   2 = pres du pommeau   3 = pres de la tete")
+                else:
+                    contexte["attente"] = None
+                    afficher("Assistant : je cherche des images libres de droits (Wikimedia Commons)...")
+                    lancer_recherche(params)
+                return
+            if contexte.get("attente") == "place" and message in ("1", "2", "3"):
+                position = {"1": 0.5, "2": 0.85, "3": 0.15}[message]
+                params = contexte["params"]
+                contexte["attente"] = None
+                contexte["params"] = None
+                afficher("Assistant : je dessine le marteau avec ses ailes (%s cm)." % params["taille"])
+                lancer_parametrique(params["nom"], params["taille"], position)
+                return
+            if contexte.get("attente") in ("source", "place"):
+                contexte["attente"] = None
+                contexte["params"] = None
             contexte["choix"] = None
             contexte["texte"] += " " + message
             params, questions = analyser_demande(contexte["texte"])
@@ -1021,9 +1082,11 @@ def interface():
                 return
             if params["ailes"]:
                 contexte["texte"] = ""
-                afficher("Assistant : je cherche des images libres de droits (Wikimedia Commons)...")
-                lancer_recherche(params)
                 contexte["params"] = params
+                contexte["attente"] = "source"
+                afficher("Assistant : pour les ailes, que voulez-vous ?")
+                afficher("  1 = dessinees par le generateur (10 cm chaque aile, fiable)")
+                afficher("  2 = chercher une image libre sur le web (resultats incertains)")
                 return
             afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
             lancer_parametrique(params["nom"], params["taille"])
@@ -1059,9 +1122,11 @@ def interface():
         afficher("Assistant : decrivez l'objet (pour l'instant : un marteau, avec ou sans ailes).")
         verifier_chat()
 
-    def lancer_parametrique(nom, taille):
+    def lancer_parametrique(nom, taille, position_ailes=None):
         cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--parametrique",
                "--nom", nom, "--taille", str(taille), "--mc", "256"]
+        if position_ailes is not None:
+            cmd += ["--ailes", "--position-ailes", str(position_ailes)]
 
         def travail():
             log("=== Generation parametrique de '" + nom + "' ===")
@@ -1182,6 +1247,8 @@ def main():
         parseur.add_argument("--worker", action="store_true")
         parseur.add_argument("--image", default="")
         parseur.add_argument("--parametrique", action="store_true")
+        parseur.add_argument("--ailes", action="store_true")
+        parseur.add_argument("--position-ailes", type=float, default=0.5)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
         parseur.add_argument("--mc", type=int, default=256)
