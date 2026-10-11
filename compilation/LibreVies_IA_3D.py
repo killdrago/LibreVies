@@ -944,6 +944,7 @@ def interface():
             pass
         fenetre.after(150, poll)
 
+    ecrire("Version : avec bouton Assistant (discussion), ligne du bas a gauche.")
     threading.Thread(target=installation, daemon=True).start()
     fenetre.after(150, poll)
     fenetre.mainloop()
