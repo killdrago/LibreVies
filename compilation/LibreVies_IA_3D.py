@@ -788,11 +788,14 @@ def resultats_commons(donnees, n=5):
         licence = _sans_html((meta.get("LicenseShortName") or {}).get("value", ""))
         if not any(m in licence for m in ("CC", "Public domain", "PD")):
             continue
+        titre = page.get("title", "").replace("File:", "")
+        if not any(mot in titre.lower() for mot in ("hammer", "mallet", "marteau")):
+            continue
         url = info.get("thumburl") or info.get("url")
         if not url:
             continue
         trouves.append((page.get("index", 9999), {
-            "titre": page.get("title", "").replace("File:", ""),
+            "titre": titre,
             "url": url,
             "licence": licence,
             "auteur": _sans_html((meta.get("Artist") or {}).get("value", "")),
@@ -928,8 +931,10 @@ def interface():
                     if res:
                         file_chat.put(("choix", params, res, preparer_apercus(res)))
                     else:
-                        file_chat.put(("msg", "Aucune image libre trouvee pour cette demande. "
-                                              "Decrivez autrement, ou repondez « sans ailes »."))
+                        file_chat.put(("msg", "Aucune image libre de marteau a ailes trouvee sur "
+                                              "Wikimedia Commons. Repondez « sans ailes » pour un "
+                                              "marteau normal, ou utilisez votre propre photo "
+                                              "(bouton Choisir dans la fenetre principale)."))
                 except Exception as exc:
                     file_chat.put(("msg", "Recherche impossible (connexion internet ?) : " + str(exc)))
 
@@ -1038,7 +1043,10 @@ def interface():
                                  "dans la fenetre des images, ou tapez le numero ici :")
                         for i, r in enumerate(res, 1):
                             afficher("  %d. %s  [%s]" % (i, r["titre"], r["licence"]))
-                        ouvrir_apercus(res, chemins)
+                        try:
+                            ouvrir_apercus(res, chemins)
+                        except Exception as exc:
+                            afficher("Assistant : fenetre des images impossible : " + str(exc))
             except queue.Empty:
                 pass
             try:
