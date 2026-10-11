@@ -850,7 +850,7 @@ def interface():
         threading.Thread(target=travail, daemon=True).start()
 
     ttk.Button(cadre, text="Assistant (discussion)...", command=ouvrir_assistant).grid(
-        row=6, column=1, sticky="w", padx=5)
+        row=5, column=0, sticky="w", pady=8)
 
     ttk.Button(cadre, text="Ouvrir le dossier des sorties",
                command=lambda: ouvrir_sorties()).grid(row=5, column=2, sticky="e")
