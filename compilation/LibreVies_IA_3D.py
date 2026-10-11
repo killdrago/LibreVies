@@ -297,7 +297,208 @@ def exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom):
 
 
 
+# ---------------------------------------------------------------------------
+# Generateur parametrique (sans IA) : marteau de mecanicien, lisse, avec textures
+# ---------------------------------------------------------------------------
+
+PARAM = {
+    "L_manche": 0.27, "r_col": 0.0175, "r_bout": 0.0140, "r_bout_arr": 0.012, "x_debut": -0.035,
+    "tete_x0": -0.100, "tete_x1": -0.012, "tete_y": 0.030, "tete_z": 0.020, "rayon_arr": 0.006,
+    "panne_base_x": -0.100, "panne_tip_x": -0.150, "panne_y": 0.042,
+}
+TEX_PARAM = 512
+
+
+def _manche_param(n_angle=96, n_station=140):
+    import numpy as np
+    p = PARAM
+    t = np.linspace(0.0, 1.0, n_station)
+    xs = p["x_debut"] + (p["L_manche"] - p["x_debut"]) * (0.5 - 0.5 * np.cos(np.pi * t))
+    rs = []
+    for x in xs:
+        u = np.clip(x / p["L_manche"], 0.0, 1.0)
+        r = p["r_col"] + (p["r_bout"] - p["r_col"]) * u
+        if x < 0:
+            r = p["r_col"]
+        debut = p["L_manche"] - p["r_bout_arr"]
+        if x > debut:
+            k = min((x - debut) / p["r_bout_arr"], 1.0)
+            r = (p["r_bout"] - p["r_bout_arr"]) + p["r_bout_arr"] * np.sqrt(max(0.0, 1.0 - k * k))
+        rs.append(r)
+    th = np.linspace(0, 2 * np.pi, n_angle + 1)
+    V, UV = [], []
+    for x, r in zip(xs, rs):
+        v = (x - p["x_debut"]) / (p["L_manche"] - p["x_debut"])
+        for a in th:
+            V.append([x, r * np.cos(a), r * np.sin(a)])
+            UV.append([a / (2 * np.pi), v])
+    cols = n_angle + 1
+    F = []
+    for i in range(n_station - 1):
+        for j in range(n_angle):
+            a = i * cols + j
+            b = a + 1
+            c = a + cols
+            d = c + 1
+            F.append([a, b, d])
+            F.append([a, d, c])
+    c0 = len(V)
+    V.append([xs[0], 0, 0])
+    UV.append([0.5, 0.0])
+    c1 = len(V)
+    V.append([xs[-1], 0, 0])
+    UV.append([0.5, 1.0])
+    last = (n_station - 1) * cols
+    for j in range(n_angle):
+        F.append([c0, j + 1, j])
+        F.append([c1, last + j, last + j + 1])
+    return np.array(V), np.array(UV), np.array(F)
+
+
+def _sphere_param(c, r):
+    import trimesh
+    s = trimesh.creation.icosphere(subdivisions=3, radius=r)
+    s.apply_translation(c)
+    return s
+
+
+def _hull_param(pieces):
+    import numpy as np
+    import trimesh
+    m = trimesh.util.concatenate(pieces).convex_hull
+    V = np.asarray(m.vertices)
+    F = np.asarray(m.faces)
+    mn, mx = V.min(0), V.max(0)
+    UV = np.column_stack([
+        (V[:, 1] - mn[1]) / (mx[1] - mn[1] + 1e-9),
+        (V[:, 2] - mn[2]) / (mx[2] - mn[2] + 1e-9),
+    ])
+    return V, UV, F
+
+
+def _tete_param():
+    p = PARAM
+    r = p["rayon_arr"]
+    pts = []
+    for x in (p["tete_x0"] + r, p["tete_x1"] - r):
+        for y in (-p["tete_y"] + r, p["tete_y"] - r):
+            for z in (-p["tete_z"] + r, p["tete_z"] - r):
+                pts.append([x, y, z])
+    return _hull_param([_sphere_param(q, r) for q in pts])
+
+
+def _panne_param():
+    p = PARAM
+    py = p["panne_y"]
+    bx = p["panne_base_x"]
+    return _hull_param([
+        _sphere_param((bx + 0.010, py - 0.006, -0.012), 0.0080),
+        _sphere_param((bx + 0.010, py - 0.006, 0.012), 0.0080),
+        _sphere_param((bx - 0.025, py + 0.001, -0.005), 0.0050),
+        _sphere_param((p["panne_tip_x"], py - 0.001, 0.0), 0.0035),
+        _sphere_param((bx + 0.006, py, 0.0), 0.0060),
+    ])
+
+
+def _texture_bois_param(seed=7):
+    import numpy as np
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    u = np.linspace(0, 1, TEX_PARAM, endpoint=False)[None, :]
+    v = np.linspace(0, 1, TEX_PARAM, endpoint=False)[:, None]
+    deform = np.zeros((TEX_PARAM, 1))
+    for _ in range(3):
+        f = rng.integers(1, 4)
+        ph = rng.uniform(0, 2 * np.pi)
+        amp = rng.uniform(0.02, 0.05)
+        deform += amp * np.sin(2 * np.pi * f * v + ph)
+    cernes = np.zeros((TEX_PARAM, TEX_PARAM))
+    for _ in range(4):
+        k = rng.integers(3, 14)
+        ph = rng.uniform(0, 2 * np.pi)
+        cernes += np.sin(2 * np.pi * (k * u + deform) + ph)
+    cernes = (cernes - cernes.min()) / (cernes.max() - cernes.min())
+    veine = cernes ** 3
+    claire = np.array([0.91, 0.82, 0.63])
+    fonce = np.array([0.74, 0.60, 0.42])
+    mix = veine[..., None] * fonce + (1 - veine[..., None]) * claire
+    mix *= (1.0 + 0.015 * rng.standard_normal((TEX_PARAM, TEX_PARAM, 1)))
+    return Image.fromarray(np.clip(mix * 255, 0, 255).astype(np.uint8), "RGB")
+
+
+def _texture_acier_param(seed=3):
+    import numpy as np
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    base = np.array([0.13, 0.13, 0.14])
+    bruit = 1.0 + 0.03 * rng.standard_normal((TEX_PARAM, TEX_PARAM, 1))
+    return Image.fromarray(np.clip(base * bruit * 255, 0, 255).astype(np.uint8), "RGB")
+
+
+def generer_parametrique(args):
+    import numpy as np
+    import trimesh
+
+    debut = time.time()
+    print("=== Generateur parametrique (sans IA) : marteau ===", flush=True)
+    parties = [("Bois", *_manche_param()), ("Acier", *_tete_param()), ("Acier", *_panne_param())]
+
+    # Mise a l'echelle : la plus grande dimension devient la taille reelle (en metres).
+    tout = np.vstack([p[1] for p in parties])
+    etendue = tout.max(0) - tout.min(0)
+    echelle = (args.taille / 100.0) / float(etendue.max())
+    bas = tout.min(0) * echelle
+    decalage = np.array([-(tout[:, 0].min() + tout[:, 0].max()) / 2.0 * echelle,
+                         -bas[1],
+                         -(tout[:, 2].min() + tout[:, 2].max()) / 2.0 * echelle])
+    parties = [(m, V * echelle + decalage, UV, F) for m, V, UV, F in parties]
+
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    img_bois = _texture_bois_param()
+    img_acier = _texture_acier_param()
+    img_bois.save(os.path.join(dossier, args.nom + "_bois.png"))
+    img_acier.save(os.path.join(dossier, args.nom + "_acier.png"))
+
+    lignes = ["mtllib " + args.nom + ".mtl", "o " + args.nom]
+    off = 0
+    for materiel, V, UV, F in parties:
+        lignes.append("usemtl " + materiel)
+        for p in V:
+            lignes.append("v %.6f %.6f %.6f" % (p[0], p[1], p[2]))
+        for t in UV:
+            lignes.append("vt %.6f %.6f" % (t[0], t[1]))
+        for f in F:
+            a, b, c = [int(i) + off + 1 for i in f]
+            lignes.append("f %d/%d %d/%d %d/%d" % (a, a, b, b, c, c))
+        off += len(V)
+    with open(os.path.join(dossier, args.nom + ".obj"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lignes) + "\n")
+    with open(os.path.join(dossier, args.nom + ".mtl"), "w", encoding="utf-8") as f:
+        f.write("newmtl Bois\nKa 1 1 1\nKd 1 1 1\nKs 0.05 0.05 0.05\nNs 10\nmap_Kd " + args.nom + "_bois.png\n\n")
+        f.write("newmtl Acier\nKa 1 1 1\nKd 1 1 1\nKs 0.4 0.4 0.4\nNs 60\nmap_Kd " + args.nom + "_acier.png\n")
+
+    morceaux = []
+    for materiel, V, UV, F in parties:
+        img = img_bois if materiel == "Bois" else img_acier
+        vis = trimesh.visual.TextureVisuals(uv=UV, material=trimesh.visual.material.SimpleMaterial(image=img))
+        morceaux.append(trimesh.Trimesh(vertices=V, faces=F, visual=vis, process=False))
+    trimesh.Scene(morceaux).export(os.path.join(dossier, args.nom + ".glb"))
+
+    print("Fichiers crees dans : " + dossier, flush=True)
+    print("  %d sommets, %d faces" % (len(tout), sum(len(p[3]) for p in parties)), flush=True)
+    if os.path.isdir(os.path.join(ROOT, "unity")):
+        cible = os.path.join(UNITY_ITEMS, args.nom)
+        os.makedirs(cible, exist_ok=True)
+        for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_bois.png", args.nom + "_acier.png"):
+            shutil.copy2(os.path.join(dossier, nom_fichier), os.path.join(cible, nom_fichier))
+        print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
+    print("Termine en %d secondes." % int(time.time() - debut), flush=True)
+
+
 def generer(args):
+    if args.parametrique:
+        return generer_parametrique(args)
     os.environ.update(env_ia())
     sys.path.insert(0, TRIPO)
 
@@ -402,7 +603,7 @@ def interface():
 
     etat = {"pret": False, "photo": tk.StringVar(value=""), "nom": tk.StringVar(value="objet"),
             "taille": tk.StringVar(value="30"), "mc": tk.StringVar(value="256"),
-            "fond": tk.BooleanVar(value=True)}
+            "fond": tk.BooleanVar(value=True), "parametrique": tk.BooleanVar(value=False)}
 
     cadre = ttk.Frame(fenetre, padding=10)
     cadre.pack(fill="both", expand=True)
@@ -425,6 +626,8 @@ def interface():
 
     ttk.Checkbutton(cadre, text="Retirer le fond de la photo (recommande)",
                     variable=etat["fond"]).grid(row=4, column=1, sticky="w", padx=5)
+    ttk.Checkbutton(cadre, text="Marteau parametrique (sans IA, sans photo)",
+                    variable=etat["parametrique"]).grid(row=4, column=2, sticky="w", padx=5)
 
     bouton_generer = ttk.Button(cadre, text="Generer le modele 3D", state="disabled",
                                 command=lambda: generer_modele())
@@ -465,7 +668,7 @@ def interface():
         except ValueError:
             messagebox.showerror("Taille", "La taille doit etre un nombre (en cm).")
             return
-        if not os.path.isfile(photo):
+        if not etat["parametrique"].get() and not os.path.isfile(photo):
             messagebox.showerror("Photo", "Choisis une photo existante.")
             return
         if not nom or any(c in nom for c in '\\/:*?"<>| '):
@@ -480,6 +683,8 @@ def interface():
                "--mc", etat["mc"].get()]
         if not etat["fond"].get():
             cmd.append("--garder-fond")
+        if etat["parametrique"].get():
+            cmd.append("--parametrique")
 
         def travail():
             log("=== Generation de '" + nom + "' ===")
@@ -531,7 +736,8 @@ def main():
     if "--worker" in sys.argv:
         parseur = argparse.ArgumentParser()
         parseur.add_argument("--worker", action="store_true")
-        parseur.add_argument("--image", required=True)
+        parseur.add_argument("--image", default="")
+        parseur.add_argument("--parametrique", action="store_true")
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
         parseur.add_argument("--mc", type=int, default=256)
