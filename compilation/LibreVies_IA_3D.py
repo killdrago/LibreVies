@@ -315,6 +315,38 @@ def exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom):
 
 
 
+def recadrer_objet(image, taille_sortie=1024):
+    """Recadre la photo autour de l'objet (fond uni suppose), en carre, avec une marge.
+
+    L'objet occupe alors une plus grande partie de l'image avant la decoupe du fond.
+    Si l'objet n'est pas detecte, la photo est renvoyee telle quelle.
+    """
+    import numpy as np
+    from PIL import Image as _Image
+
+    rgb = image.convert("RGB")
+    im = np.asarray(rgb).astype(np.float32)
+    h, w = im.shape[:2]
+    bord = np.concatenate([im[:4].reshape(-1, 3), im[-4:].reshape(-1, 3),
+                           im[:, :4].reshape(-1, 3), im[:, -4:].reshape(-1, 3)])
+    fond = np.median(bord, axis=0)
+    masque = np.abs(im - fond).sum(-1) > 60
+    ys, xs = np.where(masque)
+    if xs.size < 50:
+        return image
+    x0, x1 = np.percentile(xs, [1, 99])
+    y0, y1 = np.percentile(ys, [1, 99])
+    marge = 0.12 * max(x1 - x0, y1 - y0)
+    x0, x1 = max(x0 - marge, 0), min(x1 + marge, w - 1)
+    y0, y1 = max(y0 - marge, 0), min(y1 + marge, h - 1)
+    cote = max(x1 - x0, y1 - y0)
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    boite = (int(cx - cote / 2), int(cy - cote / 2), int(cx + cote / 2), int(cy + cote / 2))
+    carre = _Image.new("RGB", (int(cote), int(cote)), tuple(int(v) for v in fond))
+    carre.paste(rgb.crop(boite), (0, 0))
+    return carre.resize((taille_sortie, taille_sortie), _Image.LANCZOS)
+
+
 def generer(args):
     os.environ.update(env_ia())
     sys.path.insert(0, TRIPO)
@@ -340,7 +372,7 @@ def generer(args):
     model.to(device)
 
     print("Preparation de la photo...", flush=True)
-    image = Image.open(args.image)
+    image = recadrer_objet(Image.open(args.image))
     if args.retirer_fond:
         session = rembg.new_session()
         image = remove_background(image, session)
