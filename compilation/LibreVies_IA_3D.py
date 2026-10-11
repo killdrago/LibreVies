@@ -812,7 +812,7 @@ def _sans_html(texte):
     return re.sub(r"<[^>]+>", "", texte or "").strip()
 
 
-def resultats_commons(donnees, n=5):
+def resultats_commons(donnees, n=5, mots_cles=("hammer", "mallet", "marteau")):
     """Garde les images libres (CC ou domaine public), dans l'ordre de pertinence."""
     pages = (donnees.get("query") or {}).get("pages") or {}
     trouves = []
@@ -828,7 +828,7 @@ def resultats_commons(donnees, n=5):
         if not any(m in licence for m in ("CC", "Public domain", "PD")):
             continue
         titre = page.get("title", "").replace("File:", "")
-        if not any(mot in titre.lower() for mot in ("hammer", "mallet", "marteau")):
+        if mots_cles and not any(mot in titre.lower() for mot in mots_cles):
             continue
         url = info.get("thumburl") or info.get("url")
         if not url:
@@ -844,13 +844,13 @@ def resultats_commons(donnees, n=5):
     return [r for _, r in trouves[:n]]
 
 
-def chercher_images_libres(requete, n=5):
+def chercher_images_libres(requete, n=5, mots_cles=("hammer", "mallet", "marteau")):
     import urllib.parse
     url = COMMONS_API + "?" + urllib.parse.urlencode({
         "action": "query", "format": "json", "generator": "search",
         "gsrsearch": requete, "gsrnamespace": 6, "gsrlimit": 30,
         "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "iiurlwidth": 800})
-    return resultats_commons(_http_json(url), n)
+    return resultats_commons(_http_json(url), n, mots_cles)
 
 
 def telecharger_image(url, chemin):
@@ -896,6 +896,115 @@ def ecrire_credits(nom, choisi):
     with open(os.path.join(dossier, "source.txt"), "w", encoding="utf-8") as f:
         f.write("Image source : %s\nAuteur : %s\nLicence : %s\nPage : %s\n" % (
             choisi["titre"], choisi["auteur"], choisi["licence"], choisi["page"]))
+
+
+DEFAUT_TAILLE_PIECE = 30  # cm, taille de chaque piece (modifiable plus tard)
+
+TRADUCTIONS = {
+    "marteau": "hammer", "marteaux": "hammer", "armure": "armor", "ours": "bear",
+    "baskets": "sneakers", "basket": "sneakers", "souris": "computer mouse",
+    "table": "table", "chaise": "chair", "ailes": "wings", "ange": "angel",
+    "cheval": "horse", "bouteille": "bottle", "casque": "helmet", "epee": "sword",
+    "bouclier": "shield", "lampe": "lamp", "vase": "vase", "livre": "book", "tasse": "mug",
+}
+
+PIECE_SEPARATEURS = r"(\s+(?:avec|et|posée sur|posé sur|pose sur|sur|dans|à côté de|a cote de)\s+|,)"
+DETERMINANTS = r"^(d'une\s*|d'un\s*|l'|un\s+|une\s+|des\s+|de\s+|du\s+|le\s+|la\s+|les\s+|mon\s+|ma\s+|mes\s+|son\s+|sa\s+|ses\s+)"
+
+
+def decouper_demande(texte):
+    """Repere les pieces d'une demande : [{nom, relation}] ; relation = 'sur' ou 'cote'."""
+    import re
+    morceaux = re.split(PIECE_SEPARATEURS, texte.lower().strip())
+    pieces, relation = [], "cote"
+    inverser = False
+    for k, morceau in enumerate(morceaux):
+        if k % 2 == 1:
+            relation = "sur" if "sur" in morceau else "cote"
+            inverser = relation == "sur"
+            continue
+        nom = morceau.strip()
+        for _ in range(2):
+            nom = re.sub(DETERMINANTS, "", nom)
+        nom = re.sub(r"\s+de\s+\d.*$|\s*\d.*$", "", nom).strip()
+        if nom.endswith(" dessus"):
+            nom, relation, inverser = nom[:-len(" dessus")].strip(), "sur", False
+        if len(nom) < 3:
+            relation = "cote"
+            continue
+        if inverser and relation == "sur" and pieces:
+            # "A sur B" : B est le support, il doit etre pose en premier
+            a_poser = pieces.pop()
+            pieces.append({"nom": nom, "relation": "cote"})
+            pieces.append({"nom": a_poser["nom"], "relation": "sur"})
+        else:
+            pieces.append({"nom": nom, "relation": relation})
+        relation, inverser = "cote", False
+    return pieces
+
+
+def requete_en(nom):
+    """Traduit le nom d'une piece pour Wikimedia Commons, ou None si un mot est inconnu."""
+    mots = nom.split()
+    if mots and all(m in TRADUCTIONS for m in mots):
+        return " ".join(TRADUCTIONS[m] for m in mots)
+    return None
+
+
+def executer_worker(cmd, log):
+    proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True,
+                            encoding="utf-8", errors="replace")
+    for ligne in proc.stdout:
+        log(ligne.rstrip())
+    return proc.wait()
+
+
+def assembler(args):
+    """Pose les pieces (fichiers .glb) les unes par rapport aux autres et exporte une scene."""
+    import json
+    import numpy as np
+    import trimesh
+    entrees = json.loads(args.entrees)
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    marge = 0.02  # 2 cm entre deux pieces posees cote a cote
+    combine = trimesh.Scene()
+    precedent = None  # (min, max) de la piece precedente, en metres
+    for k, e in enumerate(entrees):
+        sc = trimesh.load(e["fichier"], force="scene")
+        bmin, bmax = sc.bounds
+        echelle = (float(e["taille"]) / 100.0) / float(max((bmax - bmin).max(), 1e-9))
+        smin, smax = bmin * echelle, bmax * echelle
+        bas_centre = np.array([(smin[0] + smax[0]) / 2.0, smin[1], (smin[2] + smax[2]) / 2.0])
+        if precedent is None:
+            cible = np.array([0.0, 0.0, 0.0])
+        else:
+            pmin, pmax = precedent
+            milieu_z = (pmin[2] + pmax[2]) / 2.0
+            if e["relation"] == "sur":
+                cible = np.array([(pmin[0] + pmax[0]) / 2.0, pmax[1], milieu_z])
+            else:
+                cible = np.array([pmax[0] + marge + (smax[0] - smin[0]) / 2.0, 0.0, milieu_z])
+        M = np.eye(4)
+        M[:3, :3] *= echelle
+        M[:3, 3] = cible - bas_centre
+        pmin_new, pmax_new = None, None
+        for node in sc.graph.nodes_geometry:
+            T, nom_geom = sc.graph[node]
+            g = sc.geometry[nom_geom].copy()
+            g.apply_transform(M @ T)
+            combine.add_geometry(g, node_name="p%d_%s" % (k, node))
+            gmin, gmax = g.bounds
+            pmin_new = gmin if pmin_new is None else np.minimum(pmin_new, gmin)
+            pmax_new = gmax if pmax_new is None else np.maximum(pmax_new, gmax)
+        precedent = (pmin_new, pmax_new)
+        print("Piece %d posee (%s)." % (k + 1, e["relation"]), flush=True)
+    chemin = os.path.join(dossier, args.nom + ".glb")
+    combine.export(chemin)
+    etendue = (combine.bounds[1] - combine.bounds[0]) * 100
+    print("Scene assemblee : " + chemin, flush=True)
+    print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
 
 
 def interface():
@@ -950,7 +1059,7 @@ def interface():
         saisie = tk.StringVar(value="")
         entree = ttk.Entry(fenetre_chat, textvariable=saisie, width=70)
         entree.pack(side="left", fill="x", expand=True, padx=(8, 4), pady=(0, 8))
-        contexte = {"texte": "", "choix": None, "params": None, "attente": None}
+        contexte = {"texte": "", "choix": None, "params": None, "attente": None, "pieces": None, "i": 0}
         file_chat = queue.Queue()
 
         def afficher(msg):
@@ -1021,7 +1130,8 @@ def interface():
             afficher("Assistant : je telecharge l'image n° %d puis je la modelise." % numero)
             lancer_depuis_image(choisi, params)
 
-        def ouvrir_apercus(res, chemins):
+        def ouvrir_apercus(res, chemins, action=None):
+            action = action or choisir
             fen = tk.Toplevel(fenetre_chat)
             fen.title("Images libres proposees")
             contexte["fenetre_apercu"] = fen
@@ -1040,7 +1150,144 @@ def interface():
                 tk.Label(col, text="%d. %s" % (i, r["titre"][:40]), wraplength=190).pack()
                 tk.Label(col, text=r["licence"], fg="gray", wraplength=190).pack()
                 ttk.Button(col, text="Modeliser %d" % i,
-                           command=lambda n=i: choisir(n)).pack(pady=4)
+                           command=lambda n=i: action(n)).pack(pady=4)
+
+        def fermer_apercu():
+            fen = contexte.get("fenetre_apercu")
+            if fen is not None:
+                try:
+                    fen.destroy()
+                except tk.TclError:
+                    pass
+
+        def demander_piece():
+            piece = contexte["pieces"][contexte["i"]]
+            contexte["attente"] = "source_piece"
+            options = "1 = ma photo (je l'ouvre)"
+            if piece.get("requete"):
+                options += ", 2 = recherche web (images libres)"
+            else:
+                options += " (pas de recherche web pour ce mot)"
+            afficher("Assistant : pour « %s » : %s" % (piece["nom"], options))
+
+        def lancer_pieces(pieces):
+            for piece in pieces:
+                piece["requete"] = requete_en(piece["nom"])
+                piece["fichier"] = None
+                piece["url"] = None
+            contexte["pieces"] = pieces
+            contexte["i"] = 0
+            afficher("Assistant : je vois %d piece(s) : %s. Je demande la source de chacune."
+                     % (len(pieces), ", ".join(p["nom"] for p in pieces)))
+            demander_piece()
+
+        def piece_suivante():
+            contexte["i"] += 1
+            if contexte["i"] < len(contexte["pieces"]):
+                demander_piece()
+            else:
+                fabriquer_pieces(contexte["pieces"])
+                contexte["pieces"] = None
+                contexte["attente"] = None
+
+        def lancer_recherche_piece(requete):
+            mots = tuple(requete.split())
+
+            def travail():
+                try:
+                    res = chercher_images_libres(requete, 5, mots)
+                    if res:
+                        file_chat.put(("choix_piece", res, preparer_apercus(res)))
+                    else:
+                        file_chat.put(("msg", "Aucune image libre trouvee pour « %s »." % requete))
+                        file_chat.put(("reattendre", None, None))
+                except Exception as exc:
+                    file_chat.put(("msg", "Recherche impossible (connexion internet ?) : " + str(exc)))
+                    file_chat.put(("reattendre", None, None))
+
+            threading.Thread(target=travail, daemon=True).start()
+
+        def choisir_piece(numero):
+            piece = contexte["pieces"][contexte["i"]]
+            choisi = contexte["choix"][numero - 1]
+            contexte["choix"] = None
+            fermer_apercu()
+            piece.update({"url": choisi["url"], "titre": choisi["titre"],
+                          "licence": choisi["licence"], "auteur": choisi["auteur"],
+                          "page": choisi["page"]})
+            afficher("Assistant : image %d retenue pour %s." % (numero, piece["nom"]))
+            piece_suivante()
+
+        def traiter_piece(message):
+            piece = contexte["pieces"][contexte["i"]]
+            attente = contexte.get("attente")
+            if attente == "source_piece":
+                if message == "1":
+                    chemin = filedialog.askopenfilename(
+                        parent=fenetre_chat, title="Photo de " + piece["nom"],
+                        filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
+                    if not chemin:
+                        afficher("Assistant : pas de photo choisie. Tapez 1 pour choisir, ou 2 pour le web.")
+                        return
+                    piece["fichier"] = chemin
+                    afficher("Assistant : photo de %s enregistree." % piece["nom"])
+                    piece_suivante()
+                    return
+                if message == "2" and piece.get("requete"):
+                    contexte["attente"] = "attente_recherche"
+                    afficher("Assistant : je cherche « %s » sur Wikimedia Commons..." % piece["requete"])
+                    lancer_recherche_piece(piece["requete"])
+                    return
+                afficher("Assistant : tapez 1 (ma photo) ou 2 (recherche web).")
+                return
+            if attente == "choix_piece" and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
+                choisir_piece(int(message))
+                return
+            afficher("Assistant : tapez le numero demande.")
+
+        def fabriquer_pieces(pieces):
+            import json
+            base = "scene_%d" % int(time.time())
+            afficher("Assistant : je fabrique les %d piece(s) puis je les assemble (suivez le journal)."
+                     % len(pieces))
+
+            def travail():
+                try:
+                    os.makedirs(os.path.join(IA, "images"), exist_ok=True)
+                    entrees = []
+                    for k, piece in enumerate(pieces, 1):
+                        nom = "%s_%d" % (base, k)
+                        if piece.get("fichier"):
+                            ext = os.path.splitext(piece["fichier"])[1].lower() or ".jpg"
+                            chemin = os.path.join(IA, "images", nom + ext)
+                            shutil.copy2(piece["fichier"], chemin)
+                        else:
+                            ext = ".png" if piece["url"].lower().endswith(".png") else ".jpg"
+                            chemin = os.path.join(IA, "images", nom + ext)
+                            log("=== Telechargement : " + piece["titre"] + " ===")
+                            telecharger_image(piece["url"], chemin)
+                        log("=== Piece %d/%d : %s ===" % (k, len(pieces), piece["nom"]))
+                        cmd = [venv_python(), os.path.abspath(__file__), "--worker",
+                               "--image", chemin, "--nom", nom,
+                               "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256"]
+                        if executer_worker(cmd, log) != 0:
+                            log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
+                            return
+                        if piece.get("url"):
+                            ecrire_credits(nom, piece)
+                        entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
+                                        "taille": DEFAUT_TAILLE_PIECE,
+                                        "relation": piece["relation"]})
+                    log("=== Assemblage de '" + base + "' ===")
+                    cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--assembler",
+                           "--nom", base, "--taille", "0", "--entrees", json.dumps(entrees)]
+                    code = executer_worker(cmd, log)
+                    log("=== Fini : sorties\\" + base + "\\" + base + ".glb ===" if code == 0
+                        else "=== ECHEC assemblage : voir le journal ===")
+                except Exception as exc:
+                    log("ERREUR : " + str(exc))
+
+            threading.Thread(target=travail, daemon=True).start()
 
         def envoyer(event=None):
             message = saisie.get().strip()
@@ -1048,6 +1295,9 @@ def interface():
                 return
             saisie.set("")
             afficher("Vous : " + message)
+            if contexte.get("pieces"):
+                traiter_piece(message)
+                return
             if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir(int(message))
                 return
@@ -1073,6 +1323,12 @@ def interface():
             if contexte.get("attente") in ("source", "place"):
                 contexte["attente"] = None
                 contexte["params"] = None
+            if not contexte.get("attente") and "marteau" not in message.lower() \
+                    and "aile" not in message.lower():
+                pieces = decouper_demande(message)
+                if pieces:
+                    lancer_pieces(pieces)
+                    return
             contexte["choix"] = None
             contexte["texte"] += " " + message
             params, questions = analyser_demande(contexte["texte"])
@@ -1098,6 +1354,20 @@ def interface():
                     item = file_chat.get_nowait()
                     if item[0] == "msg":
                         afficher("Assistant : " + item[1])
+                    elif item[0] == "reattendre":
+                        contexte["attente"] = "source_piece"
+                    elif item[0] == "choix_piece":
+                        _, res, chemins = item
+                        contexte["choix"] = res
+                        contexte["attente"] = "choix_piece"
+                        nom_piece = contexte["pieces"][contexte["i"]]["nom"]
+                        afficher("Assistant : images libres pour « %s » :" % nom_piece)
+                        for i, r in enumerate(res, 1):
+                            afficher("  %d. %s  [%s]" % (i, r["titre"], r["licence"]))
+                        try:
+                            ouvrir_apercus(res, chemins, choisir_piece)
+                        except Exception as exc:
+                            afficher("Assistant : fenetre des images impossible : " + str(exc))
                     elif item[0] == "choix":
                         _, params, res, chemins = item
                         contexte["choix"] = res
@@ -1248,6 +1518,8 @@ def main():
         parseur.add_argument("--image", default="")
         parseur.add_argument("--parametrique", action="store_true")
         parseur.add_argument("--ailes", action="store_true")
+        parseur.add_argument("--assembler", action="store_true")
+        parseur.add_argument("--entrees", default="[]")
         parseur.add_argument("--position-ailes", type=float, default=0.5)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
@@ -1255,6 +1527,9 @@ def main():
         parseur.add_argument("--garder-fond", action="store_true")
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
+        if args.assembler:
+            assembler(args)
+            return
         generer(args)
         return
     interface()
