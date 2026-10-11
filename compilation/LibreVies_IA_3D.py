@@ -1505,7 +1505,7 @@ def interface():
             pass
         fenetre.after(150, poll)
 
-    ecrire("Version : assistant avec apercu des images libres (ailes).")
+    ecrire("Version : assistant multi-pieces (armure, ours, baskets...) + ailes.")
     threading.Thread(target=installation, daemon=True).start()
     fenetre.after(150, poll)
     fenetre.mainloop()
