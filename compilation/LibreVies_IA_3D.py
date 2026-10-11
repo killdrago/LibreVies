@@ -218,6 +218,23 @@ def colorer_depuis_photo(mesh, image):
         "XZ"[axe // 2], signe, score), flush=True)
 
 
+def lisser_couleurs(mesh, passes=4):
+    """Adoucit les couleurs de sommets : chaque sommet prend la moyenne de ses voisins
+    et de lui-meme. Supprime les traits de couleur dus a la projection sur une surface irreguliere."""
+    import numpy as np
+    c = np.asarray(mesh.visual.vertex_colors)[:, :3].astype(np.float64)
+    voisins = mesh.vertex_neighbors
+    for _ in range(passes):
+        nouveau = np.empty_like(c)
+        for i, v in enumerate(voisins):
+            nouveau[i] = (c[i] + c[v].sum(axis=0)) / (1 + len(v))
+        c = nouveau
+    rgba = np.zeros((len(c), 4), dtype=np.uint8)
+    rgba[:, :3] = np.clip(c, 0, 255).astype(np.uint8)
+    rgba[:, 3] = 255
+    mesh.visual.vertex_colors = rgba
+
+
 def texturer(mesh, resolution=1024):
     """Deplie le maillage (UV, xatlas) et cuit les couleurs de la photo dans une texture.
 
@@ -374,8 +391,9 @@ def generer(args):
     try:
         from trimesh.smoothing import filter_taubin
         lisse = mesh.copy()
-        filter_taubin(lisse, lamb=0.5, nu=0.53, iterations=60)
+        filter_taubin(lisse, lamb=0.5, nu=0.53, iterations=150)
         colorer_depuis_photo(lisse, image)
+        lisser_couleurs(lisse, passes=4)
         mesh_uv, image_fin, uv, F2, V2 = texturer(lisse)
         exporter_texture(mesh_uv, image_fin, uv, F2, V2, dossier, args.nom)
         print("  forme lissee et texturee : " + args.nom + ".obj / .glb", flush=True)
