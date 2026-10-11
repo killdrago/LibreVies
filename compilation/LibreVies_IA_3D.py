@@ -302,9 +302,12 @@ def exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom):
 # ---------------------------------------------------------------------------
 
 PARAM = {
-    "L_manche": 0.27, "r_col": 0.0175, "r_bout": 0.0140, "r_bout_arr": 0.012, "x_debut": -0.035,
-    "tete_x0": -0.100, "tete_x1": -0.012, "tete_y": 0.030, "tete_z": 0.020, "rayon_arr": 0.006,
-    "panne_base_x": -0.100, "panne_tip_x": -0.150, "panne_y": 0.042,
+    # Manche : axe X, la tete est a x < 0.
+    "L_manche": 0.27, "r_col": 0.0175, "r_bout": 0.0140, "r_bout_arr": 0.012, "x_debut": -0.040,
+    # Tete : fine dans l'axe du manche (X), haute (Y), large (Z), angles arrondis.
+    "tete_x0": -0.060, "tete_x1": -0.022, "tete_y": 0.040, "tete_z": 0.021, "rayon_arr": 0.006,
+    # Panne : monte au-dessus de la tete, comme sur la photo.
+    "panne_y": 0.040,
 }
 TEX_PARAM = 512
 
@@ -389,14 +392,12 @@ def _tete_param():
 
 def _panne_param():
     p = PARAM
-    py = p["panne_y"]
-    bx = p["panne_base_x"]
+    h = p["tete_y"]
     return _hull_param([
-        _sphere_param((bx + 0.010, py - 0.006, -0.012), 0.0080),
-        _sphere_param((bx + 0.010, py - 0.006, 0.012), 0.0080),
-        _sphere_param((bx - 0.025, py + 0.001, -0.005), 0.0050),
-        _sphere_param((p["panne_tip_x"], py - 0.001, 0.0), 0.0035),
-        _sphere_param((bx + 0.006, py, 0.0), 0.0060),
+        _sphere_param((-0.046, h - 0.006, -0.012), 0.0080),
+        _sphere_param((-0.046, h - 0.006, 0.012), 0.0080),
+        _sphere_param((-0.050, h + 0.015, 0.0), 0.0060),
+        _sphere_param((-0.054, h + 0.034, 0.0), 0.0035),
     ])
 
 
