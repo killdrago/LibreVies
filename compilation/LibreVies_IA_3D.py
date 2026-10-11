@@ -393,11 +393,12 @@ def _tete_param():
 def _panne_param():
     p = PARAM
     h = p["tete_y"]
+    c = (p["tete_x0"] + p["tete_x1"]) / 2.0
     return _hull_param([
-        _sphere_param((-0.046, h - 0.006, -0.012), 0.0080),
-        _sphere_param((-0.046, h - 0.006, 0.012), 0.0080),
-        _sphere_param((-0.050, h + 0.015, 0.0), 0.0060),
-        _sphere_param((-0.054, h + 0.034, 0.0), 0.0035),
+        _sphere_param((c - 0.005, h - 0.006, -0.012), 0.0080),
+        _sphere_param((c - 0.005, h - 0.006, 0.012), 0.0080),
+        _sphere_param((c - 0.009, h + 0.015, 0.0), 0.0060),
+        _sphere_param((c - 0.013, h + 0.034, 0.0), 0.0035),
     ])
 
 
@@ -436,6 +437,34 @@ def _texture_acier_param(seed=3):
     return Image.fromarray(np.clip(base * bruit * 255, 0, 255).astype(np.uint8), "RGB")
 
 
+def _parametres_depuis_triposr(mesh):
+    """Mesure le maillage TripoSR (manche sur Y, tete en bas) pour caler le modele lisse."""
+    import numpy as np
+    V = np.asarray(mesh.vertices, dtype=np.float64)
+    mn, mx = V.min(0), V.max(0)
+    T = mx[1] - mn[1]
+    # Rayon du manche : mediane de la distance a l'axe sur une tranche au milieu du manche.
+    tranche = V[np.abs(V[:, 1] - (mn[1] + 0.55 * T)) < 0.01 * T]
+    cx, cz = tranche[:, 0].mean(), tranche[:, 2].mean()
+    r_col = float(np.median(np.hypot(tranche[:, 0] - cx, tranche[:, 2] - cz)))
+    # Tete : bas du modele (10 % de la longueur).
+    bas = V[V[:, 1] < mn[1] + 0.10 * T]
+    demi_hauteur = (bas[:, 0].max() - bas[:, 0].min()) / 2.0
+    demi_largeur = (bas[:, 2].max() - bas[:, 2].min()) / 2.0
+    epaisseur = max(float(bas[:, 1].max() - bas[:, 1].min()), 0.035)
+    r_col = min(max(r_col, 0.008), 0.03)
+    r_arr = min(0.006, 0.4 * epaisseur, 0.4 * demi_largeur)
+    return {
+        "L_manche": T - epaisseur, "r_col": r_col, "r_bout": 0.8 * r_col,
+        "r_bout_arr": 0.7 * r_col, "x_debut": -0.5 * epaisseur,
+        "tete_x0": -epaisseur, "tete_x1": 0.0,
+        # La panne depasse la tete de ~0.034 m : on retire cette saillie pour rester
+        # dans l'enveloppe mesuree sur TripoSR.
+        "tete_y": float(max(demi_hauteur - 0.03, 0.02)), "tete_z": float(demi_largeur),
+        "rayon_arr": float(r_arr), "panne_y": float(max(demi_hauteur - 0.03, 0.02)),
+    }
+
+
 def _generer_forme_texturee_photo(parties, photo, dossier, nom):
     """Forme parametrique lisse + couleurs projetees depuis la photo (texture)."""
     import numpy as np
@@ -459,7 +488,7 @@ def _generer_forme_texturee_photo(parties, photo, dossier, nom):
 
 
 
-def generer_parametrique(args):
+def generer_parametrique(args, photo_pil=None):
     import numpy as np
     import trimesh
 
@@ -479,11 +508,12 @@ def generer_parametrique(args):
 
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
-    if args.image and os.path.isfile(args.image):
+    if photo_pil is not None or (args.image and os.path.isfile(args.image)):
         try:
-            from PIL import Image
-            photo = Image.open(args.image).convert("RGB")
-            _generer_forme_texturee_photo(parties, photo, dossier, args.nom)
+            if photo_pil is None:
+                from PIL import Image
+                photo_pil = Image.open(args.image).convert("RGB")
+            _generer_forme_texturee_photo(parties, photo_pil, dossier, args.nom)
             if os.path.isdir(os.path.join(ROOT, "unity")):
                 cible = os.path.join(UNITY_ITEMS, args.nom)
                 os.makedirs(cible, exist_ok=True)
@@ -595,31 +625,39 @@ def generer(args):
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
     image.save(os.path.join(dossier, "photo_traitee.png"))
-    print("Depliage UV et cuisson de la texture (couleurs de la photo)...", flush=True)
+
+    # Etape 1 : forme TripoSR + couleurs de la photo (texture gardee sous le nom _brut).
+    print("Etape 1/3 : forme TripoSR et couleurs de la photo...", flush=True)
     try:
         colorer_depuis_photo(mesh, image)
-    except Exception as erreur:
-        print("Couleurs de la photo non reprises (" + str(erreur) + ") : couleurs TripoSR gardees.", flush=True)
-    try:
         mesh_uv, image_tex, uv, F2, V2 = texturer(mesh)
-        exporter_texture(mesh_uv, image_tex, uv, F2, V2, dossier, args.nom)
-        print("Texture creee : " + args.nom + "_texture.png", flush=True)
+        exporter_texture(mesh_uv, image_tex, uv, F2, V2, dossier, args.nom + "_brut")
+        print("  texture brute creee : " + args.nom + "_brut_texture.png", flush=True)
     except Exception as erreur:
-        print("Texture impossible (" + str(erreur) + ") : export sans texture.", flush=True)
+        print("  texture brute impossible (" + str(erreur) + ")", flush=True)
+    print("  %d sommets, %d faces (TripoSR)" % (len(mesh.vertices), len(mesh.faces)), flush=True)
+
+    # Etapes 2 et 3 : dimensions mesurees sur TripoSR -> modele lisse, texture de la photo.
+    try:
+        dims = _parametres_depuis_triposr(mesh)
+        print("Etape 2/3 : dimensions mesurees (rayon du manche %.1f mm, longueur %.1f cm)" % (
+            dims["r_col"] * 1000, dims["L_manche"] * 100 + abs(dims["tete_x0"]) * 100), flush=True)
+        sauvegarde = dict(PARAM)
+        PARAM.update(dims)
+        try:
+            generer_parametrique(args, photo_pil=image)
+        finally:
+            PARAM.clear()
+            PARAM.update(sauvegarde)
+        print("Etape 3/3 : modele lisse termine.", flush=True)
+    except Exception as erreur:
+        print("Modele lisse impossible (" + str(erreur) + ") : export TripoSR seul.", flush=True)
         mesh.export(os.path.join(dossier, args.nom + ".glb"))
         mesh.export(os.path.join(dossier, args.nom + ".obj"))
-
-    print("Fichiers crees dans : " + dossier, flush=True)
-    print("  %d sommets, %d faces" % (len(mesh.vertices), len(mesh.faces)), flush=True)
-
-    if os.path.isdir(os.path.join(ROOT, "unity")):
-        cible = os.path.join(UNITY_ITEMS, args.nom)
-        os.makedirs(cible, exist_ok=True)
-        for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_texture.png"):
-            source = os.path.join(dossier, nom_fichier)
-            if os.path.isfile(source):
-                shutil.copy2(source, os.path.join(cible, nom_fichier))
-        print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/" + args.nom + ".obj", flush=True)
+        if os.path.isdir(os.path.join(ROOT, "unity")):
+            cible = os.path.join(UNITY_ITEMS, args.nom)
+            os.makedirs(cible, exist_ok=True)
+            shutil.copy2(os.path.join(dossier, args.nom + ".obj"), os.path.join(cible, args.nom + ".obj"))
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
 
