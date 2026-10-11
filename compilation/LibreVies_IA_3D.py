@@ -727,7 +727,8 @@ def analyser_demande(texte):
     """
     import re
     t = texte.lower()
-    params = {"objet": None, "taille": None, "nom": "marteau_assistant"}
+    params = {"objet": None, "taille": None, "nom": "marteau_assistant",
+              "ailes": False, "requete": "hammer"}
     questions = []
 
     if "marteau" in t:
@@ -748,9 +749,83 @@ def analyser_demande(texte):
         questions.append("Quelle taille reelle voulez-vous (la plus grande dimension, en cm) ?")
 
     if re.search(r"\bailes?\b", t) and not re.search(r"\bsans\s+ailes\b", t):
-        questions.append("Les ailes ne sont pas encore modelisees. Repondez « sans ailes » pour un marteau normal.")
+        params["ailes"] = True
+        params["nom"] = "marteau_ailes"
+        params["requete"] = "hammer angel wings" if "ange" in t else "hammer wings"
 
     return params, questions
+
+
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+AGENT_UA = "LibreVies-IA-3D/1.0 (outil local du jeu LibreVies)"
+
+
+def _http_json(url):
+    import json
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": AGENT_UA})
+    with urllib.request.urlopen(req, timeout=20) as reponse:
+        return json.loads(reponse.read().decode("utf-8"))
+
+
+def _sans_html(texte):
+    import re
+    return re.sub(r"<[^>]+>", "", texte or "").strip()
+
+
+def resultats_commons(donnees, n=5):
+    """Garde les images libres (CC ou domaine public), dans l'ordre de pertinence."""
+    pages = (donnees.get("query") or {}).get("pages") or {}
+    trouves = []
+    for page in pages.values():
+        infos = page.get("imageinfo") or []
+        if not infos:
+            continue
+        info = infos[0]
+        if info.get("mime") not in ("image/jpeg", "image/png"):
+            continue
+        meta = info.get("extmetadata") or {}
+        licence = _sans_html((meta.get("LicenseShortName") or {}).get("value", ""))
+        if not any(m in licence for m in ("CC", "Public domain", "PD")):
+            continue
+        url = info.get("thumburl") or info.get("url")
+        if not url:
+            continue
+        trouves.append((page.get("index", 9999), {
+            "titre": page.get("title", "").replace("File:", ""),
+            "url": url,
+            "licence": licence,
+            "auteur": _sans_html((meta.get("Artist") or {}).get("value", "")),
+            "page": info.get("descriptionurl", ""),
+        }))
+    trouves.sort(key=lambda couple: couple[0])
+    return [r for _, r in trouves[:n]]
+
+
+def chercher_images_libres(requete, n=5):
+    import urllib.parse
+    url = COMMONS_API + "?" + urllib.parse.urlencode({
+        "action": "query", "format": "json", "generator": "search",
+        "gsrsearch": requete, "gsrnamespace": 6, "gsrlimit": 30,
+        "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "iiurlwidth": 800})
+    return resultats_commons(_http_json(url), n)
+
+
+def telecharger_image(url, chemin):
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": AGENT_UA})
+    with urllib.request.urlopen(req, timeout=60) as reponse:
+        donnees = reponse.read()
+    with open(chemin, "wb") as f:
+        f.write(donnees)
+
+
+def ecrire_credits(nom, choisi):
+    dossier = os.path.join(SORTIES, nom)
+    os.makedirs(dossier, exist_ok=True)
+    with open(os.path.join(dossier, "source.txt"), "w", encoding="utf-8") as f:
+        f.write("Image source : %s\nAuteur : %s\nLicence : %s\nPage : %s\n" % (
+            choisi["titre"], choisi["auteur"], choisi["licence"], choisi["page"]))
 
 
 def interface():
@@ -799,13 +874,14 @@ def interface():
     def ouvrir_assistant():
         fenetre_chat = tk.Toplevel(fenetre)
         fenetre_chat.title("Assistant LibreVies")
-        fenetre_chat.geometry("560x420")
+        fenetre_chat.geometry("600x460")
         historique = tk.Text(fenetre_chat, wrap="word", height=20, state="disabled")
         historique.pack(fill="both", expand=True, padx=8, pady=8)
         saisie = tk.StringVar(value="")
         entree = ttk.Entry(fenetre_chat, textvariable=saisie, width=70)
         entree.pack(side="left", fill="x", expand=True, padx=(8, 4), pady=(0, 8))
-        contexte = {"texte": ""}
+        contexte = {"texte": "", "choix": None, "params": None}
+        file_chat = queue.Queue()
 
         def afficher(msg):
             historique.config(state="normal")
@@ -813,25 +889,107 @@ def interface():
             historique.see("end")
             historique.config(state="disabled")
 
+        def lancer_recherche(params):
+            requete = params["requete"]
+
+            def travail():
+                try:
+                    res = chercher_images_libres(requete)
+                    if not res and "angel" in requete:
+                        res = chercher_images_libres("hammer wings")
+                    if res:
+                        file_chat.put(("choix", params, res))
+                    else:
+                        file_chat.put(("msg", "Aucune image libre trouvee pour cette demande. "
+                                              "Decrivez autrement, ou repondez « sans ailes »."))
+                except Exception as exc:
+                    file_chat.put(("msg", "Recherche impossible (connexion internet ?) : " + str(exc)))
+
+            threading.Thread(target=travail, daemon=True).start()
+
+        def lancer_depuis_image(choisi, params):
+            nom = params["nom"]
+
+            def travail():
+                try:
+                    os.makedirs(os.path.join(IA, "images"), exist_ok=True)
+                    ext = ".png" if choisi["url"].lower().endswith(".png") else ".jpg"
+                    chemin = os.path.join(IA, "images", nom + ext)
+                    log("=== Telechargement : " + choisi["titre"] + " ===")
+                    telecharger_image(choisi["url"], chemin)
+                    cmd = [venv_python(), os.path.abspath(__file__), "--worker",
+                           "--image", chemin, "--nom", nom,
+                           "--taille", str(params["taille"]), "--mc", "256"]
+                    log("=== Generation de '" + nom + "' depuis l'image ===")
+                    proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT, text=True,
+                                            encoding="utf-8", errors="replace")
+                    for ligne in proc.stdout:
+                        log(ligne.rstrip())
+                    code = proc.wait()
+                    if code == 0:
+                        ecrire_credits(nom, choisi)
+                        log("Source et licence enregistrees dans sorties\\" + nom + "\\source.txt")
+                    log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
+                except Exception as exc:
+                    log("ERREUR : " + str(exc))
+
+            threading.Thread(target=travail, daemon=True).start()
+
         def envoyer(event=None):
             message = saisie.get().strip()
             if not message:
                 return
             saisie.set("")
             afficher("Vous : " + message)
+            if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
+                choisi = contexte["choix"][int(message) - 1]
+                params = contexte["params"]
+                contexte["choix"] = None
+                afficher("Assistant : je telecharge l'image n° %s puis je la modelise." % message)
+                lancer_depuis_image(choisi, params)
+                return
+            contexte["choix"] = None
             contexte["texte"] += " " + message
             params, questions = analyser_demande(contexte["texte"])
             if questions:
                 for q in questions:
                     afficher("Assistant : " + q)
                 return
+            if params["ailes"]:
+                contexte["texte"] = ""
+                afficher("Assistant : je cherche des images libres de droits (Wikimedia Commons)...")
+                lancer_recherche(params)
+                contexte["params"] = params
+                return
             afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
             lancer_parametrique(params["nom"], params["taille"])
             contexte["texte"] = ""
 
+        def verifier_chat():
+            try:
+                while True:
+                    item = file_chat.get_nowait()
+                    if item[0] == "msg":
+                        afficher("Assistant : " + item[1])
+                    elif item[0] == "choix":
+                        _, params, res = item
+                        contexte["choix"] = res
+                        contexte["params"] = params
+                        afficher("Assistant : voici des images libres. Tapez le numero a modeliser :")
+                        for i, r in enumerate(res, 1):
+                            afficher("  %d. %s  [%s]" % (i, r["titre"], r["licence"]))
+            except queue.Empty:
+                pass
+            try:
+                fenetre_chat.after(200, verifier_chat)
+            except tk.TclError:
+                pass
+
         ttk.Button(fenetre_chat, text="Envoyer", command=envoyer).pack(side="right", padx=(0, 8), pady=(0, 8))
         entree.bind("<Return>", envoyer)
-        afficher("Assistant : decrivez l'objet (pour l'instant : un marteau).")
+        afficher("Assistant : decrivez l'objet (pour l'instant : un marteau, avec ou sans ailes).")
+        verifier_chat()
 
     def lancer_parametrique(nom, taille):
         cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--parametrique",
@@ -944,7 +1102,7 @@ def interface():
             pass
         fenetre.after(150, poll)
 
-    ecrire("Version : avec bouton Assistant (discussion), ligne du bas a gauche.")
+    ecrire("Version : assistant avec recherche d'images libres (ailes).")
     threading.Thread(target=installation, daemon=True).start()
     fenetre.after(150, poll)
     fenetre.mainloop()
