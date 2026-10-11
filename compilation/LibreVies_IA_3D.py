@@ -436,6 +436,29 @@ def _texture_acier_param(seed=3):
     return Image.fromarray(np.clip(base * bruit * 255, 0, 255).astype(np.uint8), "RGB")
 
 
+def _generer_forme_texturee_photo(parties, photo, dossier, nom):
+    """Forme parametrique lisse + couleurs projetees depuis la photo (texture)."""
+    import numpy as np
+    import trimesh
+
+    V = np.vstack([p[1] for p in parties])
+    faces, off = [], 0
+    for _, Vp, _, Fp in parties:
+        faces.append(np.asarray(Fp) + off)
+        off += len(Vp)
+    # Meme orientation que TripoSR : manche sur Y, tete en bas (y minimum).
+    # (x, y, z) -> (y, x, z) est une symetrie : on inverse le sens des faces.
+    V = V[:, [1, 0, 2]]
+    F = np.vstack(faces)[:, [0, 2, 1]]
+    mesh = trimesh.Trimesh(vertices=V, faces=F, process=False)
+    mesh.visual.vertex_colors = np.full((len(V), 4), 255, dtype=np.uint8)
+    colorer_depuis_photo(mesh, photo)
+    mesh_uv, image, uv, F2, V2 = texturer(mesh)
+    exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom)
+    print("Forme parametrique texturee avec les couleurs de la photo.", flush=True)
+
+
+
 def generer_parametrique(args):
     import numpy as np
     import trimesh
@@ -456,6 +479,21 @@ def generer_parametrique(args):
 
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
+    if args.image and os.path.isfile(args.image):
+        try:
+            from PIL import Image
+            photo = Image.open(args.image).convert("RGB")
+            _generer_forme_texturee_photo(parties, photo, dossier, args.nom)
+            if os.path.isdir(os.path.join(ROOT, "unity")):
+                cible = os.path.join(UNITY_ITEMS, args.nom)
+                os.makedirs(cible, exist_ok=True)
+                for nom_fichier in (args.nom + ".obj", args.nom + ".mtl", args.nom + "_texture.png"):
+                    shutil.copy2(os.path.join(dossier, nom_fichier), os.path.join(cible, nom_fichier))
+                print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
+            print("Termine en %d secondes." % int(time.time() - debut), flush=True)
+            return
+        except Exception as erreur:
+            print("Couleurs de la photo impossibles (" + str(erreur) + ") : textures bois et acier.", flush=True)
     img_bois = _texture_bois_param()
     img_acier = _texture_acier_param()
     img_bois.save(os.path.join(dossier, args.nom + "_bois.png"))
