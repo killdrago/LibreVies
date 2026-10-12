@@ -853,11 +853,11 @@ def resultats_commons(donnees, n=5, mots_cles=("hammer", "mallet", "marteau")):
     return [r for _, r in trouves[:n]]
 
 
-def chercher_images_libres(requete, n=5, mots_cles=("hammer", "mallet", "marteau")):
+def chercher_images_libres(requete, n=15, mots_cles=("hammer", "mallet", "marteau")):
     import urllib.parse
     url = COMMONS_API + "?" + urllib.parse.urlencode({
         "action": "query", "format": "json", "generator": "search",
-        "gsrsearch": requete, "gsrnamespace": 6, "gsrlimit": 30,
+        "gsrsearch": requete, "gsrnamespace": 6, "gsrlimit": 50,
         "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "iiurlwidth": 800})
     return resultats_commons(_http_json(url), n, mots_cles)
 
@@ -1184,7 +1184,7 @@ button { font-size: 16px; padding: 8px 16px; margin: 12px 8px 0 0; }
 const zone = document.getElementById('zone');
 const photo = document.getElementById('photo');
 const cadre = document.getElementById('cadre');
-let debut = null, fin = null;
+let debut = null, fin = null, enCours = false;
 
 function position(e) {
   const r = photo.getBoundingClientRect();
@@ -1204,17 +1204,19 @@ function dessiner() {
   cadre.style.height = ((y1 - y0) * photo.offsetHeight) + 'px';
 }
 zone.addEventListener('pointerdown', function (e) {
+  enCours = true;
   debut = position(e); fin = debut;
   zone.setPointerCapture(e.pointerId);
   dessiner();
   e.preventDefault();
 });
 zone.addEventListener('pointermove', function (e) {
-  if (!debut) return;
+  if (!enCours) return;
   fin = position(e);
   dessiner();
 });
-zone.addEventListener('pointerup', function () { if (debut) { fin = fin || debut; } });
+zone.addEventListener('pointerup', function () { enCours = false; });
+zone.addEventListener('pointercancel', function () { enCours = false; });
 
 async function envoyer(corps) {
   const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
@@ -1458,25 +1460,53 @@ def interface():
 
         def ouvrir_apercus(res, chemins, action=None):
             action = action or choisir
+            fermer_apercu()
             fen = tk.Toplevel(fenetre_chat)
             fen.title("Images libres proposees")
             contexte["fenetre_apercu"] = fen
             contexte["photos"] = []
             cadre_ap = ttk.Frame(fen, padding=8)
             cadre_ap.pack(fill="both", expand=True)
-            for i, (r, chemin) in enumerate(zip(res, chemins), 1):
-                col = ttk.Frame(cadre_ap, padding=4)
-                col.grid(row=0, column=i - 1, padx=4, sticky="n")
-                if chemin:
-                    photo = tk.PhotoImage(file=chemin)
-                    contexte["photos"].append(photo)
-                    tk.Label(col, image=photo).pack()
-                else:
-                    tk.Label(col, text="(apercu indisponible)", width=24, height=8).pack()
-                tk.Label(col, text="%d. %s" % (i, r["titre"][:40]), wraplength=190).pack()
-                tk.Label(col, text=r["licence"], fg="gray", wraplength=190).pack()
-                ttk.Button(col, text="Modeliser %d" % i,
-                           command=lambda n=i: action(n)).pack(pady=4)
+            nav = ttk.Frame(fen, padding=(8, 0, 8, 8))
+            nav.pack(fill="x")
+            bouton_prec = ttk.Button(nav, text="< Precedent")
+            bouton_prec.pack(side="left")
+            etiquette = ttk.Label(nav, text="")
+            etiquette.pack(side="left", expand=True)
+            bouton_suiv = ttk.Button(nav, text="Suivant >")
+            bouton_suiv.pack(side="right")
+            par_page = 5
+            nb_pages = max(1, (len(res) + par_page - 1) // par_page)
+
+            def remplir(p):
+                p = min(max(p, 0), nb_pages - 1)
+                contexte["page"] = p
+                for w in cadre_ap.winfo_children():
+                    w.destroy()
+                contexte["photos"] = []
+                for i in range(p * par_page, min(p * par_page + par_page, len(res))):
+                    r, chemin = res[i], chemins[i]
+                    col = ttk.Frame(cadre_ap, padding=4)
+                    col.grid(row=0, column=i - p * par_page, padx=4, sticky="n")
+                    if chemin:
+                        photo = tk.PhotoImage(file=chemin)
+                        contexte["photos"].append(photo)
+                        tk.Label(col, image=photo).pack()
+                    else:
+                        tk.Label(col, text="(apercu indisponible)", width=24, height=8).pack()
+                    tk.Label(col, text="%d. %s" % (i + 1, r["titre"][:40]), wraplength=190).pack()
+                    tk.Label(col, text=r["licence"], fg="gray", wraplength=190).pack()
+                    ttk.Button(col, text="Modeliser %d" % (i + 1),
+                               command=lambda n=i + 1: action(n)).pack(pady=4)
+                etiquette.config(text="Page %d / %d  (%d resultats)" % (p + 1, nb_pages, len(res)))
+                bouton_prec.config(state="normal" if p > 0 else "disabled")
+                bouton_suiv.config(state="normal" if p < nb_pages - 1 else "disabled")
+
+            bouton_prec.config(command=lambda: remplir(contexte.get("page", 0) - 1))
+            bouton_suiv.config(command=lambda: remplir(contexte.get("page", 0) + 1))
+            contexte["aller_page"] = remplir
+            contexte["nb_pages"] = nb_pages
+            remplir(0)
 
         def fermer_apercu():
             fen = contexte.get("fenetre_apercu")
@@ -1517,7 +1547,7 @@ def interface():
 
             def travail():
                 try:
-                    res = chercher_images_libres(requete, 5, mots)
+                    res = chercher_images_libres(requete, 15, mots)
                     if res:
                         file_chat.put(("choix_piece", res, preparer_apercus(res)))
                     else:
@@ -1639,6 +1669,15 @@ def interface():
                 return
             saisie.set("")
             afficher("Vous : " + message)
+            mot = message.lower().strip()
+            if contexte.get("aller_page") and mot in ("suivant", "suivante", "plus", "next"):
+                contexte["aller_page"](contexte.get("page", 0) + 1)
+                afficher("Assistant : page suivante des images.")
+                return
+            if contexte.get("aller_page") and mot in ("precedent", "précédent", "avant"):
+                contexte["aller_page"](contexte.get("page", 0) - 1)
+                afficher("Assistant : page precedente des images.")
+                return
             if contexte.get("pieces"):
                 traiter_piece(message)
                 return
@@ -1717,7 +1756,7 @@ def interface():
                         contexte["choix"] = res
                         contexte["params"] = params
                         afficher("Assistant : voici des images libres. Cliquez sur « Modeliser n » "
-                                 "dans la fenetre des images, ou tapez le numero ici :")
+                                 "dans la fenetre des images, tapez le numero ici, ou « suivant » / « precedent » :")
                         for i, r in enumerate(res, 1):
                             afficher("  %d. %s  [%s]" % (i, r["titre"], r["licence"]))
                         try:
