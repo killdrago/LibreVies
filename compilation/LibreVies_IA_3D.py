@@ -981,6 +981,8 @@ def assembler(args):
     marge = 0.02  # 2 cm entre deux pieces posees cote a cote
     combine = trimesh.Scene()
     precedent = None  # (min, max) de la piece precedente, en metres
+    prec_sommets = None  # sommets de la piece precedente (dans la scene)
+    prec_ancrage = None  # point choisi sur la piece precedente : [u, v] dans sa photo
     for k, e in enumerate(entrees):
         sc = trimesh.load(e["fichier"], force="scene")
         bmin, bmax = sc.bounds
@@ -998,7 +1000,17 @@ def assembler(args):
         else:
             pmin, pmax = precedent
             milieu_z = (pmin[2] + pmax[2]) / 2.0
-            if e["relation"] == "sur":
+            if e["relation"] == "sur" and prec_ancrage is not None and prec_sommets is not None:
+                # point choisi par l'utilisateur sur la photo : (u, v), u = gauche->droite, v = haut->bas
+                u, v = float(prec_ancrage[0]), float(prec_ancrage[1])
+                xa = pmin[0] + u * (pmax[0] - pmin[0])
+                largeur = max(pmax[0] - pmin[0], 1e-6)
+                proches = prec_sommets[np.abs(prec_sommets[:, 0] - xa) <= 0.03 * largeur]
+                if len(proches) == 0:
+                    proches = prec_sommets[np.argsort(np.abs(prec_sommets[:, 0] - xa))[:50]]
+                dessus = proches[np.argmax(proches[:, 1])]
+                cible = np.array([xa, dessus[1], dessus[2]])
+            elif e["relation"] == "sur":
                 cible = np.array([(pmin[0] + pmax[0]) / 2.0, pmax[1], milieu_z])
             else:
                 cible = np.array([pmax[0] + marge + (smax[0] - smin[0]) / 2.0, 0.0, milieu_z])
@@ -1006,15 +1018,19 @@ def assembler(args):
         M[:3, :3] *= echelle
         M[:3, 3] = cible - bas_centre
         pmin_new, pmax_new = None, None
+        sommets_new = []
         for node in sc.graph.nodes_geometry:
             T, nom_geom = sc.graph[node]
             g = sc.geometry[nom_geom].copy()
             g.apply_transform(M @ T)
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
+            sommets_new.append(np.asarray(g.vertices))
             gmin, gmax = g.bounds
             pmin_new = gmin if pmin_new is None else np.minimum(pmin_new, gmin)
             pmax_new = gmax if pmax_new is None else np.maximum(pmax_new, gmax)
         precedent = (pmin_new, pmax_new)
+        prec_sommets = np.vstack(sommets_new)
+        prec_ancrage = e.get("ancrage")
         print("Piece %d posee (%s)." % (k + 1, e["relation"]), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
     combine.export(chemin)
