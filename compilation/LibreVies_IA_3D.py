@@ -690,10 +690,12 @@ def generer(args):
         image = image.crop((int(x0 * largeur_p), int(y0 * hauteur_p),
                             int(x1 * largeur_p), int(y1 * hauteur_p)))
     image = recadrer_objet(image)
+    apercu_transparent = None  # version avec transparence, pour la page de placement
     if args.retirer_fond:
         session = rembg.new_session()
         image = remove_background(image, session)
         image = resize_foreground(image, 0.85)
+        apercu_transparent = image.copy()
         arr = np.array(image).astype(np.float32) / 255.0
         arr = arr[:, :, :3] * arr[:, :, 3:4] + (1 - arr[:, :, 3:4]) * 0.5
         image = Image.fromarray((arr * 255.0).astype(np.uint8))
@@ -721,7 +723,8 @@ def generer(args):
 
     dossier = os.path.join(SORTIES, args.nom)
     os.makedirs(dossier, exist_ok=True)
-    image.save(os.path.join(dossier, "photo_traitee.png"))
+    (apercu_transparent if apercu_transparent is not None else image).save(
+        os.path.join(dossier, "photo_traitee.png"))
 
     # Etape 1 : forme TripoSR + couleurs de la photo (texture gardee sous le nom _brut).
     print("Etape 1/2 : forme TripoSR et couleurs de la photo...", flush=True)
