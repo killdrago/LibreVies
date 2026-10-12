@@ -55,13 +55,13 @@ PAQUETS = [
     "scikit-image",
     "imageio",
     "imageio-ffmpeg",
-    "diffusers",
-    "accelerate",
     "safetensors",
 ]
 
 # Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
 MODELE_IMAGE = "stabilityai/sdxl-turbo"
+# diffusers est installe sans ses dependances (sinon pip ne resout pas avec transformers==4.35.0).
+PAQUETS_DIFFUSERS = ["huggingface-hub==0.36.2", "diffusers==0.35.2"]
 
 # Remplacement de torchmcubes : meme fonction marching_cubes(volume, niveau) -> (sommets, faces).
 SHIM_TORCHMCUBES = '''"""Remplacement de torchmcubes par scikit-image (installe automatiquement)."""
@@ -111,11 +111,17 @@ def lancer(cmd, log, cwd=None):
     return proc.wait()
 
 
-def paquets_presents():
-    """Vrai si tous les modules importants sont deja installes dans l'environnement IA."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers, accelerate"
-    return subprocess.call([venv_python(), "-c", test], env=env_ia(),
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+def paquets_presents(log=None):
+    """Vrai si tous les modules importants sont deja installes dans l'environnement IA.
+    En cas d'echec, la fin de l'erreur d'import est envoyee au journal."""
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.35.2\""
+    proc = subprocess.run([venv_python(), "-c", test], env=env_ia(),
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if proc.returncode != 0 and log:
+        log("Import impossible, erreur :")
+        for ligne in [l for l in (proc.stderr or "").splitlines() if l.strip()][-12:]:
+            log("  " + ligne)
+    return proc.returncode == 0
 
 
 def installer(log):
@@ -131,14 +137,18 @@ def installer(log):
     else:
         log("Environnement IA\\venv deja present.")
 
-    if paquets_presents():
+    if paquets_presents(log):
         log("Paquets Python deja installes.")
     else:
         log("Installation des paquets (long la premiere fois, plusieurs Go)...")
         if lancer([venv_python(), "-m", "pip", "install", "--upgrade", "--disable-pip-version-check"]
                   + PAQUETS, log) != 0:
             raise RuntimeError("echec de l'installation des paquets Python")
-        if not paquets_presents():
+        log("Installation de diffusers (generation d'image, sans ses dependances)...")
+        if lancer([venv_python(), "-m", "pip", "install", "--disable-pip-version-check", "--no-deps"]
+                  + PAQUETS_DIFFUSERS, log) != 0:
+            raise RuntimeError("echec de l'installation de diffusers")
+        if not paquets_presents(log):
             raise RuntimeError("paquets installes mais imports impossibles : voir le journal")
         log("Paquets installes.")
 
