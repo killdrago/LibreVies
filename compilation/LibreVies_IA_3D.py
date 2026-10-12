@@ -720,9 +720,17 @@ def generer(args):
         largeur_p, hauteur_p = image.size
         image = image.crop((int(x0 * largeur_p), int(y0 * hauteur_p),
                             int(x1 * largeur_p), int(y1 * hauteur_p)))
-    image = recadrer_objet(image)
+    if not getattr(args, "deja_detoure", False):
+        image = recadrer_objet(image)
     apercu_transparent = None  # version avec transparence, pour la page de placement
-    if args.retirer_fond:
+    if getattr(args, "deja_detoure", False):
+        # photo deja detouree et retouchee a la main : on garde sa transparence
+        image = resize_foreground(Image.open(args.image).convert("RGBA"), 0.85)
+        apercu_transparent = image.copy()
+        arr = np.array(image).astype(np.float32) / 255.0
+        arr = arr[:, :, :3] * arr[:, :, 3:4] + (1 - arr[:, :, 3:4]) * 0.5
+        image = Image.fromarray((arr * 255.0).astype(np.uint8))
+    elif args.retirer_fond:
         session = rembg.new_session()
         image = remove_background(image, session)
         image = resize_foreground(image, 0.85)
@@ -1376,26 +1384,88 @@ VALIDATION_HTML = r"""<!doctype html>
 <title>LibreVies - detourage</title>
 <style>
 body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
-#fond { display: inline-block; padding: 8px; border: 2px solid #777; background-color: #fff;
+#fond { display: inline-block; padding: 0; border: 2px solid #777;
+  background-color: #fff;
   background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
     linear-gradient(-45deg, #ddd 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #ddd 75%),
     linear-gradient(-45deg, transparent 75%, #ddd 75%);
   background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
-#fond img { display: block; max-width: 640px; height: auto; }
+#toile { display: block; max-width: 640px; height: auto; touch-action: none; cursor: crosshair; }
 button { font-size: 16px; padding: 8px 16px; margin: 12px 8px 0 0; }
 </style>
 </head>
 <body>
 <h3>Le detourage de « __PIECE__ » est-il correct ?</h3>
-<p>Le fond doit disparaitre (damier). Si une partie du decor reste, recadrez plus serre.</p>
-<div id="fond"><img src="/img/detour" alt="detourage"></div><br>
+<p>Le damier = transparent. Pour retoucher : maintenez le bouton de la souris et passez sur l'image.
+ « Effacer » rend transparent, « Restaurer » remet la photo d'origine.</p>
+<div id="fond"><canvas id="toile"></canvas></div>
+<p>
+  <label><input type="radio" name="outil" value="effacer" checked> Effacer</label>
+  <label><input type="radio" name="outil" value="restaurer"> Restaurer</label>
+  &nbsp; Taille du pinceau : <input type="range" id="pinceau" min="4" max="150" value="30">
+  &nbsp; <button id="reset">Annuler mes retouches</button>
+</p>
 <button id="ok">Oui, lancer la fabrication 3D</button>
 <button id="non">Non, recadrer a nouveau</button>
 <span id="etat"></span>
 <script>
+const toile = document.getElementById('toile');
+const ctx = toile.getContext('2d');
+const copie = document.createElement('canvas');
+const copieCtx = copie.getContext('2d');
+const original = new Image();
+let peint = false;
+
+original.onload = function () {
+  toile.width = original.naturalWidth;
+  toile.height = original.naturalHeight;
+  copie.width = original.naturalWidth;
+  copie.height = original.naturalHeight;
+  copieCtx.drawImage(original, 0, 0);
+  remettreOriginal();
+};
+original.src = '/img/detour';
+
+function remettreOriginal() {
+  ctx.clearRect(0, 0, toile.width, toile.height);
+  ctx.drawImage(copie, 0, 0);
+}
+function coords(e) {
+  const r = toile.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * toile.width / r.width, y: (e.clientY - r.top) * toile.height / r.height };
+}
+function tamponner(p) {
+  const echelle = toile.width / toile.getBoundingClientRect().width;
+  const rayon = parseFloat(document.getElementById('pinceau').value) / 2 * echelle;
+  const restaurer = document.querySelector('input[name=outil]:checked').value === 'restaurer';
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, rayon, 0, Math.PI * 2);
+  if (restaurer) {
+    ctx.clip();
+    ctx.drawImage(copie, 0, 0);
+  } else {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+toile.addEventListener('pointerdown', function (e) {
+  peint = true;
+  toile.setPointerCapture(e.pointerId);
+  tamponner(coords(e));
+});
+toile.addEventListener('pointermove', function (e) {
+  if (peint) tamponner(coords(e));
+});
+toile.addEventListener('pointerup', function () { peint = false; });
+toile.addEventListener('pointercancel', function () { peint = false; });
+document.getElementById('reset').addEventListener('click', remettreOriginal);
+
 async function envoyer(ok) {
-  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: ok }) });
+  const corps = { ok: ok, png: toile.toDataURL('image/png') };
+  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
   document.getElementById('etat').textContent = rep.ok ? ' Merci, vous pouvez fermer cette page.' : ' Erreur, reessayez.';
 }
 document.getElementById('ok').addEventListener('click', function () { envoyer(true); });
@@ -1407,13 +1477,24 @@ document.getElementById('non').addEventListener('click', function () { envoyer(f
 
 
 def lancer_validation(image_detour, nom_piece, log, delai=1800):
-    """Renvoie True (on continue), False (recadrer a nouveau) ou None (page fermee)."""
+    """Renvoie (valide, png_edite) ou None si la page est fermee.
+
+    valide : True (on continue la fabrication), False (recadrer a nouveau).
+    png_edite : octets du detourage retouche, ou None."""
+    import base64
     import html as htmllib
     page = VALIDATION_HTML.replace("__PIECE__", htmllib.escape(nom_piece))
     d = lancer_page(page, {"/img/detour": image_detour}, log, delai)
     if d is None:
         return None
-    return bool(d.get("ok"))
+    png = None
+    donnee = d.get("png")
+    if isinstance(donnee, str) and donnee.startswith("data:image/png;base64,"):
+        try:
+            png = base64.b64decode(donnee.split(",", 1)[1])
+        except (ValueError, TypeError):
+            png = None
+    return bool(d.get("ok")), png
 
 
 def interface():
@@ -1713,16 +1794,26 @@ def interface():
                             if executer_worker(cmd_detour, log) != 0:
                                 log("=== ECHEC du detourage : voir le journal ===")
                                 return
-                            valide = lancer_validation(os.path.join(SORTIES, nom, "detourage.png"),
+                            retour = lancer_validation(os.path.join(SORTIES, nom, "detourage.png"),
                                                        piece["nom"], log)
-                            if valide is None:
+                            if retour is None:
                                 log("Page fermee sans reponse : fabrication annulee.")
                                 return
+                            valide, png_edite = retour
                             if valide:
+                                if png_edite:
+                                    chemin = os.path.join(IA, "images", nom + "_edite.png")
+                                    with open(chemin, "wb") as f:
+                                        f.write(png_edite)
+                                    log("Retouches du detourage enregistrees.")
+                                else:
+                                    chemin = os.path.join(SORTIES, nom, "detourage.png")
                                 break
                             log("Recadrage a refaire pour '%s'." % piece["nom"])
-                        if recadrage:
-                            cmd += ["--recadrage", recadrage]
+                        cmd = [venv_python(), os.path.abspath(__file__), "--worker",
+                               "--image", chemin, "--nom", nom,
+                               "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256",
+                               "--deja-detoure"]
                         if executer_worker(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                             return
@@ -2003,6 +2094,7 @@ def main():
         parseur.add_argument("--entrees", default="[]")
         parseur.add_argument("--recadrage", default="")
         parseur.add_argument("--detourer", action="store_true")
+        parseur.add_argument("--deja-detoure", action="store_true")
         parseur.add_argument("--position-ailes", type=float, default=0.5)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
