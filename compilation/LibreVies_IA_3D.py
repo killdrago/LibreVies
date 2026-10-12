@@ -986,10 +986,12 @@ def assembler(args):
     for k, e in enumerate(entrees):
         sc = trimesh.load(e["fichier"], force="scene")
         bmin, bmax = sc.bounds
+        anc = e.get("ancrage")
         if e.get("taille") is None and precedent is not None:
-            # piece posee sur une autre (chapeau sur une tete) : 50 % de la taille du support
+            # piece posee sur une autre : facteur (fraction de la taille du support, 0.5 par defaut)
             pmin_p, pmax_p = precedent
-            taille_m = 0.5 * float((pmax_p - pmin_p).max())
+            facteur = float(anc[2]) if anc and len(anc) > 2 else 0.5
+            taille_m = facteur * float((pmax_p - pmin_p).max())
         else:
             taille_m = float(e["taille"]) / 100.0
         echelle = taille_m / float(max((bmax - bmin).max(), 1e-9))
@@ -1000,9 +1002,9 @@ def assembler(args):
         else:
             pmin, pmax = precedent
             milieu_z = (pmin[2] + pmax[2]) / 2.0
-            if e["relation"] == "sur" and prec_ancrage is not None and prec_sommets is not None:
+            if e["relation"] == "sur" and anc is not None and prec_sommets is not None:
                 # point choisi par l'utilisateur sur la photo : (u, v), u = gauche->droite, v = haut->bas
-                u, v = float(prec_ancrage[0]), float(prec_ancrage[1])
+                u, v = float(anc[0]), float(anc[1])
                 xa = pmin[0] + u * (pmax[0] - pmin[0])
                 largeur = max(pmax[0] - pmin[0], 1e-6)
                 proches = prec_sommets[np.abs(prec_sommets[:, 0] - xa) <= 0.03 * largeur]
@@ -1030,13 +1032,157 @@ def assembler(args):
             pmax_new = gmax if pmax_new is None else np.maximum(pmax_new, gmax)
         precedent = (pmin_new, pmax_new)
         prec_sommets = np.vstack(sommets_new)
-        prec_ancrage = e.get("ancrage")
         print("Piece %d posee (%s)." % (k + 1, e["relation"]), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
     combine.export(chemin)
     etendue = (combine.bounds[1] - combine.bounds[0]) * 100
     print("Scene assemblee : " + chemin, flush=True)
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
+
+
+PLACEMENT_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>LibreVies - placement</title>
+<style>
+body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
+#zone { position: relative; display: inline-block; border: 2px solid #777; background: #fff; touch-action: none; }
+#support { display: block; max-width: 640px; height: auto; user-select: none; }
+#piece { position: absolute; cursor: move; border: 2px dashed #d33; user-select: none; }
+button { font-size: 16px; padding: 8px 16px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<h3>Placez « __PIECE__ » sur « __SUPPORT__ »</h3>
+<p>Glissez l'image pour que sa base soit posee sur le dessus de la tete. Le curseur regle la taille.</p>
+<div id="zone">
+  <img id="support" src="/img/support" alt="support">
+  <img id="piece" src="/img/piece" alt="piece">
+</div>
+<p>Taille : <input type="range" id="taille" min="5" max="150" value="50"> <span id="tv">50</span> % de la largeur du support</p>
+<button id="valider">Valider le placement</button>
+<span id="etat"></span>
+<script>
+const zone = document.getElementById('zone');
+const sup = document.getElementById('support');
+const pc = document.getElementById('piece');
+const curseur = document.getElementById('taille');
+let glisse = null;
+
+function dimensionner() {
+  const W = sup.clientWidth;
+  if (!W || !pc.naturalWidth) return;
+  const deja = pc.style.top !== '';
+  const bas = deja ? pc.offsetTop + pc.offsetHeight : 0;
+  const centre = deja ? pc.offsetLeft + pc.offsetWidth / 2 : W / 2;
+  const largeur = W * curseur.value / 100;
+  pc.style.width = largeur + 'px';
+  const h = pc.offsetHeight;
+  pc.style.left = (centre - largeur / 2) + 'px';
+  pc.style.top = (deja ? bas - h : sup.clientHeight * 0.1) + 'px';
+  document.getElementById('tv').textContent = curseur.value;
+}
+sup.addEventListener('load', dimensionner);
+pc.addEventListener('load', dimensionner);
+window.addEventListener('load', dimensionner);
+curseur.addEventListener('input', dimensionner);
+
+pc.addEventListener('pointerdown', function (e) {
+  const r = zone.getBoundingClientRect();
+  glisse = { dx: e.clientX - r.left - pc.offsetLeft, dy: e.clientY - r.top - pc.offsetTop };
+  pc.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+pc.addEventListener('pointermove', function (e) {
+  if (!glisse) return;
+  const r = zone.getBoundingClientRect();
+  pc.style.left = (e.clientX - r.left - glisse.dx) + 'px';
+  pc.style.top = (e.clientY - r.top - glisse.dy) + 'px';
+});
+pc.addEventListener('pointerup', function () { glisse = null; });
+pc.addEventListener('pointercancel', function () { glisse = null; });
+
+document.getElementById('valider').addEventListener('click', async function () {
+  const W = sup.clientWidth, H = sup.clientHeight;
+  const corps = {
+    u: (pc.offsetLeft + pc.offsetWidth / 2) / W,
+    v: (pc.offsetTop + pc.offsetHeight) / H,
+    facteur: curseur.value / 100
+  };
+  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+  document.getElementById('etat').textContent = rep.ok ? ' Placement enregistre. Vous pouvez fermer cette page.' : ' Erreur, reessayez.';
+});
+</script>
+</body>
+</html>
+"""
+
+
+def lancer_placement(image_support, image_piece, nom_support, nom_piece, log, delai=1800):
+    """Ouvre la page de placement dans le navigateur. Renvoie {u, v, facteur} ou None."""
+    import html as htmllib
+    import http.server
+    import json
+    import mimetypes
+    import webbrowser
+    fichiers = {"/img/support": image_support, "/img/piece": image_piece}
+    page = (PLACEMENT_HTML.replace("__SUPPORT__", htmllib.escape(nom_support))
+            .replace("__PIECE__", htmllib.escape(nom_piece))).encode("utf-8")
+    resultat = {"valeur": None}
+    fin = threading.Event()
+
+    class Gestion(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def _envoyer(self, code, corps, type_):
+            self.send_response(code)
+            self.send_header("Content-Type", type_)
+            self.send_header("Content-Length", str(len(corps)))
+            self.end_headers()
+            self.wfile.write(corps)
+
+        def do_GET(self):
+            if self.path == "/":
+                self._envoyer(200, page, "text/html; charset=utf-8")
+            elif self.path in fichiers and os.path.isfile(fichiers[self.path]):
+                with open(fichiers[self.path], "rb") as f:
+                    donnees = f.read()
+                type_ = mimetypes.guess_type(fichiers[self.path])[0] or "image/png"
+                self._envoyer(200, donnees, type_)
+            else:
+                self._envoyer(404, b"introuvable", "text/plain")
+
+        def do_POST(self):
+            if self.path != "/valider":
+                self._envoyer(404, b"introuvable", "text/plain")
+                return
+            try:
+                corps = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                d = json.loads(corps.decode("utf-8"))
+                resultat["valeur"] = {
+                    "u": min(max(float(d["u"]), 0.0), 1.0),
+                    "v": min(max(float(d["v"]), 0.0), 1.0),
+                    "facteur": min(max(float(d["facteur"]), 0.05), 1.5),
+                }
+                self._envoyer(200, b"ok", "text/plain")
+                fin.set()
+            except (ValueError, KeyError, TypeError):
+                self._envoyer(400, b"donnees invalides", "text/plain")
+
+    serveur = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Gestion)
+    serveur.daemon_threads = True
+    threading.Thread(target=serveur.serve_forever, daemon=True).start()
+    adresse = "http://127.0.0.1:%d/" % serveur.server_address[1]
+    try:
+        webbrowser.open(adresse)
+        log("Page de placement ouverte : " + adresse)
+        fin.wait(delai)
+    finally:
+        serveur.shutdown()
+        serveur.server_close()
+    return resultat["valeur"]
 
 
 def interface():
@@ -1307,6 +1453,23 @@ def interface():
                                         "taille": None if piece["relation"] == "sur" and k > 1
                                         else DEFAUT_TAILLE_PIECE,
                                         "relation": piece["relation"]})
+                    for k in range(1, len(pieces)):
+                        if pieces[k]["relation"] != "sur":
+                            continue
+                        img_support = os.path.join(os.path.dirname(entrees[k - 1]["fichier"]), "photo_traitee.png")
+                        img_piece = os.path.join(os.path.dirname(entrees[k]["fichier"]), "photo_traitee.png")
+                        if not os.path.isfile(img_support) or not os.path.isfile(img_piece):
+                            log("Pas de photo traitee pour placer '%s' : posee au-dessus par defaut." % pieces[k]["nom"])
+                            continue
+                        log("=== Placement de '%s' sur '%s' : glissez l'image dans le navigateur ==="
+                            % (pieces[k]["nom"], pieces[k - 1]["nom"]))
+                        place = lancer_placement(img_support, img_piece, pieces[k - 1]["nom"],
+                                                 pieces[k]["nom"], log)
+                        if place is None:
+                            log("Pas de placement enregistre : posee au-dessus par defaut.")
+                        else:
+                            entrees[k]["ancrage"] = [place["u"], place["v"], place["facteur"]]
+                            log("Placement enregistre.")
                     log("=== Assemblage de '" + base + "' ===")
                     cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--assembler",
                            "--nom", base, "--taille", "0", "--entrees", json.dumps(entrees)]
