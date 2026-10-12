@@ -55,7 +55,13 @@ PAQUETS = [
     "scikit-image",
     "imageio",
     "imageio-ffmpeg",
+    "diffusers",
+    "accelerate",
+    "safetensors",
 ]
+
+# Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
+MODELE_IMAGE = "stabilityai/sdxl-turbo"
 
 # Remplacement de torchmcubes : meme fonction marching_cubes(volume, niveau) -> (sommets, faces).
 SHIM_TORCHMCUBES = '''"""Remplacement de torchmcubes par scikit-image (installe automatiquement)."""
@@ -107,7 +113,7 @@ def lancer(cmd, log, cwd=None):
 
 def paquets_presents():
     """Vrai si tous les modules importants sont deja installes dans l'environnement IA."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas"
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers, accelerate"
     return subprocess.call([venv_python(), "-c", test], env=env_ia(),
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
 
@@ -660,6 +666,27 @@ def generer_parametrique(args, photo_pil=None):
         print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
+
+
+def generer_image_ia(args):
+    """Cree une image a partir d'une description (SDXL-Turbo, processeur), sur fond uni."""
+    os.environ.update(env_ia())
+    import torch
+    from diffusers import AutoPipelineForText2Image
+
+    torch.set_num_threads(os.cpu_count() or 8)
+    print("Chargement du modele d'image (premiere fois : telechargement, plusieurs Go)...", flush=True)
+    pipe = AutoPipelineForText2Image.from_pretrained(MODELE_IMAGE, torch_dtype=torch.float32,
+                                                     use_safetensors=True)
+    pipe = pipe.to("cpu")
+    pipe.enable_attention_slicing()
+    texte = args.prompt.strip() + ", seul au centre, fond blanc uni, photo nette, vue de cote"
+    print("Creation de l'image (peut prendre quelques minutes sur processeur)...", flush=True)
+    image = pipe(prompt=texte, num_inference_steps=4, guidance_scale=0.0,
+                 width=512, height=512).images[0]
+    os.makedirs(os.path.dirname(args.sortie_image), exist_ok=True)
+    image.save(args.sortie_image)
+    print("Image creee : " + args.sortie_image, flush=True)
 
 
 def generer_detourage(args):
@@ -1540,6 +1567,12 @@ def interface():
                                 command=lambda: generer_modele())
     bouton_generer.grid(row=5, column=1, sticky="w", pady=8, padx=5)
 
+    ttk.Label(cadre, text="Ou decrire l'objet (image creee sur ce PC) :").grid(row=6, column=0, sticky="w")
+    etat["description"] = tk.StringVar(value="")
+    ttk.Entry(cadre, textvariable=etat["description"], width=60).grid(row=6, column=1, sticky="we", padx=5)
+    bouton_image = ttk.Button(cadre, text="Creer l'image", command=lambda: creer_image())
+    bouton_image.grid(row=6, column=2)
+
     def ouvrir_assistant():
         fenetre_chat = tk.Toplevel(fenetre)
         fenetre_chat.title("Assistant LibreVies")
@@ -2049,6 +2082,37 @@ def interface():
 
         threading.Thread(target=travail, daemon=True).start()
 
+    def creer_image():
+        description = etat["description"].get().strip()
+        if not description:
+            messagebox.showerror("Description", "Ecris ce que tu veux (ex. un rocher avec un avion dessus).")
+            return
+        nom = etat["nom"].get().strip() or "objet"
+        if any(c in nom for c in '\\/:*?"<>| '):
+            messagebox.showerror("Nom", "Nom sans espace ni caractere speciaux (ex. marteau).")
+            return
+        sortie = os.path.join(IA, "images", nom + "_ia.png")
+        bouton_image.config(state="disabled")
+        cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--generer-image",
+               "--prompt", description, "--sortie-image", sortie, "--nom", nom, "--taille", "1"]
+
+        def travail():
+            log("=== Creation de l'image : " + description + " ===")
+            proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True,
+                                    encoding="utf-8", errors="replace")
+            for ligne in proc.stdout:
+                log(ligne.rstrip())
+            code = proc.wait()
+            if code == 0 and os.path.isfile(sortie):
+                log("=== Image prete : elle est mise dans le champ Photo ===")
+                file_journal.put(("PHOTO", sortie))
+            else:
+                log("=== ECHEC de la creation d'image (code %d) : voir le journal ===" % code)
+            file_journal.put(("FIN_IMAGE", None))
+
+        threading.Thread(target=travail, daemon=True).start()
+
     def installation():
         try:
             installer(log)
@@ -2069,6 +2133,10 @@ def interface():
                         ecrire("Pret : choisis une photo puis clique sur Generer.")
                     elif item[0] == "FIN":
                         bouton_generer.config(state="normal" if etat["pret"] else "disabled")
+                    elif item[0] == "PHOTO":
+                        etat["photo"].set(item[1])
+                    elif item[0] == "FIN_IMAGE":
+                        bouton_image.config(state="normal")
                     elif item[0] == "ECHEC_INSTALL":
                         bouton_generer.config(state="disabled")
                 else:
@@ -2100,8 +2168,14 @@ def main():
         parseur.add_argument("--taille", type=float, required=True)
         parseur.add_argument("--mc", type=int, default=256)
         parseur.add_argument("--garder-fond", action="store_true")
+        parseur.add_argument("--generer-image", action="store_true")
+        parseur.add_argument("--prompt", default="")
+        parseur.add_argument("--sortie-image", default="")
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
+        if args.generer_image:
+            generer_image_ia(args)
+            return
         if args.detourer:
             generer_detourage(args)
             return
