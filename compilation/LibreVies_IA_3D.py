@@ -814,6 +814,7 @@ def _sans_html(texte):
 
 def resultats_commons(donnees, n=5, mots_cles=("hammer", "mallet", "marteau")):
     """Garde les images libres (CC ou domaine public), dans l'ordre de pertinence."""
+    import re
     pages = (donnees.get("query") or {}).get("pages") or {}
     trouves = []
     for page in pages.values():
@@ -828,7 +829,8 @@ def resultats_commons(donnees, n=5, mots_cles=("hammer", "mallet", "marteau")):
         if not any(m in licence for m in ("CC", "Public domain", "PD")):
             continue
         titre = page.get("title", "").replace("File:", "")
-        if mots_cles and not any(mot in titre.lower() for mot in mots_cles):
+        if mots_cles and not any(re.search(r"\b" + re.escape(mot) + r"\b", titre.lower())
+                                 for mot in mots_cles):
             continue
         url = info.get("thumburl") or info.get("url")
         if not url:
@@ -982,7 +984,13 @@ def assembler(args):
     for k, e in enumerate(entrees):
         sc = trimesh.load(e["fichier"], force="scene")
         bmin, bmax = sc.bounds
-        echelle = (float(e["taille"]) / 100.0) / float(max((bmax - bmin).max(), 1e-9))
+        if e.get("taille") is None and precedent is not None:
+            # piece posee sur une autre (chapeau sur une tete) : 50 % de la taille du support
+            pmin_p, pmax_p = precedent
+            taille_m = 0.5 * float((pmax_p - pmin_p).max())
+        else:
+            taille_m = float(e["taille"]) / 100.0
+        echelle = taille_m / float(max((bmax - bmin).max(), 1e-9))
         smin, smax = bmin * echelle, bmax * echelle
         bas_centre = np.array([(smin[0] + smax[0]) / 2.0, smin[1], (smin[2] + smax[2]) / 2.0])
         if precedent is None:
@@ -1280,7 +1288,8 @@ def interface():
                         if piece.get("url"):
                             ecrire_credits(nom, piece)
                         entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
-                                        "taille": DEFAUT_TAILLE_PIECE,
+                                        "taille": None if piece["relation"] == "sur" and k > 1
+                                        else DEFAUT_TAILLE_PIECE,
                                         "relation": piece["relation"]})
                     log("=== Assemblage de '" + base + "' ===")
                     cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--assembler",
