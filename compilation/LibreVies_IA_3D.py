@@ -682,7 +682,14 @@ def generer(args):
     model.to(device)
 
     print("Preparation de la photo...", flush=True)
-    image = recadrer_objet(Image.open(args.image))
+    image = Image.open(args.image)
+    if getattr(args, "recadrage", ""):
+        # recadrage choisi par l'utilisateur : x0,y0,x1,y1 en fractions de la photo
+        x0, y0, x1, y1 = [float(t) for t in args.recadrage.split(",")]
+        largeur_p, hauteur_p = image.size
+        image = image.crop((int(x0 * largeur_p), int(y0 * hauteur_p),
+                            int(x1 * largeur_p), int(y1 * hauteur_p)))
+    image = recadrer_objet(image)
     if args.retirer_fond:
         session = rembg.new_session()
         image = remove_background(image, session)
@@ -970,8 +977,17 @@ def executer_worker(cmd, log):
     return proc.wait()
 
 
+def _points(V, M):
+    import numpy as np
+    return (np.asarray(V) @ M[:3, :3].T) + M[:3, 3]
+
+
 def assembler(args):
-    """Pose les pieces (fichiers .glb) les unes par rapport aux autres et exporte une scene."""
+    """Pose les pieces (fichiers .glb) les unes par rapport aux autres et exporte une scene.
+
+    ancrage = [u, v, facteur, rotation] sur une piece posee « sur » la precedente :
+    u, v : point choisi sur la photo du support ; facteur : taille relative ;
+    rotation : degres, sens horaire comme sur la page de placement."""
     import json
     import numpy as np
     import trimesh
@@ -982,13 +998,25 @@ def assembler(args):
     combine = trimesh.Scene()
     precedent = None  # (min, max) de la piece precedente, en metres
     prec_sommets = None  # sommets de la piece precedente (dans la scene)
-    prec_ancrage = None  # point choisi sur la piece precedente : [u, v] dans sa photo
     for k, e in enumerate(entrees):
         sc = trimesh.load(e["fichier"], force="scene")
-        bmin, bmax = sc.bounds
         anc = e.get("ancrage")
+        rotation = float(anc[3]) if anc and len(anc) > 3 else 0.0
+        bmin0, bmax0 = sc.bounds
+        c0 = (bmin0 + bmax0) / 2.0
+        # rotation dans le plan de l'image (autour de Z), dans le meme sens que la page
+        Rz = trimesh.transformations.rotation_matrix(np.radians(-rotation), [0, 0, 1])
+        Rc = (trimesh.transformations.translation_matrix(c0) @ Rz
+              @ trimesh.transformations.translation_matrix(-c0))
+        noeuds = []
+        for node in sc.graph.nodes_geometry:
+            T, nom_geom = sc.graph[node]
+            noeuds.append((node, nom_geom, Rc @ T))
+        pts = np.vstack([_points(sc.geometry[nom].vertices, TT) for _, nom, TT in noeuds])
+        bmin, bmax = pts.min(0), pts.max(0)
+
         if e.get("taille") is None and precedent is not None:
-            # piece posee sur une autre : facteur (fraction de la taille du support, 0.5 par defaut)
+            # piece posee sur une autre : facteur (0.5 par defaut) x taille du support
             pmin_p, pmax_p = precedent
             facteur = float(anc[2]) if anc and len(anc) > 2 else 0.5
             taille_m = facteur * float((pmax_p - pmin_p).max())
@@ -997,14 +1025,14 @@ def assembler(args):
         echelle = taille_m / float(max((bmax - bmin).max(), 1e-9))
         smin, smax = bmin * echelle, bmax * echelle
         bas_centre = np.array([(smin[0] + smax[0]) / 2.0, smin[1], (smin[2] + smax[2]) / 2.0])
+
         if precedent is None:
             cible = np.array([0.0, 0.0, 0.0])
         else:
             pmin, pmax = precedent
             milieu_z = (pmin[2] + pmax[2]) / 2.0
             if e["relation"] == "sur" and anc is not None and prec_sommets is not None:
-                # point choisi par l'utilisateur sur la photo : (u, v), u = gauche->droite, v = haut->bas
-                u, v = float(anc[0]), float(anc[1])
+                u, v = float(anc[0]), float(anc[1])  # u : gauche -> droite, v : haut -> bas
                 xa = pmin[0] + u * (pmax[0] - pmin[0])
                 largeur = max(pmax[0] - pmin[0], 1e-6)
                 proches = prec_sommets[np.abs(prec_sommets[:, 0] - xa) <= 0.03 * largeur]
@@ -1016,15 +1044,15 @@ def assembler(args):
                 cible = np.array([(pmin[0] + pmax[0]) / 2.0, pmax[1], milieu_z])
             else:
                 cible = np.array([pmax[0] + marge + (smax[0] - smin[0]) / 2.0, 0.0, milieu_z])
+
         M = np.eye(4)
         M[:3, :3] *= echelle
         M[:3, 3] = cible - bas_centre
-        pmin_new, pmax_new = None, None
         sommets_new = []
-        for node in sc.graph.nodes_geometry:
-            T, nom_geom = sc.graph[node]
-            g = sc.geometry[nom_geom].copy()
-            g.apply_transform(M @ T)
+        pmin_new, pmax_new = None, None
+        for node, nom, TT in noeuds:
+            g = sc.geometry[nom].copy()
+            g.apply_transform(M @ TT)
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
             sommets_new.append(np.asarray(g.vertices))
             gmin, gmax = g.bounds
@@ -1055,12 +1083,13 @@ button { font-size: 16px; padding: 8px 16px; margin-top: 12px; }
 </head>
 <body>
 <h3>Placez « __PIECE__ » sur « __SUPPORT__ »</h3>
-<p>Glissez l'image pour que sa base soit posee sur le dessus de la tete. Le curseur regle la taille.</p>
+<p>Glissez l'image pour que sa base soit posee sur le dessus de la tete.</p>
 <div id="zone">
   <img id="support" src="/img/support" alt="support">
   <img id="piece" src="/img/piece" alt="piece">
 </div>
 <p>Taille : <input type="range" id="taille" min="5" max="150" value="50"> <span id="tv">50</span> % de la largeur du support</p>
+<p>Rotation : <input type="range" id="rotation" min="-180" max="180" value="0"> <span id="rv">0</span> degres</p>
 <button id="valider">Valider le placement</button>
 <span id="etat"></span>
 <script>
@@ -1068,8 +1097,13 @@ const zone = document.getElementById('zone');
 const sup = document.getElementById('support');
 const pc = document.getElementById('piece');
 const curseur = document.getElementById('taille');
+const rot = document.getElementById('rotation');
 let glisse = null;
 
+function appliquerRotation() {
+  pc.style.transform = 'rotate(' + rot.value + 'deg)';
+  document.getElementById('rv').textContent = rot.value;
+}
 function dimensionner() {
   const W = sup.clientWidth;
   if (!W || !pc.naturalWidth) return;
@@ -1082,11 +1116,13 @@ function dimensionner() {
   pc.style.left = (centre - largeur / 2) + 'px';
   pc.style.top = (deja ? bas - h : sup.clientHeight * 0.1) + 'px';
   document.getElementById('tv').textContent = curseur.value;
+  appliquerRotation();
 }
 sup.addEventListener('load', dimensionner);
 pc.addEventListener('load', dimensionner);
 window.addEventListener('load', dimensionner);
 curseur.addEventListener('input', dimensionner);
+rot.addEventListener('input', appliquerRotation);
 
 pc.addEventListener('pointerdown', function (e) {
   const r = zone.getBoundingClientRect();
@@ -1105,11 +1141,13 @@ pc.addEventListener('pointercancel', function () { glisse = null; });
 
 document.getElementById('valider').addEventListener('click', async function () {
   const W = sup.clientWidth, H = sup.clientHeight;
-  const corps = {
-    u: (pc.offsetLeft + pc.offsetWidth / 2) / W,
-    v: (pc.offsetTop + pc.offsetHeight) / H,
-    facteur: curseur.value / 100
-  };
+  const w = pc.offsetWidth, h = pc.offsetHeight;
+  const cx = pc.offsetLeft + w / 2, cy = pc.offsetTop + h / 2;
+  const t = parseFloat(rot.value) * Math.PI / 180;
+  // point de la base (bas au centre de l'image), apres rotation autour du centre
+  const bx = cx - (h / 2) * Math.sin(t);
+  const by = cy + (h / 2) * Math.cos(t);
+  const corps = { u: bx / W, v: by / H, facteur: curseur.value / 100, rotation: parseFloat(rot.value) };
   const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
   document.getElementById('etat').textContent = rep.ok ? ' Placement enregistre. Vous pouvez fermer cette page.' : ' Erreur, reessayez.';
 });
@@ -1118,17 +1156,95 @@ document.getElementById('valider').addEventListener('click', async function () {
 </html>
 """
 
+CADRAGE_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>LibreVies - recadrage</title>
+<style>
+body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
+#zone { position: relative; display: inline-block; border: 2px solid #777; background: #fff; touch-action: none; cursor: crosshair; }
+#photo { display: block; max-width: 640px; height: auto; user-select: none; }
+#cadre { position: absolute; border: 2px dashed #d33; background: rgba(255, 0, 0, 0.08); display: none; pointer-events: none; }
+button { font-size: 16px; padding: 8px 16px; margin: 12px 8px 0 0; }
+</style>
+</head>
+<body>
+<h3>Recadrez « __PIECE__ »</h3>
+<p>Dessinez un rectangle autour de l'objet a modeliser (en gardant la main ou la personne hors du cadre si possible).</p>
+<div id="zone">
+  <img id="photo" src="/img/piece" alt="photo">
+  <div id="cadre"></div>
+</div>
+<br>
+<button id="valider">Valider le recadrage</button>
+<button id="tout">Garder la photo entiere</button>
+<span id="etat"></span>
+<script>
+const zone = document.getElementById('zone');
+const photo = document.getElementById('photo');
+const cadre = document.getElementById('cadre');
+let debut = null, fin = null;
 
-def lancer_placement(image_support, image_piece, nom_support, nom_piece, log, delai=1800):
-    """Ouvre la page de placement dans le navigateur. Renvoie {u, v, facteur} ou None."""
-    import html as htmllib
+function position(e) {
+  const r = photo.getBoundingClientRect();
+  return {
+    x: Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1),
+    y: Math.min(Math.max((e.clientY - r.top) / r.height, 0), 1)
+  };
+}
+function dessiner() {
+  if (!debut || !fin) { cadre.style.display = 'none'; return; }
+  const x0 = Math.min(debut.x, fin.x), x1 = Math.max(debut.x, fin.x);
+  const y0 = Math.min(debut.y, fin.y), y1 = Math.max(debut.y, fin.y);
+  cadre.style.display = 'block';
+  cadre.style.left = (photo.offsetLeft + x0 * photo.offsetWidth) + 'px';
+  cadre.style.top = (photo.offsetTop + y0 * photo.offsetHeight) + 'px';
+  cadre.style.width = ((x1 - x0) * photo.offsetWidth) + 'px';
+  cadre.style.height = ((y1 - y0) * photo.offsetHeight) + 'px';
+}
+zone.addEventListener('pointerdown', function (e) {
+  debut = position(e); fin = debut;
+  zone.setPointerCapture(e.pointerId);
+  dessiner();
+  e.preventDefault();
+});
+zone.addEventListener('pointermove', function (e) {
+  if (!debut) return;
+  fin = position(e);
+  dessiner();
+});
+zone.addEventListener('pointerup', function () { if (debut) { fin = fin || debut; } });
+
+async function envoyer(corps) {
+  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+  document.getElementById('etat').textContent = rep.ok ? ' Recadrage enregistre. Vous pouvez fermer cette page.' : ' Erreur, reessayez.';
+}
+document.getElementById('valider').addEventListener('click', function () {
+  if (!debut || !fin) { envoyer({ x0: 0, y0: 0, x1: 1, y1: 1 }); return; }
+  envoyer({
+    x0: Math.min(debut.x, fin.x), y0: Math.min(debut.y, fin.y),
+    x1: Math.max(debut.x, fin.x), y1: Math.max(debut.y, fin.y)
+  });
+});
+document.getElementById('tout').addEventListener('click', function () {
+  envoyer({ x0: 0, y0: 0, x1: 1, y1: 1 });
+});
+</script>
+</body>
+</html>
+"""
+
+
+def lancer_page(page_html, fichiers, log, delai=1800):
+    """Sert une page locale dans le navigateur et attend son envoi (POST /valider).
+
+    fichiers : {adresse: chemin} des images servies a la page. Renvoie le dict envoye, ou None."""
     import http.server
     import json
     import mimetypes
     import webbrowser
-    fichiers = {"/img/support": image_support, "/img/piece": image_piece}
-    page = (PLACEMENT_HTML.replace("__SUPPORT__", htmllib.escape(nom_support))
-            .replace("__PIECE__", htmllib.escape(nom_piece))).encode("utf-8")
+    page = page_html.encode("utf-8")
     resultat = {"valeur": None}
     fin = threading.Event()
 
@@ -1160,15 +1276,10 @@ def lancer_placement(image_support, image_piece, nom_support, nom_piece, log, de
                 return
             try:
                 corps = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                d = json.loads(corps.decode("utf-8"))
-                resultat["valeur"] = {
-                    "u": min(max(float(d["u"]), 0.0), 1.0),
-                    "v": min(max(float(d["v"]), 0.0), 1.0),
-                    "facteur": min(max(float(d["facteur"]), 0.05), 1.5),
-                }
+                resultat["valeur"] = json.loads(corps.decode("utf-8"))
                 self._envoyer(200, b"ok", "text/plain")
                 fin.set()
-            except (ValueError, KeyError, TypeError):
+            except (ValueError, TypeError):
                 self._envoyer(400, b"donnees invalides", "text/plain")
 
     serveur = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Gestion)
@@ -1177,12 +1288,49 @@ def lancer_placement(image_support, image_piece, nom_support, nom_piece, log, de
     adresse = "http://127.0.0.1:%d/" % serveur.server_address[1]
     try:
         webbrowser.open(adresse)
-        log("Page de placement ouverte : " + adresse)
+        log("Page ouverte dans le navigateur : " + adresse)
         fin.wait(delai)
     finally:
         serveur.shutdown()
         serveur.server_close()
     return resultat["valeur"]
+
+
+def _borne(valeur, bas, haut):
+    return min(max(float(valeur), bas), haut)
+
+
+def lancer_placement(image_support, image_piece, nom_support, nom_piece, log, delai=1800):
+    """Page de placement. Renvoie {u, v, facteur, rotation} ou None."""
+    import html as htmllib
+    page = (PLACEMENT_HTML.replace("__SUPPORT__", htmllib.escape(nom_support))
+            .replace("__PIECE__", htmllib.escape(nom_piece)))
+    d = lancer_page(page, {"/img/support": image_support, "/img/piece": image_piece}, log, delai)
+    if d is None:
+        return None
+    try:
+        return {"u": _borne(d["u"], 0.0, 1.0), "v": _borne(d["v"], 0.0, 1.0),
+                "facteur": _borne(d["facteur"], 0.05, 1.5),
+                "rotation": _borne(d.get("rotation", 0.0), -180.0, 180.0)}
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def lancer_cadrage(image_piece, nom_piece, log, delai=1800):
+    """Page de recadrage avant la fabrication. Renvoie 'x0,y0,x1,y1' ou None (photo entiere)."""
+    import html as htmllib
+    page = CADRAGE_HTML.replace("__PIECE__", htmllib.escape(nom_piece))
+    d = lancer_page(page, {"/img/piece": image_piece}, log, delai)
+    if d is None:
+        return None
+    try:
+        x0, y0 = _borne(d["x0"], 0.0, 1.0), _borne(d["y0"], 0.0, 1.0)
+        x1, y1 = _borne(d["x1"], 0.0, 1.0), _borne(d["y1"], 0.0, 1.0)
+    except (KeyError, ValueError, TypeError):
+        return None
+    if x1 - x0 < 0.05 or y1 - y0 < 0.05 or (x0 == 0 and y0 == 0 and x1 == 1 and y1 == 1):
+        return None
+    return "%.4f,%.4f,%.4f,%.4f" % (x0, y0, x1, y1)
 
 
 def interface():
@@ -1444,6 +1592,9 @@ def interface():
                         cmd = [venv_python(), os.path.abspath(__file__), "--worker",
                                "--image", chemin, "--nom", nom,
                                "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256"]
+                        recadrage = lancer_cadrage(chemin, piece["nom"], log)
+                        if recadrage:
+                            cmd += ["--recadrage", recadrage]
                         if executer_worker(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                             return
@@ -1468,7 +1619,8 @@ def interface():
                         if place is None:
                             log("Pas de placement enregistre : posee au-dessus par defaut.")
                         else:
-                            entrees[k]["ancrage"] = [place["u"], place["v"], place["facteur"]]
+                            entrees[k]["ancrage"] = [place["u"], place["v"], place["facteur"],
+                                                     place["rotation"]]
                             log("Placement enregistre.")
                     log("=== Assemblage de '" + base + "' ===")
                     cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--assembler",
@@ -1712,6 +1864,7 @@ def main():
         parseur.add_argument("--ailes", action="store_true")
         parseur.add_argument("--assembler", action="store_true")
         parseur.add_argument("--entrees", default="[]")
+        parseur.add_argument("--recadrage", default="")
         parseur.add_argument("--position-ailes", type=float, default=0.5)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
