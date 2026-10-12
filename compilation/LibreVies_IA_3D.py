@@ -209,6 +209,13 @@ def colorer_depuis_photo(mesh, image):
     score, couleurs, axe, signe = meilleur
     if score < 30:
         raise RuntimeError("la photo ne correspond pas clairement au modele (ecart %.0f)" % score)
+    # Faces tournees vers l'appareil : couleur de la photo. Les autres faces ne sont pas vues
+    # par la photo : couleur moyenne de la photo (pas de couleurs inventees).
+    normales = np.asarray(mesh.vertex_normals)
+    visible = normales[:, axe] * signe > 0.15
+    if visible.any():
+        moyenne = couleurs[visible].mean(axis=0)
+        couleurs = np.where(visible[:, None], couleurs, moyenne[None, :])
 
     rgba = np.zeros((len(V), 4), dtype=np.uint8)
     rgba[:, :3] = np.clip(couleurs, 0, 255).astype(np.uint8)
@@ -653,6 +660,30 @@ def generer_parametrique(args, photo_pil=None):
         print("Copie pour Unity : Assets/Resources/Items/" + args.nom + "/", flush=True)
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
+
+
+def generer_detourage(args):
+    """Detoure la photo (sans TripoSR) et enregistre l'apercu avec transparence."""
+    os.environ.update(env_ia())
+    sys.path.insert(0, TRIPO)
+    import rembg
+    from PIL import Image
+    from tsr.utils import remove_background, resize_foreground
+
+    image = Image.open(args.image)
+    if getattr(args, "recadrage", ""):
+        x0, y0, x1, y1 = [float(t) for t in args.recadrage.split(",")]
+        largeur_p, hauteur_p = image.size
+        image = image.crop((int(x0 * largeur_p), int(y0 * hauteur_p),
+                            int(x1 * largeur_p), int(y1 * hauteur_p)))
+    image = recadrer_objet(image)
+    session = rembg.new_session()
+    image = remove_background(image, session)
+    image = resize_foreground(image, 0.85)
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    image.save(os.path.join(dossier, "detourage.png"))
+    print("Detourage pret (apercu). Verifiez-le avant la fabrication 3D.", flush=True)
 
 
 def generer(args):
@@ -1338,6 +1369,53 @@ def lancer_cadrage(image_piece, nom_piece, log, delai=1800):
     return "%.4f,%.4f,%.4f,%.4f" % (x0, y0, x1, y1)
 
 
+VALIDATION_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>LibreVies - detourage</title>
+<style>
+body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
+#fond { display: inline-block; padding: 8px; border: 2px solid #777; background-color: #fff;
+  background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
+    linear-gradient(-45deg, #ddd 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ddd 75%),
+    linear-gradient(-45deg, transparent 75%, #ddd 75%);
+  background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
+#fond img { display: block; max-width: 640px; height: auto; }
+button { font-size: 16px; padding: 8px 16px; margin: 12px 8px 0 0; }
+</style>
+</head>
+<body>
+<h3>Le detourage de « __PIECE__ » est-il correct ?</h3>
+<p>Le fond doit disparaitre (damier). Si une partie du decor reste, recadrez plus serre.</p>
+<div id="fond"><img src="/img/detour" alt="detourage"></div><br>
+<button id="ok">Oui, lancer la fabrication 3D</button>
+<button id="non">Non, recadrer a nouveau</button>
+<span id="etat"></span>
+<script>
+async function envoyer(ok) {
+  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: ok }) });
+  document.getElementById('etat').textContent = rep.ok ? ' Merci, vous pouvez fermer cette page.' : ' Erreur, reessayez.';
+}
+document.getElementById('ok').addEventListener('click', function () { envoyer(true); });
+document.getElementById('non').addEventListener('click', function () { envoyer(false); });
+</script>
+</body>
+</html>
+"""
+
+
+def lancer_validation(image_detour, nom_piece, log, delai=1800):
+    """Renvoie True (on continue), False (recadrer a nouveau) ou None (page fermee)."""
+    import html as htmllib
+    page = VALIDATION_HTML.replace("__PIECE__", htmllib.escape(nom_piece))
+    d = lancer_page(page, {"/img/detour": image_detour}, log, delai)
+    if d is None:
+        return None
+    return bool(d.get("ok"))
+
+
 def interface():
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
@@ -1625,7 +1703,24 @@ def interface():
                         cmd = [venv_python(), os.path.abspath(__file__), "--worker",
                                "--image", chemin, "--nom", nom,
                                "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256"]
-                        recadrage = lancer_cadrage(chemin, piece["nom"], log)
+                        while True:
+                            recadrage = lancer_cadrage(chemin, piece["nom"], log)
+                            cmd_detour = [venv_python(), os.path.abspath(__file__), "--worker",
+                                          "--detourer", "--image", chemin, "--nom", nom, "--taille", "0"]
+                            if recadrage:
+                                cmd_detour += ["--recadrage", recadrage]
+                            log("=== Detourage de '%s' (apercu) ===" % piece["nom"])
+                            if executer_worker(cmd_detour, log) != 0:
+                                log("=== ECHEC du detourage : voir le journal ===")
+                                return
+                            valide = lancer_validation(os.path.join(SORTIES, nom, "detourage.png"),
+                                                       piece["nom"], log)
+                            if valide is None:
+                                log("Page fermee sans reponse : fabrication annulee.")
+                                return
+                            if valide:
+                                break
+                            log("Recadrage a refaire pour '%s'." % piece["nom"])
                         if recadrage:
                             cmd += ["--recadrage", recadrage]
                         if executer_worker(cmd, log) != 0:
@@ -1907,6 +2002,7 @@ def main():
         parseur.add_argument("--assembler", action="store_true")
         parseur.add_argument("--entrees", default="[]")
         parseur.add_argument("--recadrage", default="")
+        parseur.add_argument("--detourer", action="store_true")
         parseur.add_argument("--position-ailes", type=float, default=0.5)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
@@ -1914,6 +2010,9 @@ def main():
         parseur.add_argument("--garder-fond", action="store_true")
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
+        if args.detourer:
+            generer_detourage(args)
+            return
         if args.assembler:
             assembler(args)
             return
