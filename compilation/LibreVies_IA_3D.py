@@ -1673,7 +1673,7 @@ def interface():
             chemin = filedialog.askopenfilename(
                 parent=fenetre_chat, title="Choisir une image dans sorties",
                 initialdir=SORTIES,
-                filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
+                filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
             if not chemin:
                 afficher("Assistant : aucune image choisie. Tapez 1, 2 ou 3.")
                 return
@@ -1687,6 +1687,12 @@ def interface():
 
             def travail():
                 try:
+                    if os.path.splitext(chemin)[1].lower() == ".glb":
+                        cible_glb = os.path.join(SORTIES, nom, nom + ".glb")
+                        os.makedirs(os.path.dirname(cible_glb), exist_ok=True)
+                        shutil.copyfile(chemin, cible_glb)
+                        log("Modele 3D deja fait, copie : " + cible_glb)
+                        return
                     os.makedirs(os.path.join(IA, "images"), exist_ok=True)
                     ext = os.path.splitext(chemin)[1].lower() or ".png"
                     cible = os.path.join(IA, "images", nom + ext)
@@ -1852,6 +1858,25 @@ def interface():
                 return None
             return round(cm, 1) if bas <= cm <= haut else None
 
+        def appliquer_source_piece(piece, choix):
+            if choix == "2":
+                piece["source"] = 2
+                contexte["attente"] = "attente_recherche"
+                afficher("Assistant : je cherche « %s » sur Wikimedia Commons..." % piece["requete"])
+                lancer_recherche_piece(piece["requete"], piece["mots"])
+                return
+            chemin = filedialog.askopenfilename(
+                parent=fenetre_chat, title="Image ou modele 3D pour " + piece["nom"], initialdir=SORTIES,
+                filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
+            if not chemin:
+                contexte["attente"] = "source_piece"
+                afficher("Assistant : aucun fichier choisi. Tapez 2 ou 3 pour reessayer.")
+                return
+            piece["source"] = 3
+            piece["fichier"] = chemin
+            afficher("Assistant : fichier de %s enregistre." % piece["nom"])
+            piece_suivante()
+
         def traiter_piece(message):
             piece = contexte["pieces"][contexte["i"]]
             attente = contexte.get("attente")
@@ -1871,6 +1896,19 @@ def interface():
                 piece["longueur_ailes"] = cm
                 piece_suivante()
                 return
+            if attente == "ailes_image_piece":
+                if message == "1":
+                    appliquer_source_piece(piece, piece.pop("source_choisie", "2"))
+                    return
+                if message == "2":
+                    piece["source"] = 1
+                    piece.pop("source_choisie", None)
+                    contexte["attente"] = "taille_ailes_piece"
+                    afficher("Assistant : je dessine les ailes de « %s » avec le generateur. "
+                             "Quelle taille (cm, entre 3 et 40) ?" % piece["nom"])
+                    return
+                afficher("Assistant : tapez 1 (oui) ou 2 (non).")
+                return
             if attente == "source_piece":
                 if message == "1":
                     if "marteau" not in piece["nom"]:
@@ -1884,23 +1922,14 @@ def interface():
                         return
                     piece_suivante()
                     return
-                if message == "2":
-                    piece["source"] = 2
-                    contexte["attente"] = "attente_recherche"
-                    afficher("Assistant : je cherche « %s » sur Wikimedia Commons..." % piece["requete"])
-                    lancer_recherche_piece(piece["requete"], piece["mots"])
+                if message in ("2", "3") and piece.get("ailes"):
+                    piece["source_choisie"] = message
+                    contexte["attente"] = "ailes_image_piece"
+                    afficher("Assistant : l'image de « %s » contient-elle deja les ailes ?" % piece["nom"])
+                    afficher("  1 = oui   2 = non, je les dessine avec le generateur")
                     return
-                if message == "3":
-                    chemin = filedialog.askopenfilename(
-                        parent=fenetre_chat, title="Image pour " + piece["nom"], initialdir=SORTIES,
-                        filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
-                    if not chemin:
-                        afficher("Assistant : aucune image choisie. Tapez 3 pour reessayer, ou une autre option.")
-                        return
-                    piece["source"] = 3
-                    piece["fichier"] = chemin
-                    afficher("Assistant : image de %s enregistree." % piece["nom"])
-                    piece_suivante()
+                if message in ("2", "3"):
+                    appliquer_source_piece(piece, message)
                     return
                 afficher("Assistant : tapez 2 ou 3 (ou 1 pour un marteau).")
                 return
@@ -1931,6 +1960,16 @@ def interface():
                                 log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                                 return
                             entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
+                                            "taille": None if piece["relation"] == "sur" and k > 1
+                                            else piece["taille"],
+                                            "relation": piece["relation"]})
+                            continue
+                        if piece.get("fichier") and piece["fichier"].lower().endswith(".glb"):
+                            cible = os.path.join(SORTIES, nom, nom + ".glb")
+                            os.makedirs(os.path.dirname(cible), exist_ok=True)
+                            shutil.copyfile(piece["fichier"], cible)
+                            log("=== Piece %d/%d : %s (modele 3D deja fait) ===" % (k, len(pieces), piece["nom"]))
+                            entrees.append({"fichier": cible,
                                             "taille": None if piece["relation"] == "sur" and k > 1
                                             else piece["taille"],
                                             "relation": piece["relation"]})
@@ -2039,6 +2078,12 @@ def interface():
                 return
             if contexte.get("attente") == "source_marteau" and message in ("1", "2", "3"):
                 params = contexte["params"]
+                if message in ("2", "3") and params["ailes"]:
+                    params["source_choisie"] = message
+                    contexte["attente"] = "ailes_image"
+                    afficher("Assistant : l'image contient-elle deja les ailes ?")
+                    afficher("  1 = oui, elle a deja les ailes   2 = non, je dessine les ailes avec le generateur")
+                    return
                 if message == "2":
                     contexte["attente"] = None
                     contexte["params"] = None
@@ -2097,6 +2142,26 @@ def interface():
                 contexte["params"] = None
                 afficher("Assistant : je dessine le marteau avec ses ailes (%s cm)." % params["taille"])
                 lancer_parametrique(params["nom"], params["taille"], position, params.get("longueur_ailes"))
+                return
+            if contexte.get("attente") == "ailes_image" and message in ("1", "2"):
+                params = contexte["params"]
+                choix = params.pop("source_choisie", "2")
+                if message == "2":
+                    contexte["attente"] = "taille_ailes"
+                    afficher("Assistant : je dessine les ailes avec le generateur. Quelle taille pour les ailes "
+                             "(cm, entre 3 et 40, ex. 10) ?")
+                    return
+                if choix == "2":
+                    contexte["attente"] = None
+                    contexte["params"] = None
+                    afficher("Assistant : je cherche des images libres de droits (Wikimedia Commons)...")
+                    lancer_recherche(params)
+                    return
+                contexte["attente"] = "source_marteau"
+                ouvrir_bibliotheque(params)
+                return
+            if contexte.get("attente") == "ailes_image":
+                afficher("Assistant : tapez 1 (oui) ou 2 (non).")
                 return
             if contexte.get("attente") in ("source", "place", "source_marteau", "taille_ailes"):
                 contexte["attente"] = None
