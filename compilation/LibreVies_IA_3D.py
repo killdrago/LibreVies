@@ -615,7 +615,8 @@ def generer_parametrique(args, photo_pil=None):
         u = np.clip(x_pre / p["L_manche"], 0.0, 1.0)
         r_pre = p["r_col"] + (p["r_bout"] - p["r_col"]) * u
         x_final = x_pre * echelle + decalage[0]
-        parties += _ailes_param(x_final, decalage[1], decalage[2], r_pre * echelle, position=position)
+        parties += _ailes_param(x_final, decalage[1], decalage[2], r_pre * echelle, position=position,
+                                longueur=float(getattr(args, "longueur_ailes", 10.0)) / 100.0)
         print("Ailes ajoutees : 2 x 10 cm, position %.2f du manche." % position, flush=True)
 
     dossier = os.path.join(SORTIES, args.nom)
@@ -1962,6 +1963,45 @@ def interface():
             if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir(int(message))
                 return
+            if contexte.get("attente") == "source_marteau" and message in ("1", "2", "3"):
+                params = contexte["params"]
+                if message == "2":
+                    contexte["attente"] = None
+                    contexte["params"] = None
+                    afficher("Assistant : je cherche des images libres de droits (Wikimedia Commons)...")
+                    lancer_recherche(params)
+                    return
+                if message == "3":
+                    ouvrir_bibliotheque(params)
+                    return
+                if params["ailes"]:
+                    contexte["attente"] = "taille_ailes"
+                    afficher("Assistant : quelle taille pour les ailes (en cm, entre 3 et 40, ex. 10) ?")
+                    return
+                contexte["attente"] = None
+                contexte["params"] = None
+                afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
+                lancer_parametrique(params["nom"], params["taille"])
+                return
+            if contexte.get("attente") == "taille_ailes":
+                try:
+                    cm = float(message.replace(",", "."))
+                except ValueError:
+                    cm = None
+                if cm is None or not 3 <= cm <= 40:
+                    afficher("Assistant : donne une taille entre 3 et 40 cm pour les ailes (ex. 10).")
+                    return
+                params = contexte["params"]
+                params["longueur_ailes"] = cm
+                contexte["attente"] = "source"
+                afficher("Assistant : pour les ailes, que voulez-vous ?")
+                afficher("  1 = dessinees par le generateur (%s cm chaque aile)" % cm)
+                afficher("  2 et 3 ne sont pas possibles avec un marteau fabrique par le generateur")
+                return
+            if contexte.get("attente") == "source" and message in ("2", "3"):
+                afficher("Assistant : les ailes d'une image ne peuvent pas etre combinees avec un marteau "
+                         "fabrique par le generateur. Tapez 1.")
+                return
             if contexte.get("attente") == "source" and message in ("1", "2", "3"):
                 params = contexte["params"]
                 if message == "3":
@@ -1982,9 +2022,9 @@ def interface():
                 contexte["attente"] = None
                 contexte["params"] = None
                 afficher("Assistant : je dessine le marteau avec ses ailes (%s cm)." % params["taille"])
-                lancer_parametrique(params["nom"], params["taille"], position)
+                lancer_parametrique(params["nom"], params["taille"], position, params.get("longueur_ailes"))
                 return
-            if contexte.get("attente") in ("source", "place"):
+            if contexte.get("attente") in ("source", "place", "source_marteau", "taille_ailes"):
                 contexte["attente"] = None
                 contexte["params"] = None
             if not contexte.get("attente") and "marteau" not in message.lower() \
@@ -2000,18 +2040,14 @@ def interface():
                 for q in questions:
                     afficher("Assistant : " + q)
                 return
-            if params["ailes"]:
-                contexte["texte"] = ""
-                contexte["params"] = params
-                contexte["attente"] = "source"
-                afficher("Assistant : pour les ailes, que voulez-vous ?")
-                afficher("  1 = dessinees par le generateur (10 cm chaque aile, fiable)")
-                afficher("  2 = chercher une image libre sur le web (resultats incertains)")
-                afficher("  3 = prendre une image dans ma bibliotheque (dossier sorties)")
-                return
-            afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
-            lancer_parametrique(params["nom"], params["taille"])
             contexte["texte"] = ""
+            contexte["params"] = params
+            contexte["attente"] = "source_marteau"
+            afficher("Assistant : pour le marteau, que voulez-vous ?")
+            afficher("  1 = fabrique par le generateur")
+            afficher("  2 = chercher une image libre sur le web (resultats incertains)")
+            afficher("  3 = prendre une image dans ma bibliotheque (dossier sorties)")
+            return
 
         def verifier_chat():
             try:
@@ -2057,11 +2093,13 @@ def interface():
         afficher("Assistant : decrivez l'objet (pour l'instant : un marteau, avec ou sans ailes).")
         verifier_chat()
 
-    def lancer_parametrique(nom, taille, position_ailes=None):
+    def lancer_parametrique(nom, taille, position_ailes=None, longueur_ailes=None):
         cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--parametrique",
                "--nom", nom, "--taille", str(taille), "--mc", "256"]
         if position_ailes is not None:
             cmd += ["--ailes", "--position-ailes", str(position_ailes)]
+            if longueur_ailes:
+                cmd += ["--longueur-ailes", str(longueur_ailes)]
 
         def travail():
             log("=== Generation parametrique de '" + nom + "' ===")
@@ -2224,6 +2262,7 @@ def main():
         parseur.add_argument("--detourer", action="store_true")
         parseur.add_argument("--deja-detoure", action="store_true")
         parseur.add_argument("--position-ailes", type=float, default=0.5)
+        parseur.add_argument("--longueur-ailes", type=float, default=10.0)
         parseur.add_argument("--nom", required=True)
         parseur.add_argument("--taille", type=float, required=True)
         parseur.add_argument("--mc", type=int, default=256)
