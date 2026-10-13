@@ -1044,6 +1044,17 @@ def decouper_demande(texte):
     return pieces
 
 
+def fusionner_ailes(pieces):
+    """« marteau avec ailes » : les ailes ne sont pas une piece a part, elles vont sur le marteau."""
+    sortie = []
+    for p in pieces:
+        if p["nom"] in ("ailes", "aile") and sortie and "marteau" in sortie[-1]["nom"]:
+            sortie[-1]["ailes"] = True
+            continue
+        sortie.append(dict(p, ailes=False))
+    return sortie
+
+
 def requete_en(nom):
     """Requete Wikimedia Commons pour une piece, et mots a retrouver dans les titres.
 
@@ -1770,23 +1781,35 @@ def interface():
 
         def demander_piece():
             piece = contexte["pieces"][contexte["i"]]
+            contexte["attente"] = "taille_piece"
+            afficher("Assistant : pour « %s » : quelle taille reelle (cm, entre 5 et 100) ?" % piece["nom"])
+
+        def demander_source(piece):
             contexte["attente"] = "source_piece"
-            options = "1 = ma photo (je l'ouvre)"
-            options += ", 2 = recherche web (images libres)"
-            afficher("Assistant : pour « %s » : %s" % (piece["nom"], options))
+            if "marteau" in piece["nom"]:
+                afficher("Assistant : pour « %s » : 1 = fabrique par le generateur, 2 = recherche web, "
+                         "3 = ma bibliotheque (dossier sorties ou un fichier)" % piece["nom"])
+                if piece.get("ailes"):
+                    afficher("  les ailes seront dessinees avec le marteau (generateur) ; "
+                             "avec 2 ou 3, l'image doit deja contenir les ailes.")
+            else:
+                afficher("Assistant : pour « %s » : 2 = recherche web, 3 = ma bibliotheque "
+                         "(1 n'est pas disponible : je ne sais fabriquer que des marteaux)" % piece["nom"])
 
         def lancer_pieces(pieces):
             for piece in pieces:
                 piece["requete"], piece["mots"] = requete_en(piece["nom"])
                 piece["fichier"] = None
                 piece["url"] = None
+                piece["taille"] = None
+                piece["source"] = None
             contexte["pieces"] = pieces
             contexte["i"] = 0
             afficher("Assistant : je vois %d piece(s) : %s. Je demande la source de chacune."
                      % (len(pieces), ", ".join(p["nom"] for p in pieces)))
             demander_piece()
 
-        def piece_suivante():
+        def piece_suivante():  # passe a la piece suivante, ou fabrique tout
             contexte["i"] += 1
             if contexte["i"] < len(contexte["pieces"]):
                 demander_piece()
@@ -1822,27 +1845,64 @@ def interface():
             afficher("Assistant : image %d retenue pour %s." % (numero, piece["nom"]))
             piece_suivante()
 
+        def lire_cm(message, bas, haut):
+            try:
+                cm = float(message.replace(",", "."))
+            except ValueError:
+                return None
+            return round(cm, 1) if bas <= cm <= haut else None
+
         def traiter_piece(message):
             piece = contexte["pieces"][contexte["i"]]
             attente = contexte.get("attente")
+            if attente == "taille_piece":
+                cm = lire_cm(message, 5, 100)
+                if cm is None:
+                    afficher("Assistant : donne une taille entre 5 et 100 cm pour « %s »." % piece["nom"])
+                    return
+                piece["taille"] = cm
+                demander_source(piece)
+                return
+            if attente == "taille_ailes_piece":
+                cm = lire_cm(message, 3, 40)
+                if cm is None:
+                    afficher("Assistant : donne une taille entre 3 et 40 cm pour les ailes.")
+                    return
+                piece["longueur_ailes"] = cm
+                piece_suivante()
+                return
             if attente == "source_piece":
                 if message == "1":
-                    chemin = filedialog.askopenfilename(
-                        parent=fenetre_chat, title="Photo de " + piece["nom"],
-                        filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
-                    if not chemin:
-                        afficher("Assistant : pas de photo choisie. Tapez 1 pour choisir, ou 2 pour le web.")
+                    if "marteau" not in piece["nom"]:
+                        afficher("Assistant : je ne sais pas fabriquer « %s » : tapez 2 ou 3." % piece["nom"])
                         return
-                    piece["fichier"] = chemin
-                    afficher("Assistant : photo de %s enregistree." % piece["nom"])
+                    piece["source"] = 1
+                    if piece.get("ailes"):
+                        contexte["attente"] = "taille_ailes_piece"
+                        afficher("Assistant : quelle taille pour les ailes de « %s » (cm, entre 3 et 40) ?"
+                                 % piece["nom"])
+                        return
                     piece_suivante()
                     return
                 if message == "2":
+                    piece["source"] = 2
                     contexte["attente"] = "attente_recherche"
                     afficher("Assistant : je cherche « %s » sur Wikimedia Commons..." % piece["requete"])
                     lancer_recherche_piece(piece["requete"], piece["mots"])
                     return
-                afficher("Assistant : tapez 1 (ma photo) ou 2 (recherche web).")
+                if message == "3":
+                    chemin = filedialog.askopenfilename(
+                        parent=fenetre_chat, title="Image pour " + piece["nom"], initialdir=SORTIES,
+                        filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
+                    if not chemin:
+                        afficher("Assistant : aucune image choisie. Tapez 3 pour reessayer, ou une autre option.")
+                        return
+                    piece["source"] = 3
+                    piece["fichier"] = chemin
+                    afficher("Assistant : image de %s enregistree." % piece["nom"])
+                    piece_suivante()
+                    return
+                afficher("Assistant : tapez 2 ou 3 (ou 1 pour un marteau).")
                 return
             if attente == "choix_piece" and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir_piece(int(message))
@@ -1861,6 +1921,20 @@ def interface():
                     entrees = []
                     for k, piece in enumerate(pieces, 1):
                         nom = "%s_%d" % (base, k)
+                        if piece.get("source") == 1:
+                            cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--parametrique",
+                                   "--nom", nom, "--taille", str(piece["taille"]), "--mc", "256"]
+                            if piece.get("ailes"):
+                                cmd += ["--ailes", "--longueur-ailes", str(piece.get("longueur_ailes", 10.0))]
+                            log("=== Piece %d/%d : %s (generateur) ===" % (k, len(pieces), piece["nom"]))
+                            if executer_worker(cmd, log) != 0:
+                                log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
+                                return
+                            entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
+                                            "taille": None if piece["relation"] == "sur" and k > 1
+                                            else piece["taille"],
+                                            "relation": piece["relation"]})
+                            continue
                         if piece.get("fichier"):
                             ext = os.path.splitext(piece["fichier"])[1].lower() or ".jpg"
                             chemin = os.path.join(IA, "images", nom + ext)
@@ -1873,7 +1947,7 @@ def interface():
                         log("=== Piece %d/%d : %s ===" % (k, len(pieces), piece["nom"]))
                         cmd = [venv_python(), os.path.abspath(__file__), "--worker",
                                "--image", chemin, "--nom", nom,
-                               "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256"]
+                               "--taille", str(piece["taille"]), "--mc", "256"]
                         while True:
                             recadrage = lancer_cadrage(chemin, piece["nom"], log)
                             cmd_detour = [venv_python(), os.path.abspath(__file__), "--worker",
@@ -1902,7 +1976,7 @@ def interface():
                             log("Recadrage a refaire pour '%s'." % piece["nom"])
                         cmd = [venv_python(), os.path.abspath(__file__), "--worker",
                                "--image", chemin, "--nom", nom,
-                               "--taille", str(DEFAUT_TAILLE_PIECE), "--mc", "256",
+                               "--taille", str(piece["taille"]), "--mc", "256",
                                "--deja-detoure"]
                         if executer_worker(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
@@ -1911,7 +1985,7 @@ def interface():
                             ecrire_credits(nom, piece)
                         entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
                                         "taille": None if piece["relation"] == "sur" and k > 1
-                                        else DEFAUT_TAILLE_PIECE,
+                                        else piece["taille"],
                                         "relation": piece["relation"]})
                     for k in range(1, len(pieces)):
                         if pieces[k]["relation"] != "sur":
@@ -2027,10 +2101,9 @@ def interface():
             if contexte.get("attente") in ("source", "place", "source_marteau", "taille_ailes"):
                 contexte["attente"] = None
                 contexte["params"] = None
-            if not contexte.get("attente") and "marteau" not in message.lower() \
-                    and "aile" not in message.lower():
-                pieces = decouper_demande(message)
-                if pieces:
+            if not contexte.get("attente"):
+                pieces = fusionner_ailes(decouper_demande(message))
+                if pieces and not (len(pieces) == 1 and "marteau" in pieces[0]["nom"]):
                     lancer_pieces(pieces)
                     return
             contexte["choix"] = None
