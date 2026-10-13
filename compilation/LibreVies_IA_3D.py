@@ -1053,7 +1053,7 @@ def decouper_demande(texte):
     import re
     t = texte.lower().strip()
     # Formules de politesse et verbes : ne font pas partie des pieces
-    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|je|moi|nous|svp|stp)\b", " ", t)
+    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|met|mets|mettre|pose|poser|ajoute|ajouter|place|placer|je|moi|nous|svp|stp)\b", " ", t)
     # « sur la tete », « sur le dos »... : le petit objet est pose dessus
     t = re.sub(r"\bsur\s+(la\s+|le\s+|sa\s+|son\s+|ses\s+|les\s+)?(tete|tête|dos|epaule|épaule|main|mains)\b", " dessus ", t)
     morceaux = re.split(PIECE_SEPARATEURS, re.sub(r"\s+", " ", t))
@@ -1857,8 +1857,8 @@ def interface():
                     afficher("  les ailes seront dessinees avec le marteau (generateur) ; "
                              "avec 2 ou 3, l'image doit deja contenir les ailes.")
             else:
-                afficher("Assistant : pour « %s » : 2 = recherche web, 3 = ma bibliotheque "
-                         "(1 n'est pas disponible : je ne sais fabriquer que des marteaux)" % piece["nom"])
+                afficher("Assistant : pour « %s » : 1 = ma photo (je l'ouvre), 2 = recherche web, "
+                         "3 = ma bibliotheque (dossier sorties)" % piece["nom"])
 
         def lancer_pieces(pieces):
             for piece in pieces:
@@ -1991,10 +1991,19 @@ def interface():
                 afficher("Assistant : tapez 1 (oui) ou 2 (non).")
                 return
             if attente == "source_piece":
-                if message == "1":
-                    if "marteau" not in piece["nom"]:
-                        afficher("Assistant : je ne sais pas fabriquer « %s » : tapez 2 ou 3." % piece["nom"])
+                if message == "1" and "marteau" not in piece["nom"]:
+                    chemin = filedialog.askopenfilename(
+                        parent=fenetre_chat, title="Ma photo de " + piece["nom"],
+                        filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
+                    if not chemin:
+                        afficher("Assistant : pas de photo choisie. Tapez 1, 2 ou 3.")
                         return
+                    piece["source"] = 3
+                    piece["fichier"] = chemin
+                    afficher("Assistant : photo de %s enregistree." % piece["nom"])
+                    piece_suivante()
+                    return
+                if message == "1":
                     piece["source"] = 1
                     if piece.get("ailes"):
                         contexte["attente"] = "taille_ailes_piece"
@@ -2013,7 +2022,7 @@ def interface():
                 if message in ("2", "3"):
                     appliquer_source_piece(piece, message)
                     return
-                afficher("Assistant : tapez 2 ou 3 (ou 1 pour un marteau).")
+                afficher("Assistant : tapez 1, 2 ou 3.")
                 return
             if attente == "choix_piece" and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir_piece(int(message))
