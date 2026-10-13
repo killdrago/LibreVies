@@ -1657,6 +1657,45 @@ def interface():
 
             threading.Thread(target=travail, daemon=True).start()
 
+        def ouvrir_bibliotheque(params):
+            chemin = filedialog.askopenfilename(
+                parent=fenetre_chat, title="Choisir une image dans sorties",
+                initialdir=SORTIES,
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous", "*.*")])
+            if not chemin:
+                afficher("Assistant : aucune image choisie. Tapez 1, 2 ou 3.")
+                return
+            contexte["attente"] = None
+            contexte["params"] = None
+            afficher("Assistant : j'utilise l'image choisie : " + os.path.basename(chemin))
+            lancer_depuis_fichier(chemin, params)
+
+        def lancer_depuis_fichier(chemin, params):
+            nom = params["nom"]
+
+            def travail():
+                try:
+                    os.makedirs(os.path.join(IA, "images"), exist_ok=True)
+                    ext = os.path.splitext(chemin)[1].lower() or ".png"
+                    cible = os.path.join(IA, "images", nom + ext)
+                    if os.path.abspath(chemin) != os.path.abspath(cible):
+                        shutil.copyfile(chemin, cible)
+                    cmd = [venv_python(), os.path.abspath(__file__), "--worker",
+                           "--image", cible, "--nom", nom,
+                           "--taille", str(params["taille"]), "--mc", "256"]
+                    log("=== Generation de '" + nom + "' depuis ma bibliotheque ===")
+                    proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT, text=True,
+                                            encoding="utf-8", errors="replace")
+                    for ligne in proc.stdout:
+                        log(ligne.rstrip())
+                    code = proc.wait()
+                    log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
+                except Exception as exc:
+                    log("ERREUR : " + str(exc))
+
+            threading.Thread(target=travail, daemon=True).start()
+
         def choisir(numero):
             choisi = contexte["choix"][numero - 1]
             params = contexte["params"]
@@ -1923,8 +1962,11 @@ def interface():
             if contexte["choix"] and message.isdigit() and 1 <= int(message) <= len(contexte["choix"]):
                 choisir(int(message))
                 return
-            if contexte.get("attente") == "source" and message in ("1", "2"):
+            if contexte.get("attente") == "source" and message in ("1", "2", "3"):
                 params = contexte["params"]
+                if message == "3":
+                    ouvrir_bibliotheque(params)
+                    return
                 if message == "1":
                     contexte["attente"] = "place"
                     afficher("Assistant : ou placer les ailes sur le manche ?")
@@ -1965,6 +2007,7 @@ def interface():
                 afficher("Assistant : pour les ailes, que voulez-vous ?")
                 afficher("  1 = dessinees par le generateur (10 cm chaque aile, fiable)")
                 afficher("  2 = chercher une image libre sur le web (resultats incertains)")
+                afficher("  3 = prendre une image dans ma bibliotheque (dossier sorties)")
                 return
             afficher("Assistant : je lance la creation d'un marteau de %s cm." % params["taille"])
             lancer_parametrique(params["nom"], params["taille"])
