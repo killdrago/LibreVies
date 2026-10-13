@@ -862,9 +862,16 @@ def analyser_demande(texte):
         questions.append("Quel objet voulez-vous ? Pour l'instant je sais fabriquer un marteau.")
 
     trouve = re.search(r"(\d+(?:[.,]\d+)?)\s*(cm|mm|m)\b", t)
+    lu = None
     if trouve:
-        valeur = float(trouve.group(1).replace(",", "."))
-        unite = trouve.group(2)
+        lu = (float(trouve.group(1).replace(",", ".")), trouve.group(2))
+    else:
+        # Sans unite (ex. « 48 ») : le dernier nombre de la phrase est lu en cm.
+        nombres = re.findall(r"\d+(?:[.,]\d+)?", t)
+        if nombres:
+            lu = (float(nombres[-1].replace(",", ".")), "cm")
+    if lu:
+        valeur, unite = lu
         cm = valeur * {"cm": 1.0, "mm": 0.1, "m": 100.0}[unite]
         if 5 <= cm <= 100:
             params["taille"] = round(cm, 1)
