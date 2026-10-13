@@ -1857,8 +1857,8 @@ def interface():
                     afficher("  les ailes seront dessinees avec le marteau (generateur) ; "
                              "avec 2 ou 3, l'image doit deja contenir les ailes.")
             else:
-                afficher("Assistant : pour « %s » : 1 = ma photo (je l'ouvre), 2 = recherche web, "
-                         "3 = ma bibliotheque (dossier sorties)" % piece["nom"])
+                afficher("Assistant : pour « %s » : 1 = generer l'image (SDXL-Turbo, en local, quelques minutes), "
+                         "2 = recherche web, 3 = ma bibliotheque ou mon fichier" % piece["nom"])
 
         def lancer_pieces(pieces):
             for piece in pieces:
@@ -1992,15 +1992,9 @@ def interface():
                 return
             if attente == "source_piece":
                 if message == "1" and "marteau" not in piece["nom"]:
-                    chemin = filedialog.askopenfilename(
-                        parent=fenetre_chat, title="Ma photo de " + piece["nom"],
-                        filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
-                    if not chemin:
-                        afficher("Assistant : pas de photo choisie. Tapez 1, 2 ou 3.")
-                        return
-                    piece["source"] = 3
-                    piece["fichier"] = chemin
-                    afficher("Assistant : photo de %s enregistree." % piece["nom"])
+                    piece["source"] = "gen"
+                    piece["fichier"] = None
+                    afficher("Assistant : je creerai l'image de « %s » avec SDXL-Turbo pendant la fabrication." % piece["nom"])
                     piece_suivante()
                     return
                 if message == "1":
@@ -2055,6 +2049,16 @@ def interface():
                                             else piece["taille"],
                                             "relation": piece["relation"]})
                             continue
+                        if piece.get("source") == "gen":
+                            sortie_gen = os.path.join(IA, "images", nom + "_ia.png")
+                            cmd_gen = [venv_python(), os.path.abspath(__file__), "--worker", "--generer-image",
+                                       "--prompt", "a single " + piece["requete"] + " object",
+                                       "--sortie-image", sortie_gen, "--nom", nom, "--taille", "1"]
+                            log("=== Piece %d/%d : %s (image creee par SDXL-Turbo) ===" % (k, len(pieces), piece["nom"]))
+                            if executer_worker(cmd_gen, log) != 0 or not os.path.isfile(sortie_gen):
+                                log("=== ECHEC de la creation de l'image pour %s : voir le journal ===" % piece["nom"])
+                                return
+                            piece["fichier"] = sortie_gen
                         if piece.get("fichier") and piece["fichier"].lower().endswith(".glb"):
                             cible = os.path.join(SORTIES, nom, nom + ".glb")
                             os.makedirs(os.path.dirname(cible), exist_ok=True)
