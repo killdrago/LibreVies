@@ -1917,6 +1917,10 @@ def interface():
             return round(cm, 1) if bas <= cm <= haut else None
 
         def appliquer_source_piece(piece, choix):
+            if choix == "3" and piece.get("fichier"):
+                piece["source"] = 3
+                piece_suivante()
+                return
             if choix == "2":
                 piece["source"] = 2
                 contexte["attente"] = "attente_recherche"
@@ -1959,6 +1963,21 @@ def interface():
                 piece_suivante()
                 return
             if attente == "ailes_image_piece":
+                if message == "3":
+                    chemin = filedialog.askopenfilename(
+                        parent=fenetre_chat, title="Image ou modele 3D pour " + piece["nom"], initialdir=SORTIES,
+                        filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
+                    if not chemin:
+                        afficher("Assistant : aucun fichier choisi. Tapez 1, 2 ou 3.")
+                        return
+                    piece["fichier"] = chemin
+                    piece["source"] = 3
+                    piece["source_choisie"] = "3"
+                    afficher("Assistant : fichier de %s enregistre. L'image contient-elle deja les ailes ?"
+                             % piece["nom"])
+                    afficher("  1 = oui   2 = non, je les dessine avec le generateur")
+                    afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
+                    return
                 if message == "1":
                     appliquer_source_piece(piece, piece.pop("source_choisie", "2"))
                     return
@@ -1989,6 +2008,7 @@ def interface():
                     contexte["attente"] = "ailes_image_piece"
                     afficher("Assistant : l'image de « %s » contient-elle deja les ailes ?" % piece["nom"])
                     afficher("  1 = oui   2 = non, je les dessine avec le generateur")
+                    afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
                     return
                 if message in ("2", "3"):
                     appliquer_source_piece(piece, message)
@@ -2149,8 +2169,7 @@ def interface():
                     contexte["attente"] = "ailes_image"
                     afficher("Assistant : l'image contient-elle deja les ailes ?")
                     afficher("  1 = oui, elle a deja les ailes   2 = non, je dessine les ailes avec le generateur")
-                    if message == "3":
-                        afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
+                    afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
                     return
                 if message == "2":
                     contexte["attente"] = None
@@ -2219,9 +2238,9 @@ def interface():
                 afficher("Assistant : je dessine le marteau avec ses ailes (%s cm)." % params["taille"])
                 lancer_parametrique(params["nom"], params["taille"], position, params.get("longueur_ailes"))
                 return
-            if contexte.get("attente") == "ailes_image" and message == "3" \
-                    and contexte["params"].get("source_choisie") == "3":
+            if contexte.get("attente") == "ailes_image" and message == "3":
                 params = contexte["params"]
+                params["source_choisie"] = "3"
                 chemin = filedialog.askopenfilename(
                     parent=fenetre_chat, title="Choisir l'image du marteau", initialdir=SORTIES,
                     filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
