@@ -1723,8 +1723,8 @@ def interface():
 
             threading.Thread(target=travail, daemon=True).start()
 
-        def ouvrir_bibliotheque(params):
-            chemin = filedialog.askopenfilename(
+        def ouvrir_bibliotheque(params, chemin_deja=None):
+            chemin = chemin_deja or filedialog.askopenfilename(
                 parent=fenetre_chat, title="Choisir une image dans sorties",
                 initialdir=SORTIES,
                 filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
@@ -2149,6 +2149,8 @@ def interface():
                     contexte["attente"] = "ailes_image"
                     afficher("Assistant : l'image contient-elle deja les ailes ?")
                     afficher("  1 = oui, elle a deja les ailes   2 = non, je dessine les ailes avec le generateur")
+                    if message == "3":
+                        afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
                     return
                 if message == "2":
                     contexte["attente"] = None
@@ -2157,7 +2159,7 @@ def interface():
                     lancer_recherche(params)
                     return
                 if message == "3":
-                    ouvrir_bibliotheque(params)
+                    ouvrir_bibliotheque(params, params.get("fichier_choisi"))
                     return
                 if params["ailes"]:
                     contexte["attente"] = "taille_ailes"
@@ -2185,7 +2187,7 @@ def interface():
                         lancer_recherche(params)
                     else:
                         contexte["attente"] = "source_marteau"
-                        ouvrir_bibliotheque(params)
+                        ouvrir_bibliotheque(params, params.get("fichier_choisi"))
                     return
                 contexte["attente"] = "place"
                 afficher("Assistant : ou placer les ailes sur le manche ?")
@@ -2198,7 +2200,7 @@ def interface():
             if contexte.get("attente") == "source" and message in ("1", "2", "3"):
                 params = contexte["params"]
                 if message == "3":
-                    ouvrir_bibliotheque(params)
+                    ouvrir_bibliotheque(params, params.get("fichier_choisi"))
                     return
                 if message == "1":
                     contexte["attente"] = "place"
@@ -2217,6 +2219,21 @@ def interface():
                 afficher("Assistant : je dessine le marteau avec ses ailes (%s cm)." % params["taille"])
                 lancer_parametrique(params["nom"], params["taille"], position, params.get("longueur_ailes"))
                 return
+            if contexte.get("attente") == "ailes_image" and message == "3" \
+                    and contexte["params"].get("source_choisie") == "3":
+                params = contexte["params"]
+                chemin = filedialog.askopenfilename(
+                    parent=fenetre_chat, title="Choisir l'image du marteau", initialdir=SORTIES,
+                    filetypes=[("Images et modeles 3D", "*.png *.jpg *.jpeg *.webp *.bmp *.glb"), ("Tous", "*.*")])
+                if not chemin:
+                    afficher("Assistant : aucune image choisie. Tapez 1 ou 2.")
+                    return
+                params["fichier_choisi"] = chemin
+                afficher("Assistant : image choisie : " + os.path.basename(chemin))
+                afficher("Assistant : l'image contient-elle deja les ailes ?")
+                afficher("  1 = oui, elle a deja les ailes   2 = non, je dessine les ailes avec le generateur")
+                afficher("  3 = prendre une autre image dans ma bibliotheque (dossier sorties)")
+                return
             if contexte.get("attente") == "ailes_image" and message in ("1", "2"):
                 params = contexte["params"]
                 choix = params.pop("source_choisie", "2")
@@ -2234,7 +2251,7 @@ def interface():
                     lancer_recherche(params)
                     return
                 contexte["attente"] = "source_marteau"
-                ouvrir_bibliotheque(params)
+                ouvrir_bibliotheque(params, params.get("fichier_choisi"))
                 return
             if contexte.get("attente") == "ailes_image":
                 afficher("Assistant : tapez 1 (oui) ou 2 (non).")
