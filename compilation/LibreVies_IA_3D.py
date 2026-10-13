@@ -679,6 +679,52 @@ def generer_parametrique(args, photo_pil=None):
 
 
 
+def ajouter_ailes_fichier(args):
+    """Ajoute deux ailes a un marteau deja fabrique (.glb). Le marteau d'origine est garde en copie."""
+    import numpy as np
+    import trimesh
+
+    cible = os.path.join(SORTIES, args.nom, args.nom + ".glb")
+    os.makedirs(os.path.dirname(cible), exist_ok=True)
+    sauvegarde = os.path.join(SORTIES, args.nom, args.nom + "_sans_ailes.glb")
+    if not os.path.isfile(sauvegarde):
+        shutil.copyfile(args.image, sauvegarde)
+
+    sc = trimesh.load(args.image, force="scene")
+    bmin, bmax = sc.bounds
+    sc.apply_scale((args.taille / 100.0) / max(float((bmax - bmin).max()), 1e-9))
+    bmin, bmax = sc.bounds
+    centre_h = (bmin + bmax) / 2.0
+
+    # Ailes : meme geometrie que le marteau parametrique, a la taille demandee.
+    parties = [("Bois", *_manche_param()), ("Acier", *_tete_param()), ("Acier", *_panne_param())]
+    tout = np.vstack([q[1] for q in parties])
+    etendue = tout.max(0) - tout.min(0)
+    echelle = (args.taille / 100.0) / float(etendue.max())
+    bas = tout.min(0) * echelle
+    decalage = np.array([-(tout[:, 0].min() + tout[:, 0].max()) / 2.0 * echelle,
+                         -bas[1],
+                         -(tout[:, 2].min() + tout[:, 2].max()) / 2.0 * echelle])
+    centre_param = np.array([0.0, float(etendue[1]) * echelle / 2.0, 0.0])
+    position = 0.5
+    x_pre = PARAM["x_debut"] + position * (PARAM["L_manche"] - PARAM["x_debut"])
+    u = np.clip(x_pre / PARAM["L_manche"], 0.0, 1.0)
+    r_pre = PARAM["r_col"] + (PARAM["r_bout"] - PARAM["r_col"]) * u
+    x_final = x_pre * echelle + decalage[0]
+    ailes = _ailes_param(x_final, decalage[1], decalage[2], r_pre * echelle, position=position,
+                         longueur=float(args.longueur_ailes) / 100.0)
+    decalage_monde = centre_h - centre_param
+    img_bois = _texture_bois_param()
+    img_acier = _texture_acier_param()
+    for k, (materiel, V, UV, F) in enumerate(ailes):
+        img = img_bois if materiel == "Bois" else img_acier
+        vis = trimesh.visual.TextureVisuals(uv=UV, material=trimesh.visual.material.SimpleMaterial(image=img))
+        morceau = trimesh.Trimesh(vertices=np.asarray(V) + decalage_monde, faces=F, visual=vis, process=False)
+        sc.add_geometry(morceau, node_name="ailes_%d" % k)
+    sc.export(cible)
+    print("Ailes ajoutees au marteau : " + cible, flush=True)
+
+
 def generer_image_ia(args):
     """Cree une image a partir d'une description (SDXL-Turbo, processeur), sur fond uni."""
     os.environ.update(env_ia())
@@ -1532,6 +1578,14 @@ document.getElementById('non').addEventListener('click', function () { envoyer(f
 """
 
 
+def ajouter_ailes_glb(glb, nom, taille, longueur, log):
+    cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--ajouter-ailes",
+           "--image", glb, "--nom", nom, "--taille", str(taille), "--longueur-ailes", str(longueur)]
+    log("=== Ajout des ailes au marteau ===")
+    if executer_worker(cmd, log) != 0:
+        log("=== ECHEC de l'ajout des ailes : voir le journal ===")
+
+
 def lancer_validation(image_detour, nom_piece, log, delai=1800):
     """Renvoie (valide, png_edite) ou None si la page est fermee.
 
@@ -1620,6 +1674,10 @@ def interface():
             historique.see("end")
             historique.config(state="disabled")
 
+        def ajouter_ailes(params, nom, log):
+            ajouter_ailes_glb(os.path.join(SORTIES, nom, nom + ".glb"), nom, params["taille"],
+                              params.get("longueur_ailes", 10.0), log)
+
         def lancer_recherche(params):
             requete = params["requete"]
 
@@ -1660,6 +1718,8 @@ def interface():
                     for ligne in proc.stdout:
                         log(ligne.rstrip())
                     code = proc.wait()
+                    if code == 0 and params.get("ailes_a_ajouter"):
+                        ajouter_ailes(params, nom, log)
                     if code == 0:
                         ecrire_credits(nom, choisi)
                         log("Source et licence enregistrees dans sorties\\" + nom + "\\source.txt")
@@ -1692,6 +1752,8 @@ def interface():
                         os.makedirs(os.path.dirname(cible_glb), exist_ok=True)
                         shutil.copyfile(chemin, cible_glb)
                         log("Modele 3D deja fait, copie : " + cible_glb)
+                        if params.get("ailes_a_ajouter"):
+                            ajouter_ailes(params, nom, log)
                         return
                     os.makedirs(os.path.join(IA, "images"), exist_ok=True)
                     ext = os.path.splitext(chemin)[1].lower() or ".png"
@@ -1708,6 +1770,8 @@ def interface():
                     for ligne in proc.stdout:
                         log(ligne.rstrip())
                     code = proc.wait()
+                    if code == 0 and params.get("ailes_a_ajouter"):
+                        ajouter_ailes(params, nom, log)
                     log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
                 except Exception as exc:
                     log("ERREUR : " + str(exc))
@@ -1894,6 +1958,10 @@ def interface():
                     afficher("Assistant : donne une taille entre 3 et 40 cm pour les ailes.")
                     return
                 piece["longueur_ailes"] = cm
+                if piece.get("ailes_a_ajouter"):
+                    contexte["attente"] = None
+                    appliquer_source_piece(piece, piece["hammer_choix"])
+                    return
                 piece_suivante()
                 return
             if attente == "ailes_image_piece":
@@ -1901,10 +1969,10 @@ def interface():
                     appliquer_source_piece(piece, piece.pop("source_choisie", "2"))
                     return
                 if message == "2":
-                    piece["source"] = 1
-                    piece.pop("source_choisie", None)
+                    piece["ailes_a_ajouter"] = True
+                    piece["hammer_choix"] = piece.pop("source_choisie", "2")
                     contexte["attente"] = "taille_ailes_piece"
-                    afficher("Assistant : je dessine les ailes de « %s » avec le generateur. "
+                    afficher("Assistant : les ailes de « %s » seront ajoutees a l'image. "
                              "Quelle taille (cm, entre 3 et 40) ?" % piece["nom"])
                     return
                 afficher("Assistant : tapez 1 (oui) ou 2 (non).")
@@ -1969,6 +2037,8 @@ def interface():
                             os.makedirs(os.path.dirname(cible), exist_ok=True)
                             shutil.copyfile(piece["fichier"], cible)
                             log("=== Piece %d/%d : %s (modele 3D deja fait) ===" % (k, len(pieces), piece["nom"]))
+                            if piece.get("ailes_a_ajouter"):
+                                ajouter_ailes(piece, nom, log)
                             entrees.append({"fichier": cible,
                                             "taille": None if piece["relation"] == "sur" and k > 1
                                             else piece["taille"],
@@ -2020,6 +2090,8 @@ def interface():
                         if executer_worker(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                             return
+                        if piece.get("ailes_a_ajouter"):
+                            ajouter_ailes(piece, nom, log)
                         if piece.get("url"):
                             ecrire_credits(nom, piece)
                         entrees.append({"fichier": os.path.join(SORTIES, nom, nom + ".glb"),
@@ -2112,10 +2184,18 @@ def interface():
                     return
                 params = contexte["params"]
                 params["longueur_ailes"] = cm
-                contexte["attente"] = "source"
-                afficher("Assistant : pour les ailes, que voulez-vous ?")
-                afficher("  1 = dessinees par le generateur (%s cm chaque aile)" % cm)
-                afficher("  2 et 3 ne sont pas possibles avec un marteau fabrique par le generateur")
+                if params.get("ailes_a_ajouter"):
+                    contexte["attente"] = None
+                    if params.get("hammer_choix") == "2":
+                        afficher("Assistant : je cherche une image libre de marteau...")
+                        lancer_recherche(params)
+                    else:
+                        contexte["attente"] = "source_marteau"
+                        ouvrir_bibliotheque(params)
+                    return
+                contexte["attente"] = "place"
+                afficher("Assistant : ou placer les ailes sur le manche ?")
+                afficher("  1 = milieu du manche   2 = pres du pommeau   3 = pres de la tete")
                 return
             if contexte.get("attente") == "source" and message in ("2", "3"):
                 afficher("Assistant : les ailes d'une image ne peuvent pas etre combinees avec un marteau "
@@ -2147,8 +2227,10 @@ def interface():
                 params = contexte["params"]
                 choix = params.pop("source_choisie", "2")
                 if message == "2":
+                    params["ailes_a_ajouter"] = True
+                    params["hammer_choix"] = choix
                     contexte["attente"] = "taille_ailes"
-                    afficher("Assistant : je dessine les ailes avec le generateur. Quelle taille pour les ailes "
+                    afficher("Assistant : les ailes seront ajoutees au marteau de l'image. Quelle taille pour les ailes "
                              "(cm, entre 3 et 40, ex. 10) ?")
                     return
                 if choix == "2":
@@ -2406,10 +2488,14 @@ def main():
         parseur.add_argument("--mc", type=int, default=256)
         parseur.add_argument("--garder-fond", action="store_true")
         parseur.add_argument("--generer-image", action="store_true")
+        parseur.add_argument("--ajouter-ailes", action="store_true")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
+        if args.ajouter_ailes:
+            ajouter_ailes_fichier(args)
+            return
         if args.generer_image:
             generer_image_ia(args)
             return
