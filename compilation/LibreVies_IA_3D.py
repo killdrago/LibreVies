@@ -225,13 +225,8 @@ def colorer_depuis_photo(mesh, image):
     score, couleurs, axe, signe = meilleur
     if score < 30:
         raise RuntimeError("la photo ne correspond pas clairement au modele (ecart %.0f)" % score)
-    # Faces tournees vers l'appareil : couleur de la photo. Les autres faces ne sont pas vues
-    # par la photo : couleur moyenne de la photo (pas de couleurs inventees).
-    normales = np.asarray(mesh.vertex_normals)
-    visible = normales[:, axe] * signe > 0.15
-    if visible.any():
-        moyenne = couleurs[visible].mean(axis=0)
-        couleurs = np.where(visible[:, None], couleurs, moyenne[None, :])
+    # Couleurs de la photo projetees sur tout le modele, sans assombrissement ni adoucissement
+    # (les ombres seront gerees dans le jeu).
 
     rgba = np.zeros((len(V), 4), dtype=np.uint8)
     rgba[:, :3] = np.clip(couleurs, 0, 255).astype(np.uint8)
@@ -868,7 +863,6 @@ def generer(args):
         lisse = mesh.copy()
         filter_taubin(lisse, lamb=0.5, nu=0.53, iterations=150)
         colorer_depuis_photo(lisse, image)
-        lisser_couleurs(lisse, passes=4)
         mesh_uv, image_fin, uv, F2, V2 = texturer(lisse)
         exporter_texture(mesh_uv, image_fin, uv, F2, V2, dossier, args.nom)
         print("  forme lissee et texturee : " + args.nom + ".obj / .glb", flush=True)
