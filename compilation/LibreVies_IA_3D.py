@@ -61,7 +61,9 @@ PAQUETS = [
 # Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
 MODELE_IMAGE = "stabilityai/sdxl-turbo"
 # diffusers est installe sans ses dependances (sinon pip ne resout pas avec transformers==4.35.0).
-PAQUETS_DIFFUSERS = ["huggingface-hub==0.36.2", "diffusers==0.35.2"]
+# diffusers 0.20.2 : compatible avec transformers 4.35.0 (verifie) et recommande par Zero123++.
+# huggingface-hub 0.17.3 : seule version compatible avec transformers 4.35.0 et tokenizers 0.14.
+PAQUETS_DIFFUSERS = ["huggingface-hub==0.17.3", "diffusers==0.20.2"]
 
 # Remplacement de torchmcubes : meme fonction marching_cubes(volume, niveau) -> (sommets, faces).
 SHIM_TORCHMCUBES = '''"""Remplacement de torchmcubes par scikit-image (installe automatiquement)."""
@@ -114,7 +116,7 @@ def lancer(cmd, log, cwd=None):
 def paquets_presents(log=None):
     """Vrai si tous les modules importants sont deja installes dans l'environnement IA.
     En cas d'echec, la fin de l'erreur d'import est envoyee au journal."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.35.2\""
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.20.2\""
     proc = subprocess.run([venv_python(), "-c", test], env=env_ia(),
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 and log:
