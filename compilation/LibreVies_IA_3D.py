@@ -176,6 +176,32 @@ def installer(log):
 # Generation (execute par l'environnement IA, avec --worker)
 # ---------------------------------------------------------------------------
 
+def _propager_couleurs(mesh, c, ok):
+    """Chaque sommet non visible prend la moyenne de ses voisins deja colores (vectorise, rapide)."""
+    import numpy as np
+    E = np.asarray(mesh.edges_unique)
+    a, b = E[:, 0], E[:, 1]
+    c = c.copy()
+    ok = ok.copy()
+    for _ in range(400):
+        if ok.all():
+            break
+        somme = np.zeros_like(c)
+        n = np.zeros(len(c))
+        m1 = ok[b] & ~ok[a]
+        np.add.at(somme, a[m1], c[b[m1]])
+        np.add.at(n, a[m1], 1.0)
+        m2 = ok[a] & ~ok[b]
+        np.add.at(somme, b[m2], c[a[m2]])
+        np.add.at(n, b[m2], 1.0)
+        nouveau = (n > 0) & ~ok
+        if not nouveau.any():
+            break
+        c[nouveau] = somme[nouveau] / n[nouveau, None]
+        ok = ok | nouveau
+    return c
+
+
 def _colorer_generique(mesh, im, masque_photo, X0, X1, Y0, Y1):
     """Projection generique de la photo (objets sans forme de marteau).
 
@@ -216,19 +242,7 @@ def _colorer_generique(mesh, im, masque_photo, X0, X1, Y0, Y1):
     c = im[py, px].astype(np.float64)
     visible = N[:, prof] > 0.2
     if visible.any() and not visible.all():
-        ok = visible.copy()
-        voisins = mesh.vertex_neighbors
-        for _ in range(200):
-            if ok.all():
-                break
-            nouveau = c.copy()
-            nouvel_ok = ok.copy()
-            for i in np.where(~ok)[0]:
-                vs = [v for v in voisins[i] if ok[v]]
-                if vs:
-                    nouveau[i] = c[vs].mean(axis=0)
-                    nouvel_ok[i] = True
-            c, ok = nouveau, nouvel_ok
+        c = _propager_couleurs(mesh, c, visible)
     rgba = np.zeros((len(V), 4), dtype=np.uint8)
     rgba[:, :3] = np.clip(c, 0, 255).astype(np.uint8)
     rgba[:, 3] = 255
@@ -295,20 +309,7 @@ def colorer_depuis_photo(mesh, image):
     normales = np.asarray(mesh.vertex_normals)
     visible = normales[:, axe] * signe > 0.2
     if visible.any() and not visible.all():
-        c = couleurs.astype(np.float64)
-        ok = visible.copy()
-        voisins = mesh.vertex_neighbors
-        for _ in range(200):
-            if ok.all():
-                break
-            nouveau = c.copy()
-            nouvel_ok = ok.copy()
-            for i in np.where(~ok)[0]:
-                vs = [v for v in voisins[i] if ok[v]]
-                if vs:
-                    nouveau[i] = c[vs].mean(axis=0)
-                    nouvel_ok[i] = True
-            c, ok = nouveau, nouvel_ok
+        c = _propager_couleurs(mesh, couleurs.astype(np.float64), visible)
         couleurs = c
     rgba = np.zeros((len(V), 4), dtype=np.uint8)
     rgba[:, :3] = np.clip(couleurs, 0, 255).astype(np.uint8)
