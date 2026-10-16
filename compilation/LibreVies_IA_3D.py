@@ -1362,6 +1362,11 @@ TRADUCTIONS = {
     "table": "table", "chaise": "chair", "ailes": "wings", "ange": "angel", "chapeau": "hat", "chapeaux": "hat", "chien": "dog", "chat": "cat", "voiture": "car", "arbre": "tree", "maison": "house", "poisson": "fish", "pomme": "apple", "lunettes": "glasses", "fleur": "flower",
     "cheval": "horse", "bouteille": "bottle", "casque": "helmet", "epee": "sword",
     "bouclier": "shield", "lampe": "lamp", "vase": "vase", "livre": "book", "tasse": "mug",
+    "cuillere": "spoon", "cuillère": "spoon", "cuillères": "spoon", "cuilleres": "spoon",
+    "fourchette": "fork", "couteau": "knife", "rocher": "rock", "champignon": "mushroom",
+    "bateau": "boat", "avion": "airplane", "bougie": "candle", "chaussure": "shoe",
+    "chaussures": "shoe", "pierre": "stone", "cloche": "bell", "horloge": "clock",
+    "lit": "bed", "banc": "bench", "seau": "bucket", "chapeau de sorcier": "wizard hat",
 }
 
 PIECE_SEPARATEURS = r"(\s+(?:avec|et|posée sur|posé sur|pose sur|sur|dans|à côté de|a cote de)\s+|,)"
@@ -1373,7 +1378,9 @@ def decouper_demande(texte):
     import re
     t = texte.lower().strip()
     # Formules de politesse et verbes : ne font pas partie des pieces
-    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|met|mets|mettre|pose|poser|ajoute|ajouter|place|placer|je|moi|nous|svp|stp)\b", " ", t)
+    t = re.sub(r"\ben\s+(3\s?d|trois dimensions)\b", " ", t)
+    t = re.sub(r"\b(3\s?d|trois dimensions)\b", " ", t)
+    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|met|mets|mettre|pose|poser|ajoute|ajouter|place|placer|je|moi|nous|svp|stp|dessine|dessines|dessiner|dessin|modelise|modélise|modeliser|modéliser|genere|génère|generer|générer|fabrique|fabriquer|montre|montrer|imagine|imaginer|vouloir|veux)\b", " ", t)
     # « sur la tete », « sur le dos »... : le petit objet est pose dessus
     t = re.sub(r"\bsur\s+(la\s+|le\s+|sa\s+|son\s+|ses\s+|les\s+)?(tete|tête|dos|epaule|épaule|main|mains)\b", " dessus ", t)
     morceaux = re.split(PIECE_SEPARATEURS, re.sub(r"\s+", " ", t))
