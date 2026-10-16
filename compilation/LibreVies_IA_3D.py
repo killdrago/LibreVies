@@ -176,6 +176,67 @@ def installer(log):
 # Generation (execute par l'environnement IA, avec --worker)
 # ---------------------------------------------------------------------------
 
+def _colorer_generique(mesh, im, masque_photo, X0, X1, Y0, Y1):
+    """Projection generique de la photo (objets sans forme de marteau).
+
+    La photo est vue de face : la hauteur du modele correspond a la hauteur de l'objet sur la photo,
+    et l'axe horizontal (X ou Z) est celui dont la silhouette projetee ressemble le plus a l'objet.
+    Les faces visibles (tournees vers la photo, cote +profondeur) prennent la couleur de la photo ;
+    les autres prennent la moyenne de leurs voisins visibles."""
+    import numpy as np
+    V = np.asarray(mesh.vertices, dtype=np.float64)
+    N = np.asarray(mesh.vertex_normals)
+    lo, hi = V.min(0), V.max(0)
+    H, W = im.shape[:2]
+
+    def projeter(h):
+        u = (V[:, h] - lo[h]) / max(hi[h] - lo[h], 1e-9)
+        v = (V[:, 1] - lo[1]) / max(hi[1] - lo[1], 1e-9)
+        px = np.clip(np.round(X0 + u * (X1 - X0)).astype(int), 0, W - 1)
+        py = np.clip(np.round(Y1 - v * (Y1 - Y0)).astype(int), 0, H - 1)
+        return px, py
+
+    # Choix de l'axe horizontal par ressemblance des silhouettes
+    meilleur = None
+    for h in (0, 2):
+        px, py = projeter(h)
+        forme = np.zeros((H, W), bool)
+        forme[py, px] = True
+        for dy in (-2, -1, 0, 1, 2):
+            for dx in (-2, -1, 0, 1, 2):
+                forme |= np.roll(np.roll(forme, dy, 0), dx, 1)
+        inter = np.logical_and(forme, masque_photo).sum()
+        union = np.logical_or(forme, masque_photo).sum()
+        iou = inter / max(union, 1)
+        if meilleur is None or iou > meilleur[0]:
+            meilleur = (iou, h)
+    iou, h = meilleur
+    prof = 2 if h == 0 else 0            # axe de profondeur
+    px, py = projeter(h)
+    c = im[py, px].astype(np.float64)
+    visible = N[:, prof] > 0.2
+    if visible.any() and not visible.all():
+        ok = visible.copy()
+        voisins = mesh.vertex_neighbors
+        for _ in range(200):
+            if ok.all():
+                break
+            nouveau = c.copy()
+            nouvel_ok = ok.copy()
+            for i in np.where(~ok)[0]:
+                vs = [v for v in voisins[i] if ok[v]]
+                if vs:
+                    nouveau[i] = c[vs].mean(axis=0)
+                    nouvel_ok[i] = True
+            c, ok = nouveau, nouvel_ok
+    rgba = np.zeros((len(V), 4), dtype=np.uint8)
+    rgba[:, :3] = np.clip(c, 0, 255).astype(np.uint8)
+    rgba[:, 3] = 255
+    mesh.visual.vertex_colors = rgba
+    print("Couleurs reprises de la photo (projection generique, axe %s, ressemblance %.2f)."
+          % ("XZ"[h // 2], iou), flush=True)
+
+
 def colorer_depuis_photo(mesh, image):
     """Remplace les couleurs de sommets de TripoSR (pales) par celles de la photo.
 
@@ -204,7 +265,7 @@ def colorer_depuis_photo(mesh, image):
         (np.abs(V[:, 0] - centre[0]) < 0.35 * demi[0]) & \
         (np.abs(V[:, 2] - centre[2]) < 0.35 * demi[2])
     if not tete.any() or not manche.any():
-        raise RuntimeError("forme du modele inattendue")
+        return _colorer_generique(mesh, im, np.abs(im - fond).sum(-1) > 60, X0, X1, Y0, Y1)
 
     def projeter(axe, signe):
         px = X0 + (V[:, 1] - ymin) / hauteur * (X1 - X0)
@@ -224,7 +285,8 @@ def colorer_depuis_photo(mesh, image):
                 meilleur = (score, c, axe, signe)
     score, couleurs, axe, signe = meilleur
     if score < 30:
-        raise RuntimeError("la photo ne correspond pas clairement au modele (ecart %.0f)" % score)
+        print("Forme non reconnue comme un marteau (ecart %.0f) : projection generique." % score, flush=True)
+        return _colorer_generique(mesh, im, np.abs(im - fond).sum(-1) > 60, X0, X1, Y0, Y1)
     # Couleurs de la photo projetees sur tout le modele, sans assombrissement ni adoucissement
     # (les ombres seront gerees dans le jeu).
 
