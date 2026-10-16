@@ -694,6 +694,72 @@ def generer_parametrique(args, photo_pil=None):
 
 
 
+def _matrice_redressement_auto(mesh):
+    """Matrice 4x4 qui aligne l'objet sur ses axes principaux, l'axe le plus vertical allant vers le haut."""
+    import numpy as np
+    import trimesh
+    to_origin, _ = trimesh.bounds.oriented_bounds(mesh)
+    axes = np.linalg.inv(to_origin)[:3, :3]        # colonnes : axes de la boite dans le repere de depart
+    i = int(np.argmax(np.abs(axes[1, :])))         # axe de la boite le plus proche de la verticale
+    autres = [j for j in range(3) if j != i]
+    P = np.zeros((3, 3))
+    P[1, i] = float(np.sign(axes[1, i])) or 1.0    # sens : vers le haut
+    P[0, autres[0]] = 1.0
+    P[2, autres[1]] = 1.0
+    if np.linalg.det(P) < 0:
+        P[0, :] *= -1.0
+    M = np.eye(4)
+    M[:3, :3] = P
+    return M @ to_origin
+
+
+def _matrice_inclinaison(tx, tz):
+    """Inclinaison manuelle en degres : tx autour de X (avant/arriere), tz autour de Z (gauche/droite).
+    Meme convention que la page de redressement (Rz x Rx)."""
+    import math
+    import numpy as np
+    a, b = math.radians(tx), math.radians(tz)
+    Rx = np.array([[1, 0, 0, 0],
+                   [0, math.cos(a), -math.sin(a), 0],
+                   [0, math.sin(a), math.cos(a), 0],
+                   [0, 0, 0, 1]])
+    Rz = np.array([[math.cos(b), -math.sin(b), 0, 0],
+                   [math.sin(b), math.cos(b), 0, 0],
+                   [0, 0, 1, 0],
+                   [0, 0, 0, 1]])
+    return Rz @ Rx
+
+
+def _poser_au_sol(sc):
+    """Base de l'objet a y = 0, centre sur x et z."""
+    bmin, bmax = sc.bounds
+    sc.apply_translation([-(bmin[0] + bmax[0]) / 2.0, -bmin[1], -(bmin[2] + bmax[2]) / 2.0])
+
+
+def redresser_fichier(args):
+    """Redresse le modele du piece : alignement automatique, puis inclinaison (tx, tz en degres).
+    --apercu : ecrit <nom>_redresse_apercu.glb et sauvegarde le modele d'origine.
+    Sans --apercu : ecrit le GLB final <nom>.glb a partir de la sauvegarde."""
+    import trimesh
+    dossier = os.path.join(SORTIES, args.nom)
+    cible = os.path.join(dossier, args.nom + ".glb")
+    if not os.path.isfile(cible):
+        print("Redressement impossible : modele introuvable " + cible, flush=True)
+        return 1
+    source = os.path.join(dossier, args.nom + "_avant_redressement.glb")
+    if args.apercu or not os.path.isfile(source):
+        shutil.copyfile(cible, source)
+    sc = trimesh.load(source, force="scene")
+    sc.apply_transform(_matrice_redressement_auto(sc.dump(concatenate=True)))
+    sc.apply_transform(_matrice_inclinaison(args.tx, args.tz))
+    _poser_au_sol(sc)
+    sortie = os.path.join(dossier, args.nom + "_redresse_apercu.glb") if args.apercu else cible
+    sc.export(sortie)
+    print("Redressement : inclinaison manuelle %+.1f (avant/arriere), %+.1f (gauche/droite) degres -> %s"
+          % (args.tx, args.tz, os.path.basename(sortie)), flush=True)
+    return 0
+
+
 def ajouter_ailes_fichier(args):
     """Ajoute deux ailes a un marteau deja fabrique (.glb). Le marteau d'origine est garde en copie."""
     import numpy as np
@@ -1600,6 +1666,144 @@ def ajouter_ailes_glb(glb, nom, taille, longueur, log):
         log("=== ECHEC de l'ajout des ailes : voir le journal ===")
 
 
+REDRESSEMENT_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>LibreVies - redressement</title>
+<style>
+body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
+#scene { width: 640px; height: 480px; background: #e8e8e8; border: 2px solid #777; }
+button { font-size: 16px; padding: 8px 14px; margin: 4px; }
+#fleches { display: inline-block; vertical-align: top; margin-left: 16px; }
+#fleches div { text-align: center; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<h3>Redressement de « __PIECE__ »</h3>
+<p>Le modele a deja ete redresse automatiquement. Si il penche encore, utilisez les fleches :
+le dessus de l'objet suit la fleche. Glissez avec la souris pour tourner la vue.</p>
+<div id="scene"></div>
+<div id="fleches">
+  <div><button id="haut">&uarr; Haut</button></div>
+  <div><button id="gauche">&larr; Gauche</button> <button id="droite">Droite &rarr;</button></div>
+  <div><button id="bas">&darr; Bas</button></div>
+  <div><button id="reset">Remettre automatique</button></div>
+</div>
+<p>Pas : <input type="range" id="pas" min="1" max="30" value="5"> <span id="pasv">5</span> degres
+  &nbsp; Inclinaison : <span id="angles">0, 0</span></p>
+<p>
+  <button id="ok">Valider et enregistrer le modele</button>
+  <button id="non">Garder le modele d'origine</button>
+  <span id="etat"></span>
+</p>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const zone = document.getElementById('scene');
+const rendu = new THREE.WebGLRenderer({ antialias: true });
+rendu.setSize(640, 480);
+zone.appendChild(rendu.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const lumiere = new THREE.DirectionalLight(0xffffff, 1.0);
+lumiere.position.set(2, 4, 3);
+scene.add(lumiere);
+const sol = new THREE.GridHelper(2, 20, 0x999999, 0xbbbbbb);
+scene.add(sol);
+const camera = new THREE.PerspectiveCamera(40, 640 / 480, 0.01, 100);
+camera.position.set(1.6, 1.2, 2.2);
+camera.lookAt(0, 0.3, 0);
+const commandes = new OrbitControls(camera, rendu.domElement);
+commandes.target.set(0, 0.3, 0);
+commandes.update();
+
+const pivot = new THREE.Group();
+scene.add(pivot);
+let tx = 0, tz = 0;
+let pas = 5;
+
+function miseAJour() {
+  const m = new THREE.Matrix4().makeRotationZ(THREE.MathUtils.degToRad(tz))
+    .multiply(new THREE.Matrix4().makeRotationX(THREE.MathUtils.degToRad(tx)));
+  pivot.position.set(0, 0, 0);
+  pivot.quaternion.setFromRotationMatrix(m);
+  pivot.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(pivot, true);
+  pivot.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+  document.getElementById('angles').textContent = tx.toFixed(0) + ', ' + tz.toFixed(0);
+}
+
+new GLTFLoader().load('/modele.glb', (gltf) => {
+  pivot.add(gltf.scene);
+  miseAJour();
+  document.getElementById('etat').textContent = 'Modele charge.';
+}, undefined, () => {
+  document.getElementById('etat').textContent = 'Modele introuvable : garder le modele d\'origine.';
+});
+
+document.getElementById('haut').onclick = () => { tx -= pas; miseAJour(); };
+document.getElementById('bas').onclick = () => { tx += pas; miseAJour(); };
+document.getElementById('gauche').onclick = () => { tz += pas; miseAJour(); };
+document.getElementById('droite').onclick = () => { tz -= pas; miseAJour(); };
+document.getElementById('reset').onclick = () => { tx = 0; tz = 0; miseAJour(); };
+document.getElementById('pas').oninput = (e) => {
+  pas = parseFloat(e.target.value);
+  document.getElementById('pasv').textContent = pas;
+};
+
+function envoyer(corps) {
+  document.getElementById('ok').disabled = true;
+  document.getElementById('non').disabled = true;
+  fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(corps) })
+    .then(() => { document.getElementById('etat').textContent = 'Enregistre. Vous pouvez fermer cette page.'; });
+}
+document.getElementById('ok').onclick = () => envoyer({ valide: true, tx: tx, tz: tz });
+document.getElementById('non').onclick = () => envoyer({ valide: false });
+
+function boucle() {
+  requestAnimationFrame(boucle);
+  commandes.update();
+  rendu.render(scene, camera);
+}
+boucle();
+</script>
+</body>
+</html>
+"""
+
+
+def lancer_redressement(nom, nom_piece, log, delai=1800):
+    """Redresse le modele d'une piece : alignement automatique, puis page pour corriger a la main."""
+    import html as htmllib
+    cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--redresser", "--apercu",
+           "--nom", nom, "--taille", "0"]
+    log("=== Redressement automatique de '%s' ===" % nom_piece)
+    if executer_worker(cmd, log) != 0:
+        log("Redressement automatique impossible : modele garde tel quel.")
+        return
+    apercu = os.path.join(SORTIES, nom, nom + "_redresse_apercu.glb")
+    page = REDRESSEMENT_HTML.replace("__PIECE__", htmllib.escape(nom_piece))
+    log("Page de redressement ouverte : corrigez a la main si besoin, puis validez.")
+    d = lancer_page(page, {"/modele.glb": apercu}, log, delai)
+    if not d or not d.get("valide"):
+        log("Modele d'origine garde pour '%s'." % nom_piece)
+        return
+    cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--redresser",
+           "--nom", nom, "--taille", "0",
+           "--tx", str(float(d.get("tx", 0.0))), "--tz", str(float(d.get("tz", 0.0)))]
+    if executer_worker(cmd, log) != 0:
+        log("=== ECHEC du redressement final : voir le journal ===")
+
+
 def lancer_validation(image_detour, nom_piece, log, delai=1800):
     """Renvoie (valide, png_edite) ou None si la page est fermee.
 
@@ -2084,6 +2288,7 @@ def interface():
                             os.makedirs(os.path.dirname(cible), exist_ok=True)
                             shutil.copyfile(piece["fichier"], cible)
                             log("=== Piece %d/%d : %s (modele 3D deja fait) ===" % (k, len(pieces), piece["nom"]))
+                            lancer_redressement(nom, piece["nom"], log)
                             if piece.get("ailes_a_ajouter"):
                                 ajouter_ailes(piece, nom, log)
                             entrees.append({"fichier": cible,
@@ -2137,6 +2342,7 @@ def interface():
                         if executer_worker(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                             return
+                        lancer_redressement(nom, piece["nom"], log)
                         if piece.get("ailes_a_ajouter"):
                             ajouter_ailes(piece, nom, log)
                         if piece.get("url"):
@@ -2554,8 +2760,14 @@ def main():
         parseur.add_argument("--ajouter-ailes", action="store_true")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
+        parseur.add_argument("--redresser", action="store_true")
+        parseur.add_argument("--apercu", action="store_true")
+        parseur.add_argument("--tx", type=float, default=0.0)
+        parseur.add_argument("--tz", type=float, default=0.0)
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
+        if args.redresser:
+            sys.exit(redresser_fichier(args))
         if args.ajouter_ailes:
             ajouter_ailes_fichier(args)
             return
