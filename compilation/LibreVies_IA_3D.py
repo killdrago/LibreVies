@@ -56,6 +56,8 @@ PAQUETS = [
     "imageio",
     "imageio-ffmpeg",
     "safetensors",
+    "psutil",
+    "setuptools<81",
 ]
 
 # Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
@@ -63,7 +65,8 @@ MODELE_IMAGE = "stabilityai/sdxl-turbo"
 # diffusers est installe sans ses dependances (sinon pip ne resout pas avec transformers==4.35.0).
 # diffusers 0.20.2 : compatible avec transformers 4.35.0 (verifie) et recommande par Zero123++.
 # huggingface-hub 0.17.3 : seule version compatible avec transformers 4.35.0 et tokenizers 0.14.
-PAQUETS_DIFFUSERS = ["huggingface-hub==0.17.3", "diffusers==0.20.2"]
+# accelerate 0.20.3 : importe par diffusers 0.20.2, et compatible avec huggingface-hub 0.17.3.
+PAQUETS_DIFFUSERS = ["huggingface-hub==0.17.3", "diffusers==0.20.2", "accelerate==0.20.3"]
 
 # Remplacement de torchmcubes : meme fonction marching_cubes(volume, niveau) -> (sommets, faces).
 SHIM_TORCHMCUBES = '''"""Remplacement de torchmcubes par scikit-image (installe automatiquement)."""
