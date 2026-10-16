@@ -1936,6 +1936,8 @@ def interface():
                     for ligne in proc.stdout:
                         log(ligne.rstrip())
                     code = proc.wait()
+                    if code == 0:
+                        lancer_redressement(nom, nom, log)
                     if code == 0 and params.get("ailes_a_ajouter"):
                         ajouter_ailes(params, nom, log)
                     if code == 0:
@@ -1988,6 +1990,8 @@ def interface():
                     for ligne in proc.stdout:
                         log(ligne.rstrip())
                     code = proc.wait()
+                    if code == 0:
+                        lancer_redressement(nom, nom, log)
                     if code == 0 and params.get("ailes_a_ajouter"):
                         ajouter_ailes(params, nom, log)
                     log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
@@ -2664,6 +2668,8 @@ def interface():
             for ligne in proc.stdout:
                 log(ligne.rstrip())
             code = proc.wait()
+            if code == 0:
+                lancer_redressement(nom, nom, log)
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
             file_journal.put(("FIN", code))
 
