@@ -876,7 +876,17 @@ def _lisser_volume(vol, passes=2):
     return vol
 
 
-def _reconstruire_coque(masques, journal, n_recherche=48, n_final=128):
+def _centrer_vue(img, m):
+    """Recentre une vue sur la boite englobante de l'objet (meme decalage pour l'image et le masque)."""
+    import numpy as np
+    ys, xs = np.where(m)
+    taille = m.shape[0]
+    dy = int(round(taille / 2.0 - (ys.min() + ys.max()) / 2.0))
+    dx = int(round(taille / 2.0 - (xs.min() + xs.max()) / 2.0))
+    return np.roll(np.roll(img, dy, 0), dx, 1), np.roll(np.roll(m, dy, 0), dx, 1), (dx, dy)
+
+
+def _reconstruire_coque(masques, angles, journal, n_recherche=48, n_final=128):
     """Cherche le sens des angles et l'echelle qui collent le mieux aux 7 silhouettes,
     puis construit la coque visuelle au niveau de precision demande."""
     import numpy as np
@@ -886,14 +896,14 @@ def _reconstruire_coque(masques, journal, n_recherche=48, n_final=128):
     pts = _grille_cube(n_recherche)
     for sens_az in (1, -1):
         for sens_el in (1, -1):
-            rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in zip(AUTO_AZIMUTS, AUTO_ELEVATIONS)]
+            rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in angles]
             for s in (0.5, 0.6, 0.7, 0.8, 0.9):
                 garde = _carver(pts, rots, masques, s)
                 moyenne, _ = _score_coque(pts[garde], rots, masques, s, _rayon(n_recherche, s, masques[0].shape[0]))
                 if meilleur is None or moyenne > meilleur[0]:
                     meilleur = (moyenne, sens_az, sens_el, s)
     moyenne, sens_az, sens_el, s = meilleur
-    rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in zip(AUTO_AZIMUTS, AUTO_ELEVATIONS)]
+    rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in angles]
     journal.ecrire("Meilleure configuration : sens azimut %+d, sens elevation %+d, echelle %.1f, IoU moyen %.2f"
                    % (sens_az, sens_el, s, moyenne))
     if moyenne < 0.5:
@@ -1022,15 +1032,29 @@ def generer_auto(args):
             masques.append(m)
             journal.ecrire("Vue %d (azimut %d, elevation %d) : objet occupe %.0f%%"
                            % (k, AUTO_AZIMUTS[k], AUTO_ELEVATIONS[k], 100.0 * m.mean()))
-        images = [(np.asarray(cond.resize((S, S)).convert("RGB")), masques[0])]
+        brutes = [(np.asarray(cond.resize((S, S)).convert("RGB")), masques[0])]
         for k, vue in enumerate(vues):
-            images.append((np.asarray(vue.resize((S, S)).convert("RGB")), masques[k + 1]))
+            brutes.append((np.asarray(vue.resize((S, S)).convert("RGB")), masques[k + 1]))
+        angles = [(0, 0)] + list(zip(AUTO_AZIMUTS[1:], AUTO_ELEVATIONS[1:]))
+        images, masques, angles_ok = [], [], []
+        for (a, e), (img, m) in zip(angles, brutes):
+            if m.mean() < 0.03:
+                journal.ecrire("Vue (azimut %d, elevation %d) ignoree : objet trop petit (%.0f%%)"
+                               % (a, e, 100.0 * m.mean()))
+                continue
+            img_c, m_c, (dx, dy) = _centrer_vue(img, m)
+            journal.ecrire("Vue (azimut %d, elevation %d) recentree : decalage %d, %d pixels" % (a, e, dx, dy))
+            images.append((img_c, m_c))
+            masques.append(m_c)
+            angles_ok.append((a, e))
         for k, m in enumerate(masques):
             Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(dossier, "5_masque_%d.png" % k))
+        if len(masques) < 3:
+            raise RuntimeError("moins de 3 vues exploitables (objet detoure trop petit ou absent)")
 
         etape = "5 : coque visuelle (forme)"
         journal.ecrire("--- Etape " + etape)
-        mesh, rots, s = _reconstruire_coque(masques, journal, 48, args.resolution)
+        mesh, rots, s = _reconstruire_coque(masques, angles_ok, journal, 48, args.resolution)
 
         etape = "6 : couleurs"
         journal.ecrire("--- Etape " + etape)
