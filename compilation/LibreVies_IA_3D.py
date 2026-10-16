@@ -56,17 +56,12 @@ PAQUETS = [
     "imageio",
     "imageio-ffmpeg",
     "safetensors",
-    "psutil",
-    "setuptools<81",
 ]
 
 # Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
 MODELE_IMAGE = "stabilityai/sdxl-turbo"
 # diffusers est installe sans ses dependances (sinon pip ne resout pas avec transformers==4.35.0).
-# diffusers 0.20.2 : compatible avec transformers 4.35.0 (verifie) et recommande par Zero123++.
-# huggingface-hub 0.17.3 : seule version compatible avec transformers 4.35.0 et tokenizers 0.14.
-# accelerate 0.20.3 : importe par diffusers 0.20.2, et compatible avec huggingface-hub 0.17.3.
-PAQUETS_DIFFUSERS = ["huggingface-hub==0.17.3", "diffusers==0.20.2", "accelerate==0.20.3"]
+PAQUETS_DIFFUSERS = ["huggingface-hub==0.36.2", "diffusers==0.35.2"]
 
 # Remplacement de torchmcubes : meme fonction marching_cubes(volume, niveau) -> (sommets, faces).
 SHIM_TORCHMCUBES = '''"""Remplacement de torchmcubes par scikit-image (installe automatiquement)."""
@@ -119,7 +114,7 @@ def lancer(cmd, log, cwd=None):
 def paquets_presents(log=None):
     """Vrai si tous les modules importants sont deja installes dans l'environnement IA.
     En cas d'echec, la fin de l'erreur d'import est envoyee au journal."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.20.2\""
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.35.2\""
     proc = subprocess.run([venv_python(), "-c", test], env=env_ia(),
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 and log:
@@ -766,337 +761,6 @@ def generer_image_ia(args):
     print("Image creee : " + args.sortie_image, flush=True)
 
 
-# ---------------------------------------------------------------------------
-# Generation automatique (option 1) : une phrase -> image de face -> 6 vues -> 3D
-# Chaque etape est ecrite dans IA\logs\auto_<nom>_<date>.log
-# ---------------------------------------------------------------------------
-
-AUTO_MV = "sudo-ai/zero123plus-v1.2"
-AUTO_MV_PIPE = "sudo-ai/zero123plus-pipeline"
-AUTO_AZIMUTS = [0, 30, 90, 150, 210, 270, 330]        # 0 = vue de face (image d'origine)
-AUTO_ELEVATIONS = [0, 20, -10, 20, -10, 20, -10]      # Zero123++ v1.2 : 20 et -10 alternes
-
-
-class JournalAuto:
-    """Journal lisible : chaque etape, ses fichiers et ses erreurs sont ecrits dans un .log."""
-
-    def __init__(self, chemin):
-        self.chemin = chemin
-        os.makedirs(os.path.dirname(chemin), exist_ok=True)
-        self.f = open(chemin, "a", encoding="utf-8")
-        self.debut = time.time()
-
-    def ecrire(self, msg):
-        ligne = "[%7.1fs] %s" % (time.time() - self.debut, msg)
-        self.f.write(ligne + "\n")
-        self.f.flush()
-        print(ligne, flush=True)
-
-    def fermer(self):
-        self.f.close()
-
-
-def _rotation_vue(azimut, elevation, sens_az=1, sens_el=1):
-    """Matrice qui envoie un point de l'objet dans le repere de la camera (z = vers la camera)."""
-    import numpy as np
-    a = np.radians(sens_az * azimut)
-    e = np.radians(sens_el * elevation)
-    ca, sa, ce, se = np.cos(a), np.sin(a), np.cos(e), np.sin(e)
-    ry = np.array([[ca, 0, sa], [0, 1, 0], [-sa, 0, ca]])
-    rx = np.array([[1, 0, 0], [0, ce, -se], [0, se, ce]])
-    return rx @ ry
-
-
-def _projeter(points, rot, s, taille):
-    """Projection orthographique : l'objet occupe la fraction s de la demi-image (repere [-1, 1])."""
-    import numpy as np
-    c = points @ rot.T
-    u = taille / 2.0 + s * (taille / 2.0) * c[:, 0]
-    v = taille / 2.0 - s * (taille / 2.0) * c[:, 1]
-    return u, v
-
-
-def _grille_cube(n):
-    import numpy as np
-    axe = np.linspace(-1.0, 1.0, n)
-    x, y, z = np.meshgrid(axe, axe, axe, indexing="ij")
-    return np.column_stack([x.ravel(), y.ravel(), z.ravel()])
-
-
-def _carver(points, rots, masques, s):
-    """Garde les points qui tombent dans le masque de toutes les vues (coque visuelle)."""
-    import numpy as np
-    garde = np.ones(len(points), dtype=bool)
-    for rot, m in zip(rots, masques):
-        taille = m.shape[0]
-        u, v = _projeter(points, rot, s, taille)
-        iu = np.floor(u).astype(int)
-        iv = np.floor(v).astype(int)
-        ok = (iu >= 0) & (iu < taille) & (iv >= 0) & (iv < taille)
-        dedans = np.zeros(len(points), dtype=bool)
-        dedans[ok] = m[iv[ok], iu[ok]]
-        garde &= dedans
-    return garde
-
-
-def _score_coque(pts, rots, masques, s, rayon=1):
-    """IoU entre la silhouette de la coque et le masque de chaque vue (moyenne, puis par vue)."""
-    import numpy as np
-    scores = []
-    for rot, m in zip(rots, masques):
-        taille = m.shape[0]
-        sil = np.zeros((taille, taille), dtype=bool)
-        if len(pts):
-            u, v = _projeter(pts, rot, s, taille)
-            iu = np.clip(np.floor(u).astype(int), 0, taille - 1)
-            iv = np.clip(np.floor(v).astype(int), 0, taille - 1)
-            sil[iv, iu] = True
-            for du in range(-rayon, rayon + 1):
-                for dv in range(-rayon, rayon + 1):
-                    sil[np.clip(iv + dv, 0, taille - 1), np.clip(iu + du, 0, taille - 1)] = True
-        inter = np.logical_and(sil, m).sum()
-        union = np.logical_or(sil, m).sum()
-        scores.append(float(inter) / max(float(union), 1.0))
-    return float(np.mean(scores)), scores
-
-
-def _rayon(n, s, taille):
-    """Demi-cote d'un voxel en pixels (pour la silhouette)."""
-    import numpy as np
-    return max(1, int(round((2.0 / (n - 1)) * s * (taille / 2.0) / 2.0)))
-
-
-def _lisser_volume(vol, passes=2):
-    import numpy as np
-    for _ in range(passes):
-        acc = vol.copy()
-        for axe in range(3):
-            acc += np.roll(vol, 1, axe) + np.roll(vol, -1, axe)
-        vol = acc / 7.0
-    return vol
-
-
-def _centrer_vue(img, m):
-    """Recentre une vue sur la boite englobante de l'objet (meme decalage pour l'image et le masque)."""
-    import numpy as np
-    ys, xs = np.where(m)
-    taille = m.shape[0]
-    dy = int(round(taille / 2.0 - (ys.min() + ys.max()) / 2.0))
-    dx = int(round(taille / 2.0 - (xs.min() + xs.max()) / 2.0))
-    return np.roll(np.roll(img, dy, 0), dx, 1), np.roll(np.roll(m, dy, 0), dx, 1), (dx, dy)
-
-
-def _reconstruire_coque(masques, angles, journal, n_recherche=48, n_final=128):
-    """Cherche le sens des angles et l'echelle qui collent le mieux aux 7 silhouettes,
-    puis construit la coque visuelle au niveau de precision demande."""
-    import numpy as np
-    from skimage.measure import marching_cubes
-    journal.ecrire("Recherche du sens des angles et de l'echelle (%d configurations)..." % (2 * 2 * 5))
-    meilleur = None
-    pts = _grille_cube(n_recherche)
-    for sens_az in (1, -1):
-        for sens_el in (1, -1):
-            rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in angles]
-            for s in (0.5, 0.6, 0.7, 0.8, 0.9):
-                garde = _carver(pts, rots, masques, s)
-                moyenne, _ = _score_coque(pts[garde], rots, masques, s, _rayon(n_recherche, s, masques[0].shape[0]))
-                if meilleur is None or moyenne > meilleur[0]:
-                    meilleur = (moyenne, sens_az, sens_el, s)
-    moyenne, sens_az, sens_el, s = meilleur
-    rots = [_rotation_vue(a, e, sens_az, sens_el) for a, e in angles]
-    journal.ecrire("Meilleure configuration : sens azimut %+d, sens elevation %+d, echelle %.1f, IoU moyen %.2f"
-                   % (sens_az, sens_el, s, moyenne))
-    if moyenne < 0.5:
-        journal.ecrire("AVERTISSEMENT : accord faible entre les vues (IoU %.2f) : la forme sera approximative." % moyenne)
-    pts = _grille_cube(n_final)
-    garde = _carver(pts, rots, masques, s)
-    journal.ecrire("Coque visuelle : %d voxels gardes sur %d (grille %d^3)" % (garde.sum(), len(pts), n_final))
-    if garde.sum() < 50:
-        raise RuntimeError("coque vide : les silhouettes ne se recoupent pas (voir les masques dans le dossier auto)")
-    occ = garde.reshape(n_final, n_final, n_final).astype(np.float32)
-    vol = _lisser_volume(occ)
-    verts, faces, _, _ = marching_cubes(vol, 0.5, spacing=(2.0 / (n_final - 1),) * 3)
-    verts = verts - 1.0
-    import trimesh
-    mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=True)
-    parties = mesh.split(only_watertight=False)
-    mesh = max(parties, key=lambda m: len(m.faces))
-    journal.ecrire("Maillage : %d sommets, %d faces (plus grosse piece gardee sur %d)"
-                   % (len(mesh.vertices), len(mesh.faces), len(parties)))
-    return mesh, rots, s
-
-
-def _colorer_coque(mesh, rots, s, images):
-    """Couleur de chaque sommet : moyenne des vues qui le regardent (normale vers la camera)."""
-    import numpy as np
-    from PIL import Image
-    taille = images[0][0].shape[0]
-    V = np.asarray(mesh.vertices)
-    N = np.asarray(mesh.vertex_normals)
-    somme = np.zeros((len(V), 3))
-    poids = np.zeros(len(V))
-    for rot, (rgb, msk) in zip(rots, images):
-        vue_cam = rot.T @ np.array([0.0, 0.0, 1.0])     # direction de l'objet vers la camera
-        face = (N @ vue_cam) > 0.15
-        u, v = _projeter(V, rot, s, taille)
-        iu = np.clip(np.floor(u).astype(int), 0, taille - 1)
-        iv = np.clip(np.floor(v).astype(int), 0, taille - 1)
-        ok = face & msk[iv, iu]
-        somme[ok] += rgb[iv[ok], iu[ok]]
-        poids[ok] += 1
-    couleurs = np.full((len(V), 3), 150.0)
-    vus = poids > 0
-    couleurs[vus] = somme[vus] / poids[vus][:, None]
-    return couleurs.astype(np.uint8), int(vus.sum())
-
-
-def _vues_zero123(cond, etapes, journal):
-    """Genere les 6 vues avec Zero123++ v1.2 (grille 3 x 2, chacune 320 px)."""
-    import gc
-    import torch
-    from diffusers import DiffusionPipeline, EulerAncestralDiscreteScheduler
-    journal.ecrire("Chargement de Zero123++ (%s) : premiere fois, telechargement de plusieurs Go" % AUTO_MV)
-    pipe = DiffusionPipeline.from_pretrained(AUTO_MV, custom_pipeline=AUTO_MV_PIPE, torch_dtype=torch.float32)
-    pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
-    pipe.to("cpu")
-    torch.set_num_threads(os.cpu_count() or 8)
-    journal.ecrire("Modele charge. Generation des vues : %d etapes sur processeur (tres long)" % etapes)
-    debut = time.time()
-    grille = pipe(cond, num_inference_steps=etapes).images[0]
-    journal.ecrire("Vues generees en %d s : grille %dx%d" % (time.time() - debut, grille.size[0], grille.size[1]))
-    del pipe
-    gc.collect()
-    # La disposition depend de la forme reelle de la grille : 3 colonnes x 2 lignes si elle est
-    # plus large que haute, 2 colonnes x 3 lignes si elle est plus haute que large.
-    if grille.size[0] >= grille.size[1]:
-        colonnes, lignes = 3, 2
-    else:
-        colonnes, lignes = 2, 3
-    journal.ecrire("Disposition de la grille : %d colonnes x %d lignes" % (colonnes, lignes))
-    w, h = grille.size[0] // colonnes, grille.size[1] // lignes
-    vues = []
-    for k in range(6):
-        c, r = k % colonnes, k // colonnes
-        vues.append(grille.crop((c * w, r * h, (c + 1) * w, (r + 1) * h)))
-    return grille, vues
-
-
-def generer_auto(args):
-    """Une demande -> modele 3D complet (image de face, 6 vues, coque visuelle, couleurs)."""
-    import numpy as np
-    import traceback
-    import types
-    os.environ.update(env_ia())
-    from PIL import Image
-    import rembg
-    import trimesh
-
-    nom = args.nom
-    dossier = os.path.join(SORTIES, nom, "auto")
-    os.makedirs(dossier, exist_ok=True)
-    journal = JournalAuto(os.path.join(IA, "logs", "auto_%s_%s.log" % (nom, time.strftime("%Y%m%d_%H%M%S"))))
-    etape = "initialisation"
-    try:
-        journal.ecrire("=== Generation automatique ===")
-        journal.ecrire("Demande (en anglais pour le modele) : %s" % args.prompt)
-        journal.ecrire("Nom=%s, taille=%s cm, etapes multi-vues=%s, resolution=%s"
-                       % (nom, args.taille, args.etapes_mv, args.resolution))
-        journal.ecrire("Dossier des fichiers intermediaires : " + dossier)
-
-        etape = "1 : image de face (SDXL-Turbo)"
-        journal.ecrire("--- Etape " + etape)
-        front = os.path.join(dossier, "1_face.png")
-        generer_image_ia(types.SimpleNamespace(prompt=args.prompt, sortie_image=front))
-        journal.ecrire("Image de face creee : " + front)
-
-        etape = "2 : fond retire et image carree"
-        journal.ecrire("--- Etape " + etape)
-        session = rembg.new_session()
-        fg = rembg.remove(Image.open(front).convert("RGB"), session=session).convert("RGBA")
-        base = Image.new("RGB", fg.size, (127, 127, 127))
-        base.paste(fg, mask=fg.split()[3])
-        cond = base.resize((512, 512))
-        cond.save(os.path.join(dossier, "2_face_sans_fond.png"))
-        part = np.asarray(fg)[..., 3] > 128
-        journal.ecrire("Objet occupe %.0f%% de l'image de face" % (100.0 * part.mean()))
-        if part.mean() < 0.02:
-            raise RuntimeError("objet introuvable dans l'image de face (fond non retire)")
-
-        etape = "3 : 6 vues (Zero123++)"
-        journal.ecrire("--- Etape " + etape)
-        grille, vues = _vues_zero123(cond, args.etapes_mv, journal)
-        grille.save(os.path.join(dossier, "3_grille_vues.png"))
-
-        etape = "4 : fond retire sur chaque vue"
-        journal.ecrire("--- Etape " + etape)
-        S = 256
-        masques = [np.asarray(fg.resize((S, S)))[..., 3] > 128]
-        for k, vue in enumerate(vues, 1):
-            vue.save(os.path.join(dossier, "3_vue_%d.png" % k))
-            d = rembg.remove(vue.convert("RGB"), session=session).convert("RGBA")
-            d.save(os.path.join(dossier, "4_vue_%d_detouree.png" % k))
-            m = np.asarray(d.resize((S, S)))[..., 3] > 128
-            masques.append(m)
-            journal.ecrire("Vue %d (azimut %d, elevation %d) : objet occupe %.0f%%"
-                           % (k, AUTO_AZIMUTS[k], AUTO_ELEVATIONS[k], 100.0 * m.mean()))
-        brutes = [(np.asarray(cond.resize((S, S)).convert("RGB")), masques[0])]
-        for k, vue in enumerate(vues):
-            brutes.append((np.asarray(vue.resize((S, S)).convert("RGB")), masques[k + 1]))
-        angles = [(0, 0)] + list(zip(AUTO_AZIMUTS[1:], AUTO_ELEVATIONS[1:]))
-        images, masques, angles_ok = [], [], []
-        for (a, e), (img, m) in zip(angles, brutes):
-            if m.mean() < 0.03:
-                journal.ecrire("Vue (azimut %d, elevation %d) ignoree : objet trop petit (%.0f%%)"
-                               % (a, e, 100.0 * m.mean()))
-                continue
-            img_c, m_c, (dx, dy) = _centrer_vue(img, m)
-            journal.ecrire("Vue (azimut %d, elevation %d) recentree : decalage %d, %d pixels" % (a, e, dx, dy))
-            images.append((img_c, m_c))
-            masques.append(m_c)
-            angles_ok.append((a, e))
-        for k, m in enumerate(masques):
-            Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(dossier, "5_masque_%d.png" % k))
-        if len(masques) < 3:
-            raise RuntimeError("moins de 3 vues exploitables (objet detoure trop petit ou absent)")
-
-        etape = "5 : coque visuelle (forme)"
-        journal.ecrire("--- Etape " + etape)
-        mesh, rots, s = _reconstruire_coque(masques, angles_ok, journal, 48, args.resolution)
-
-        etape = "6 : couleurs"
-        journal.ecrire("--- Etape " + etape)
-        couleurs, nb_vus = _colorer_coque(mesh, rots, s, images)
-        journal.ecrire("Sommets colores par les vues : %d sur %d" % (nb_vus, len(mesh.vertices)))
-        mesh.visual.vertex_colors = np.column_stack([couleurs, np.full(len(couleurs), 255, np.uint8)])
-
-        etape = "7 : mise a l'echelle et export"
-        journal.ecrire("--- Etape " + etape)
-        extents = mesh.bounding_box.extents
-        mesh.apply_scale((args.taille / 100.0) / float(extents.max()))
-        bornes = mesh.bounds
-        mesh.apply_translation([-(bornes[0][0] + bornes[1][0]) / 2.0, -bornes[0][1],
-                                -(bornes[0][2] + bornes[1][2]) / 2.0])
-        sortie = os.path.join(SORTIES, nom, nom + "_auto.glb")
-        os.makedirs(os.path.dirname(sortie), exist_ok=True)
-        mesh.export(sortie)
-        journal.ecrire("Modele 3D cree : " + sortie)
-        journal.ecrire("RESULTAT : OK")
-        return sortie
-    except SystemExit:
-        raise
-    except Exception:
-        journal.ecrire("ECHEC a l'etape : " + etape)
-        journal.ecrire(traceback.format_exc())
-        journal.ecrire("RESULTAT : ECHEC")
-        journal.fermer()
-        raise SystemExit(1)
-    finally:
-        try:
-            journal.fermer()
-        except Exception:
-            pass
-
-
 def generer_detourage(args):
     """Detoure la photo (sans TripoSR) et enregistre l'apercu avec transparence."""
     os.environ.update(env_ia())
@@ -1398,11 +1062,6 @@ TRADUCTIONS = {
     "table": "table", "chaise": "chair", "ailes": "wings", "ange": "angel", "chapeau": "hat", "chapeaux": "hat", "chien": "dog", "chat": "cat", "voiture": "car", "arbre": "tree", "maison": "house", "poisson": "fish", "pomme": "apple", "lunettes": "glasses", "fleur": "flower",
     "cheval": "horse", "bouteille": "bottle", "casque": "helmet", "epee": "sword",
     "bouclier": "shield", "lampe": "lamp", "vase": "vase", "livre": "book", "tasse": "mug",
-    "cuillere": "spoon", "cuillère": "spoon", "cuillères": "spoon", "cuilleres": "spoon",
-    "fourchette": "fork", "couteau": "knife", "rocher": "rock", "champignon": "mushroom",
-    "bateau": "boat", "avion": "airplane", "bougie": "candle", "chaussure": "shoe",
-    "chaussures": "shoe", "pierre": "stone", "cloche": "bell", "horloge": "clock",
-    "lit": "bed", "banc": "bench", "seau": "bucket", "chapeau de sorcier": "wizard hat",
 }
 
 PIECE_SEPARATEURS = r"(\s+(?:avec|et|posée sur|posé sur|pose sur|sur|dans|à côté de|a cote de)\s+|,)"
@@ -1414,9 +1073,7 @@ def decouper_demande(texte):
     import re
     t = texte.lower().strip()
     # Formules de politesse et verbes : ne font pas partie des pieces
-    t = re.sub(r"\ben\s+(3\s?d|trois dimensions)\b", " ", t)
-    t = re.sub(r"\b(3\s?d|trois dimensions)\b", " ", t)
-    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|met|mets|mettre|pose|poser|ajoute|ajouter|place|placer|je|moi|nous|svp|stp|dessine|dessines|dessiner|dessin|modelise|modélise|modeliser|modéliser|genere|génère|generer|générer|fabrique|fabriquer|montre|montrer|imagine|imaginer|vouloir|veux)\b", " ", t)
+    t = re.sub(r"\b(fait|fais|faire|donne|donner|cree|crée|creer|créer|veux|voudrais|met|mets|mettre|pose|poser|ajoute|ajouter|place|placer|je|moi|nous|svp|stp)\b", " ", t)
     # « sur la tete », « sur le dos »... : le petit objet est pose dessus
     t = re.sub(r"\bsur\s+(la\s+|le\s+|sa\s+|son\s+|ses\s+|les\s+)?(tete|tête|dos|epaule|épaule|main|mains)\b", " dessus ", t)
     morceaux = re.split(PIECE_SEPARATEURS, re.sub(r"\s+", " ", t))
@@ -2220,9 +1877,8 @@ def interface():
                     afficher("  les ailes seront dessinees avec le marteau (generateur) ; "
                              "avec 2 ou 3, l'image doit deja contenir les ailes.")
             else:
-                afficher("Assistant : pour « %s » : 1 = generation automatique (IA : image, vues, 3D ; "
-                         "tres lent sur processeur, journal dans IA\\logs), 2 = recherche web, "
-                         "3 = ma bibliotheque ou mon fichier" % piece["nom"])
+                afficher("Assistant : pour « %s » : 1 = generer l'image (SDXL-Turbo, en local, quelques minutes), "
+                         "2 = recherche web, 3 = ma bibliotheque ou mon fichier" % piece["nom"])
 
         def lancer_pieces(pieces):
             for piece in pieces:
@@ -2356,9 +2012,9 @@ def interface():
                 return
             if attente == "source_piece":
                 if message == "1" and "marteau" not in piece["nom"]:
-                    piece["source"] = "auto"
+                    piece["source"] = "gen"
                     piece["fichier"] = None
-                    afficher("Assistant : je ferai le modele de « %s » automatiquement pendant la fabrication." % piece["nom"])
+                    afficher("Assistant : je creerai l'image de « %s » avec SDXL-Turbo pendant la fabrication." % piece["nom"])
                     piece_suivante()
                     return
                 if message == "1":
@@ -2413,16 +2069,16 @@ def interface():
                                             else piece["taille"],
                                             "relation": piece["relation"]})
                             continue
-                        if piece.get("source") == "auto":
-                            sortie_auto = os.path.join(SORTIES, nom, nom + "_auto.glb")
-                            cmd_auto = [venv_python(), os.path.abspath(__file__), "--worker", "--auto",
-                                        "--prompt", piece["requete"], "--nom", nom,
-                                        "--taille", str(piece["taille"]), "--etapes-mv", "36", "--resolution", "128"]
-                            log("=== Piece %d/%d : %s (generation automatique, journal dans IA\\logs) ===" % (k, len(pieces), piece["nom"]))
-                            if executer_worker(cmd_auto, log) != 0 or not os.path.isfile(sortie_auto):
-                                log("=== ECHEC de la generation automatique pour %s : voir le journal ===" % piece["nom"])
+                        if piece.get("source") == "gen":
+                            sortie_gen = os.path.join(IA, "images", nom + "_ia.png")
+                            cmd_gen = [venv_python(), os.path.abspath(__file__), "--worker", "--generer-image",
+                                       "--prompt", "a single " + piece["requete"] + " object",
+                                       "--sortie-image", sortie_gen, "--nom", nom, "--taille", "1"]
+                            log("=== Piece %d/%d : %s (image creee par SDXL-Turbo) ===" % (k, len(pieces), piece["nom"]))
+                            if executer_worker(cmd_gen, log) != 0 or not os.path.isfile(sortie_gen):
+                                log("=== ECHEC de la creation de l'image pour %s : voir le journal ===" % piece["nom"])
                                 return
-                            piece["fichier"] = sortie_auto
+                            piece["fichier"] = sortie_gen
                         if piece.get("fichier") and piece["fichier"].lower().endswith(".glb"):
                             cible = os.path.join(SORTIES, nom, nom + ".glb")
                             os.makedirs(os.path.dirname(cible), exist_ok=True)
@@ -2898,14 +2554,8 @@ def main():
         parseur.add_argument("--ajouter-ailes", action="store_true")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
-        parseur.add_argument("--auto", action="store_true")
-        parseur.add_argument("--etapes-mv", type=int, default=36)
-        parseur.add_argument("--resolution", type=int, default=128)
         args = parseur.parse_args()
         args.retirer_fond = not args.garder_fond
-        if args.auto:
-            generer_auto(args)
-            return
         if args.ajouter_ailes:
             ajouter_ailes_fichier(args)
             return
