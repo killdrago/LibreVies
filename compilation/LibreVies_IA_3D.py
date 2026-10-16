@@ -1751,12 +1751,12 @@ button { font-size: 16px; padding: 8px 14px; margin: 4px; }
 <h3>Redressement de « __PIECE__ »</h3>
 <p>Le modele a deja ete redresse automatiquement. Si il penche encore, utilisez les fleches :
 le dessus de l'objet suit la fleche. Glissez avec la souris pour tourner la vue.</p>
+<p><button id="depart">Revenir au départ</button> <span>(orientation juste après la génération, redressement automatique)</span></p>
 <div id="scene"></div>
 <div id="fleches">
   <div><button id="haut">&uarr; Haut</button></div>
   <div><button id="gauche">&larr; Gauche</button> <button id="droite">Droite &rarr;</button></div>
   <div><button id="bas">&darr; Bas</button></div>
-  <div><button id="reset">Remettre automatique</button></div>
 </div>
 <p>Pas : <input type="range" id="pas" min="1" max="30" value="5"> <span id="pasv">5</span> degres
   &nbsp; Inclinaison : <span id="angles">0, 0</span></p>
@@ -1816,7 +1816,7 @@ document.getElementById('haut').onclick = () => { tx -= pas; miseAJour(); };
 document.getElementById('bas').onclick = () => { tx += pas; miseAJour(); };
 document.getElementById('gauche').onclick = () => { tz += pas; miseAJour(); };
 document.getElementById('droite').onclick = () => { tz -= pas; miseAJour(); };
-document.getElementById('reset').onclick = () => { tx = 0; tz = 0; miseAJour(); };
+document.getElementById('depart').onclick = () => { tx = 0; tz = 0; pas = 5; document.getElementById('pas').value = 5; document.getElementById('pasv').textContent = 5; miseAJour(); };
 document.getElementById('pas').oninput = (e) => {
   pas = parseFloat(e.target.value);
   document.getElementById('pasv').textContent = pas;
