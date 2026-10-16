@@ -966,10 +966,17 @@ def _vues_zero123(cond, etapes, journal):
     journal.ecrire("Vues generees en %d s : grille %dx%d" % (time.time() - debut, grille.size[0], grille.size[1]))
     del pipe
     gc.collect()
-    w, h = grille.size[0] // 3, grille.size[1] // 2
+    # La disposition depend de la forme reelle de la grille : 3 colonnes x 2 lignes si elle est
+    # plus large que haute, 2 colonnes x 3 lignes si elle est plus haute que large.
+    if grille.size[0] >= grille.size[1]:
+        colonnes, lignes = 3, 2
+    else:
+        colonnes, lignes = 2, 3
+    journal.ecrire("Disposition de la grille : %d colonnes x %d lignes" % (colonnes, lignes))
+    w, h = grille.size[0] // colonnes, grille.size[1] // lignes
     vues = []
     for k in range(6):
-        c, r = k % 3, k // 3
+        c, r = k % colonnes, k // colonnes
         vues.append(grille.crop((c * w, r * h, (c + 1) * w, (r + 1) * h)))
     return grille, vues
 
