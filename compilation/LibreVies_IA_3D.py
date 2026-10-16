@@ -228,6 +228,26 @@ def colorer_depuis_photo(mesh, image):
     # Couleurs de la photo projetees sur tout le modele, sans assombrissement ni adoucissement
     # (les ombres seront gerees dans le jeu).
 
+    # Les faces qui ne regardent pas la photo (cotes, dos) ne doivent pas recevoir les pixels
+    # de la projection (souvent sombres) : elles prennent la moyenne de leurs voisins visibles.
+    normales = np.asarray(mesh.vertex_normals)
+    visible = normales[:, axe] * signe > 0.2
+    if visible.any() and not visible.all():
+        c = couleurs.astype(np.float64)
+        ok = visible.copy()
+        voisins = mesh.vertex_neighbors
+        for _ in range(200):
+            if ok.all():
+                break
+            nouveau = c.copy()
+            nouvel_ok = ok.copy()
+            for i in np.where(~ok)[0]:
+                vs = [v for v in voisins[i] if ok[v]]
+                if vs:
+                    nouveau[i] = c[vs].mean(axis=0)
+                    nouvel_ok[i] = True
+            c, ok = nouveau, nouvel_ok
+        couleurs = c
     rgba = np.zeros((len(V), 4), dtype=np.uint8)
     rgba[:, :3] = np.clip(couleurs, 0, 255).astype(np.uint8)
     rgba[:, 3] = 255
