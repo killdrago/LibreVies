@@ -2177,22 +2177,23 @@ def interface():
     ttk.Button(cadre_moteur, text="Installer Stable Fast 3D", command=installer_sf3d_fenetre).pack(side="left", padx=4)
 
     cadre_cpu = ttk.Frame(cadre)
-    cadre_cpu.grid(row=5, column=2, sticky="w", padx=5)
-    ttk.Label(cadre_cpu, text="Limite processeur (%) :").pack(side="left")
+    cadre_cpu.grid(row=3, column=2, sticky="w", padx=5)
+    ttk.Label(cadre_cpu, text="Limite processeur :").pack(side="left")
     etat["limite_cpu"] = tk.IntVar(value=100)
-    ecrire_limite_cpu(100)
+    etiquette_cpu = ttk.Label(cadre_cpu, text="100 %", width=6)
+    etiquette_cpu.pack(side="right")
 
     def changer_limite_cpu(valeur):
-        etat["limite_cpu"].set(int(float(valeur)))
+        valeur = int(round(float(valeur)))
+        etat["limite_cpu"].set(valeur)
+        etiquette_cpu.config(text="%d %%" % valeur)
         ecrire_limite_cpu(valeur)
-        etiquette_cpu.config(text="%d %%" % int(float(valeur)))
 
-    curseur_cpu = ttk.Scale(cadre_cpu, from_=0, to=100, orient="horizontal", length=160,
-                            command=changer_limite_cpu)
+    curseur_cpu = tk.Scale(cadre_cpu, from_=5, to=100, orient="horizontal", length=180,
+                           showvalue=0, command=changer_limite_cpu)
     curseur_cpu.set(100)
     curseur_cpu.pack(side="left", padx=4)
-    etiquette_cpu = ttk.Label(cadre_cpu, text="100 %")
-    etiquette_cpu.pack(side="left")
+    ecrire_limite_cpu(100)
 
     ttk.Label(cadre, text="Ou decrire l'objet (image creee sur ce PC) :").grid(row=6, column=0, sticky="w")
     etat["description"] = tk.StringVar(value="")
