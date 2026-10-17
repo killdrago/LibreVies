@@ -1874,7 +1874,7 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
     with open(source, "w", encoding="utf-8") as f:
         json.dump({"pieces": [{"fichier": c, "nom": n} for c, n in zip(chemins, noms)]}, f)
     cmd_decoupe = [venv_python(), os.path.abspath(__file__), "--worker", "--decouper-3d",
-                   "--entrees-fichier", source, "--nom", nom]
+                   "--entrees-fichier", source, "--nom", nom, "--taille", "0"]
     if executer_worker(cmd_decoupe, log) == 0 and os.path.isfile(source.replace(".json", "_parties.json")):
         with open(source.replace(".json", "_parties.json"), encoding="utf-8") as f:
             parties = json.load(f)["pieces"]
@@ -1894,7 +1894,7 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
     with open(entrees, "w", encoding="utf-8") as f:
         json.dump(donnees, f)
     cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--editer-3d",
-           "--entrees-fichier", entrees, "--nom", nom]
+           "--entrees-fichier", entrees, "--nom", nom, "--taille", "0"]
     code = executer_worker(cmd, log)
     log("=== Fini : " + os.path.join(dossier, nom + ".glb") + " ===" if code == 0
         else "=== ECHEC edition 3D : voir le journal ===")
