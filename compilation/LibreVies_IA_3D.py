@@ -1052,7 +1052,7 @@ def lancer_generation(cmd_triposr, log):
                 return 0
             log("Stable Fast 3D a echoue : essai avec TripoSR.")
         else:
-            log("Stable Fast 3D n'est pas installe : TripoSR est utilise. Bouton « Installer Stable Fast 3D ».")
+            log("Stable Fast 3D n'est pas installe : TripoSR est utilise. Bouton « Installer Stable Fast 3D » (dans la fenetre).")
     log("=== Moteur : TripoSR ===")
     return executer_worker(cmd_triposr, log)
 
@@ -2174,7 +2174,8 @@ def interface():
         log("=== Installation de Stable Fast 3D (longue, patientez) ===")
         threading.Thread(target=travail_install, daemon=True).start()
 
-    ttk.Button(cadre_moteur, text="Installer Stable Fast 3D", command=installer_sf3d_fenetre).pack(side="left", padx=4)
+    if not sf3d_installe():
+        ttk.Button(cadre_moteur, text="Installer Stable Fast 3D", command=installer_sf3d_fenetre).pack(side="left", padx=4)
 
     cadre_cpu = ttk.Frame(cadre)
     cadre_cpu.grid(row=4, column=0, sticky="w", pady=4)
