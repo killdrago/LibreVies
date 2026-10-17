@@ -687,6 +687,7 @@ def generer_parametrique(args, photo_pil=None):
                          -(tout[:, 2].min() + tout[:, 2].max()) / 2.0 * echelle])
     parties = [(m, V * echelle + decalage, UV, F) for m, V, UV, F in parties]
 
+    nb_corps = len(parties)  # les morceaux suivants sont les ailes
     if getattr(args, "ailes", False):
         p = PARAM
         position = min(max(float(getattr(args, "position_ailes", 0.5)), 0.05), 0.95)
@@ -739,12 +740,15 @@ def generer_parametrique(args, photo_pil=None):
         f.write("newmtl Bois\nKa 1 1 1\nKd 1 1 1\nKs 0.05 0.05 0.05\nNs 10\nmap_Kd " + args.nom + "_bois.png\n\n")
         f.write("newmtl Acier\nKa 1 1 1\nKd 1 1 1\nKs 0.4 0.4 0.4\nNs 60\nmap_Kd " + args.nom + "_acier.png\n")
 
-    morceaux = []
-    for materiel, V, UV, F in parties:
+    # noeuds nommes : le corps et les ailes restent separables dans l'edition 3D
+    morceaux = trimesh.Scene()
+    for k, (materiel, V, UV, F) in enumerate(parties):
         img = img_bois if materiel == "Bois" else img_acier
         vis = trimesh.visual.TextureVisuals(uv=UV, material=trimesh.visual.material.SimpleMaterial(image=img))
-        morceaux.append(trimesh.Trimesh(vertices=V, faces=F, visual=vis, process=False))
-    trimesh.Scene(morceaux).export(os.path.join(dossier, args.nom + ".glb"))
+        nom_noeud = ("ailes_%d" % (k - nb_corps)) if k >= nb_corps else ("corps_%d" % k)
+        morceaux.add_geometry(trimesh.Trimesh(vertices=V, faces=F, visual=vis, process=False),
+                              node_name=nom_noeud)
+    morceaux.export(os.path.join(dossier, args.nom + ".glb"))
 
     print("Fichiers crees dans : " + dossier, flush=True)
     print("  %d sommets, %d faces" % (len(tout), sum(len(p[3]) for p in parties)), flush=True)
