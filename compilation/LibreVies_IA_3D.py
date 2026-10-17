@@ -412,7 +412,7 @@ def exporter_texture(mesh_uv, image, uv, F2, V2, dossier, nom):
         f.write("\n".join(lignes) + "\n")
     with open(os.path.join(dossier, nom + ".mtl"), "w", encoding="utf-8") as f:
         f.write("newmtl Texture\nKa 1 1 1\nKd 1 1 1\nKs 0.1 0.1 0.1\nNs 20\nmap_Kd " + png + "\n")
-    mesh_uv.export(os.path.join(dossier, nom + ".glb"))
+    mesh_uv.export(os.path.join(dossier, nom + ".glb"), include_normals=True)
 
 
 
@@ -748,7 +748,7 @@ def generer_parametrique(args, photo_pil=None):
         nom_noeud = ("ailes_%d" % (k - nb_corps)) if k >= nb_corps else ("corps_%d" % k)
         morceaux.add_geometry(trimesh.Trimesh(vertices=V, faces=F, visual=vis, process=False),
                               node_name=nom_noeud)
-    morceaux.export(os.path.join(dossier, args.nom + ".glb"))
+    morceaux.export(os.path.join(dossier, args.nom + ".glb"), include_normals=True)
 
     print("Fichiers crees dans : " + dossier, flush=True)
     print("  %d sommets, %d faces" % (len(tout), sum(len(p[3]) for p in parties)), flush=True)
@@ -822,7 +822,7 @@ def redresser_fichier(args):
     sc.apply_transform(_matrice_inclinaison(args.tx, args.tz))
     _poser_au_sol(sc)
     sortie = os.path.join(dossier, args.nom + "_redresse_apercu.glb") if args.apercu else cible
-    sc.export(sortie)
+    sc.export(sortie, include_normals=True)
     print("Redressement : inclinaison manuelle %+.1f (avant/arriere), %+.1f (gauche/droite) degres -> %s"
           % (args.tx, args.tz, os.path.basename(sortie)), flush=True)
     return 0
@@ -870,7 +870,7 @@ def ajouter_ailes_fichier(args):
         vis = trimesh.visual.TextureVisuals(uv=UV, material=trimesh.visual.material.SimpleMaterial(image=img))
         morceau = trimesh.Trimesh(vertices=np.asarray(V) + decalage_monde, faces=F, visual=vis, process=False)
         sc.add_geometry(morceau, node_name="ailes_%d" % k)
-    sc.export(cible)
+    sc.export(cible, include_normals=True)
     print("Ailes ajoutees au marteau : " + cible, flush=True)
 
 
@@ -1172,7 +1172,7 @@ def generer(args):
         import traceback
         print("Lissage impossible (" + str(erreur) + ") : export TripoSR sans lissage.", flush=True)
         print(traceback.format_exc(), flush=True)
-        mesh.export(os.path.join(dossier, args.nom + ".glb"))
+        mesh.export(os.path.join(dossier, args.nom + ".glb"), include_normals=True)
         mesh.export(os.path.join(dossier, args.nom + ".obj"))
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
@@ -1575,7 +1575,7 @@ def assembler(args):
         prec_sommets = np.vstack(sommets_new)
         print("Piece %d posee (%s)." % (k + 1, e["relation"]), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
-    combine.export(chemin)
+    combine.export(chemin, include_normals=True)
     etendue = (combine.bounds[1] - combine.bounds[0]) * 100
     print("Scene assemblee : " + chemin, flush=True)
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
@@ -1827,7 +1827,7 @@ def editer_3d(args):
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
         print("Piece %d placee : %s" % (k + 1, p.get("nom", "")), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
-    combine.export(chemin)
+    combine.export(chemin, include_normals=True)
     etendue = (combine.bounds[1] - combine.bounds[0]) * 100
     print("Modele final : " + chemin, flush=True)
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
@@ -1862,7 +1862,7 @@ def decouper_fichier(args):
                 g.apply_transform(T)
                 nouvelle.add_geometry(g, node_name=str(node))
             fichier = os.path.join(dossier, "p%d_%s.glb" % (k, suffixe))
-            nouvelle.export(fichier)
+            nouvelle.export(fichier, include_normals=True)
             sortie.append({"fichier": fichier, "nom": nom_objet})
     with open(args.entrees_fichier.replace(".json", "_parties.json"), "w", encoding="utf-8") as f:
         json.dump({"pieces": sortie}, f)
