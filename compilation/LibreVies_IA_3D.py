@@ -2178,9 +2178,9 @@ def interface():
 
     cadre_cpu = ttk.Frame(cadre)
     cadre_cpu.grid(row=4, column=0, sticky="w", pady=4)
-    ttk.Label(cadre_cpu, text="Limite processeur :").pack(side="left")
+    ttk.Label(cadre_cpu, text="Limite CPU :").pack(side="left")
     etat["limite_cpu"] = tk.IntVar(value=100)
-    etiquette_cpu = ttk.Label(cadre_cpu, text="100 %", width=6)
+    etiquette_cpu = ttk.Label(cadre_cpu, text="100 %", width=5)
     etiquette_cpu.pack(side="right")
 
     def changer_limite_cpu(valeur):
@@ -2189,7 +2189,7 @@ def interface():
         etiquette_cpu.config(text="%d %%" % valeur)
         ecrire_limite_cpu(valeur)
 
-    curseur_cpu = tk.Scale(cadre_cpu, from_=5, to=100, orient="horizontal", length=180,
+    curseur_cpu = tk.Scale(cadre_cpu, from_=5, to=100, orient="horizontal", length=90,
                            showvalue=0, command=changer_limite_cpu)
     curseur_cpu.set(100)
     curseur_cpu.pack(side="left", padx=4)
