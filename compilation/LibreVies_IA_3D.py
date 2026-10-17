@@ -1585,9 +1585,9 @@ EDITION_HTML = r"""<!doctype html>
 <style>
 body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
 #scene { width: 800px; height: 520px; border: 2px solid #777; display: inline-block; vertical-align: top; }
-#panneau { display: inline-block; vertical-align: top; margin-left: 14px; width: 280px; }
+#panneau { display: inline-block; vertical-align: top; margin-left: 14px; width: 300px; }
 button { font-size: 14px; padding: 6px 10px; margin: 2px; }
-.liste button { display: block; width: 100%; text-align: left; }
+select { font-size: 15px; padding: 4px; width: 100%; }
 .actif { background: #9cf !important; }
 </style>
 <script type="importmap">
@@ -1598,19 +1598,21 @@ button { font-size: 14px; padding: 6px 10px; margin: 2px; }
 </head>
 <body>
 <h3>Edition 3D : placer les pieces avant le fichier final</h3>
-<p>Clique une piece dans la liste pour la selectionner. Choisis le mode (deplacer, redimensionner, tourner),
-puis manipule la piece dans la fenetre. Glisse la souris dans le vide pour tourner la vue.
-Quand tout est en place, clique sur « Valider ».</p>
+<p>Dans la liste, choisis <b>Tous les objets</b> pour tout deplacer ensemble, ou une seule partie
+(marteau, ailes...) pour ne modifier qu'elle. Glisse la souris dans le vide pour tourner la vue ; la molette zoome.</p>
 <div id="scene"></div>
 <div id="panneau">
-  <div class="liste" id="liste"></div>
+  <p><b>Objet a modifier :</b><br><select id="choix"></select></p>
   <p>Mode :
     <button id="m_translate">Deplacer</button>
     <button id="m_scale">Redimensionner</button>
     <button id="m_rotate">Tourner</button></p>
-  <p>Taille de la piece selectionnee : <input type="range" id="taille" min="10" max="300" value="100" disabled>
+  <p>Taille : <input type="range" id="taille" min="10" max="300" value="100" disabled>
     <span id="taillev">100</span> %</p>
   <p>Dimensions : <span id="dims">-</span></p>
+  <p>Couleur : <input type="color" id="couleur" value="#c8a878">
+    <button id="appliquer_couleur">Appliquer</button>
+    <button id="couleur_origine">Couleur d'origine</button></p>
   <p>
     <button id="ok">Valider et creer le modele final</button>
     <button id="annuler">Annuler</button>
@@ -1639,9 +1641,11 @@ const lumiere = new THREE.DirectionalLight(0xffffff, 1.5);
 lumiere.position.set(1, 2, 1);
 scene.add(lumiere);
 scene.add(new THREE.GridHelper(1.0, 20));
+
 const orbite = new OrbitControls(camera, rendu.domElement);
 orbite.target.set(0, 0.1, 0);
-orbite.enableZoom = false;  // zoom gere ci-dessous : 5 % par cran de molette
+orbite.enableZoom = false;
+// zoom molette : 5 % par cran, limites 30 cm a 4 m
 rendu.domElement.addEventListener('wheel', (e) => {
   e.preventDefault();
   const vers = orbite.target.clone().sub(camera.position);
@@ -1651,33 +1655,36 @@ rendu.domElement.addEventListener('wheel', (e) => {
   vers.normalize();
   camera.position.copy(orbite.target).addScaledVector(vers, -nd);
 }, { passive: false });
+
 const transf = new TransformControls(camera, rendu.domElement);
 transf.addEventListener('dragging-changed', e => { orbite.enabled = !e.value; });
 transf.addEventListener('objectChange', majDims);
 scene.add(transf);
 
-const groupes = [];
-let courant = -1;
+const ensemble = new THREE.Group();
+scene.add(ensemble);
+const groupes = [];   // {nom, groupe, couleur}
+let cible = null;     // objet actuellement manipule (ensemble ou une partie)
 const etat = document.getElementById('etat');
+const choix = document.getElementById('choix');
+const taille = document.getElementById('taille');
 
 function majDims() {
-  if (courant < 0) return;
-  const g = groupes[courant].groupe;
-  const boite = new THREE.Box3().setFromObject(g);
-  const t = boite.getSize(new THREE.Vector3());
+  if (!cible) return;
+  const t = new THREE.Box3().setFromObject(cible).getSize(new THREE.Vector3());
   document.getElementById('dims').textContent =
     (t.x * 100).toFixed(1) + ' x ' + (t.y * 100).toFixed(1) + ' x ' + (t.z * 100).toFixed(1) + ' cm';
-  document.getElementById('taille').value = Math.round(g.scale.x * 100);
-  document.getElementById('taillev').textContent = Math.round(g.scale.x * 100);
+  taille.value = Math.round(cible.scale.x * 100);
+  document.getElementById('taillev').textContent = Math.round(cible.scale.x * 100);
 }
 
-function selectionner(i) {
-  courant = i;
-  transf.attach(groupes[i].groupe);
-  groupes.forEach((p, k) => p.bouton.classList.toggle('actif', k === i));
-  document.getElementById('taille').disabled = false;
+function selectionner(valeur) {
+  cible = (valeur === 'tous') ? ensemble : groupes[parseInt(valeur, 10)].groupe;
+  transf.attach(cible);
+  taille.disabled = false;
   majDims();
 }
+choix.onchange = () => selectionner(choix.value);
 
 function setMode(m) {
   transf.setMode(m);
@@ -1689,44 +1696,76 @@ document.getElementById('m_scale').onclick = () => setMode('scale');
 document.getElementById('m_rotate').onclick = () => setMode('rotate');
 setMode('translate');
 
-document.getElementById('taille').oninput = (e) => {
-  if (courant < 0) return;
+taille.oninput = (e) => {
+  if (!cible) return;
   const v = parseFloat(e.target.value) / 100;
-  groupes[courant].groupe.scale.setScalar(v);
+  cible.scale.setScalar(v);
   document.getElementById('taillev').textContent = e.target.value;
   majDims();
+};
+
+function piecesCiblees() {
+  return choix.value === 'tous' ? groupes : [groupes[parseInt(choix.value, 10)]];
+}
+
+document.getElementById('appliquer_couleur').onclick = () => {
+  const hex = document.getElementById('couleur').value;
+  piecesCiblees().forEach(p => {
+    p.groupe.traverse(o => {
+      if (o.isMesh) {
+        if (o.userData.matOrig === undefined) o.userData.matOrig = o.material;
+        o.material = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.6, metalness: 0.0 });
+      }
+    });
+    p.couleur = hex;
+  });
+  etat.textContent = 'Couleur appliquee.';
+};
+
+document.getElementById('couleur_origine').onclick = () => {
+  piecesCiblees().forEach(p => {
+    p.groupe.traverse(o => {
+      if (o.isMesh && o.userData.matOrig !== undefined) o.material = o.userData.matOrig;
+    });
+    p.couleur = null;
+  });
+  etat.textContent = 'Couleur d\'origine restauree.';
 };
 
 async function charger() {
   const chargeur = new GLTFLoader();
   let decalage = 0;
+  const opt = document.createElement('option');
+  opt.value = 'tous';
+  opt.textContent = 'Tous les objets';
+  choix.appendChild(opt);
   for (let i = 0; i < PIECES.length; i++) {
     const p = PIECES[i];
     etat.textContent = 'Chargement de ' + p.nom + '...';
     const gltf = await chargeur.loadAsync(p.url);
     const groupe = new THREE.Group();
     groupe.add(gltf.scene);
-    scene.add(groupe);
+    ensemble.add(groupe);
     groupe.updateMatrixWorld(true);
     const boite = new THREE.Box3().setFromObject(groupe);
-    const taille = boite.getSize(new THREE.Vector3());
+    const dim = boite.getSize(new THREE.Vector3());
     // Pose initiale : pieces cote a cote, posees sur le sol
     groupe.position.set(decalage - boite.min.x, -boite.min.y, -(boite.min.z + boite.max.z) / 2);
-    decalage += taille.x + 0.02;
-    const bouton = document.createElement('button');
-    bouton.textContent = p.nom;
-    const indice = i;
-    bouton.onclick = () => selectionner(indice);
-    document.getElementById('liste').appendChild(bouton);
-    groupes.push({ nom: p.nom, groupe, bouton });
+    decalage += dim.x + 0.02;
+    groupes.push({ nom: p.nom, groupe, couleur: null });
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = p.nom;
+    choix.appendChild(o);
   }
-  etat.textContent = PIECES.length + ' piece(s) chargee(s). Selectionne une piece.';
-  if (groupes.length) selectionner(0);
+  choix.value = 'tous';
+  etat.textContent = PIECES.length + ' partie(s) chargee(s).';
+  selectionner('tous');
 }
 
 document.getElementById('ok').onclick = async () => {
   scene.updateMatrixWorld(true);
-  const pieces = groupes.map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray() }));
+  const pieces = groupes.map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray(), couleur: g.couleur }));
   etat.textContent = 'Envoi...';
   const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ pieces: pieces }) });
@@ -1765,10 +1804,16 @@ def editer_3d(args):
         sc = trimesh.load(p["fichier"], force="scene")
         # three.js : matrice en ordre colonne par colonne
         M = np.array(p["matrice"], dtype=float).reshape(4, 4).T
+        couleur = p.get("couleur")
+        if couleur:
+            h = couleur.lstrip("#")
+            rgba = np.array([int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255], dtype=np.uint8)
         for node in sc.graph.nodes_geometry:
             T, nom_geom = sc.graph[node]
             g = sc.geometry[nom_geom].copy()
             g.apply_transform(M @ T)
+            if couleur:
+                g.visual = trimesh.visual.ColorVisuals(mesh=g, face_colors=np.tile(rgba, (len(g.faces), 1)))
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
         print("Piece %d placee : %s" % (k + 1, p.get("nom", "")), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
@@ -1833,7 +1878,7 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
         log("Edition 3D annulee : rien n'a ete cree.")
         return False
     entrees = os.path.join(dossier, nom + "_placement.json")
-    donnees = {"pieces": [{"fichier": c, "nom": n, "matrice": p["matrice"]}
+    donnees = {"pieces": [{"fichier": c, "nom": n, "matrice": p["matrice"], "couleur": p.get("couleur")}
                           for c, n, p in zip(chemins, noms, res["pieces"])]}
     with open(entrees, "w", encoding="utf-8") as f:
         json.dump(donnees, f)
