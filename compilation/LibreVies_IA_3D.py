@@ -1778,11 +1778,52 @@ def editer_3d(args):
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
 
 
+def decouper_fichier(args):
+    """Worker : eclate chaque modele en parties (une par geometrie), pour les selectionner separement.
+    Lit --entrees-fichier ({"pieces": [{fichier, nom}]}) et ecrit <entrees>_parties.json."""
+    import json
+    import re
+    import trimesh
+    with open(args.entrees_fichier, encoding="utf-8") as f:
+        donnees = json.load(f)
+    sortie = []
+    for k, p in enumerate(donnees["pieces"]):
+        sc = trimesh.load(p["fichier"], force="scene")
+        noeuds = list(sc.graph.nodes_geometry)
+        if len(noeuds) <= 1:
+            sortie.append({"fichier": p["fichier"], "nom": p["nom"]})
+            continue
+        dossier = os.path.join(os.path.dirname(p["fichier"]), "parties")
+        os.makedirs(dossier, exist_ok=True)
+        for j, node in enumerate(noeuds):
+            T, nom_geom = sc.graph[node]
+            g = sc.geometry[nom_geom].copy()
+            g.apply_transform(T)
+            fichier = os.path.join(dossier, "p%d_%d_%s.glb" % (k, j, re.sub(r"\W", "_", str(node))))
+            trimesh.Scene(g).export(fichier)
+            sortie.append({"fichier": fichier, "nom": "%s : %s" % (p["nom"], node)})
+    with open(args.entrees_fichier.replace(".json", "_parties.json"), "w", encoding="utf-8") as f:
+        json.dump({"pieces": sortie}, f)
+    print("Parties : %d" % len(sortie), flush=True)
+
+
 def lancer_edition(chemins, nom, log, noms=None, delai=3600):
-    """Ouvre la page d'edition 3D avec les pieces, puis ecrit le modele final <nom>.glb.
+    """Ouvre la page d'edition 3D avec les pieces (eclatees en parties), puis ecrit le modele final <nom>.glb.
     Renvoie True si le modele a ete cree."""
     import json
     noms = noms or [os.path.basename(c) for c in chemins]
+    dossier = os.path.join(SORTIES, nom)
+    os.makedirs(dossier, exist_ok=True)
+    source = os.path.join(dossier, nom + "_source_edition.json")
+    with open(source, "w", encoding="utf-8") as f:
+        json.dump({"pieces": [{"fichier": c, "nom": n} for c, n in zip(chemins, noms)]}, f)
+    cmd_decoupe = [venv_python(), os.path.abspath(__file__), "--worker", "--decouper-3d",
+                   "--entrees-fichier", source, "--nom", nom]
+    if executer_worker(cmd_decoupe, log) == 0 and os.path.isfile(source.replace(".json", "_parties.json")):
+        with open(source.replace(".json", "_parties.json"), encoding="utf-8") as f:
+            parties = json.load(f)["pieces"]
+        chemins = [p["fichier"] for p in parties]
+        noms = [p["nom"] for p in parties]
     pieces_js = [{"nom": n, "url": "/piece/%d.glb" % i} for i, n in enumerate(noms)]
     fichiers = {"/piece/%d.glb" % i: c for i, c in enumerate(chemins)}
     page = EDITION_HTML.replace("__PIECES__", json.dumps(pieces_js))
@@ -1791,8 +1832,6 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
     if not res or res.get("annule") or not res.get("pieces"):
         log("Edition 3D annulee : rien n'a ete cree.")
         return False
-    dossier = os.path.join(SORTIES, nom)
-    os.makedirs(dossier, exist_ok=True)
     entrees = os.path.join(dossier, nom + "_placement.json")
     donnees = {"pieces": [{"fichier": c, "nom": n, "matrice": p["matrice"]}
                           for c, n, p in zip(chemins, noms, res["pieces"])]}
@@ -3491,6 +3530,7 @@ def main():
         parseur.add_argument("--ajouter-ailes", action="store_true")
         parseur.add_argument("--editer-3d", action="store_true")
         parseur.add_argument("--apercu-3d", action="store_true")
+        parseur.add_argument("--decouper-3d", action="store_true")
         parseur.add_argument("--entrees-fichier", default="")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
@@ -3505,6 +3545,9 @@ def main():
             sys.exit(redresser_fichier(args))
         if args.moteur == "sf3d":
             generer_sf3d(args)
+            return
+        if args.decouper_3d:
+            decouper_fichier(args)
             return
         if args.apercu_3d:
             apercu_3d(args)
