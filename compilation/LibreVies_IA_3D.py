@@ -2130,6 +2130,67 @@ def interface():
     cadre = ttk.Frame(fenetre, padding=10)
     cadre.pack(fill="both", expand=True)
 
+    # --- Connexion Hugging Face (jeton) : bandeau en haut de la fenetre ---
+    jeton_fichier = os.path.join(MODELES, "huggingface", "token")
+    jeton_var = tk.StringVar(value="")
+    file_compte = queue.Queue()
+
+    bandeau_hf = ttk.Frame(fenetre, padding=(10, 8, 10, 0))
+    bandeau_hf.pack(side="top", fill="x", before=cadre)
+    ttk.Label(bandeau_hf, text="Jeton Hugging Face :").pack(side="left")
+    ttk.Entry(bandeau_hf, textvariable=jeton_var, width=40, show="*").pack(side="left", padx=5)
+    etiquette_compte = ttk.Label(bandeau_hf, text="non connecte")
+    etiquette_compte.pack(side="left", padx=5)
+
+    def verifier_compte(jeton):
+        """Demande a Hugging Face le pseudo lie au jeton (en arriere-plan)."""
+        def travail():
+            file_compte.put("verification...")
+            env = env_ia()
+            env["HF_TOKEN"] = jeton
+            py = venv_sf3d_python() if os.path.isfile(venv_sf3d_python()) else venv_python()
+            try:
+                res = subprocess.run([py, "-c", "from huggingface_hub import whoami; print(whoami()['name'])"],
+                                     env=env, capture_output=True, text=True, timeout=90)
+                if res.returncode == 0 and res.stdout.strip():
+                    file_compte.put("connecte : " + res.stdout.strip().splitlines()[-1])
+                else:
+                    file_compte.put("jeton refuse")
+            except Exception as erreur:
+                file_compte.put("erreur : %s" % erreur)
+        threading.Thread(target=travail, daemon=True).start()
+
+    def connecter_hf():
+        jeton = jeton_var.get().strip()
+        if not jeton:
+            etiquette_compte.config(text="colle ton jeton")
+            return
+        os.makedirs(os.path.dirname(jeton_fichier), exist_ok=True)
+        with open(jeton_fichier, "w", encoding="utf-8") as f:
+            f.write(jeton)
+        jeton_var.set("")
+        verifier_compte(jeton)
+
+    ttk.Button(bandeau_hf, text="Connecter", command=connecter_hf).pack(side="left", padx=5)
+
+    def poll_compte():
+        try:
+            while True:
+                etiquette_compte.config(text=file_compte.get_nowait())
+        except queue.Empty:
+            pass
+        fenetre.after(200, poll_compte)
+
+    # Au demarrage : reprend le jeton deja enregistre (dossier IA ou cache par defaut du CLI)
+    cache_defaut = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "token")
+    if not os.path.isfile(jeton_fichier) and os.path.isfile(cache_defaut):
+        os.makedirs(os.path.dirname(jeton_fichier), exist_ok=True)
+        shutil.copyfile(cache_defaut, jeton_fichier)
+    if os.path.isfile(jeton_fichier):
+        with open(jeton_fichier, encoding="utf-8") as f:
+            verifier_compte(f.read().strip())
+    fenetre.after(200, poll_compte)
+
     ttk.Label(cadre, text="Photo de l'objet :").grid(row=0, column=0, sticky="w")
     ttk.Entry(cadre, textvariable=etat["photo"], width=60).grid(row=0, column=1, sticky="we", padx=5)
     bouton_photo = ttk.Button(cadre, text="Choisir...",
