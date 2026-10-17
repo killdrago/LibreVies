@@ -1577,6 +1577,197 @@ def assembler(args):
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
 
 
+EDITION_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>LibreVies - edition 3D</title>
+<style>
+body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
+#scene { width: 800px; height: 520px; border: 2px solid #777; display: inline-block; vertical-align: top; }
+#panneau { display: inline-block; vertical-align: top; margin-left: 14px; width: 280px; }
+button { font-size: 14px; padding: 6px 10px; margin: 2px; }
+.liste button { display: block; width: 100%; text-align: left; }
+.actif { background: #9cf !important; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<h3>Edition 3D : placer les pieces avant le fichier final</h3>
+<p>Clique une piece dans la liste pour la selectionner. Choisis le mode (deplacer, redimensionner, tourner),
+puis manipule la piece dans la fenetre. Glisse la souris dans le vide pour tourner la vue.
+Quand tout est en place, clique sur « Valider ».</p>
+<div id="scene"></div>
+<div id="panneau">
+  <div class="liste" id="liste"></div>
+  <p>Mode :
+    <button id="m_translate">Deplacer</button>
+    <button id="m_scale">Redimensionner</button>
+    <button id="m_rotate">Tourner</button></p>
+  <p>Taille de la piece selectionnee : <input type="range" id="taille" min="10" max="300" value="100" disabled>
+    <span id="taillev">100</span> %</p>
+  <p>Dimensions : <span id="dims">-</span></p>
+  <p>
+    <button id="ok">Valider et creer le modele final</button>
+    <button id="annuler">Annuler</button>
+  </p>
+  <p id="etat"></p>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+const PIECES = __PIECES__;
+
+const LARG = 800, HAUT = 520;
+const rendu = new THREE.WebGLRenderer({ antialias: true });
+rendu.setSize(LARG, HAUT);
+document.getElementById('scene').appendChild(rendu.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe8e8e8);
+const camera = new THREE.PerspectiveCamera(45, LARG / HAUT, 0.001, 100);
+camera.position.set(0.6, 0.5, 0.8);
+camera.lookAt(0, 0.1, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 2.0));
+const lumiere = new THREE.DirectionalLight(0xffffff, 1.5);
+lumiere.position.set(1, 2, 1);
+scene.add(lumiere);
+scene.add(new THREE.GridHelper(1.0, 20));
+const orbite = new OrbitControls(camera, rendu.domElement);
+orbite.target.set(0, 0.1, 0);
+const transf = new TransformControls(camera, rendu.domElement);
+transf.addEventListener('dragging-changed', e => { orbite.enabled = !e.value; });
+transf.addEventListener('objectChange', majDims);
+scene.add(transf);
+
+const groupes = [];
+let courant = -1;
+const etat = document.getElementById('etat');
+
+function majDims() {
+  if (courant < 0) return;
+  const g = groupes[courant].groupe;
+  const boite = new THREE.Box3().setFromObject(g);
+  const t = boite.getSize(new THREE.Vector3());
+  document.getElementById('dims').textContent =
+    (t.x * 100).toFixed(1) + ' x ' + (t.y * 100).toFixed(1) + ' x ' + (t.z * 100).toFixed(1) + ' cm';
+  document.getElementById('taille').value = Math.round(g.scale.x * 100);
+  document.getElementById('taillev').textContent = Math.round(g.scale.x * 100);
+}
+
+function selectionner(i) {
+  courant = i;
+  transf.attach(groupes[i].groupe);
+  groupes.forEach((p, k) => p.bouton.classList.toggle('actif', k === i));
+  document.getElementById('taille').disabled = false;
+  majDims();
+}
+
+function setMode(m) {
+  transf.setMode(m);
+  ['m_translate', 'm_scale', 'm_rotate'].forEach(id =>
+    document.getElementById(id).classList.toggle('actif', id === 'm_' + m));
+}
+document.getElementById('m_translate').onclick = () => setMode('translate');
+document.getElementById('m_scale').onclick = () => setMode('scale');
+document.getElementById('m_rotate').onclick = () => setMode('rotate');
+setMode('translate');
+
+document.getElementById('taille').oninput = (e) => {
+  if (courant < 0) return;
+  const v = parseFloat(e.target.value) / 100;
+  groupes[courant].groupe.scale.setScalar(v);
+  document.getElementById('taillev').textContent = e.target.value;
+  majDims();
+};
+
+async function charger() {
+  const chargeur = new GLTFLoader();
+  let decalage = 0;
+  for (let i = 0; i < PIECES.length; i++) {
+    const p = PIECES[i];
+    etat.textContent = 'Chargement de ' + p.nom + '...';
+    const gltf = await chargeur.loadAsync(p.url);
+    const groupe = new THREE.Group();
+    groupe.add(gltf.scene);
+    scene.add(groupe);
+    groupe.updateMatrixWorld(true);
+    const boite = new THREE.Box3().setFromObject(groupe);
+    const taille = boite.getSize(new THREE.Vector3());
+    // Pose initiale : pieces cote a cote, posees sur le sol
+    groupe.position.set(decalage - boite.min.x, -boite.min.y, -(boite.min.z + boite.max.z) / 2);
+    decalage += taille.x + 0.02;
+    const bouton = document.createElement('button');
+    bouton.textContent = p.nom;
+    const indice = i;
+    bouton.onclick = () => selectionner(indice);
+    document.getElementById('liste').appendChild(bouton);
+    groupes.push({ nom: p.nom, groupe, bouton });
+  }
+  etat.textContent = PIECES.length + ' piece(s) chargee(s). Selectionne une piece.';
+  if (groupes.length) selectionner(0);
+}
+
+document.getElementById('ok').onclick = async () => {
+  scene.updateMatrixWorld(true);
+  const pieces = groupes.map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray() }));
+  etat.textContent = 'Envoi...';
+  const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ pieces: pieces }) });
+  etat.textContent = rep.ok ? 'Valide. Tu peux fermer cette page.' : 'Erreur d envoi.';
+};
+document.getElementById('annuler').onclick = async () => {
+  await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ annule: true }) });
+  etat.textContent = 'Annule. Tu peux fermer cette page.';
+};
+
+function boucle() {
+  requestAnimationFrame(boucle);
+  orbite.update();
+  rendu.render(scene, camera);
+}
+boucle();
+charger().catch(err => { etat.textContent = 'Erreur de chargement : ' + err; });
+</script>
+</body>
+</html>
+"""
+
+
+def editer_3d(args):
+    """Applique les positions/tailles choisies sur la page d'edition et ecrit <nom>_edite.glb."""
+    import json
+    import numpy as np
+    import trimesh
+    with open(args.entrees_fichier, encoding="utf-8") as f:
+        donnees = json.load(f)
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    combine = trimesh.Scene()
+    for k, p in enumerate(donnees["pieces"]):
+        sc = trimesh.load(p["fichier"], force="scene")
+        # three.js : matrice en ordre colonne par colonne
+        M = np.array(p["matrice"], dtype=float).reshape(4, 4).T
+        for node in sc.graph.nodes_geometry:
+            T, nom_geom = sc.graph[node]
+            g = sc.geometry[nom_geom].copy()
+            g.apply_transform(M @ T)
+            combine.add_geometry(g, node_name="p%d_%s" % (k, node))
+        print("Piece %d placee : %s" % (k + 1, p.get("nom", "")), flush=True)
+    chemin = os.path.join(dossier, args.nom + "_edite.glb")
+    combine.export(chemin)
+    etendue = (combine.bounds[1] - combine.bounds[0]) * 100
+    print("Modele final : " + chemin, flush=True)
+    print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
+
+
 PLACEMENT_HTML = r"""<!doctype html>
 <html lang="fr">
 <head>
@@ -2991,6 +3182,50 @@ def interface():
     ttk.Button(cadre, text="Ouvrir le dossier des sorties",
                command=lambda: ouvrir_sorties()).grid(row=5, column=2, sticky="e")
 
+    def ouvrir_edition_3d():
+        import json
+        from tkinter import simpledialog
+        chemins = filedialog.askopenfilenames(parent=fenetre, title="Pieces 3D a placer",
+                                              initialdir=SORTIES,
+                                              filetypes=[("Modeles 3D", "*.glb"), ("Tous", "*.*")])
+        if not chemins:
+            return
+        nom = simpledialog.askstring("Edition 3D", "Nom du modele final (sans espace) :",
+                                     parent=fenetre, initialvalue="scene")
+        if not nom or " " in nom.strip():
+            log("Edition 3D annulee : nom vide ou avec espace.")
+            return
+        nom = nom.strip()
+
+        def travail():
+            pieces_js = [{"nom": os.path.basename(c), "url": "/piece/%d.glb" % i}
+                         for i, c in enumerate(chemins)]
+            fichiers = {"/piece/%d.glb" % i: c for i, c in enumerate(chemins)}
+            page = EDITION_HTML.replace("__PIECES__", json.dumps(pieces_js))
+            log("=== Edition 3D : placez les pieces dans la fenetre du navigateur ===")
+            res = lancer_page(page, fichiers, log, delai=3600)
+            if not res or res.get("annule") or not res.get("pieces"):
+                log("Edition 3D annulee.")
+                return
+            dossier = os.path.join(SORTIES, nom)
+            os.makedirs(dossier, exist_ok=True)
+            entrees = os.path.join(dossier, nom + "_placement.json")
+            donnees = {"pieces": [{"fichier": c, "nom": os.path.basename(c),
+                                   "matrice": p["matrice"]}
+                                  for c, p in zip(chemins, res["pieces"])]}
+            with open(entrees, "w", encoding="utf-8") as f:
+                json.dump(donnees, f)
+            cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--editer-3d",
+                   "--entrees-fichier", entrees, "--nom", nom]
+            code = executer_worker(cmd, log)
+            log("=== Fini : " + os.path.join(dossier, nom + "_edite.glb") + " ===" if code == 0
+                else "=== ECHEC edition 3D : voir le journal ===")
+
+        threading.Thread(target=travail, daemon=True).start()
+
+    ttk.Button(cadre, text="Edition 3D : placer les pieces...",
+               command=ouvrir_edition_3d).grid(row=7, column=0, columnspan=3, sticky="w", pady=(6, 0))
+
     journal = tk.Text(cadre, height=20, wrap="word")
     journal.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
     cadre.columnconfigure(1, weight=1)
@@ -3144,6 +3379,8 @@ def main():
         parseur.add_argument("--garder-fond", action="store_true")
         parseur.add_argument("--generer-image", action="store_true")
         parseur.add_argument("--ajouter-ailes", action="store_true")
+        parseur.add_argument("--editer-3d", action="store_true")
+        parseur.add_argument("--entrees-fichier", default="")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
         parseur.add_argument("--redresser", action="store_true")
@@ -3157,6 +3394,9 @@ def main():
             sys.exit(redresser_fichier(args))
         if args.moteur == "sf3d":
             generer_sf3d(args)
+            return
+        if args.editer_3d:
+            editer_3d(args)
             return
         if args.ajouter_ailes:
             ajouter_ailes_fichier(args)
