@@ -1761,11 +1761,39 @@ def editer_3d(args):
             g.apply_transform(M @ T)
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
         print("Piece %d placee : %s" % (k + 1, p.get("nom", "")), flush=True)
-    chemin = os.path.join(dossier, args.nom + "_edite.glb")
+    chemin = os.path.join(dossier, args.nom + ".glb")
     combine.export(chemin)
     etendue = (combine.bounds[1] - combine.bounds[0]) * 100
     print("Modele final : " + chemin, flush=True)
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
+
+
+def lancer_edition(chemins, nom, log, noms=None, delai=3600):
+    """Ouvre la page d'edition 3D avec les pieces, puis ecrit le modele final <nom>.glb.
+    Renvoie True si le modele a ete cree."""
+    import json
+    noms = noms or [os.path.basename(c) for c in chemins]
+    pieces_js = [{"nom": n, "url": "/piece/%d.glb" % i} for i, n in enumerate(noms)]
+    fichiers = {"/piece/%d.glb" % i: c for i, c in enumerate(chemins)}
+    page = EDITION_HTML.replace("__PIECES__", json.dumps(pieces_js))
+    log("=== Edition 3D : placez, agrandissez ou reduisez les pieces dans le navigateur ===")
+    res = lancer_page(page, fichiers, log, delai=delai)
+    if not res or res.get("annule") or not res.get("pieces"):
+        log("Edition 3D annulee : rien n'a ete cree.")
+        return False
+    dossier = os.path.join(SORTIES, nom)
+    os.makedirs(dossier, exist_ok=True)
+    entrees = os.path.join(dossier, nom + "_placement.json")
+    donnees = {"pieces": [{"fichier": c, "nom": n, "matrice": p["matrice"]}
+                          for c, n, p in zip(chemins, noms, res["pieces"])]}
+    with open(entrees, "w", encoding="utf-8") as f:
+        json.dump(donnees, f)
+    cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--editer-3d",
+           "--entrees-fichier", entrees, "--nom", nom]
+    code = executer_worker(cmd, log)
+    log("=== Fini : " + os.path.join(dossier, nom + ".glb") + " ===" if code == 0
+        else "=== ECHEC edition 3D : voir le journal ===")
+    return code == 0
 
 
 PLACEMENT_HTML = r"""<!doctype html>
@@ -2925,6 +2953,10 @@ def interface():
                                         "taille": None if piece["relation"] == "sur" and k > 1
                                         else piece["taille"],
                                         "relation": piece["relation"]})
+                    if len(entrees) >= 2:
+                        lancer_edition([e["fichier"] for e in entrees], base, log,
+                                       noms=[pc["nom"] for pc in pieces])
+                        return
                     for k in range(1, len(pieces)):
                         if pieces[k]["relation"] != "sur":
                             continue
@@ -3198,28 +3230,7 @@ def interface():
         nom = nom.strip()
 
         def travail():
-            pieces_js = [{"nom": os.path.basename(c), "url": "/piece/%d.glb" % i}
-                         for i, c in enumerate(chemins)]
-            fichiers = {"/piece/%d.glb" % i: c for i, c in enumerate(chemins)}
-            page = EDITION_HTML.replace("__PIECES__", json.dumps(pieces_js))
-            log("=== Edition 3D : placez les pieces dans la fenetre du navigateur ===")
-            res = lancer_page(page, fichiers, log, delai=3600)
-            if not res or res.get("annule") or not res.get("pieces"):
-                log("Edition 3D annulee.")
-                return
-            dossier = os.path.join(SORTIES, nom)
-            os.makedirs(dossier, exist_ok=True)
-            entrees = os.path.join(dossier, nom + "_placement.json")
-            donnees = {"pieces": [{"fichier": c, "nom": os.path.basename(c),
-                                   "matrice": p["matrice"]}
-                                  for c, p in zip(chemins, res["pieces"])]}
-            with open(entrees, "w", encoding="utf-8") as f:
-                json.dump(donnees, f)
-            cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--editer-3d",
-                   "--entrees-fichier", entrees, "--nom", nom]
-            code = executer_worker(cmd, log)
-            log("=== Fini : " + os.path.join(dossier, nom + "_edite.glb") + " ===" if code == 0
-                else "=== ECHEC edition 3D : voir le journal ===")
+            lancer_edition(chemins, nom, log)
 
         threading.Thread(target=travail, daemon=True).start()
 
