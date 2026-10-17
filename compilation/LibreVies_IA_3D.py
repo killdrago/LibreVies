@@ -1806,6 +1806,76 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
     return code == 0
 
 
+CHAT_QUEUE = queue.Queue()
+
+
+def apercu_3d(args):
+    """Ecrit <modele>_apercu.png : vue rapide du modele (couleurs et ombrage)."""
+    import numpy as np
+    import trimesh
+    from PIL import Image, ImageDraw
+    sc = trimesh.load(args.image, force="scene")
+    m = sc.dump(concatenate=True)
+    V = np.asarray(m.vertices, dtype=float)
+    F = np.asarray(m.faces)
+    if len(F) == 0:
+        raise SystemExit("modele vide : apercu impossible")
+    try:
+        couleurs = np.asarray(m.visual.to_color().face_colors[:, :3], dtype=float)
+    except Exception:
+        couleurs = np.tile(np.array([190.0, 170.0, 140.0]), (len(F), 1))
+    N = np.asarray(m.face_normals, dtype=float)
+    V = V - (V.min(0) + V.max(0)) / 2.0
+    a, b = np.radians(-35.0), np.radians(-15.0)
+    Ry = np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
+    Rx = np.array([[1, 0, 0], [0, np.cos(b), -np.sin(b)], [0, np.sin(b), np.cos(b)]])
+    R = Rx @ Ry
+    P = V @ R.T
+    N = N @ R.T
+    if len(F) > 60000:
+        idx = np.random.default_rng(0).choice(len(F), 60000, replace=False)
+        F, couleurs, N = F[idx], couleurs[idx], N[idx]
+    W, H = 720, 540
+    etendue = P[:, :2].max(0) - P[:, :2].min(0)
+    echelle = 0.85 * min(W / max(etendue[0], 1e-9), H / max(etendue[1], 1e-9))
+    XY = np.stack([W / 2 + P[:, 0] * echelle, H / 2 - P[:, 1] * echelle], 1)
+    lum = np.array([0.3, 0.5, 1.0])
+    lum = lum / np.linalg.norm(lum)
+    ombre = 0.4 + 0.6 * np.abs(N @ lum)
+    ordre = np.argsort(P[F].mean(1)[:, 2])  # du plus loin au plus proche
+    img = Image.new("RGB", (W, H), (232, 232, 232))
+    dessin = ImageDraw.Draw(img)
+    for i in ordre:
+        pts = [tuple(p) for p in XY[F[i]]]
+        c = tuple(int(min(255, x * ombre[i])) for x in couleurs[i])
+        dessin.polygon(pts, fill=c)
+    chemin = os.path.splitext(args.image)[0] + "_apercu.png"
+    img.save(chemin)
+    print("Apercu : " + chemin, flush=True)
+
+
+def apres_generation(glbs, nom_final, log, noms):
+    """Apres la generation : montre l'apercu de chaque piece dans l'assistant,
+    puis ouvre l'edition 3D avant l'enregistrement du modele final."""
+    for glb, nom in zip(glbs, noms):
+        if not os.path.isfile(glb):
+            log("Fichier introuvable : " + glb)
+            continue
+        cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--apercu-3d",
+               "--image", glb, "--nom", nom, "--taille", "0"]
+        png = os.path.splitext(glb)[0] + "_apercu.png"
+        if executer_worker(cmd, log) == 0 and os.path.isfile(png):
+            CHAT_QUEUE.put(("image", png, "Apercu : " + nom))
+        else:
+            CHAT_QUEUE.put(("msg", "Apercu indisponible pour '%s' (voir le journal)." % nom))
+    CHAT_QUEUE.put(("msg", "edition 3D avant l'enregistrement de '%s' : placez, agrandissez ou "
+                           "reduisez les pieces, puis validez." % nom_final))
+    if lancer_edition(glbs, nom_final, log, noms=noms):
+        CHAT_QUEUE.put(("msg", "modele final enregistre : sorties\\%s\\%s.glb" % (nom_final, nom_final)))
+    else:
+        CHAT_QUEUE.put(("msg", "edition annulee : rien n'a ete enregistre pour '%s'." % nom_final))
+
+
 PLACEMENT_HTML = r"""<!doctype html>
 <html lang="fr">
 <head>
@@ -2502,7 +2572,7 @@ def interface():
         entree = ttk.Entry(fenetre_chat, textvariable=saisie, width=70)
         entree.pack(side="left", fill="x", expand=True, padx=(8, 4), pady=(0, 8))
         contexte = {"texte": "", "choix": None, "params": None, "attente": None, "pieces": None, "i": 0}
-        file_chat = queue.Queue()
+        file_chat = CHAT_QUEUE
 
         def afficher(msg):
             historique.config(state="normal")
@@ -2556,6 +2626,8 @@ def interface():
                     if code == 0:
                         ecrire_credits(nom, choisi)
                         log("Source et licence enregistrees dans sorties\\" + nom + "\\source.txt")
+                    if code == 0:
+                        apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom])
                     log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
                 except Exception as exc:
                     log("ERREUR : " + str(exc))
@@ -2587,6 +2659,7 @@ def interface():
                         log("Modele 3D deja fait, copie : " + cible_glb)
                         if params.get("ailes_a_ajouter"):
                             ajouter_ailes(params, nom, log)
+                        apres_generation([cible_glb], nom, log, [nom])
                         return
                     os.makedirs(os.path.join(IA, "images"), exist_ok=True)
                     ext = os.path.splitext(chemin)[1].lower() or ".png"
@@ -2602,6 +2675,8 @@ def interface():
                         lancer_redressement(nom, nom, log)
                     if code == 0 and params.get("ailes_a_ajouter"):
                         ajouter_ailes(params, nom, log)
+                    if code == 0:
+                        apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom])
                     log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
                 except Exception as exc:
                     log("ERREUR : " + str(exc))
@@ -2963,9 +3038,9 @@ def interface():
                                         "taille": None if piece["relation"] == "sur" and k > 1
                                         else piece["taille"],
                                         "relation": piece["relation"]})
-                    if len(entrees) >= 2:
-                        lancer_edition([e["fichier"] for e in entrees], base, log,
-                                       noms=[pc["nom"] for pc in pieces])
+                    if entrees:
+                        apres_generation([e["fichier"] for e in entrees], base, log,
+                                         noms=[pc["nom"] for pc in pieces])
                         return
                     for k in range(1, len(pieces)):
                         if pieces[k]["relation"] != "sur":
@@ -3160,6 +3235,18 @@ def interface():
                     item = file_chat.get_nowait()
                     if item[0] == "msg":
                         afficher("Assistant : " + item[1])
+                    elif item[0] == "image":
+                        afficher("Assistant : " + item[2])
+                        try:
+                            photo = tk.PhotoImage(file=item[1])
+                            contexte.setdefault("photos", []).append(photo)
+                            historique.config(state="normal")
+                            historique.image_create("end", image=photo)
+                            historique.insert("end", "\n")
+                            historique.see("end")
+                            historique.config(state="disabled")
+                        except tk.TclError as exc:
+                            afficher("Apercu impossible a afficher : " + str(exc))
                     elif item[0] == "reattendre":
                         contexte["attente"] = "source_piece"
                     elif item[0] == "choix_piece":
@@ -3214,6 +3301,8 @@ def interface():
             for ligne in proc.stdout:
                 log(ligne.rstrip())
             code = proc.wait()
+            if code == 0:
+                apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom])
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
 
         threading.Thread(target=travail, daemon=True).start()
@@ -3401,6 +3490,7 @@ def main():
         parseur.add_argument("--generer-image", action="store_true")
         parseur.add_argument("--ajouter-ailes", action="store_true")
         parseur.add_argument("--editer-3d", action="store_true")
+        parseur.add_argument("--apercu-3d", action="store_true")
         parseur.add_argument("--entrees-fichier", default="")
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
@@ -3415,6 +3505,9 @@ def main():
             sys.exit(redresser_fichier(args))
         if args.moteur == "sf3d":
             generer_sf3d(args)
+            return
+        if args.apercu_3d:
+            apercu_3d(args)
             return
         if args.editer_3d:
             editer_3d(args)
