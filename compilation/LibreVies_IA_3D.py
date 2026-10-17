@@ -2516,6 +2516,12 @@ def interface():
 
     def log(msg):
         file_journal.put(str(msg))
+        try:  # copie dans un fichier, pour pouvoir relire le diagnostic apres coup
+            os.makedirs(IA, exist_ok=True)
+            with open(os.path.join(IA, "journal_LibreVies.txt"), "a", encoding="utf-8") as f:
+                f.write(time.strftime("%H:%M:%S") + "  " + str(msg) + "\n")
+        except OSError:
+            pass
 
     etat = {"pret": False, "photo": tk.StringVar(value=""), "nom": tk.StringVar(value="objet"),
             "taille": tk.StringVar(value="30"), "mc": tk.StringVar(value="256"),
