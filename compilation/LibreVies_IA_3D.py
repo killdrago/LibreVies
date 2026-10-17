@@ -1718,7 +1718,7 @@ document.getElementById('appliquer_couleur').onclick = () => {
     p.groupe.traverse(o => {
       if (o.isMesh) {
         if (o.userData.matOrig === undefined) o.userData.matOrig = o.material;
-        o.material = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.6, metalness: 0.0 });
+        o.material = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide });
       }
     });
     p.couleur = hex;
@@ -1749,6 +1749,12 @@ async function charger() {
     const gltf = await chargeur.loadAsync(p.url);
     const groupe = new THREE.Group();
     groupe.add(gltf.scene);
+    gltf.scene.traverse(o => {
+      if (o.isMesh) {
+        o.material = o.material.clone();
+        o.material.side = THREE.DoubleSide;
+      }
+    });
     ensemble.add(groupe);
     groupe.updateMatrixWorld(true);
     const boite = new THREE.Box3().setFromObject(groupe);
