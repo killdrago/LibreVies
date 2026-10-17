@@ -1955,9 +1955,15 @@ def apercu_3d(args):
     print("Apercu : " + chemin, flush=True)
 
 
-def apres_generation(glbs, nom_final, log, noms):
-    """Apres la generation : montre l'apercu de chaque piece dans l'assistant,
+def apres_generation(glbs, nom_final, log, noms, dans_chat=True):
+    """Apres la generation : montre l'apercu de chaque piece (assistant ou journal),
     puis ouvre l'edition 3D avant l'enregistrement du modele final."""
+    def dire(msg):
+        if dans_chat:
+            CHAT_QUEUE.put(("msg", msg))
+        else:
+            log(msg)
+
     for glb, nom in zip(glbs, noms):
         if not os.path.isfile(glb):
             log("Fichier introuvable : " + glb)
@@ -1966,15 +1972,18 @@ def apres_generation(glbs, nom_final, log, noms):
                "--image", glb, "--nom", nom, "--taille", "0"]
         png = os.path.splitext(glb)[0] + "_apercu.png"
         if executer_worker(cmd, log) == 0 and os.path.isfile(png):
-            CHAT_QUEUE.put(("image", png, "Apercu : " + nom))
+            if dans_chat:
+                CHAT_QUEUE.put(("image", png, "Apercu : " + nom))
+            else:
+                log("Apercu : " + png)
         else:
-            CHAT_QUEUE.put(("msg", "Apercu indisponible pour '%s' (voir le journal)." % nom))
-    CHAT_QUEUE.put(("msg", "edition 3D avant l'enregistrement de '%s' : placez, agrandissez ou "
-                           "reduisez les pieces, puis validez." % nom_final))
+            dire("Apercu indisponible pour '%s' (voir le journal)." % nom)
+    dire("edition 3D avant l'enregistrement de '%s' : placez, agrandissez ou "
+         "reduisez les pieces, puis validez." % nom_final)
     if lancer_edition(glbs, nom_final, log, noms=noms):
-        CHAT_QUEUE.put(("msg", "modele final enregistre : sorties\\%s\\%s.glb" % (nom_final, nom_final)))
+        dire("modele final enregistre : sorties\\%s\\%s.glb" % (nom_final, nom_final))
     else:
-        CHAT_QUEUE.put(("msg", "edition annulee : rien n'a ete enregistre pour '%s'." % nom_final))
+        dire("edition annulee : rien n'a ete enregistre pour '%s'." % nom_final)
 
 
 PLACEMENT_HTML = r"""<!doctype html>
@@ -3495,7 +3504,8 @@ def interface():
             log("=== Generation de '" + nom + "' ===")
             code = lancer_generation(cmd, log)
             if code == 0:
-                lancer_redressement(nom, nom, log)
+                apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom],
+                                 dans_chat=False)
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
             file_journal.put(("FIN", code))
 
