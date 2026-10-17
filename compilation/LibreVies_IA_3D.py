@@ -2177,7 +2177,7 @@ def interface():
     ttk.Button(cadre_moteur, text="Installer Stable Fast 3D", command=installer_sf3d_fenetre).pack(side="left", padx=4)
 
     cadre_cpu = ttk.Frame(cadre)
-    cadre_cpu.grid(row=3, column=2, sticky="w", padx=5)
+    cadre_cpu.grid(row=4, column=0, sticky="w", pady=4)
     ttk.Label(cadre_cpu, text="Limite processeur :").pack(side="left")
     etat["limite_cpu"] = tk.IntVar(value=100)
     etiquette_cpu = ttk.Label(cadre_cpu, text="100 %", width=6)
