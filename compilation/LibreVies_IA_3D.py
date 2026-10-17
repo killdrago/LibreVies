@@ -56,6 +56,7 @@ PAQUETS = [
     "imageio",
     "imageio-ffmpeg",
     "safetensors",
+    "psutil",
 ]
 
 # Generation d'image locale (processeur, sans carte NVIDIA) : SDXL-Turbo, telecharge au premier usage.
@@ -114,7 +115,7 @@ def lancer(cmd, log, cwd=None):
 def paquets_presents(log=None):
     """Vrai si tous les modules importants sont deja installes dans l'environnement IA.
     En cas d'echec, la fin de l'erreur d'import est envoyee au journal."""
-    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers; assert diffusers.__version__ == \"0.35.2\""
+    test = "import torch, torchvision, trimesh, rembg, skimage, transformers, einops, omegaconf, PIL, xatlas, diffusers, psutil; assert diffusers.__version__ == \"0.35.2\""
     proc = subprocess.run([venv_python(), "-c", test], env=env_ia(),
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 and log:
@@ -914,6 +915,148 @@ def generer_detourage(args):
     print("Detourage pret (apercu). Verifiez-le avant la fabrication 3D.", flush=True)
 
 
+SF3D_DEPOT = "https://codeload.github.com/Stability-AI/stable-fast-3d/zip/refs/heads/main"
+SF3D_DIR = os.path.join(IA, "stable-fast-3d")
+VENV_SF3D = os.path.join(IA, "venv_sf3d")
+MOTEUR_FICHIER = "moteur.txt"
+
+
+def venv_sf3d_python():
+    if os.name == "nt":
+        return os.path.join(VENV_SF3D, "Scripts", "python.exe")
+    return os.path.join(VENV_SF3D, "bin", "python")
+
+
+def sf3d_installe():
+    return os.path.isfile(venv_sf3d_python()) and os.path.isfile(os.path.join(SF3D_DIR, "run.py"))
+
+
+def moteur_actif():
+    """'sf3d' ou 'triposr' (choix du menu deroulant, enregistre dans IA/moteur.txt)."""
+    try:
+        with open(os.path.join(IA, MOTEUR_FICHIER), encoding="utf-8") as f:
+            valeur = f.read().strip()
+            return valeur if valeur in ("sf3d", "triposr") else "sf3d"
+    except OSError:
+        return "sf3d"
+
+
+def ecrire_moteur(valeur):
+    os.makedirs(IA, exist_ok=True)
+    with open(os.path.join(IA, MOTEUR_FICHIER), "w", encoding="utf-8") as f:
+        f.write(valeur)
+
+
+def installer_sf3d(log):
+    """Installe Stable Fast 3D dans IA\\venv_sf3d. Renvoie 0 si tout est en place."""
+    os.makedirs(IA, exist_ok=True)
+    if not os.path.isfile(os.path.join(SF3D_DIR, "run.py")):
+        zip_chemin = os.path.join(IA, "stable-fast-3d.zip")
+        log("Telechargement du code de Stable Fast 3D...")
+        try:
+            urllib.request.urlretrieve(SF3D_DEPOT, zip_chemin)
+        except OSError as erreur:
+            log("ECHEC du telechargement : " + str(erreur))
+            return 1
+        with zipfile.ZipFile(zip_chemin) as z:
+            z.extractall(IA)
+        extrait = os.path.join(IA, "stable-fast-3d-main")
+        if os.path.isdir(SF3D_DIR):
+            shutil.rmtree(SF3D_DIR)
+        os.rename(extrait, SF3D_DIR)
+    if not os.path.isfile(venv_sf3d_python()):
+        log("Creation de l'environnement IA\\venv_sf3d...")
+        if lancer([sys.executable, "-m", "venv", VENV_SF3D], log) != 0:
+            log("ECHEC : creation de l'environnement impossible.")
+            return 1
+    py = venv_sf3d_python()
+    etapes = [
+        [py, "-m", "pip", "install", "-U", "pip"],
+        [py, "-m", "pip", "install", "setuptools==69.5.1", "wheel"],
+        [py, "-m", "pip", "install", "torch", "torchvision"],
+        [py, "-m", "pip", "install", "einops==0.7.0", "jaxtyping==0.2.31", "omegaconf==2.3.0",
+         "transformers==4.42.3", "open_clip_torch==2.24.0", "trimesh==4.4.1", "numpy==1.26.4",
+         "huggingface-hub==0.23.4", "rembg==2.0.57", "onnxruntime", "pynanoinstantmeshes==0.0.3",
+         "gpytoolbox==0.2.0", "pillow", "tqdm", "imageio", "scipy"],
+        [py, "-m", "pip", "install", "--no-build-isolation", os.path.join(SF3D_DIR, "texture_baker")],
+        [py, "-m", "pip", "install", "--no-build-isolation", os.path.join(SF3D_DIR, "uv_unwrapper")],
+    ]
+    for etape in etapes:
+        if lancer(etape, log) != 0:
+            log("=== ECHEC de l'installation de Stable Fast 3D : voir le journal ===")
+            if "texture_baker" in etape or "uv_unwrapper" in etape:
+                log("Les extensions C++ demandent les outils de build C++ de Visual Studio 2022 (sous Windows).")
+            return 1
+    log("Installation de Stable Fast 3D terminee.")
+    log("Derniere etape (une seule fois) : demande l'acces sur https://huggingface.co/stabilityai/stable-fast-3d")
+    log("puis, dans une invite de commandes : IA\\venv_sf3d\\Scripts\\huggingface-cli login (colle ton jeton la-bas).")
+    return 0
+
+
+def generer_sf3d(args):
+    """Modele depuis une photo avec Stable Fast 3D. Le modele fournit deja sa texture (UV) : pas de recoloration."""
+    os.environ.update(env_ia())
+    sys.path.insert(0, SF3D_DIR)
+    import torch
+    import rembg
+    from PIL import Image
+    from sf3d.system import SF3D
+    from sf3d.utils import remove_background, resize_foreground
+
+    debut = time.time()
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    if device == "cpu":
+        os.environ["SF3D_USE_CPU"] = "1"
+    torch.set_num_threads(os.cpu_count() or 4)
+    print("Calcul sur : " + device + " (" + str(torch.get_num_threads()) + " threads)", flush=True)
+    print("Chargement de Stable Fast 3D (premiere fois : telechargement)...", flush=True)
+    model = SF3D.from_pretrained("stabilityai/stable-fast-3d", config_name="config.yaml",
+                                 weight_name="model.safetensors")
+    model.to(device)
+    model.eval()
+    session = rembg.new_session()
+    image = remove_background(Image.open(args.image).convert("RGBA"), session)
+    image = resize_foreground(image, 0.85)
+    dossier = os.path.join(SORTIES, args.nom)
+    os.makedirs(dossier, exist_ok=True)
+    image.save(os.path.join(dossier, "photo_traitee.png"))
+    print("Creation du modele 3D (processeur, patientez)...", flush=True)
+    with torch.no_grad():
+        mesh = model.run_image([image], bake_resolution=1024, remesh="none", vertex_count=-1)
+    if isinstance(mesh, (list, tuple)):
+        mesh = mesh[0]
+    bornes = mesh.bounds
+    etendue = bornes[1] - bornes[0]
+    if float(etendue.max()) <= 0:
+        raise RuntimeError("le modele genere est vide : essaie une autre photo")
+    mesh.apply_scale((args.taille / 100.0) / float(etendue.max()))
+    bornes = mesh.bounds
+    mesh.apply_translation([
+        -(bornes[0][0] + bornes[1][0]) / 2.0,
+        -bornes[0][1],
+        -(bornes[0][2] + bornes[1][2]) / 2.0,
+    ])
+    mesh.export(os.path.join(dossier, args.nom + ".glb"), include_normals=True)
+    print("Modele Stable Fast 3D : " + args.nom + ".glb", flush=True)
+    print("Termine en %d secondes." % int(time.time() - debut), flush=True)
+
+
+def lancer_generation(cmd_triposr, log):
+    """Genere depuis une photo avec le moteur choisi. Si Stable Fast 3D echoue, TripoSR prend le relais.
+    Renvoie le code de sortie."""
+    if moteur_actif() == "sf3d":
+        if sf3d_installe():
+            cmd_sf3d = [venv_sf3d_python()] + cmd_triposr[1:] + ["--moteur", "sf3d"]
+            log("=== Moteur : Stable Fast 3D ===")
+            if executer_worker(cmd_sf3d, log) == 0:
+                return 0
+            log("Stable Fast 3D a echoue : essai avec TripoSR.")
+        else:
+            log("Stable Fast 3D n'est pas installe : TripoSR est utilise. Bouton « Installer Stable Fast 3D ».")
+    log("=== Moteur : TripoSR ===")
+    return executer_worker(cmd_triposr, log)
+
+
 def generer(args):
     if args.parametrique:
         return generer_parametrique(args)
@@ -1274,7 +1417,7 @@ def ecrire_limite_cpu(valeur):
         f.write(str(max(5, min(100, int(float(valeur))))))
 
 
-def controler_cpu(pid):
+def controler_cpu(pid, parent=None):
     """Limite la charge processeur d'un processus : pause/reprise par cycles de 0,1 s.
     Avec 50 %, le processus tourne la moitie du temps. S'arrete quand le processus se termine."""
     import psutil
@@ -1291,6 +1434,12 @@ def controler_cpu(pid):
                     break
             except psutil.Error:
                 break
+            if parent is not None:
+                try:
+                    if psutil.Process(parent).status() == psutil.STATUS_ZOMBIE:
+                        break  # l'app est fermee : on enleve la limite
+                except psutil.Error:
+                    break
             limite = lire_limite_cpu()
             if limite >= 100:
                 if not actif:
@@ -1317,7 +1466,8 @@ def controler_cpu(pid):
 def demarrer_limiteur(proc):
     """Lance le limiteur (processus separe) pour le travail proc. Renvoie le processus limiteur."""
     try:
-        return subprocess.Popen([venv_python(), os.path.abspath(__file__), "--limiteur-pid", str(proc.pid)],
+        return subprocess.Popen([venv_python(), os.path.abspath(__file__), "--limiteur-pid", str(proc.pid),
+                                 "--limiteur-parent", str(os.getpid())],
                                 env=env_ia(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:
         return None
@@ -2003,6 +2153,29 @@ def interface():
                                 command=lambda: generer_modele())
     bouton_generer.grid(row=5, column=1, sticky="w", pady=8, padx=5)
 
+    cadre_moteur = ttk.Frame(cadre)
+    cadre_moteur.grid(row=4, column=2, sticky="w", padx=5)
+    ttk.Label(cadre_moteur, text="Moteur :").pack(side="left")
+    etat["moteur"] = tk.StringVar(value="Stable Fast 3D" if moteur_actif() == "sf3d" else "TripoSR")
+    ecrire_moteur("sf3d" if etat["moteur"].get() == "Stable Fast 3D" else "triposr")
+
+    def changer_moteur(_evenement=None):
+        ecrire_moteur("sf3d" if etat["moteur"].get() == "Stable Fast 3D" else "triposr")
+
+    combo_moteur = ttk.Combobox(cadre_moteur, textvariable=etat["moteur"],
+                                values=["Stable Fast 3D", "TripoSR"], width=16, state="readonly")
+    combo_moteur.pack(side="left", padx=4)
+    combo_moteur.bind("<<ComboboxSelected>>", changer_moteur)
+
+    def installer_sf3d_fenetre():
+        def travail_install():
+            installer_sf3d(log)
+
+        log("=== Installation de Stable Fast 3D (longue, patientez) ===")
+        threading.Thread(target=travail_install, daemon=True).start()
+
+    ttk.Button(cadre_moteur, text="Installer Stable Fast 3D", command=installer_sf3d_fenetre).pack(side="left", padx=4)
+
     cadre_cpu = ttk.Frame(cadre)
     cadre_cpu.grid(row=5, column=2, sticky="w", padx=5)
     ttk.Label(cadre_cpu, text="Limite processeur (%) :").pack(side="left")
@@ -2083,12 +2256,7 @@ def interface():
                            "--image", chemin, "--nom", nom,
                            "--taille", str(params["taille"]), "--mc", "256"]
                     log("=== Generation de '" + nom + "' depuis l'image ===")
-                    proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
-                                            stderr=subprocess.STDOUT, text=True,
-                                            encoding="utf-8", errors="replace")
-                    for ligne in proc.stdout:
-                        log(ligne.rstrip())
-                    code = proc.wait()
+                    code = lancer_generation(cmd, log)
                     if code == 0:
                         lancer_redressement(nom, nom, log)
                     if code == 0 and params.get("ailes_a_ajouter"):
@@ -2137,12 +2305,7 @@ def interface():
                            "--image", cible, "--nom", nom,
                            "--taille", str(params["taille"]), "--mc", "256"]
                     log("=== Generation de '" + nom + "' depuis ma bibliotheque ===")
-                    proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
-                                            stderr=subprocess.STDOUT, text=True,
-                                            encoding="utf-8", errors="replace")
-                    for ligne in proc.stdout:
-                        log(ligne.rstrip())
-                    code = proc.wait()
+                    code = lancer_generation(cmd, log)
                     if code == 0:
                         lancer_redressement(nom, nom, log)
                     if code == 0 and params.get("ailes_a_ajouter"):
@@ -2496,7 +2659,7 @@ def interface():
                                "--image", chemin, "--nom", nom,
                                "--taille", str(piece["taille"]), "--mc", "256",
                                "--deja-detoure"]
-                        if executer_worker(cmd, log) != 0:
+                        if lancer_generation(cmd, log) != 0:
                             log("=== ECHEC sur la piece %s : voir le journal ===" % piece["nom"])
                             return
                         lancer_redressement(nom, piece["nom"], log)
@@ -2815,15 +2978,7 @@ def interface():
 
         def travail():
             log("=== Generation de '" + nom + "' ===")
-            proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True,
-                                    encoding="utf-8", errors="replace")
-            limiteur = demarrer_limiteur(proc)
-            for ligne in proc.stdout:
-                log(ligne.rstrip())
-            code = proc.wait()
-            if limiteur is not None:
-                limiteur.wait()
+            code = lancer_generation(cmd, log)
             if code == 0:
                 lancer_redressement(nom, nom, log)
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
@@ -2902,7 +3057,10 @@ def interface():
 
 def main():
     if "--limiteur-pid" in sys.argv:
-        controler_cpu(int(sys.argv[sys.argv.index("--limiteur-pid") + 1]))
+        parent = None
+        if "--limiteur-parent" in sys.argv:
+            parent = int(sys.argv[sys.argv.index("--limiteur-parent") + 1])
+        controler_cpu(int(sys.argv[sys.argv.index("--limiteur-pid") + 1]), parent)
         return
     if "--worker" in sys.argv:
         parseur = argparse.ArgumentParser()
@@ -2926,6 +3084,7 @@ def main():
         parseur.add_argument("--prompt", default="")
         parseur.add_argument("--sortie-image", default="")
         parseur.add_argument("--redresser", action="store_true")
+        parseur.add_argument("--moteur", default="triposr")
         parseur.add_argument("--apercu", action="store_true")
         parseur.add_argument("--tx", type=float, default=0.0)
         parseur.add_argument("--tz", type=float, default=0.0)
@@ -2933,6 +3092,9 @@ def main():
         args.retirer_fond = not args.garder_fond
         if args.redresser:
             sys.exit(redresser_fichier(args))
+        if args.moteur == "sf3d":
+            generer_sf3d(args)
+            return
         if args.ajouter_ailes:
             ajouter_ailes_fichier(args)
             return
