@@ -1255,13 +1255,85 @@ def requete_en(nom):
     return " ".join(traduits), tuple(set(" ".join(traduits + mots).split()))
 
 
+LIMITE_CPU_FICHIER = "limite_cpu.txt"
+
+
+def lire_limite_cpu():
+    """Limite de processeur voulue (5 a 100 %), lue dans IA/limite_cpu.txt a chaque cycle."""
+    try:
+        with open(os.path.join(IA, LIMITE_CPU_FICHIER), encoding="utf-8") as f:
+            return max(5, min(100, int(float(f.read().strip()))))
+    except (OSError, ValueError):
+        return 100
+
+
+def ecrire_limite_cpu(valeur):
+    """Enregistre la limite choisie avec le curseur (le limiteur la prend en compte tout de suite)."""
+    os.makedirs(IA, exist_ok=True)
+    with open(os.path.join(IA, LIMITE_CPU_FICHIER), "w", encoding="utf-8") as f:
+        f.write(str(max(5, min(100, int(float(valeur))))))
+
+
+def controler_cpu(pid):
+    """Limite la charge processeur d'un processus : pause/reprise par cycles de 0,1 s.
+    Avec 50 %, le processus tourne la moitie du temps. S'arrete quand le processus se termine."""
+    import psutil
+    try:
+        p = psutil.Process(pid)
+    except psutil.Error:
+        return
+    cycle = 0.1
+    actif = True
+    try:
+        while True:
+            try:
+                if not p.is_running() or p.status() == psutil.STATUS_ZOMBIE:
+                    break
+            except psutil.Error:
+                break
+            limite = lire_limite_cpu()
+            if limite >= 100:
+                if not actif:
+                    p.resume()
+                    actif = True
+                time.sleep(0.2)
+                continue
+            marche = cycle * limite / 100.0
+            if not actif:
+                p.resume()
+                actif = True
+            time.sleep(marche)
+            p.suspend()
+            actif = False
+            time.sleep(cycle - marche)
+    finally:
+        try:
+            if not actif:
+                p.resume()
+        except psutil.Error:
+            pass
+
+
+def demarrer_limiteur(proc):
+    """Lance le limiteur (processus separe) pour le travail proc. Renvoie le processus limiteur."""
+    try:
+        return subprocess.Popen([venv_python(), os.path.abspath(__file__), "--limiteur-pid", str(proc.pid)],
+                                env=env_ia(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+
+
 def executer_worker(cmd, log):
     proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True,
                             encoding="utf-8", errors="replace")
+    limiteur = demarrer_limiteur(proc)
     for ligne in proc.stdout:
         log(ligne.rstrip())
-    return proc.wait()
+    code = proc.wait()
+    if limiteur is not None:
+        limiteur.wait()
+    return code
 
 
 def _points(V, M):
@@ -1930,6 +2002,24 @@ def interface():
     bouton_generer = ttk.Button(cadre, text="Generer le modele 3D", state="disabled",
                                 command=lambda: generer_modele())
     bouton_generer.grid(row=5, column=1, sticky="w", pady=8, padx=5)
+
+    cadre_cpu = ttk.Frame(cadre)
+    cadre_cpu.grid(row=5, column=2, sticky="w", padx=5)
+    ttk.Label(cadre_cpu, text="Limite processeur (%) :").pack(side="left")
+    etat["limite_cpu"] = tk.IntVar(value=100)
+    ecrire_limite_cpu(100)
+
+    def changer_limite_cpu(valeur):
+        etat["limite_cpu"].set(int(float(valeur)))
+        ecrire_limite_cpu(valeur)
+        etiquette_cpu.config(text="%d %%" % int(float(valeur)))
+
+    curseur_cpu = ttk.Scale(cadre_cpu, from_=0, to=100, orient="horizontal", length=160,
+                            command=changer_limite_cpu)
+    curseur_cpu.set(100)
+    curseur_cpu.pack(side="left", padx=4)
+    etiquette_cpu = ttk.Label(cadre_cpu, text="100 %")
+    etiquette_cpu.pack(side="left")
 
     ttk.Label(cadre, text="Ou decrire l'objet (image creee sur ce PC) :").grid(row=6, column=0, sticky="w")
     etat["description"] = tk.StringVar(value="")
@@ -2728,9 +2818,12 @@ def interface():
             proc = subprocess.Popen(cmd, env=env_ia(), stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True,
                                     encoding="utf-8", errors="replace")
+            limiteur = demarrer_limiteur(proc)
             for ligne in proc.stdout:
                 log(ligne.rstrip())
             code = proc.wait()
+            if limiteur is not None:
+                limiteur.wait()
             if code == 0:
                 lancer_redressement(nom, nom, log)
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
@@ -2808,6 +2901,9 @@ def interface():
 
 
 def main():
+    if "--limiteur-pid" in sys.argv:
+        controler_cpu(int(sys.argv[sys.argv.index("--limiteur-pid") + 1]))
+        return
     if "--worker" in sys.argv:
         parseur = argparse.ArgumentParser()
         parseur.add_argument("--worker", action="store_true")
