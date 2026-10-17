@@ -1641,10 +1641,16 @@ scene.add(lumiere);
 scene.add(new THREE.GridHelper(1.0, 20));
 const orbite = new OrbitControls(camera, rendu.domElement);
 orbite.target.set(0, 0.1, 0);
-orbite.minDistance = 0.3;
-orbite.maxDistance = 4;
-orbite.zoomSpeed = 0.2;
-orbite.enableDamping = false;
+orbite.enableZoom = false;  // zoom gere ci-dessous : 5 % par cran de molette
+rendu.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const vers = orbite.target.clone().sub(camera.position);
+  const d = vers.length();
+  const facteur = Math.exp(Math.sign(e.deltaY) * 0.05);
+  const nd = THREE.MathUtils.clamp(d * facteur, 0.3, 4);
+  vers.normalize();
+  camera.position.copy(orbite.target).addScaledVector(vers, -nd);
+}, { passive: false });
 const transf = new TransformControls(camera, rendu.domElement);
 transf.addEventListener('dragging-changed', e => { orbite.enabled = !e.value; });
 transf.addEventListener('objectChange', majDims);
