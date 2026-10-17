@@ -1824,8 +1824,9 @@ def editer_3d(args):
 
 
 def decouper_fichier(args):
-    """Worker : eclate chaque modele en parties (une par geometrie), pour les selectionner separement.
-    Lit --entrees-fichier ({"pieces": [{fichier, nom}]}) et ecrit <entrees>_parties.json."""
+    """Worker : separe les ailes du reste du modele, pour les deplacer independamment.
+    Un modele sans ailes reste un seul objet. Lit --entrees-fichier ({"pieces": [{fichier, nom}]})
+    et ecrit <entrees>_parties.json : deux objets, « <nom> » et « ailes de <nom> »."""
     import json
     import re
     import trimesh
@@ -1835,21 +1836,27 @@ def decouper_fichier(args):
     for k, p in enumerate(donnees["pieces"]):
         sc = trimesh.load(p["fichier"], force="scene")
         noeuds = list(sc.graph.nodes_geometry)
-        if len(noeuds) <= 1:
+        ailes = [n for n in noeuds if str(n).lower().startswith("ailes")]
+        corps = [n for n in noeuds if n not in ailes]
+        if not ailes or not corps:
             sortie.append({"fichier": p["fichier"], "nom": p["nom"]})
             continue
         dossier = os.path.join(os.path.dirname(p["fichier"]), "parties")
         os.makedirs(dossier, exist_ok=True)
-        for j, node in enumerate(noeuds):
-            T, nom_geom = sc.graph[node]
-            g = sc.geometry[nom_geom].copy()
-            g.apply_transform(T)
-            fichier = os.path.join(dossier, "p%d_%d_%s.glb" % (k, j, re.sub(r"\W", "_", str(node))))
-            trimesh.Scene(g).export(fichier)
-            sortie.append({"fichier": fichier, "nom": "%s : %s" % (p["nom"], node)})
+        for groupe, nom_objet, suffixe in ((corps, p["nom"], "corps"),
+                                           (ailes, "ailes de " + p["nom"], "ailes")):
+            nouvelle = trimesh.Scene()
+            for node in groupe:
+                T, nom_geom = sc.graph[node]
+                g = sc.geometry[nom_geom].copy()
+                g.apply_transform(T)
+                nouvelle.add_geometry(g, node_name=str(node))
+            fichier = os.path.join(dossier, "p%d_%s.glb" % (k, suffixe))
+            nouvelle.export(fichier)
+            sortie.append({"fichier": fichier, "nom": nom_objet})
     with open(args.entrees_fichier.replace(".json", "_parties.json"), "w", encoding="utf-8") as f:
         json.dump({"pieces": sortie}, f)
-    print("Parties : %d" % len(sortie), flush=True)
+    print("Objets : %d" % len(sortie), flush=True)
 
 
 def lancer_edition(chemins, nom, log, noms=None, delai=3600):
