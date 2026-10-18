@@ -2260,21 +2260,22 @@ VALIDATION_HTML = r"""<!doctype html>
 <title>LibreVies - detourage</title>
 <style>
 body { font-family: sans-serif; margin: 16px; background: #f2f2f2; }
-#fond { display: inline-block; padding: 0; border: 2px solid #777;
+#fond { display: block; width: 640px; height: 520px; overflow: auto; padding: 0; border: 2px solid #777; box-sizing: content-box;
   background-color: #fff;
   background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
     linear-gradient(-45deg, #ddd 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #ddd 75%),
     linear-gradient(-45deg, transparent 75%, #ddd 75%);
   background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
-#toile { display: block; max-width: 640px; height: auto; touch-action: none; cursor: crosshair; }
+#toile { display: block; max-width: none; height: auto; touch-action: none; cursor: crosshair; }
 button { font-size: 16px; padding: 8px 16px; margin: 12px 8px 0 0; }
 </style>
 </head>
 <body>
 <h3>Le detourage de « __PIECE__ » est-il correct ?</h3>
 <p>Le damier = transparent. Pour retoucher : maintenez le bouton de la souris et passez sur l'image.
- « Effacer » rend transparent, « Restaurer » remet la photo d'origine.</p>
+ « Effacer » rend transparent, « Restaurer » remet la photo d'origine.
+ <b>Molette</b> : zoom avant/arriere (au niveau du curseur). Barres de defilement pour deplacer l'image.</p>
 <div id="fond"><canvas id="toile"></canvas></div>
 <p>
   <label><input type="radio" name="outil" value="effacer" checked> Effacer</label>
@@ -2293,6 +2294,11 @@ const copieCtx = copie.getContext('2d');
 const original = new Image();
 let peint = false;
 
+let zoom = 1;
+function appliquerZoom() {
+  toile.style.width = (toile.width * zoom) + 'px';
+  toile.style.height = 'auto';
+}
 original.onload = function () {
   toile.width = original.naturalWidth;
   toile.height = original.naturalHeight;
@@ -2300,7 +2306,24 @@ original.onload = function () {
   copie.height = original.naturalHeight;
   copieCtx.drawImage(original, 0, 0);
   remettreOriginal();
+  zoom = Math.min(1, 600 / original.naturalWidth);
+  appliquerZoom();
 };
+
+// Molette : zoom de 10 % par cran, centre sur le curseur (limites 20 % a 800 %).
+const zone = document.getElementById('fond');
+zone.addEventListener('wheel', function (e) {
+  if (!toile.width) return;
+  e.preventDefault();
+  const avant = toile.getBoundingClientRect();
+  const fx = (e.clientX - avant.left) / avant.width;
+  const fy = (e.clientY - avant.top) / avant.height;
+  zoom = Math.min(8, Math.max(0.2, zoom * Math.exp(-Math.sign(e.deltaY) * 0.1)));
+  appliquerZoom();
+  const apres = toile.getBoundingClientRect();
+  zone.scrollLeft += (apres.left + fx * apres.width) - e.clientX;
+  zone.scrollTop += (apres.top + fy * apres.height) - e.clientY;
+}, { passive: false });
 original.src = '/img/detour';
 
 function remettreOriginal() {
