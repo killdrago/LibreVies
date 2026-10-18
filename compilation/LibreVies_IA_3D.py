@@ -3462,12 +3462,38 @@ def interface():
     ttk.Button(cadre, text="Edition 3D : placer les pieces...",
                command=ouvrir_edition_3d).grid(row=7, column=0, sticky="w", pady=(6, 0))
 
-    def voir_mises_a_jour():
-        import webbrowser
-        webbrowser.open("https://github.com/killdrago/LibreVies/commits/arena/c40ef64e-librevies")
+    def voir_detourage():
+        # Ouvre la page de retouche du detourage sur le dernier detourage.png trouve,
+        # sans relancer de generation.
+        candidats = []
+        if os.path.isdir(SORTIES):
+            for racine, _dirs, fichiers in os.walk(SORTIES):
+                if "detourage.png" in fichiers:
+                    chemin = os.path.join(racine, "detourage.png")
+                    candidats.append((os.path.getmtime(chemin), chemin))
+        if candidats:
+            chemin = max(candidats)[1]
+        else:
+            chemin = filedialog.askopenfilename(
+                parent=fenetre, title="Choisir un detourage a voir",
+                initialdir=SORTIES,
+                filetypes=[("Images", "*.png"), ("Tous", "*.*")])
+            if not chemin:
+                return
+        nom_piece = os.path.splitext(os.path.basename(chemin))[0]
+        log("Apercu du detourage ouvert : " + chemin)
 
-    ttk.Button(cadre, text="Voir les mises a jour (GitHub)",
-               command=voir_mises_a_jour).grid(row=7, column=2, sticky="e", pady=(6, 0))
+        def travail():
+            retour = lancer_validation(chemin, os.path.basename(os.path.dirname(chemin)) or nom_piece, log, delai=900)
+            if retour is None:
+                log("Page du detourage fermee sans validation.")
+            else:
+                log("Page du detourage fermee (validation : %s)." % ("oui" if retour[0] else "non"))
+
+        threading.Thread(target=travail, daemon=True).start()
+
+    ttk.Button(cadre, text="Voir le detourage...",
+               command=voir_detourage).grid(row=7, column=2, sticky="e", pady=(6, 0))
 
     journal = tk.Text(cadre, height=20, wrap="word")
     journal.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
