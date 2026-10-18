@@ -2417,6 +2417,16 @@ camera.position.set(1.6, 1.2, 2.2);
 camera.lookAt(0, 0.3, 0);
 const commandes = new OrbitControls(camera, rendu.domElement);
 commandes.target.set(0, 0.3, 0);
+commandes.enableZoom = false;  // zoom gere ci-dessous : 5 % par cran, limites 20 cm a 3 m
+rendu.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const vers = commandes.target.clone().sub(camera.position);
+  const d = vers.length();
+  const facteur = Math.exp(Math.sign(e.deltaY) * 0.05);
+  const nd = THREE.MathUtils.clamp(d * facteur, 0.2, 3);
+  vers.normalize();
+  camera.position.copy(commandes.target).addScaledVector(vers, -nd);
+}, { passive: false });
 commandes.update();
 
 const pivot = new THREE.Group();
@@ -3450,7 +3460,14 @@ def interface():
         threading.Thread(target=travail, daemon=True).start()
 
     ttk.Button(cadre, text="Edition 3D : placer les pieces...",
-               command=ouvrir_edition_3d).grid(row=7, column=0, columnspan=3, sticky="w", pady=(6, 0))
+               command=ouvrir_edition_3d).grid(row=7, column=0, sticky="w", pady=(6, 0))
+
+    def voir_mises_a_jour():
+        import webbrowser
+        webbrowser.open("https://github.com/killdrago/LibreVies/commits/arena/c40ef64e-librevies")
+
+    ttk.Button(cadre, text="Voir les mises a jour (GitHub)",
+               command=voir_mises_a_jour).grid(row=7, column=2, sticky="e", pady=(6, 0))
 
     journal = tk.Text(cadre, height=20, wrap="word")
     journal.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
