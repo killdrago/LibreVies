@@ -8998,7 +8998,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // passe donc par une propriete du shader (_Defilement), pas par mainTextureOffset.
             float t = Time.time;
             materielEauRiviere.SetVector("_Defilement", new Vector4(
-                Mathf.Repeat(t * 0.0075f, 1f), Mathf.Repeat(t * 0.0125f, 1f), 0f, 0f));
+                Mathf.Repeat(t * 0.00375f, 1f), Mathf.Repeat(t * 0.00625f, 1f), 0f, 0f));
         }
         // Textes de degats : montent de 1,6 m/s et s'effacent en 1 s.
         for (int i = floaters.Count - 1; i >= 0; i--)
