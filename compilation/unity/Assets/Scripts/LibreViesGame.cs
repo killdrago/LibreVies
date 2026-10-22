@@ -5548,6 +5548,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Debug.LogWarning("[LV] nuages : shader ou texture absent, ciel sans nuages.");
             return;
         }
+        texture.wrapMode = TextureWrapMode.Clamp;   // pas de repetition de la texture sur les bords
         var materiau = new Material(shader) { name = "LV_Nuage", mainTexture = texture };
         materiau.color = new Color(1f, 1f, 1f, 0.9f);
         var rng = new System.Random(7);
