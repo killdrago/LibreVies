@@ -260,6 +260,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private float infoTimer;
     private float brightness = 0.5f;
     private float contrast = 1f;
+    // Qualite graphique 0..1 (0 = la plus legere, 1 = maximum). Pilote ombres, anti-crenelage,
+    // filtrage, detail des modeles, netteté et couleurs.
+    private float qualiteGraphique = 1f;
+    private float qualiteAppliquee = -1f;
     private GUIStyle titleStyle;
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
@@ -322,6 +326,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public int version = 4;
         public float brightness = 0.50f;
         public float contrast = 1f;
+        public float qualiteGraphique = -1f;   // -1 = absent (anciens fichiers) : maximum
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -834,6 +839,8 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (screenAdjustEffect != null)
             screenAdjustEffect.SetAdjustments(brightness, contrast);
+        if (!Mathf.Approximately(qualiteAppliquee, qualiteGraphique))
+            AppliquerQualiteGraphique();
         imagesAffichees++;
         if (!mondePret)
         {
@@ -1690,6 +1697,43 @@ public sealed class LibreViesGame : MonoBehaviour
         return null;
     }
 
+    private string NomNiveauQualite()
+    {
+        float q = qualiteGraphique;
+        if (q < 0.2f) return "Tres faible";
+        if (q < 0.4f) return "Faible";
+        if (q < 0.6f) return "Moyen";
+        if (q < 0.8f) return "Eleve";
+        return "Maximum";
+    }
+
+    private void AppliquerQualiteGraphique()
+    {
+        float q = Mathf.Clamp01(qualiteGraphique);
+        qualiteAppliquee = qualiteGraphique;
+        QualitySettings.shadowDistance = Mathf.Lerp(20f, 160f, q);
+        QualitySettings.shadowResolution = q < 0.25f ? ShadowResolution.Low
+            : q < 0.5f ? ShadowResolution.Medium
+            : q < 0.8f ? ShadowResolution.High
+            : ShadowResolution.VeryHigh;
+        QualitySettings.shadowCascades = q < 0.3f ? 1 : (q < 0.7f ? 2 : 4);
+        QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        QualitySettings.antiAliasing = q < 0.2f ? 0 : (q < 0.5f ? 2 : (q < 0.8f ? 4 : 8));
+        QualitySettings.anisotropicFiltering = q < 0.5f
+            ? AnisotropicFiltering.Disable : AnisotropicFiltering.ForceEnable;
+        QualitySettings.lodBias = Mathf.Lerp(0.7f, 2f, q);
+        QualitySettings.pixelLightCount = Mathf.RoundToInt(Mathf.Lerp(1f, 8f, q));
+        QualitySettings.softParticles = q >= 0.5f;
+        QualitySettings.realtimeReflectionProbes = q >= 0.8f;
+        if (RenderSettings.sun != null)
+        {
+            RenderSettings.sun.shadows = q < 0.3f ? LightShadows.Hard : LightShadows.Soft;
+            RenderSettings.sun.shadowStrength = Mathf.Lerp(0.7f, 0.9f, q);
+        }
+        if (screenAdjustEffect != null)
+            screenAdjustEffect.SetQualite(q);
+    }
+
     private void CreateEnvironment()
     {
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
@@ -1719,6 +1763,7 @@ public sealed class LibreViesGame : MonoBehaviour
         sun.shadowNormalBias = 0.32f;
         sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
         RenderSettings.sun = sun;
+        AppliquerQualiteGraphique();
 
         // La lumiere directionnelle eclaire le monde, mais ne dessine pas
         // toujours un disque visible selon le pipeline actif. On ajoute donc
@@ -8436,14 +8481,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerGraphique()
     {
         GUI.Label(new Rect(0, 0, 380, 25), "REGLAGES VISUELS", labelStyle);
-        GUI.Label(new Rect(0, 42, 130, 24), "Luminosite", smallStyle);
-        brightness = GUI.HorizontalSlider(new Rect(135, 51, 220, 18), brightness, 0f, 1f);
-        GUI.Label(new Rect(360, 42, 55, 24), Mathf.RoundToInt(brightness * 100) + "%", smallStyle);
-        GUI.Label(new Rect(0, 78, 130, 24), "Contraste", smallStyle);
-        contrast = GUI.HorizontalSlider(new Rect(135, 87, 220, 18), contrast, 0.5f, 1.5f);
-        GUI.Label(new Rect(360, 78, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
-        GUI.Label(new Rect(0, 114, 160, 24), "Resolution", smallStyle);
-        if (GUI.Button(new Rect(135, 112, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
+        GUI.Label(new Rect(0, 42, 130, 24), "Qualite graphique", smallStyle);
+        qualiteGraphique = GUI.HorizontalSlider(new Rect(135, 51, 220, 18), qualiteGraphique, 0f, 1f);
+        GUI.Label(new Rect(360, 42, 55, 24), Mathf.RoundToInt(qualiteGraphique * 100) + "%", smallStyle);
+        GUI.Label(new Rect(135, 66, 240, 20), "Niveau : " + NomNiveauQualite(), smallStyle);
+        GUI.Label(new Rect(0, 84, 130, 24), "Luminosite", smallStyle);
+        brightness = GUI.HorizontalSlider(new Rect(135, 93, 220, 18), brightness, 0f, 1f);
+        GUI.Label(new Rect(360, 84, 55, 24), Mathf.RoundToInt(brightness * 100) + "%", smallStyle);
+        GUI.Label(new Rect(0, 120, 130, 24), "Contraste", smallStyle);
+        contrast = GUI.HorizontalSlider(new Rect(135, 129, 220, 18), contrast, 0.5f, 1.5f);
+        GUI.Label(new Rect(360, 120, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
+        GUI.Label(new Rect(0, 156, 160, 24), "Resolution", smallStyle);
+        if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
         if (menuResolutions)
         {
             // Deux colonnes rendent toutes les resolutions accessibles en un
@@ -8453,7 +8502,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 int colonne = i / lignesParColonne;
                 int ligne = i % lignesParColonne;
-                Rect choix = new Rect(colonne * 210f, 142f + ligne * 27f, 200f, 25f);
+                Rect choix = new Rect(colonne * 210f, 184f + ligne * 27f, 200f, 25f);
                 if (GUI.Button(choix, resolutions[i].x + " x " + resolutions[i].y, buttonStyle))
                 {
                     resolutionIndex = i;
@@ -8548,6 +8597,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         brightness = Mathf.Clamp01(config.brightness);
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
+        qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
         cameraSensitivity = Mathf.Clamp(config.cameraSensitivity, 0.5f, 10f);
         clavierAzerty = config.azerty;
         inverserAxeX = config.invertX;
@@ -8614,7 +8664,8 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             var config = new Configuration
             {
-                brightness = brightness, contrast = contrast, cameraSensitivity = cameraSensitivity,
+                brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
+                cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
                 gauche = toucheGauche, droite = toucheDroite, saut = toucheSaut,

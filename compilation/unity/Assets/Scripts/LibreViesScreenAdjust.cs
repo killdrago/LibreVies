@@ -7,6 +7,16 @@ public sealed class LibreViesScreenAdjust : MonoBehaviour
     private Material material;
     private float brightness = 0.5f;
     private float contrast = 1f;
+    private float nettete = 0f;
+    private float vivacite = 0f;
+
+    // q entre 0 (faible) et 1 (maximum) : netteté et couleurs vives.
+    public void SetQualite(float q)
+    {
+        q = Mathf.Clamp01(q);
+        nettete = q * 0.6f;
+        vivacite = q * 0.15f;
+    }
 
     public void SetAdjustments(float newBrightness, float newContrast)
     {
@@ -28,6 +38,8 @@ public sealed class LibreViesScreenAdjust : MonoBehaviour
         }
         material.SetFloat("_Brightness", brightness);
         material.SetFloat("_Contrast", contrast);
+        material.SetFloat("_Nettete", nettete);
+        material.SetFloat("_Vivacite", vivacite);
         Graphics.Blit(source, destination, material);
     }
 
