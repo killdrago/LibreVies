@@ -1157,11 +1157,10 @@ def informations_export_jeu(executable):
     return resultat
 
 
-def launch(path, pseudo='Joueur', session_token='', api_url='', graphisme='standard'):
+def launch(path, pseudo='Joueur', session_token='', api_url=''):
     # Le pseudo est public. La session reste en RAM, dans l'environnement du
     # seul enfant : jamais dans argv, le manifeste, un fichier ou un journal.
-    args = [path, '-libreviesPseudo', str(pseudo or 'Joueur'),
-            '-libreviesGraphisme', str(graphisme or 'standard')]
+    args = [path, '-libreviesPseudo', str(pseudo or 'Joueur')]
     env = os.environ.copy()
     env.pop('LIBREVIES_SESSION_TOKEN', None)
     env.pop('LIBREVIES_API_URL', None)
@@ -1384,43 +1383,10 @@ class App(tk.Tk):
         self.play_btn = tk.Button(self, text="JOUER", font=("Segoe UI", 14, "bold"),
                                   fg=TEXT, bg="#444444", relief="flat", cursor="hand2",
                                   state="disabled", width=10, command=self.play)
-        self.play_btn.place(x=745, y=698, height=42)
-        tk.Button(self, text="QUITTER", font=("Segoe UI", 11, "bold"),
+        self.play_btn.place(x=750, y=698, height=42)
+        tk.Button(self, text="QUITTER", font=("Segoe UI", 14, "bold"),
                   fg=TEXT, bg="#aa3333", relief="flat", cursor="hand2",
-                  width=8, command=self.destroy).place(x=830, y=698, height=42)
-        tk.Button(self, text="GRAPHISME", font=("Segoe UI", 10, "bold"),
-                  fg=TEXT, bg="#335577", relief="flat", cursor="hand2",
-                  width=10, command=self.ouvrir_graphisme).place(x=915, y=698, height=42)
-
-    def ouvrir_graphisme(self):
-        # Choix du moteur graphique. Utile si le jeu plante au lancement :
-        # on passe sur un rendu plus leger sans reinstaller.
-        fenetre = tk.Toplevel(self)
-        fenetre.title("Graphisme")
-        fenetre.configure(bg=BG)
-        fenetre.resizable(False, False)
-        fenetre.transient(self)
-        choix = tk.StringVar(value=load_local_config().get('graphisme', 'standard'))
-        tk.Label(fenetre, text="Choisis le moteur graphique :", font=("Segoe UI", 12, "bold"),
-                 fg=TEXT, bg=BG).pack(padx=20, pady=(16, 8), anchor="w")
-        for valeur, texte in (("standard", "Standard (leger, recommande)"),
-                              ("urp", "URP (intermediaire)"),
-                              ("hdrp", "HDRP (tres lourd : carte graphique recente requise)")):
-            tk.Radiobutton(fenetre, text=texte, variable=choix, value=valeur,
-                           font=("Segoe UI", 11), fg=TEXT, bg=BG, selectcolor="#333355",
-                           activebackground=BG, activeforeground=TEXT).pack(padx=20, pady=2, anchor="w")
-        tk.Label(fenetre, text="Le changement s'applique au prochain lancement du jeu.",
-                 font=("Segoe UI", 9), fg=TEXT, bg=BG).pack(padx=20, pady=(10, 0), anchor="w")
-
-        def enregistrer():
-            cfg = load_local_config()
-            cfg['graphisme'] = choix.get()
-            save_local_config(cfg)
-            fenetre.destroy()
-
-        tk.Button(fenetre, text="Enregistrer", font=("Segoe UI", 11, "bold"), fg=TEXT, bg="#444444",
-                  relief="flat", cursor="hand2", command=enregistrer).pack(pady=16)
-        fenetre.grab_set()
+                  width=10, command=self.destroy).place(x=886, y=698, height=42)
 
 
     # ============================================================
@@ -2056,8 +2022,7 @@ class App(tk.Tk):
             self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
             return
         try:
-            launch(self.game, self.logged_pseudo, self.session_token, self.connected_api_url,
-                   load_local_config().get('graphisme', 'standard'))
+            launch(self.game, self.logged_pseudo, self.session_token, self.connected_api_url)
         except Exception as e:
             self._upd_bar(0, 'Lancement impossible : %s' % e)
             return
