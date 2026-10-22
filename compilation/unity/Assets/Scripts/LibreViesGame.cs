@@ -6365,7 +6365,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 // La camera peut descendre jusqu'a la hauteur des jambes
                 // tout en gardant le sol comme limite physique.
-                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, -45f, 70f);
+                cameraPitch = Mathf.Clamp(cameraPitch + mouvementVertical, -80f, 70f);
             }
         }
         if (Input.GetKeyDown(KeyCode.LeftBracket))
@@ -6405,7 +6405,20 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector3 position = target + orbit * (Vector3.back * cameraDistance);
         // Filet de sécurité identique à la référence : jamais sous le terrain.
         float sol = TerrainHeight(position.x, position.z) + 0.08f;
-        if (position.y < sol) position.y = sol;
+        if (position.y < sol)
+        {
+            // Camera basse : au lieu de la remonter (ce qui la plaquait sur le
+            // sol loin du heros), on la rapproche du heros le long de son axe
+            // jusqu'a la hauteur du sol. On peut ainsi regarder le ciel depuis
+            // les pieds du joueur.
+            Vector3 direction = orbit * Vector3.back;
+            float rapprochement = (target.y - sol) / Mathf.Max(0.01f, -direction.y);
+            float distanceMin = 1.2f;
+            if (direction.y < 0f && rapprochement >= distanceMin)
+                position = target + direction * rapprochement;
+            else
+                position.y = sol;
+        }
         gameCamera.transform.position = position;
         gameCamera.transform.LookAt(target);
         MettreAJourVisibiliteAffiches(position);
