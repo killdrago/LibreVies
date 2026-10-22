@@ -1788,7 +1788,7 @@ public sealed class LibreViesGame : MonoBehaviour
         RenderSettings.ambientGroundColor = new Color(0.17f, 0.15f, 0.11f);
         RenderSettings.fog = true;
         RenderSettings.fogColor = new Color(0.68f, 0.77f, 0.88f);
-        RenderSettings.fogDensity = 0.0022f;
+        RenderSettings.fogDensity = 0.0028f;   // brume un peu plus marquee vers l'horizon
         RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Skybox;
         RenderSettings.reflectionIntensity = 0.7f;
         // Projection stable : les ombres restent ancrees dans le monde au lieu
@@ -1849,7 +1849,7 @@ public sealed class LibreViesGame : MonoBehaviour
             var material = new Material(procedural) { name = "Ciel_LibreVies" };
             if (material.HasProperty("_SkyTint")) material.SetColor("_SkyTint", new Color(0.30f, 0.46f, 0.78f));
             if (material.HasProperty("_GroundColor")) material.SetColor("_GroundColor", new Color(0.45f, 0.50f, 0.26f));
-            if (material.HasProperty("_AtmosphereThickness")) material.SetFloat("_AtmosphereThickness", 0.85f);
+            if (material.HasProperty("_AtmosphereThickness")) material.SetFloat("_AtmosphereThickness", 1.0f);   // horizon plus doux
             if (material.HasProperty("_Exposure")) material.SetFloat("_Exposure", 1.35f);
             if (material.HasProperty("_SunSize")) material.SetFloat("_SunSize", 0.04f);
             RenderSettings.skybox = material;
