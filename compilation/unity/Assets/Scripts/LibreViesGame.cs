@@ -264,6 +264,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // filtrage, detail des modeles, netteté et couleurs.
     private float qualiteGraphique = 1f;
     private float qualiteAppliquee = -1f;
+    private float intensiteHalo = 0.3f;
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
     private int antialiasingChoix;
     private int anisotropeChoix;
@@ -337,6 +338,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float qualiteGraphique = -1f;   // -1 = absent (anciens fichiers) : maximum
         public int antialiasingChoix;          // 0 = par defaut
         public int anisotropeChoix;            // 0 = par defaut
+        public float intensiteHalo = -1f;      // -1 = absent : 30 %
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -848,7 +850,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private void Update()
     {
         if (screenAdjustEffect != null)
+        {
             screenAdjustEffect.SetAdjustments(brightness, contrast);
+            screenAdjustEffect.SetHalo(intensiteHalo);
+        }
         if (!Mathf.Approximately(qualiteAppliquee, qualiteGraphique))
             AppliquerQualiteGraphique();
         imagesAffichees++;
@@ -8611,6 +8616,9 @@ public sealed class LibreViesGame : MonoBehaviour
                     AppliquerFiltrage();
                     SauverConfiguration();
                 }
+                GUI.Label(new Rect(0, 256, 130, 24), "Halo des lumieres", smallStyle);
+                intensiteHalo = GUI.HorizontalSlider(new Rect(135, 265, 220, 18), intensiteHalo, 0f, 1f);
+                GUI.Label(new Rect(360, 256, 55, 24), Mathf.RoundToInt(intensiteHalo * 100) + "%", smallStyle);
             }
             else
             {
@@ -8731,6 +8739,7 @@ public sealed class LibreViesGame : MonoBehaviour
         brightness = Mathf.Clamp01(config.brightness);
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
+        intensiteHalo = config.intensiteHalo < 0f ? 0.3f : Mathf.Clamp01(config.intensiteHalo);
         antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
         anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);
         AppliquerFiltrage();
@@ -8802,6 +8811,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
                 antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
+                intensiteHalo = intensiteHalo,
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,

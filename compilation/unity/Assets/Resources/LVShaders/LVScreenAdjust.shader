@@ -80,7 +80,7 @@ Shader "Hidden/LibreVies/ReglagesEcran"
             {
                 fixed3 c = tex2D(_MainTex, i.uv).rgb;
                 float luminosite = max(c.r, max(c.g, c.b));
-                float k = saturate((luminosite - 0.7) / 0.3);
+                float k = saturate((luminosite - 0.85) / 0.15);
                 return fixed4(c * k, 1);
             }
             ENDCG

@@ -19,9 +19,14 @@ public sealed class LibreViesScreenAdjust : MonoBehaviour
         q = Mathf.Clamp01(q);
         nettete = q * 0.6f;
         vivacite = q * 0.15f;
-        halo = q * 0.35f;
         etalonnage = q * 0.5f;
         vignettage = q * 0.25f;
+    }
+
+    // intensite 0..1 (curseur « Halo des lumieres » des options). 100 % = 0,5 d'ajout.
+    public void SetHalo(float intensite)
+    {
+        halo = Mathf.Clamp01(intensite) * 0.5f;
     }
 
     public void SetAdjustments(float newBrightness, float newContrast)
