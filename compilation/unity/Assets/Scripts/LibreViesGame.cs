@@ -1788,7 +1788,7 @@ public sealed class LibreViesGame : MonoBehaviour
         RenderSettings.ambientGroundColor = new Color(0.17f, 0.15f, 0.11f);
         RenderSettings.fog = true;
         RenderSettings.fogColor = new Color(0.68f, 0.77f, 0.88f);
-        RenderSettings.fogDensity = 0.0028f;   // brume un peu plus marquee vers l'horizon
+        RenderSettings.fogDensity = 0.0022f;
         RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Skybox;
         RenderSettings.reflectionIntensity = 0.7f;
         // Projection stable : les ombres restent ancrees dans le monde au lieu
@@ -1849,7 +1849,7 @@ public sealed class LibreViesGame : MonoBehaviour
             var material = new Material(procedural) { name = "Ciel_LibreVies" };
             if (material.HasProperty("_SkyTint")) material.SetColor("_SkyTint", new Color(0.30f, 0.46f, 0.78f));
             if (material.HasProperty("_GroundColor")) material.SetColor("_GroundColor", new Color(0.45f, 0.50f, 0.26f));
-            if (material.HasProperty("_AtmosphereThickness")) material.SetFloat("_AtmosphereThickness", 1.0f);   // horizon plus doux
+            if (material.HasProperty("_AtmosphereThickness")) material.SetFloat("_AtmosphereThickness", 0.85f);
             if (material.HasProperty("_Exposure")) material.SetFloat("_Exposure", 1.35f);
             if (material.HasProperty("_SunSize")) material.SetFloat("_SunSize", 0.04f);
             RenderSettings.skybox = material;
@@ -5539,47 +5539,38 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateClouds()
     {
-        // Chaque nuage est compose de volumes arrondis qui se recouvrent :
-        // les silhouettes sont douces depuis le sol et restent legeres a
-        // deplacer comme un seul groupe. Aucun cube ne sert plus de nuage.
-        Vector3[] boules =
+        // Vrais nuages : plans transparents avec une texture de nuage douce, poses
+        // haut dans le ciel. Ils derivent lentement comme un seul ensemble.
+        Shader shader = Shader.Find("Sprites/Default");
+        Texture2D texture = Resources.Load<Texture2D>("LVTextures/LV_Cloud");
+        if (shader == null || texture == null)
         {
-            new Vector3(-5.4f, 0.0f, 0.1f),
-            new Vector3(-3.5f, 0.8f, 0.0f),
-            new Vector3(-1.2f, 1.35f, 0.1f),
-            new Vector3(1.2f, 0.95f, -0.1f),
-            new Vector3(3.7f, 0.35f, 0.1f),
-            new Vector3(5.2f, 0.0f, -0.1f),
-            new Vector3(0.0f, 0.15f, 0.5f)
-        };
-        Vector3[] tailles =
+            Debug.LogWarning("[LV] nuages : shader ou texture absent, ciel sans nuages.");
+            return;
+        }
+        var materiau = new Material(shader) { name = "LV_Nuage", mainTexture = texture };
+        materiau.color = new Color(1f, 1f, 1f, 0.9f);
+        var rng = new System.Random(7);
+        float etendue = WorldSize + 40f;
+        for (int i = 0; i < 22; i++)
         {
-            new Vector3(4.2f, 2.0f, 2.6f),
-            new Vector3(4.0f, 2.8f, 2.9f),
-            new Vector3(4.8f, 3.6f, 3.2f),
-            new Vector3(4.6f, 3.0f, 3.0f),
-            new Vector3(4.0f, 2.35f, 2.7f),
-            new Vector3(3.4f, 1.8f, 2.4f),
-            new Vector3(6.5f, 1.65f, 3.3f)
-        };
-        for (int i = 0; i < 7; i++)
-        {
-            var cloud = new GameObject("Nuage");
-            cloud.transform.position = new Vector3(-80 + i * 28,
-                24 + (i % 3) * 4, -30 + i * 13);
-            for (int j = 0; j < boules.Length; j++)
-            {
-                string materiau = j == 0 || j == 5 ? "Nuage_Ombre" : "Nuage";
-                GameObject boule = Primitive(PrimitiveType.Sphere, boules[j], tailles[j],
-                    materiau, cloud.transform, "Nuage_Volume_" + j);
-                Renderer rendu = boule.GetComponent<Renderer>();
-                if (rendu != null)
-                {
-                    rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    rendu.receiveShadows = false;
-                }
-            }
-            clouds.Add(cloud);
+            GameObject nuage = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            nuage.name = "Nuage";
+            Destroy(nuage.GetComponent<Collider>());
+            float x = Mathf.Lerp(-etendue, etendue, (float)rng.NextDouble());
+            float z = Mathf.Lerp(-etendue * 0.6f, etendue * 0.6f, (float)rng.NextDouble());
+            float hauteur = 55f + (float)rng.NextDouble() * 35f;
+            nuage.transform.position = new Vector3(x, hauteur, z);
+            // Plan horizontal (vu de dessous), orientation et taille variees
+            float largeur = 70f + (float)rng.NextDouble() * 90f;
+            float profondeur = largeur * (0.45f + (float)rng.NextDouble() * 0.25f);
+            nuage.transform.rotation = Quaternion.Euler(90f, (float)rng.NextDouble() * 360f, 0f);
+            nuage.transform.localScale = new Vector3(largeur, profondeur, 1f);
+            Renderer rendu = nuage.GetComponent<Renderer>();
+            rendu.sharedMaterial = materiau;
+            rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            rendu.receiveShadows = false;
+            clouds.Add(nuage);
         }
     }
 
