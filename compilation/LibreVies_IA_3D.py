@@ -1823,7 +1823,12 @@ def editer_3d(args):
             g = sc.geometry[nom_geom].copy()
             g.apply_transform(M @ T)
             if couleur:
-                g.visual = trimesh.visual.ColorVisuals(mesh=g, face_colors=np.tile(rgba, (len(g.faces), 1)))
+                # Vrai materiau PBR de la couleur choisie : visible dans tous les visionneurs
+                # (les couleurs de sommets seules sont ignorees par certains).
+                from trimesh.visual.material import PBRMaterial
+                mat = PBRMaterial(name="couleur_" + h.lower(), baseColorFactor=rgba,
+                                  metallicFactor=0.0, roughnessFactor=0.6, doubleSided=True)
+                g.visual = trimesh.visual.TextureVisuals(material=mat)
             combine.add_geometry(g, node_name="p%d_%s" % (k, node))
         print("Piece %d placee : %s" % (k + 1, p.get("nom", "")), flush=True)
     chemin = os.path.join(dossier, args.nom + ".glb")
