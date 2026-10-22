@@ -1709,8 +1709,20 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void AppliquerQualiteGraphique()
     {
-        float q = Mathf.Clamp01(qualiteGraphique);
         qualiteAppliquee = qualiteGraphique;
+        try
+        {
+            AppliquerQualiteGraphiqueSecure();
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : qualite graphique non appliquee : " + erreur.Message);
+        }
+    }
+
+    private void AppliquerQualiteGraphiqueSecure()
+    {
+        float q = Mathf.Clamp01(qualiteGraphique);
         QualitySettings.shadowDistance = Mathf.Lerp(20f, 160f, q);
         QualitySettings.shadowResolution = q < 0.25f ? ShadowResolution.Low
             : q < 0.5f ? ShadowResolution.Medium
@@ -1718,7 +1730,6 @@ public sealed class LibreViesGame : MonoBehaviour
             : ShadowResolution.VeryHigh;
         QualitySettings.shadowCascades = q < 0.3f ? 1 : (q < 0.7f ? 2 : 4);
         QualitySettings.shadowProjection = ShadowProjection.StableFit;
-        QualitySettings.antiAliasing = q < 0.2f ? 0 : (q < 0.5f ? 2 : (q < 0.8f ? 4 : 8));
         QualitySettings.anisotropicFiltering = q < 0.5f
             ? AnisotropicFiltering.Disable : AnisotropicFiltering.ForceEnable;
         QualitySettings.lodBias = Mathf.Lerp(0.7f, 2f, q);
