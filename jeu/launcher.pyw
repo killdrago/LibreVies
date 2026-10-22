@@ -1384,13 +1384,13 @@ class App(tk.Tk):
         self.play_btn = tk.Button(self, text="JOUER", font=("Segoe UI", 14, "bold"),
                                   fg=TEXT, bg="#444444", relief="flat", cursor="hand2",
                                   state="disabled", width=10, command=self.play)
-        self.play_btn.place(x=750, y=698, height=42)
-        tk.Button(self, text="QUITTER", font=("Segoe UI", 14, "bold"),
+        self.play_btn.place(x=745, y=698, height=42)
+        tk.Button(self, text="QUITTER", font=("Segoe UI", 11, "bold"),
                   fg=TEXT, bg="#aa3333", relief="flat", cursor="hand2",
-                  width=10, command=self.destroy).place(x=886, y=698, height=42)
-        tk.Button(self, text="GRAPHISME", font=("Segoe UI", 11, "bold"),
+                  width=8, command=self.destroy).place(x=830, y=698, height=42)
+        tk.Button(self, text="GRAPHISME", font=("Segoe UI", 10, "bold"),
                   fg=TEXT, bg="#335577", relief="flat", cursor="hand2",
-                  width=12, command=self.ouvrir_graphisme).place(x=750, y=648, height=38)
+                  width=10, command=self.ouvrir_graphisme).place(x=915, y=698, height=42)
 
     def ouvrir_graphisme(self):
         # Choix du moteur graphique. Utile si le jeu plante au lancement :
