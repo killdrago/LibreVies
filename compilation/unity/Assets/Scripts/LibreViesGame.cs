@@ -269,7 +269,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private int anisotropeChoix;
     private static readonly int[] valeursAntialiasing = { -1, 0, 2, 4, 8 };
     private static readonly string[] nomsAntialiasing = { "Par defaut", "Desactive", "2x", "4x", "8x" };
-    private static readonly string[] nomsAnisotrope = { "Par defaut", "Desactive", "Active", "Force" };
+    private static readonly string[] nomsAnisotrope = { "Par defaut", "Desactive", "Active" };
+    private bool menuAntialiasing;
+    private GUIStyle optionsTitleStyle;
     private GUIStyle titleStyle;
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
@@ -1711,8 +1713,12 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (anisotropeChoix > 0)
             {
-                QualitySettings.anisotropicFiltering = anisotropeChoix == 1 ? AnisotropicFiltering.Disable
-                    : anisotropeChoix == 2 ? AnisotropicFiltering.Enable : AnisotropicFiltering.ForceEnable;
+                // Unity n'applique le filtre que si le niveau est regle sur chaque texture.
+                bool actif = anisotropeChoix == 2;
+                QualitySettings.anisotropicFiltering = actif ? AnisotropicFiltering.ForceEnable : AnisotropicFiltering.Disable;
+                foreach (Texture2D texture in Resources.FindObjectsOfTypeAll<Texture2D>())
+                    if (texture != null && texture.mipmapCount > 1)
+                        texture.anisoLevel = actif ? 16 : 1;
             }
             if (antialiasingChoix > 0)
                 QualitySettings.antiAliasing = valeursAntialiasing[antialiasingChoix];
@@ -8498,7 +8504,10 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = new Color(0.07f, 0.09f, 0.14f, 1f);
         GUI.DrawTexture(cadre, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Box(cadre, "OPTIONS", boxStyle);
+        GUI.Box(cadre, "", boxStyle);
+        if (optionsTitleStyle == null)
+            optionsTitleStyle = new GUIStyle(titleStyle) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
+        GUI.Label(new Rect(cadre.x, cadre.y + 8, cadre.width, 26), "OPTIONS", optionsTitleStyle);
         GUI.color = ongletOptions == 0 ? new Color(0.18f, 0.40f, 0.62f) : new Color(0.12f, 0.16f, 0.25f);
         GUI.DrawTexture(new Rect(cadre.x + 18, cadre.y + 42, 145, 42), Texture2D.whiteTexture);
         GUI.color = ongletOptions == 1 ? new Color(0.42f, 0.25f, 0.58f) : new Color(0.12f, 0.16f, 0.25f);
@@ -8531,22 +8540,40 @@ public sealed class LibreViesGame : MonoBehaviour
         contrast = GUI.HorizontalSlider(new Rect(135, 129, 220, 18), contrast, 0.5f, 1.5f);
         GUI.Label(new Rect(360, 120, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
         GUI.Label(new Rect(0, 156, 160, 24), "Resolution", smallStyle);
-        if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
+        if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle))
+        {
+            menuResolutions = !menuResolutions;
+            menuAntialiasing = false;
+        }
         if (!menuResolutions)
         {
             GUI.Label(new Rect(0, 190, 160, 24), "Anti-aliasing", smallStyle);
-            if (GUI.Button(new Rect(135, 188, 220, 28), nomsAntialiasing[antialiasingChoix], buttonStyle))
+            if (GUI.Button(new Rect(135, 188, 220, 28), nomsAntialiasing[antialiasingChoix] + "  \u25BE", buttonStyle))
             {
-                antialiasingChoix = (antialiasingChoix + 1) % valeursAntialiasing.Length;
-                AppliquerFiltrage();
-                SauverConfiguration();
+                menuAntialiasing = !menuAntialiasing;
             }
-            GUI.Label(new Rect(0, 224, 160, 24), "Filtrage anisotrope", smallStyle);
-            if (GUI.Button(new Rect(135, 222, 220, 28), nomsAnisotrope[anisotropeChoix], buttonStyle))
+            if (!menuAntialiasing)
             {
-                anisotropeChoix = (anisotropeChoix + 1) % nomsAnisotrope.Length;
-                AppliquerFiltrage();
-                SauverConfiguration();
+                GUI.Label(new Rect(0, 224, 160, 24), "Filtrage anisotrope", smallStyle);
+                if (GUI.Button(new Rect(135, 222, 220, 28), nomsAnisotrope[anisotropeChoix], buttonStyle))
+                {
+                    anisotropeChoix = (anisotropeChoix + 1) % nomsAnisotrope.Length;
+                    AppliquerFiltrage();
+                    SauverConfiguration();
+                }
+            }
+            else
+            {
+                for (int i = 0; i < nomsAntialiasing.Length; i++)
+                {
+                    if (GUI.Button(new Rect(135, 218f + i * 27f, 220, 25), nomsAntialiasing[i], buttonStyle))
+                    {
+                        antialiasingChoix = i;
+                        menuAntialiasing = false;
+                        AppliquerFiltrage();
+                        SauverConfiguration();
+                    }
+                }
             }
         }
         if (menuResolutions)
