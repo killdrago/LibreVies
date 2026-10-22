@@ -8986,8 +8986,18 @@ public sealed class LibreViesGame : MonoBehaviour
         etincelles.Add(new EffetEtincelle { Root = root, Age = 0f });
     }
 
+    private Material materielEauRiviere;
+
     private void UpdateEffects(float dt)
     {
+        // Eau : la riviere coule lentement (la texture defile dans deux directions).
+        if (materielEauRiviere == null) materielEauRiviere = Mat("Eau_Riviere");
+        if (materielEauRiviere != null && materielEauRiviere.HasProperty("_MainTex"))
+        {
+            float t = Time.time;
+            materielEauRiviere.mainTextureOffset = new Vector2(
+                Mathf.Repeat(t * 0.02f, 1f), Mathf.Repeat(t * 0.035f, 1f));
+        }
         // Textes de degats : montent de 1,6 m/s et s'effacent en 1 s.
         for (int i = floaters.Count - 1; i >= 0; i--)
         {
