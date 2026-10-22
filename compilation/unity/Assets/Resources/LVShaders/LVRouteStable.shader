@@ -8,6 +8,7 @@ Shader "LibreVies/StablePBR"
         _Color ("Teinte", Color) = (1,1,1,1)
         _MainTex ("Texture", 2D) = "white" {}
         _Tiling ("Echelle monde", Float) = 0.28
+        _Defilement ("Defilement (eau)", Vector) = (0,0,0,0)
         _Metallic ("Metallic", Range(0,1)) = 0.05
         _Smoothness ("Brillance", Range(0,1)) = 0.28
         _EmissionColor ("Emission", Color) = (0,0,0,0)
@@ -30,6 +31,7 @@ Shader "LibreVies/StablePBR"
             sampler2D _MainTex;
             fixed4 _Color;
             float _Tiling;
+            float4 _Defilement;
             float _Metallic;
             float _Smoothness;
             fixed4 _EmissionColor;
@@ -63,9 +65,10 @@ Shader "LibreVies/StablePBR"
                 float scale = max(_Tiling, 0.001);
                 float3 weights = abs(normalize(normal));
                 weights /= max(weights.x + weights.y + weights.z, 0.001);
-                fixed4 sampleX = tex2D(_MainTex, position.yz * scale);
-                fixed4 sampleY = tex2D(_MainTex, position.xz * scale);
-                fixed4 sampleZ = tex2D(_MainTex, position.xy * scale);
+                // _Defilement : decalage de texture (0 pour tout le monde sauf l'eau qui coule).
+                fixed4 sampleX = tex2D(_MainTex, position.yz * scale + _Defilement.xy);
+                fixed4 sampleY = tex2D(_MainTex, position.xz * scale + _Defilement.xy);
+                fixed4 sampleZ = tex2D(_MainTex, position.xy * scale + _Defilement.xy);
                 return sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
             }
 

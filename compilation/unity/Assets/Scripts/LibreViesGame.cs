@@ -8992,11 +8992,13 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         // Eau : la riviere coule lentement (la texture defile dans deux directions).
         if (materielEauRiviere == null) materielEauRiviere = Mat("Eau_Riviere");
-        if (materielEauRiviere != null && materielEauRiviere.HasProperty("_MainTex"))
+        if (materielEauRiviere != null)
         {
+            // Le shader du monde calcule ses UV a partir de la position : le decalage
+            // passe donc par une propriete du shader (_Defilement), pas par mainTextureOffset.
             float t = Time.time;
-            materielEauRiviere.mainTextureOffset = new Vector2(
-                Mathf.Repeat(t * 0.02f, 1f), Mathf.Repeat(t * 0.035f, 1f));
+            materielEauRiviere.SetVector("_Defilement", new Vector4(
+                Mathf.Repeat(t * 0.12f, 1f), Mathf.Repeat(t * 0.2f, 1f), 0f, 0f));
         }
         // Textes de degats : montent de 1,6 m/s et s'effacent en 1 s.
         for (int i = floaters.Count - 1; i >= 0; i--)
