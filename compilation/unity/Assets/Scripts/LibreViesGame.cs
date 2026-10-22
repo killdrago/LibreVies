@@ -264,6 +264,12 @@ public sealed class LibreViesGame : MonoBehaviour
     // filtrage, detail des modeles, netteté et couleurs.
     private float qualiteGraphique = 1f;
     private float qualiteAppliquee = -1f;
+    // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
+    private int antialiasingChoix;
+    private int anisotropeChoix;
+    private static readonly int[] valeursAntialiasing = { -1, 0, 2, 4, 8 };
+    private static readonly string[] nomsAntialiasing = { "Par defaut", "Desactive", "2x", "4x", "8x" };
+    private static readonly string[] nomsAnisotrope = { "Par defaut", "Desactive", "Active", "Force" };
     private GUIStyle titleStyle;
     private GUIStyle labelStyle;
     private GUIStyle smallStyle;
@@ -327,6 +333,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public float brightness = 0.50f;
         public float contrast = 1f;
         public float qualiteGraphique = -1f;   // -1 = absent (anciens fichiers) : maximum
+        public int antialiasingChoix;          // 0 = par defaut
+        public int anisotropeChoix;            // 0 = par defaut
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -1697,6 +1705,24 @@ public sealed class LibreViesGame : MonoBehaviour
         return null;
     }
 
+    private void AppliquerFiltrage()
+    {
+        try
+        {
+            if (anisotropeChoix > 0)
+            {
+                QualitySettings.anisotropicFiltering = anisotropeChoix == 1 ? AnisotropicFiltering.Disable
+                    : anisotropeChoix == 2 ? AnisotropicFiltering.Enable : AnisotropicFiltering.ForceEnable;
+            }
+            if (antialiasingChoix > 0)
+                QualitySettings.antiAliasing = valeursAntialiasing[antialiasingChoix];
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : filtrage non applique : " + erreur.Message);
+        }
+    }
+
     private string NomNiveauQualite()
     {
         float q = qualiteGraphique;
@@ -1730,8 +1756,6 @@ public sealed class LibreViesGame : MonoBehaviour
             : ShadowResolution.VeryHigh;
         QualitySettings.shadowCascades = q < 0.3f ? 1 : (q < 0.7f ? 2 : 4);
         QualitySettings.shadowProjection = ShadowProjection.StableFit;
-        QualitySettings.anisotropicFiltering = q < 0.5f
-            ? AnisotropicFiltering.Disable : AnisotropicFiltering.ForceEnable;
         QualitySettings.lodBias = Mathf.Lerp(0.7f, 2f, q);
         QualitySettings.pixelLightCount = Mathf.RoundToInt(Mathf.Lerp(1f, 8f, q));
         QualitySettings.softParticles = q >= 0.5f;
@@ -8470,6 +8494,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerOptions()
     {
         Rect cadre = new Rect(Screen.width / 2 - 310, Screen.height / 2 - 235, 620, 470);
+        // Fond opaque sous la boite (le style par defaut est semi-transparent).
+        GUI.color = new Color(0.07f, 0.09f, 0.14f, 1f);
+        GUI.DrawTexture(cadre, Texture2D.whiteTexture);
+        GUI.color = Color.white;
         GUI.Box(cadre, "OPTIONS", boxStyle);
         GUI.color = ongletOptions == 0 ? new Color(0.18f, 0.40f, 0.62f) : new Color(0.12f, 0.16f, 0.25f);
         GUI.DrawTexture(new Rect(cadre.x + 18, cadre.y + 42, 145, 42), Texture2D.whiteTexture);
@@ -8504,6 +8532,23 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(360, 120, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
         GUI.Label(new Rect(0, 156, 160, 24), "Resolution", smallStyle);
         if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle)) menuResolutions = !menuResolutions;
+        if (!menuResolutions)
+        {
+            GUI.Label(new Rect(0, 190, 160, 24), "Anti-aliasing", smallStyle);
+            if (GUI.Button(new Rect(135, 188, 220, 28), nomsAntialiasing[antialiasingChoix], buttonStyle))
+            {
+                antialiasingChoix = (antialiasingChoix + 1) % valeursAntialiasing.Length;
+                AppliquerFiltrage();
+                SauverConfiguration();
+            }
+            GUI.Label(new Rect(0, 224, 160, 24), "Filtrage anisotrope", smallStyle);
+            if (GUI.Button(new Rect(135, 222, 220, 28), nomsAnisotrope[anisotropeChoix], buttonStyle))
+            {
+                anisotropeChoix = (anisotropeChoix + 1) % nomsAnisotrope.Length;
+                AppliquerFiltrage();
+                SauverConfiguration();
+            }
+        }
         if (menuResolutions)
         {
             // Deux colonnes rendent toutes les resolutions accessibles en un
@@ -8609,6 +8654,9 @@ public sealed class LibreViesGame : MonoBehaviour
         brightness = Mathf.Clamp01(config.brightness);
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
+        antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
+        anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);
+        AppliquerFiltrage();
         cameraSensitivity = Mathf.Clamp(config.cameraSensitivity, 0.5f, 10f);
         clavierAzerty = config.azerty;
         inverserAxeX = config.invertX;
@@ -8676,6 +8724,7 @@ public sealed class LibreViesGame : MonoBehaviour
             var config = new Configuration
             {
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
+                antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
