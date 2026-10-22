@@ -4588,6 +4588,7 @@ public sealed class LibreViesGame : MonoBehaviour
         float y = TerrainHeight(poste.x, poste.y);
         var root = new GameObject(nord ? "Garde_Nord" : "Garde_Sud").transform;
         root.position = new Vector3(poste.x, y, poste.y);
+        AjouterOmbreContact(root, 0.4f);
         var state = new GardeState
         {
             Root = root.gameObject, Poste = poste, Portail = portail, Nord = nord, Ville = ville
@@ -4827,6 +4828,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // perdre le placement valide du NPC devant le salon.
         var root = new GameObject("PNJ_" + (metier == "Esthetique" ? "Medecin" : metier)).transform;
         root.position = new Vector3(position.x, y, position.z);
+        AjouterOmbreContact(root, 0.4f);
         var pnj = new PnjState { Root = root.gameObject, Metier = metier, Ville = ville };
 
         // Les habitants utilisent le même humanoïde OBJ indépendant que
@@ -5850,6 +5852,53 @@ public sealed class LibreViesGame : MonoBehaviour
         return true;
     }
 
+    private static Material materielOmbreContact;
+    private static Texture2D textureOmbreContact;
+
+    // Ombre de contact : une tache sombre douce posee au sol sous un personnage,
+    // pour qu'il ne paraisse pas flotter. Coût faible (un quad sans ombre portee).
+    private void AjouterOmbreContact(Transform parent, float rayon)
+    {
+        if (parent == null) return;
+        if (materielOmbreContact == null)
+        {
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) return;
+            const int taille = 64;
+            textureOmbreContact = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
+            textureOmbreContact.wrapMode = TextureWrapMode.Clamp;
+            textureOmbreContact.filterMode = FilterMode.Bilinear;
+            var pixels = new Color32[taille * taille];
+            for (int y = 0; y < taille; y++)
+            {
+                for (int x = 0; x < taille; x++)
+                {
+                    float dx = (x + 0.5f) / taille * 2f - 1f;
+                    float dy = (y + 0.5f) / taille * 2f - 1f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(1f - distance);
+                    alpha = alpha * alpha * 0.6f;   // ombre douce, 60 % au centre
+                    pixels[y * taille + x] = new Color32(0, 0, 0, (byte)(alpha * 255f));
+                }
+            }
+            textureOmbreContact.SetPixels32(pixels);
+            textureOmbreContact.Apply();
+            materielOmbreContact = new Material(shader) { name = "LV_OmbreContact" };
+            materielOmbreContact.mainTexture = textureOmbreContact;
+        }
+        GameObject ombre = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        ombre.name = "OmbreContact";
+        Destroy(ombre.GetComponent<Collider>());
+        ombre.transform.SetParent(parent, false);
+        ombre.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        ombre.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+        ombre.transform.localScale = new Vector3(rayon * 2f, rayon * 2f, 1f);
+        Renderer rendu = ombre.GetComponent<Renderer>();
+        rendu.sharedMaterial = materielOmbreContact;
+        rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rendu.receiveShadows = false;
+    }
+
     private void CreatePlayer()
     {
         player = new GameObject("Joueur").transform;
@@ -5859,6 +5908,7 @@ public sealed class LibreViesGame : MonoBehaviour
         cameraPivot.SetParent(player, false);
         heroBody = new GameObject("Heros_LowPoly").transform;
         heroBody.SetParent(player, false);
+        AjouterOmbreContact(player, 0.45f);
         if (personnageActuel.EstPrimitif)
         {
             // default=1 : garder exactement le personnage de base actuel.
