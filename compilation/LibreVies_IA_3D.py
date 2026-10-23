@@ -1838,6 +1838,12 @@ def editer_3d(args):
     print("Dimensions : %.1f x %.1f x %.1f cm" % tuple(etendue), flush=True)
 
 
+# Decoupage generique des objets d'un seul bloc (sortie d'un moteur 3D) en pieces nommees.
+# Mettre a False pour revenir au comportement d'avant (un objet = une piece).
+DECOUPAGE_AUTO_OBJETS = True
+DECOUPAGE_AUTO_NB_PIECES = 4
+
+
 def decouper_fichier(args):
     """Worker : separe les ailes du reste du modele, pour les deplacer independamment.
     Un modele sans ailes reste un seul objet. Lit --entrees-fichier ({"pieces": [{fichier, nom}]})
@@ -1853,6 +1859,16 @@ def decouper_fichier(args):
         noeuds = list(sc.graph.nodes_geometry)
         ailes = [n for n in noeuds if str(n).lower().startswith("ailes")]
         corps = [n for n in noeuds if n not in ailes]
+        if not ailes and DECOUPAGE_AUTO_OBJETS and len(noeuds) == 1:
+            # Objet d'un seul bloc : decoupage generique en pieces, noms automatiques.
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import decoupage_generique
+            dossier = os.path.join(os.path.dirname(p["fichier"]), "parties", "p%d" % k)
+            catalogue = decoupage_generique.decouper(p["fichier"], dossier, k=DECOUPAGE_AUTO_NB_PIECES)
+            for piece in catalogue["pieces"]:
+                sortie.append({"fichier": piece["fichier"], "nom": p["nom"] + " - " + piece["nom"]})
+            continue
         if not ailes or not corps:
             sortie.append({"fichier": p["fichier"], "nom": p["nom"]})
             continue
