@@ -1873,7 +1873,7 @@ window.addEventListener('pointerup', (e) => {
     texteActif = false;
     orbite.enabled = !zoneActive;
     const cible = groupes[parseInt(choix.value, 10)];
-    const canevas = capturerZoneTexture(x0, y0, x1, y1, cible);
+    const canevas = capturerEcran(x0, y0, x1, y1);
     if (!canevas) {
       etat.textContent = "Aucune texture trouvee dans cette zone : entoure une partie de l'autre objet.";
       return;
@@ -2085,6 +2085,22 @@ function remplirTransparence(canevas) {
   }
   ctx.putImageData(img, 0, 0);
   return canevas;
+}
+
+function capturerEcran(x0, y0, x1, y1) {
+  // Prend exactement ce qui est affiche dans le cadre (pixels de l'ecran).
+  rendu.render(scene, camera);
+  const rect = rendu.domElement.getBoundingClientRect();
+  const k = rendu.domElement.width / rect.width;
+  const sx = Math.max(0, Math.round((x0 - rect.left) * k));
+  const sy = Math.max(0, Math.round((y0 - rect.top) * k));
+  const sw = Math.max(2, Math.round((x1 - x0) * k));
+  const sh = Math.max(2, Math.round((y1 - y0) * k));
+  const canevas = document.createElement('canvas');
+  canevas.width = sw;
+  canevas.height = sh;
+  canevas.getContext('2d').drawImage(rendu.domElement, sx, sy, sw, sh, 0, 0, sw, sh);
+  return remplirTransparence(canevas);
 }
 
 function capturerZoneTexture(x0, y0, x1, y1, cible) {
