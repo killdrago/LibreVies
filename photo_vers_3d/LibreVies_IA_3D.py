@@ -1798,7 +1798,7 @@ async function charger() {
     // Pose initiale : pieces cote a cote, posees sur le sol
     groupe.position.set(decalage - boite.min.x, -boite.min.y, -(boite.min.z + boite.max.z) / 2);
     decalage += dim.x + 0.02;
-    groupes.push({ nom: p.nom, groupe, couleur: null });
+    groupes.push({ nom: p.nom, groupe, couleur: null, famille: i });
     const o = document.createElement('option');
     o.value = String(i);
     o.textContent = p.nom;
@@ -1971,7 +1971,8 @@ function decouperZone(x0, y0, x1, y1) {
   nouvelles.forEach(({ source, groupe }) => {
     zonesCreees += 1;
     ensemble.add(groupe);
-    groupes.push({ nom: source.nom + ' - zone ' + zonesCreees, groupe, couleur: source.couleur, nouvelle: true });
+    groupes.push({ nom: source.nom + ' - zone ' + zonesCreees, groupe, couleur: source.couleur, nouvelle: true,
+                   famille: source.famille });
     operation.nouvelles.push(groupes[groupes.length - 1]);
     const option = document.createElement('option');
     option.value = String(groupes.length - 1);
@@ -2015,25 +2016,46 @@ const modeTexture = document.getElementById('mode_texture');
 const fichierTexture = document.getElementById('fichier_texture');
 let texteActif = false;
 
-function uvPlanaires(geo) {
-  // Projection plane sur la plus petite dimension de la piece, ramenee entre 0 et 1 (etirement).
-  const pos = geo.attributes.position;
+function piecesDeLaFamille(entree) {
+  // Toutes les pieces issues du meme objet (pieces d'origine + zones decoupees).
+  if (!entree || entree.famille === undefined) return entree ? [entree] : [];
+  return groupes.filter(g => !g.supprime && g.famille === entree.famille);
+}
+
+function uvMonde(familles) {
+  // Boite englobante de tout l'objet en coordonnees monde : une seule projection pour toutes les pieces.
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
-  const p = [0, 0, 0];
-  for (let i = 0; i < pos.count; i++) {
-    p[0] = pos.getX(i); p[1] = pos.getY(i); p[2] = pos.getZ(i);
-    for (let c = 0; c < 3; c++) { min[c] = Math.min(min[c], p[c]); max[c] = Math.max(max[c], p[c]); }
-  }
-  const ext = [0, 1, 2].map(c => Math.max(max[c] - min[c], 1e-9));
+  const p = new THREE.Vector3();
+  familles.forEach((g) => {
+    g.groupe.updateMatrixWorld(true);
+    g.groupe.traverse((o) => {
+      if (!o.isMesh) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
+        const c = [p.x, p.y, p.z];
+        for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], c[k]); max[k] = Math.max(max[k], c[k]); }
+      }
+    });
+  });
+  const ext = [0, 1, 2].map(k => Math.max(max[k] - min[k], 1e-9));
   let axe = 0;
-  for (let c = 1; c < 3; c++) if (ext[c] < ext[axe]) axe = c;
-  const [ua, ub] = [0, 1, 2].filter(c => c !== axe);
+  for (let k = 1; k < 3; k++) if (ext[k] < ext[axe]) axe = k;
+  const [ua, ub] = [0, 1, 2].filter(k => k !== axe);
+  return { min, ext, ua, ub };
+}
+
+function uvDansBoite(o, boite) {
+  const pos = o.geometry.attributes.position;
   const uv = new Float32Array(pos.count * 2);
+  const p = new THREE.Vector3();
+  const c = [0, 0, 0];
   for (let i = 0; i < pos.count; i++) {
-    p[0] = pos.getX(i); p[1] = pos.getY(i); p[2] = pos.getZ(i);
-    uv[2 * i] = (p[ua] - min[ua]) / ext[ua];
-    uv[2 * i + 1] = 1 - (p[ub] - min[ub]) / ext[ub];
+    p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
+    c[0] = p.x; c[1] = p.y; c[2] = p.z;
+    uv[2 * i] = (c[boite.ua] - boite.min[boite.ua]) / boite.ext[boite.ua];
+    uv[2 * i + 1] = 1 - (c[boite.ub] - boite.min[boite.ub]) / boite.ext[boite.ub];
   }
   return uv;
 }
@@ -2041,7 +2063,7 @@ function uvPlanaires(geo) {
 function capturerZoneTexture(x0, y0, x1, y1, cible) {
   // Prend la partie de la texture d'un AUTRE objet qui se trouve dans le rectangle.
   const rect = rendu.domElement.getBoundingClientRect();
-  const sources = groupes.filter(g => !g.supprime && g !== cible);
+  const sources = groupes.filter(g => !g.supprime && !piecesDeLaFamille(cible).includes(g));
   const centre = new THREE.Vector3();
   for (const g of sources) {
     g.groupe.updateMatrixWorld(true);
@@ -2092,24 +2114,34 @@ function appliquerTexture(entree, canevas) {
   const tex = new THREE.CanvasTexture(canevas);
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
-  entree.groupe.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.userData.matOrig === undefined) o.userData.matOrig = o.material;
-    if (o.userData.uvOrig === undefined) o.userData.uvOrig = o.geometry.attributes.uv ? o.geometry.attributes.uv.clone() : null;
-    o.geometry.setAttribute('uv', new THREE.BufferAttribute(uvPlanaires(o.geometry), 2));
-    o.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide });
+  const familles = piecesDeLaFamille(entree);
+  const boite = uvMonde(familles);
+  familles.forEach((g) => {
+    g.groupe.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.userData.matOrig === undefined) o.userData.matOrig = o.material;
+      if (o.userData.uvOrig === undefined) o.userData.uvOrig = o.geometry.attributes.uv ? o.geometry.attributes.uv.clone() : null;
+      o.geometry.setAttribute('uv', new THREE.BufferAttribute(uvDansBoite(o, boite), 2));
+      o.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide });
+    });
+    g.couleur = null;
+    g.modifie = true;
+    g.texture = 'personnalisee';
   });
-  entree.couleur = null;
-  entree.modifie = true;
+  etat.textContent = familles.length > 1
+    ? 'Texture appliquee a tout l objet (' + familles.length + ' parties).'
+    : 'Texture appliquee.';
 }
 
 function restaurerTextureOrigine(entree) {
-  if (!entree) return;
-  entree.groupe.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.userData.matOrig !== undefined) o.material = o.userData.matOrig;
-    if (o.userData.uvOrig) o.geometry.setAttribute('uv', o.userData.uvOrig.clone());
-    else if (o.userData.uvOrig === null) o.geometry.deleteAttribute('uv');
+  piecesDeLaFamille(entree).forEach((g) => {
+    g.groupe.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.userData.matOrig !== undefined) o.material = o.userData.matOrig;
+      if (o.userData.uvOrig) o.geometry.setAttribute('uv', o.userData.uvOrig.clone());
+      else if (o.userData.uvOrig === null) o.geometry.deleteAttribute('uv');
+    });
+    g.texture = 'origine';
   });
 }
 
