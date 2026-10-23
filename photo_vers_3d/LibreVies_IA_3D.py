@@ -1935,7 +1935,7 @@ def decouper_fichier(args):
     print("Objets : %d" % len(sortie), flush=True)
 
 
-def lancer_edition(chemins, nom, log, noms=None, delai=3600):
+def lancer_edition(chemins, nom, log, noms=None, delai=3600, decouper=True):
     """Ouvre la page d'edition 3D avec les pieces (eclatees en parties), puis ecrit le modele final <nom>.glb.
     Renvoie True si le modele a ete cree."""
     import json
@@ -1947,7 +1947,10 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600):
         json.dump({"pieces": [{"fichier": c, "nom": n} for c, n in zip(chemins, noms)]}, f)
     cmd_decoupe = [venv_python(), os.path.abspath(__file__), "--worker", "--decouper-3d",
                    "--entrees-fichier", source, "--nom", nom, "--taille", "0"]
-    if executer_worker(cmd_decoupe, log) == 0 and os.path.isfile(source.replace(".json", "_parties.json")):
+    if not decouper:
+        # Pas de decoupage : chaque fichier reste une piece entiere sur la table.
+        pass
+    elif executer_worker(cmd_decoupe, log) == 0 and os.path.isfile(source.replace(".json", "_parties.json")):
         with open(source.replace(".json", "_parties.json"), encoding="utf-8") as f:
             parties = json.load(f)["pieces"]
         chemins = [p["fichier"] for p in parties]
@@ -2021,7 +2024,7 @@ def apercu_3d(args):
     print("Apercu : " + chemin, flush=True)
 
 
-def apres_generation(glbs, nom_final, log, noms, dans_chat=True):
+def apres_generation(glbs, nom_final, log, noms, dans_chat=True, decouper=True):
     """Apres la generation : montre l'apercu de chaque piece (assistant ou journal),
     puis ouvre l'edition 3D avant l'enregistrement du modele final."""
     def dire(msg):
@@ -2046,7 +2049,7 @@ def apres_generation(glbs, nom_final, log, noms, dans_chat=True):
             dire("Apercu indisponible pour '%s' (voir le journal)." % nom)
     dire("edition 3D avant l'enregistrement de '%s' : placez, agrandissez ou "
          "reduisez les pieces, puis validez." % nom_final)
-    if lancer_edition(glbs, nom_final, log, noms=noms):
+    if lancer_edition(glbs, nom_final, log, noms=noms, decouper=decouper):
         dire("modele final enregistre : sorties\\%s\\%s.glb" % (nom_final, nom_final))
     else:
         dire("edition annulee : rien n'a ete enregistre pour '%s'." % nom_final)
@@ -3636,7 +3639,20 @@ def interface():
         def travail():
             log("=== Generation de '" + nom + "' ===")
             code = lancer_generation(cmd, log)
-            if code == 0:
+            if code == 0 and moteur_actif() == "les_deux":
+                # Les deux modeles entiers, poses sur la table (pas de decoupage).
+                fichiers, etiquettes = [], []
+                principal = os.path.join(SORTIES, nom, nom + ".glb")
+                autre = os.path.join(SORTIES, nom + "_triposr", nom + "_triposr.glb")
+                if os.path.isfile(principal):
+                    fichiers.append(principal)
+                    etiquettes.append("(Stable Fast 3D)" if sf3d_installe() else "(TripoSR)")
+                if os.path.isfile(autre):
+                    fichiers.append(autre)
+                    etiquettes.append("(TripoSR)")
+                apres_generation(fichiers, nom, log, [nom + " " + e for e in etiquettes],
+                                 dans_chat=False, decouper=False)
+            elif code == 0:
                 apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom],
                                  dans_chat=False)
             log("=== Fini ===" if code == 0 else "=== ECHEC (code %d) : voir le journal ===" % code)
