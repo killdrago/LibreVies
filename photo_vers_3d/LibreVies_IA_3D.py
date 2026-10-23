@@ -1633,6 +1633,12 @@ select { font-size: 15px; padding: 4px; width: 100%; }
 <div id="scene"></div>
 <div id="panneau">
   <p><b>Objet a modifier :</b><br><select id="choix"></select></p>
+  <p><b>Texture de la piece :</b><br><select id="mode_texture">
+    <option value="origine">Texture d'origine</option>
+    <option value="personnaliser">Personnaliser : entourer une zone de l'autre objet</option>
+    <option value="importer">Importer une image</option>
+  </select>
+  <input type="file" id="fichier_texture" accept="image/*" style="display:none"></p>
   <p>Mode :
     <button id="m_translate">Deplacer</button>
     <button id="m_scale">Redimensionner</button>
@@ -1843,7 +1849,7 @@ boutonZone.onclick = () => {
 };
 
 rendu.domElement.addEventListener('pointerdown', (e) => {
-  if (!zoneActive || e.button !== 0) return;
+  if ((!zoneActive && !texteActif) || e.button !== 0) return;
   zoneDebut = { x: e.clientX, y: e.clientY };
   Object.assign(rectZone.style, { display: 'block', left: e.clientX + 'px', top: e.clientY + 'px', width: '0px', height: '0px' });
 });
@@ -1862,6 +1868,19 @@ window.addEventListener('pointerup', (e) => {
   const x0 = Math.min(e.clientX, debut.x), x1 = Math.max(e.clientX, debut.x);
   const y0 = Math.min(e.clientY, debut.y), y1 = Math.max(e.clientY, debut.y);
   if (x1 - x0 < 4 || y1 - y0 < 4) return;
+  if (texteActif) {
+    texteActif = false;
+    orbite.enabled = !zoneActive;
+    const cible = groupes[parseInt(choix.value, 10)];
+    const canevas = capturerZoneTexture(x0, y0, x1, y1, cible);
+    if (!canevas) {
+      etat.textContent = "Aucune texture trouvee dans cette zone : entoure une partie de l'autre objet.";
+      return;
+    }
+    appliquerTexture(cible, canevas);
+    etat.textContent = 'Texture copiee sur la piece.';
+    return;
+  }
   decouperZone(x0, y0, x1, y1);
 });
 
@@ -1990,6 +2009,146 @@ function annulerDecoupe() {
   etat.textContent = 'Decoupe annulee.';
 }
 document.getElementById('annuler_decoupe').onclick = annulerDecoupe;
+
+// ---- Textures : origine, personnalisee (zone copiee d'un autre objet) ou importee ----
+const modeTexture = document.getElementById('mode_texture');
+const fichierTexture = document.getElementById('fichier_texture');
+let texteActif = false;
+
+function uvPlanaires(geo) {
+  // Projection plane sur la plus petite dimension de la piece, ramenee entre 0 et 1 (etirement).
+  const pos = geo.attributes.position;
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  const p = [0, 0, 0];
+  for (let i = 0; i < pos.count; i++) {
+    p[0] = pos.getX(i); p[1] = pos.getY(i); p[2] = pos.getZ(i);
+    for (let c = 0; c < 3; c++) { min[c] = Math.min(min[c], p[c]); max[c] = Math.max(max[c], p[c]); }
+  }
+  const ext = [0, 1, 2].map(c => Math.max(max[c] - min[c], 1e-9));
+  let axe = 0;
+  for (let c = 1; c < 3; c++) if (ext[c] < ext[axe]) axe = c;
+  const [ua, ub] = [0, 1, 2].filter(c => c !== axe);
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    p[0] = pos.getX(i); p[1] = pos.getY(i); p[2] = pos.getZ(i);
+    uv[2 * i] = (p[ua] - min[ua]) / ext[ua];
+    uv[2 * i + 1] = 1 - (p[ub] - min[ub]) / ext[ub];
+  }
+  return uv;
+}
+
+function capturerZoneTexture(x0, y0, x1, y1, cible) {
+  // Prend la partie de la texture d'un AUTRE objet qui se trouve dans le rectangle.
+  const rect = rendu.domElement.getBoundingClientRect();
+  const sources = groupes.filter(g => !g.supprime && g !== cible);
+  const centre = new THREE.Vector3();
+  for (const g of sources) {
+    g.groupe.updateMatrixWorld(true);
+    const meshes = [];
+    g.groupe.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    for (const o of meshes) {
+      const image = o.material && o.material.map && o.material.map.image;
+      if (!image) continue;
+      const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      const uv = geo.attributes.uv;
+      const pos = geo.attributes.position;
+      if (!uv) continue;
+      let umin = Infinity, umax = -Infinity, vmin = Infinity, vmax = -Infinity, n = 0;
+      for (let t = 0; t < pos.count; t += 3) {
+        centre.set(
+          (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3,
+          (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3,
+          (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3);
+        centre.applyMatrix4(o.matrixWorld);
+        const s = projeterEcran(centre, rect);
+        if (!(s.z < 1 && s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1)) continue;
+        n++;
+        for (let k = 0; k < 3; k++) {
+          const u = uv.getX(t + k), v = uv.getY(t + k);
+          umin = Math.min(umin, u); umax = Math.max(umax, u);
+          vmin = Math.min(vmin, v); vmax = Math.max(vmax, v);
+        }
+      }
+      if (n === 0) continue;
+      // Texture GLB : flipY = false, donc v = 0 est la premiere ligne de l'image.
+      const L = image.width, H = image.height;
+      const sx = Math.max(0, Math.floor(umin * L));
+      const sy = Math.max(0, Math.floor(vmin * H));
+      const sw = Math.max(2, Math.min(L - sx, Math.ceil((umax - umin) * L)));
+      const sh = Math.max(2, Math.min(H - sy, Math.ceil((vmax - vmin) * H)));
+      const canevas = document.createElement('canvas');
+      canevas.width = sw;
+      canevas.height = sh;
+      canevas.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+      return canevas;
+    }
+  }
+  return null;
+}
+
+function appliquerTexture(entree, canevas) {
+  if (!entree) return;
+  const tex = new THREE.CanvasTexture(canevas);
+  tex.flipY = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  entree.groupe.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.userData.matOrig === undefined) o.userData.matOrig = o.material;
+    if (o.userData.uvOrig === undefined) o.userData.uvOrig = o.geometry.attributes.uv ? o.geometry.attributes.uv.clone() : null;
+    o.geometry.setAttribute('uv', new THREE.BufferAttribute(uvPlanaires(o.geometry), 2));
+    o.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide });
+  });
+  entree.couleur = null;
+  entree.modifie = true;
+}
+
+function restaurerTextureOrigine(entree) {
+  if (!entree) return;
+  entree.groupe.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.userData.matOrig !== undefined) o.material = o.userData.matOrig;
+    if (o.userData.uvOrig) o.geometry.setAttribute('uv', o.userData.uvOrig.clone());
+    else if (o.userData.uvOrig === null) o.geometry.deleteAttribute('uv');
+  });
+}
+
+modeTexture.onchange = () => {
+  const mode = modeTexture.value;
+  texteActif = false;
+  orbite.enabled = !zoneActive;
+  if (mode === 'origine') {
+    piecesCiblees().forEach(restaurerTextureOrigine);
+    etat.textContent = "Texture d'origine restauree.";
+    return;
+  }
+  if (choix.value === 'tous') {
+    etat.textContent = 'Choisis d abord une piece precise dans la liste.';
+    modeTexture.value = 'origine';
+    return;
+  }
+  if (mode === 'personnaliser') {
+    texteActif = true;
+    orbite.enabled = false;
+    transf.detach();
+    etat.textContent = "Entoure une zone de l'autre objet : sa texture sera copiee sur cette piece.";
+  } else if (mode === 'importer') {
+    fichierTexture.value = '';
+    fichierTexture.click();
+  }
+};
+
+fichierTexture.onchange = async () => {
+  const fichier = fichierTexture.files[0];
+  if (!fichier || choix.value === 'tous') return;
+  const bitmap = await createImageBitmap(fichier);
+  const canevas = document.createElement('canvas');
+  canevas.width = bitmap.width;
+  canevas.height = bitmap.height;
+  canevas.getContext('2d').drawImage(bitmap, 0, 0);
+  appliquerTexture(groupes[parseInt(choix.value, 10)], canevas);
+  etat.textContent = 'Image importee et appliquee sur la piece.';
+};
 
 async function exporterGlb(groupe) {
   // Export dans le repere du groupe (le placement est envoye a part dans « matrice »)
