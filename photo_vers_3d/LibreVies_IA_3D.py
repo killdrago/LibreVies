@@ -1646,6 +1646,7 @@ select { font-size: 15px; padding: 4px; width: 100%; }
   <p>
     <button id="supprimer">Supprimer la partie selectionnee</button>
     <button id="decouper_zone">Decouper une zone</button>
+    <button id="annuler_decoupe">Annuler la derniere decoupe</button>
     <button id="ok">Valider et creer le modele final</button>
     <button id="annuler">Annuler</button>
   </p>
@@ -1827,6 +1828,7 @@ const boutonZone = document.getElementById('decouper_zone');
 let zoneActive = false;
 let zoneDebut = null;
 let zonesCreees = 0;
+const pileDecoupes = [];
 
 boutonZone.onclick = () => {
   zoneActive = !zoneActive;
@@ -1895,6 +1897,7 @@ function decouperZone(x0, y0, x1, y1) {
     : [groupes[parseInt(choix.value, 10)]].filter(g => g && !g.supprime);
   let nbTriangles = 0;
   const nouvelles = [];
+  const operation = { modifs: [], sources: [], nouvelles: [] };
   cibles.forEach((g) => {
     g.groupe.updateMatrixWorld(true);
     const inverseGroupe = g.groupe.matrixWorld.clone().invert();
@@ -1919,6 +1922,7 @@ function decouperZone(x0, y0, x1, y1) {
       }
       if (dedans.length === 0) return;
       nbTriangles += dedans.length;
+      operation.modifs.push({ o: o, ancienGeo: o.geometry, ancienVisible: o.visible });
       const matOrig = o.userData.matOrig !== undefined ? o.userData.matOrig : o.material;
       // Partie restee sur le modele d'origine
       if (dehors.length === 0) {
@@ -1941,6 +1945,7 @@ function decouperZone(x0, y0, x1, y1) {
       nouveau.quaternion.copy(g.groupe.quaternion);
       nouveau.scale.copy(g.groupe.scale);
       dedansParGroupe.forEach(m => nouveau.add(m));
+      operation.sources.push({ g: g, ancienModifie: g.modifie });
       g.modifie = true;
       nouvelles.push({ source: g, groupe: nouveau });
     }
@@ -1949,15 +1954,42 @@ function decouperZone(x0, y0, x1, y1) {
     zonesCreees += 1;
     ensemble.add(groupe);
     groupes.push({ nom: source.nom + ' - zone ' + zonesCreees, groupe, couleur: source.couleur, nouvelle: true });
+    operation.nouvelles.push(groupes[groupes.length - 1]);
     const option = document.createElement('option');
     option.value = String(groupes.length - 1);
     option.textContent = groupes[groupes.length - 1].nom;
     choix.appendChild(option);
   });
+  if (operation.modifs.length) pileDecoupes.push(operation);
   etat.textContent = nbTriangles === 0
     ? 'Aucun triangle dans la zone. Essaie une zone qui recouvre le modele.'
     : nbTriangles + ' triangles separes en ' + nouvelles.length + ' nouvelle(s) partie(s).';
 }
+
+function annulerDecoupe() {
+  const op = pileDecoupes.pop();
+  if (!op) {
+    etat.textContent = 'Rien a annuler.';
+    return;
+  }
+  op.modifs.slice().reverse().forEach(({ o, ancienGeo, ancienVisible }) => {
+    if (o.geometry !== ancienGeo) o.geometry.dispose();
+    o.geometry = ancienGeo;
+    o.visible = ancienVisible;
+  });
+  op.nouvelles.forEach((entree) => {
+    const idx = groupes.indexOf(entree);
+    entree.groupe.removeFromParent();
+    entree.supprime = true;
+    const option = choix.querySelector('option[value="' + idx + '"]');
+    if (option) option.remove();
+  });
+  op.sources.forEach(({ g, ancienModifie }) => { g.modifie = ancienModifie; });
+  choix.value = 'tous';
+  selectionner('tous');
+  etat.textContent = 'Decoupe annulee.';
+}
+document.getElementById('annuler_decoupe').onclick = annulerDecoupe;
 
 async function exporterGlb(groupe) {
   // Export dans le repere du groupe (le placement est envoye a part dans « matrice »)
@@ -2052,7 +2084,7 @@ def editer_3d(args):
 
 # Decoupage generique des objets d'un seul bloc (sortie d'un moteur 3D) en pieces nommees.
 # Mettre a False pour revenir au comportement d'avant (un objet = une piece).
-DECOUPAGE_AUTO_OBJETS = True
+DECOUPAGE_AUTO_OBJETS = False
 DECOUPAGE_AUTO_NB_PIECES = 2
 
 
