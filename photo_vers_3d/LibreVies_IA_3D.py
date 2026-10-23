@@ -1645,6 +1645,7 @@ select { font-size: 15px; padding: 4px; width: 100%; }
     <button id="couleur_origine">Couleur d'origine</button></p>
   <p>
     <button id="supprimer">Supprimer la partie selectionnee</button>
+    <button id="decouper_zone">Decouper une zone</button>
     <button id="ok">Valider et creer le modele final</button>
     <button id="annuler">Annuler</button>
   </p>
@@ -1654,6 +1655,7 @@ select { font-size: 15px; padding: 4px; width: 100%; }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 const PIECES = __PIECES__;
@@ -1817,11 +1819,176 @@ document.getElementById('supprimer').onclick = () => {
   etat.textContent = 'Partie supprimee : ' + g.nom;
 };
 
+// ---- Decoupe d'une zone : on entoure une zone a l'ecran, les triangles dedans deviennent une piece ----
+const rectZone = document.createElement('div');
+rectZone.style.cssText = 'position:fixed;border:2px dashed #ff8c00;background:rgba(255,140,0,0.15);display:none;pointer-events:none;z-index:50';
+document.body.appendChild(rectZone);
+const boutonZone = document.getElementById('decouper_zone');
+let zoneActive = false;
+let zoneDebut = null;
+let zonesCreees = 0;
+
+boutonZone.onclick = () => {
+  zoneActive = !zoneActive;
+  orbite.enabled = !zoneActive;
+  boutonZone.textContent = zoneActive ? 'Decoupe de zone : ACTIVE (cliquer pour arreter)' : 'Decouper une zone';
+  if (zoneActive) {
+    transf.detach();
+    etat.textContent = 'Entoure la zone a separer : glisse la souris sur le modele.';
+  } else {
+    selectionner(choix.value);
+  }
+};
+
+rendu.domElement.addEventListener('pointerdown', (e) => {
+  if (!zoneActive || e.button !== 0) return;
+  zoneDebut = { x: e.clientX, y: e.clientY };
+  Object.assign(rectZone.style, { display: 'block', left: e.clientX + 'px', top: e.clientY + 'px', width: '0px', height: '0px' });
+});
+window.addEventListener('pointermove', (e) => {
+  if (!zoneDebut) return;
+  Object.assign(rectZone.style, {
+    left: Math.min(e.clientX, zoneDebut.x) + 'px', top: Math.min(e.clientY, zoneDebut.y) + 'px',
+    width: Math.abs(e.clientX - zoneDebut.x) + 'px', height: Math.abs(e.clientY - zoneDebut.y) + 'px',
+  });
+});
+window.addEventListener('pointerup', (e) => {
+  if (!zoneDebut) return;
+  const debut = zoneDebut;
+  zoneDebut = null;
+  rectZone.style.display = 'none';
+  const x0 = Math.min(e.clientX, debut.x), x1 = Math.max(e.clientX, debut.x);
+  const y0 = Math.min(e.clientY, debut.y), y1 = Math.max(e.clientY, debut.y);
+  if (x1 - x0 < 4 || y1 - y0 < 4) return;
+  decouperZone(x0, y0, x1, y1);
+});
+
+function projeterEcran(point, rect) {
+  const v = point.clone().project(camera);
+  return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height, z: v.z };
+}
+
+function extraireTriangles(geo, debuts) {
+  // Nouvelle geometrie non indexee avec les triangles listes (debut de chaque triangle).
+  const nVert = debuts.length * 3;
+  const g = new THREE.BufferGeometry();
+  for (const nomAttr of Object.keys(geo.attributes)) {
+    const a = geo.attributes[nomAttr];
+    const taille = a.itemSize;
+    const tab = new Float32Array(nVert * taille);
+    let k = 0;
+    debuts.forEach((t) => {
+      for (let j = 0; j < 3; j++) {
+        for (let c = 0; c < taille; c++) tab[k * taille + c] = a.array[(t + j) * taille + c];
+        k++;
+      }
+    });
+    g.setAttribute(nomAttr, new THREE.BufferAttribute(tab, taille));
+  }
+  return g;
+}
+
+function decouperZone(x0, y0, x1, y1) {
+  const rect = rendu.domElement.getBoundingClientRect();
+  const cibles = choix.value === 'tous'
+    ? groupes.filter(g => !g.supprime)
+    : [groupes[parseInt(choix.value, 10)]].filter(g => g && !g.supprime);
+  let nbTriangles = 0;
+  const nouvelles = [];
+  cibles.forEach((g) => {
+    g.groupe.updateMatrixWorld(true);
+    const inverseGroupe = g.groupe.matrixWorld.clone().invert();
+    const meshes = [];
+    g.groupe.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    const dedansParGroupe = [];
+    meshes.forEach((o) => {
+      const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      const pos = geo.attributes.position;
+      const dedans = [];
+      const dehors = [];
+      const centre = new THREE.Vector3();
+      for (let t = 0; t < pos.count; t += 3) {
+        centre.set(
+          (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3,
+          (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3,
+          (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3);
+        centre.applyMatrix4(o.matrixWorld);
+        const s = projeterEcran(centre, rect);
+        const dansZone = s.z < 1 && s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
+        (dansZone ? dedans : dehors).push(t);
+      }
+      if (dedans.length === 0) return;
+      nbTriangles += dedans.length;
+      const matOrig = o.userData.matOrig !== undefined ? o.userData.matOrig : o.material;
+      // Partie restee sur le modele d'origine
+      if (dehors.length === 0) {
+        o.visible = false;
+      } else {
+        const ancienne = o.geometry;
+        o.geometry = extraireTriangles(geo, dehors);
+        if (ancienne !== geo) ancienne.dispose();
+      }
+      // Partie decoupee : ramenee dans le repere du groupe, puis dans une nouvelle piece
+      const bloc = extraireTriangles(geo, dedans);
+      bloc.applyMatrix4(inverseGroupe.clone().multiply(o.matrixWorld));
+      const m = new THREE.Mesh(bloc, o.material.clone());
+      m.userData.matOrig = matOrig;
+      dedansParGroupe.push(m);
+    });
+    if (dedansParGroupe.length) {
+      const nouveau = new THREE.Group();
+      nouveau.position.copy(g.groupe.position);
+      nouveau.quaternion.copy(g.groupe.quaternion);
+      nouveau.scale.copy(g.groupe.scale);
+      dedansParGroupe.forEach(m => nouveau.add(m));
+      g.modifie = true;
+      nouvelles.push({ source: g, groupe: nouveau });
+    }
+  });
+  nouvelles.forEach(({ source, groupe }) => {
+    zonesCreees += 1;
+    ensemble.add(groupe);
+    groupes.push({ nom: source.nom + ' - zone ' + zonesCreees, groupe, couleur: source.couleur, nouvelle: true });
+    const option = document.createElement('option');
+    option.value = String(groupes.length - 1);
+    option.textContent = groupes[groupes.length - 1].nom;
+    choix.appendChild(option);
+  });
+  etat.textContent = nbTriangles === 0
+    ? 'Aucun triangle dans la zone. Essaie une zone qui recouvre le modele.'
+    : nbTriangles + ' triangles separes en ' + nouvelles.length + ' nouvelle(s) partie(s).';
+}
+
+async function exporterGlb(groupe) {
+  // Export dans le repere du groupe (le placement est envoye a part dans « matrice »)
+  const copie = groupe.clone(true);
+  copie.position.set(0, 0, 0);
+  copie.quaternion.identity();
+  copie.scale.set(1, 1, 1);
+  copie.updateMatrixWorld(true);
+  return new Promise((ok, ko) => new GLTFExporter().parse(copie, ok, ko, { binary: true }));
+}
+
+function enBase64(buffer) {
+  const octets = new Uint8Array(buffer);
+  let texte = '';
+  for (let i = 0; i < octets.length; i += 0x8000) {
+    texte += String.fromCharCode.apply(null, octets.subarray(i, i + 0x8000));
+  }
+  return btoa(texte);
+}
+
 document.getElementById('ok').onclick = async () => {
   scene.updateMatrixWorld(true);
-  const pieces = groupes.filter(g => !g.supprime)
-    .map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray(), couleur: g.couleur }));
   etat.textContent = 'Envoi...';
+  const pieces = [];
+  for (let i = 0; i < groupes.length; i++) {
+    const g = groupes[i];
+    if (g.supprime) continue;
+    const entree = { index: i, nom: g.nom, matrice: g.groupe.matrixWorld.toArray(), couleur: g.couleur };
+    if (g.nouvelle || g.modifie) entree.glb = enBase64(await exporterGlb(g.groupe));
+    pieces.push(entree);
+  }
   const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ pieces: pieces }) });
   etat.textContent = rep.ok ? 'Valide. Tu peux fermer cette page.' : 'Erreur d envoi.';
@@ -1963,9 +2130,21 @@ def lancer_edition(chemins, nom, log, noms=None, delai=3600, decouper=True):
     if not res or res.get("annule") or not res.get("pieces"):
         log("Edition 3D annulee : rien n'a ete cree.")
         return False
+    import base64
     entrees = os.path.join(dossier, nom + "_placement.json")
-    donnees = {"pieces": [{"fichier": c, "nom": n, "matrice": p["matrice"], "couleur": p.get("couleur")}
-                          for c, n, p in zip(chemins, noms, res["pieces"])]}
+    pieces_finales = []
+    for k, p in enumerate(res["pieces"]):
+        if p.get("glb"):
+            # Piece modifiee ou decoupee dans la page : geometrie envoyee par la page
+            os.makedirs(os.path.join(dossier, "zones"), exist_ok=True)
+            chemin = os.path.join(dossier, "zones", "piece_%02d.glb" % k)
+            with open(chemin, "wb") as f:
+                f.write(base64.b64decode(p["glb"]))
+        else:
+            chemin = chemins[p["index"]]
+        pieces_finales.append({"fichier": chemin, "nom": p["nom"], "matrice": p["matrice"],
+                               "couleur": p.get("couleur")})
+    donnees = {"pieces": pieces_finales}
     with open(entrees, "w", encoding="utf-8") as f:
         json.dump(donnees, f)
     cmd = [venv_python(), os.path.abspath(__file__), "--worker", "--editer-3d",
