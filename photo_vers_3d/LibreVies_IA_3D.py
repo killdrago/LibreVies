@@ -1878,7 +1878,6 @@ window.addEventListener('pointerup', (e) => {
       return;
     }
     appliquerTexture(cible, canevas);
-    etat.textContent = 'Texture copiee sur la piece.';
     return;
   }
   decouperZone(x0, y0, x1, y1);
