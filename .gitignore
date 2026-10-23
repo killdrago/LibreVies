@@ -60,5 +60,5 @@ __pycache__/
 /jeu/journal_auth.log
 /jeu/journal_launcher.txt
 
-# --- IA 3D (LibreVies_IA_3D.py) : environnement, code TripoSR, modeles et sorties ---
-/compilation/IA/
+# --- IA 3D (photo_vers_3d/LibreVies_IA_3D.py) : environnement, code TripoSR, modeles et sorties ---
+/photo_vers_3d/IA/

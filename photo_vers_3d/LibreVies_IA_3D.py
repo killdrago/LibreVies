@@ -4,7 +4,7 @@
 LibreVies - Photo vers modele 3D (TripoSR, processeur, sans carte NVIDIA).
 
 UN SEUL FICHIER. Double-clic (ou python LibreVies_IA_3D.py) :
-  1. cree le dossier compilation\\IA\\ (tout ce qui est IA est la dedans) ;
+  1. cree le dossier photo_vers_3d\\IA\\ (tout ce qui est IA est la dedans) ;
   2. cree un environnement Python prive (IA\\venv) ;
   3. installe automatiquement les paquets manquants (PyTorch, TripoSR, rembg...) ;
   4. telecharge le code officiel TripoSR (IA\\TripoSR) ;
@@ -14,7 +14,7 @@ UN SEUL FICHIER. Double-clic (ou python LibreVies_IA_3D.py) :
 Le premier lancement telecharge beaucoup de choses (plusieurs Go) : c'est normal.
 Les lancements suivants ne retelechargent rien.
 
-Le fichier garde les sorties dans compilation\\IA\\. Le dossier IA est ignore par Git.
+Le fichier garde les sorties dans photo_vers_3d\\IA\\. Le dossier IA est ignore par Git.
 """
 
 import argparse
