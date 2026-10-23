@@ -71,7 +71,9 @@ def _decouper_par_groupes(mesh, k):
     centres = mesh.triangles_center
     normales = mesh.face_normals
     taille = np.maximum(mesh.extents.max(), 1e-6)
-    caracteristiques = np.hstack([centres / taille, normales * 0.5])
+    # Position seulement : sur un modele genere, les normales bruitees coupent en lamelles.
+    caracteristiques = centres / taille
+    del normales
     np.random.seed(0)
     _, etiquettes = kmeans2(caracteristiques.astype(np.float64), k, minit="++", seed=0)
     morceaux = []
@@ -84,7 +86,7 @@ def _decouper_par_groupes(mesh, k):
     return morceaux
 
 
-def decouper(fichier_glb, dossier_sortie, k=4, taille_min_faces=4):
+def decouper(fichier_glb, dossier_sortie, k=2, taille_min_faces=4):
     """Decoupe le GLB et ecrit les pieces + catalogue.json. Renvoie le catalogue (dict)."""
     scene = trimesh.load(fichier_glb, force="scene")
     if not scene.geometry:

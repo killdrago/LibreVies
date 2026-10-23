@@ -1644,6 +1644,7 @@ select { font-size: 15px; padding: 4px; width: 100%; }
     <button id="appliquer_couleur">Appliquer</button>
     <button id="couleur_origine">Couleur d'origine</button></p>
   <p>
+    <button id="supprimer">Supprimer la partie selectionnee</button>
     <button id="ok">Valider et creer le modele final</button>
     <button id="annuler">Annuler</button>
   </p>
@@ -1735,7 +1736,7 @@ taille.oninput = (e) => {
 };
 
 function piecesCiblees() {
-  return choix.value === 'tous' ? groupes : [groupes[parseInt(choix.value, 10)]];
+  return choix.value === 'tous' ? groupes.filter(g => !g.supprime) : [groupes[parseInt(choix.value, 10)]];
 }
 
 document.getElementById('appliquer_couleur').onclick = () => {
@@ -1799,9 +1800,27 @@ async function charger() {
   selectionner('tous');
 }
 
+document.getElementById('supprimer').onclick = () => {
+  if (choix.value === 'tous') {
+    etat.textContent = 'Choisis une partie precise dans la liste pour la supprimer.';
+    return;
+  }
+  const idx = parseInt(choix.value, 10);
+  const g = groupes[idx];
+  if (!g || g.supprime) return;
+  transf.detach();
+  g.groupe.removeFromParent();
+  g.supprime = true;
+  choix.querySelector('option[value="' + idx + '"]').remove();
+  choix.value = 'tous';
+  selectionner('tous');
+  etat.textContent = 'Partie supprimee : ' + g.nom;
+};
+
 document.getElementById('ok').onclick = async () => {
   scene.updateMatrixWorld(true);
-  const pieces = groupes.map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray(), couleur: g.couleur }));
+  const pieces = groupes.filter(g => !g.supprime)
+    .map(g => ({ nom: g.nom, matrice: g.groupe.matrixWorld.toArray(), couleur: g.couleur }));
   etat.textContent = 'Envoi...';
   const rep = await fetch('/valider', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ pieces: pieces }) });
@@ -1867,7 +1886,7 @@ def editer_3d(args):
 # Decoupage generique des objets d'un seul bloc (sortie d'un moteur 3D) en pieces nommees.
 # Mettre a False pour revenir au comportement d'avant (un objet = une piece).
 DECOUPAGE_AUTO_OBJETS = True
-DECOUPAGE_AUTO_NB_PIECES = 4
+DECOUPAGE_AUTO_NB_PIECES = 2
 
 
 def decouper_fichier(args):
