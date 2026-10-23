@@ -881,7 +881,7 @@ def generer_image_ia(args):
     from diffusers import AutoPipelineForText2Image
 
     torch.set_num_threads(os.cpu_count() or 8)
-    print("Chargement du modele d'image (premiere fois : telechargement, plusieurs Go)...", flush=True)
+    print("Chargement du modele d'image...", flush=True)
     pipe = AutoPipelineForText2Image.from_pretrained(MODELE_IMAGE, torch_dtype=torch.float32,
                                                      use_safetensors=True)
     pipe = pipe.to("cpu")
@@ -1017,7 +1017,7 @@ def generer_sf3d(args):
         os.environ["SF3D_USE_CPU"] = "1"
     torch.set_num_threads(os.cpu_count() or 4)
     print("Calcul sur : " + device + " (" + str(torch.get_num_threads()) + " threads)", flush=True)
-    print("Chargement de Stable Fast 3D (premiere fois : telechargement)...", flush=True)
+    print("Chargement de Stable Fast 3D...", flush=True)
     model = SF3D.from_pretrained("stabilityai/stable-fast-3d", config_name="config.yaml",
                                  weight_name="model.safetensors")
     model.to(device)
@@ -1106,7 +1106,7 @@ def generer(args):
     torch.set_num_threads(os.cpu_count() or 4)
     print("Calcul sur : " + device + " (" + str(torch.get_num_threads()) + " threads)", flush=True)
 
-    print("Chargement du modele TripoSR (premiere fois : telechargement)...", flush=True)
+    print("Chargement du modele TripoSR...", flush=True)
     model = TSR.from_pretrained(
         "stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt",
     )
@@ -3651,7 +3651,7 @@ def interface():
                     fichiers.append(autre)
                     etiquettes.append("(TripoSR)")
                 apres_generation(fichiers, nom, log, [nom + " " + e for e in etiquettes],
-                                 dans_chat=False, decouper=False)
+                                 dans_chat=False)
             elif code == 0:
                 apres_generation([os.path.join(SORTIES, nom, nom + ".glb")], nom, log, [nom],
                                  dans_chat=False)
