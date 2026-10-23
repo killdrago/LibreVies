@@ -2059,6 +2059,27 @@ function uvDansBoite(o, boite) {
   return uv;
 }
 
+function remplirTransparence(canevas) {
+  // Un pixel transparent se lit en noir : on le remplace par la couleur moyenne des pixels visibles.
+  const ctx = canevas.getContext('2d');
+  const img = ctx.getImageData(0, 0, canevas.width, canevas.height);
+  const d = img.data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] > 127) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+  }
+  r = n ? r / n : 200; g = n ? g / n : 200; b = n ? b / n : 200;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    d[i] = d[i] * a + r * (1 - a);
+    d[i + 1] = d[i + 1] * a + g * (1 - a);
+    d[i + 2] = d[i + 2] * a + b * (1 - a);
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canevas;
+}
+
 function capturerZoneTexture(x0, y0, x1, y1, cible) {
   // Prend la partie de la texture d'un AUTRE objet qui se trouve dans le rectangle.
   const rect = rendu.domElement.getBoundingClientRect();
@@ -2102,7 +2123,7 @@ function capturerZoneTexture(x0, y0, x1, y1, cible) {
       canevas.width = sw;
       canevas.height = sh;
       canevas.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
-      return canevas;
+      return remplirTransparence(canevas);
     }
   }
   return null;
@@ -2180,6 +2201,7 @@ fichierTexture.onchange = async () => {
   canevas.width = bitmap.width;
   canevas.height = bitmap.height;
   canevas.getContext('2d').drawImage(bitmap, 0, 0);
+  remplirTransparence(canevas);
   appliquerTexture(groupes[parseInt(choix.value, 10)], canevas);
   etat.textContent = 'Image importee et appliquee sur la piece.';
 };
