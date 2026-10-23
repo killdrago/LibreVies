@@ -1638,7 +1638,8 @@ select { font-size: 15px; padding: 4px; width: 100%; }
     <option value="personnaliser">Personnaliser : entourer une zone de l'autre objet</option>
     <option value="importer">Importer une image</option>
   </select>
-  <input type="file" id="fichier_texture" accept="image/*" style="display:none"></p>
+  <input type="file" id="fichier_texture" accept="image/*" style="display:none">
+  <br>Taille du motif (cm) : <input type="number" id="taille_motif" value="6" min="1" max="200" style="width:60px"></p>
   <p>Mode :
     <button id="m_translate">Deplacer</button>
     <button id="m_scale">Redimensionner</button>
@@ -2053,8 +2054,14 @@ function uvDansBoite(o, boite) {
   for (let i = 0; i < pos.count; i++) {
     p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
     c[0] = p.x; c[1] = p.y; c[2] = p.z;
-    uv[2 * i] = (c[boite.ua] - boite.min[boite.ua]) / boite.ext[boite.ua];
-    uv[2 * i + 1] = 1 - (c[boite.ub] - boite.min[boite.ub]) / boite.ext[boite.ub];
+    if (boite.tuile) {
+      // Repetition : une tuile fait la taille du motif, la texture se repete sur la piece
+      uv[2 * i] = (c[boite.ua] - boite.min[boite.ua]) / boite.tuile;
+      uv[2 * i + 1] = 1 - (c[boite.ub] - boite.min[boite.ub]) / boite.tuile;
+    } else {
+      uv[2 * i] = (c[boite.ua] - boite.min[boite.ua]) / boite.ext[boite.ua];
+      uv[2 * i + 1] = 1 - (c[boite.ub] - boite.min[boite.ub]) / boite.ext[boite.ub];
+    }
   }
   return uv;
 }
@@ -2134,8 +2141,12 @@ function appliquerTexture(entree, canevas) {
   const tex = new THREE.CanvasTexture(canevas);
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   const familles = piecesDeLaFamille(entree);
   const boite = uvMonde(familles);
+  const cm = parseFloat(document.getElementById('taille_motif').value);
+  boite.tuile = (cm > 0 ? cm : 6) / 100;
   familles.forEach((g) => {
     g.groupe.traverse((o) => {
       if (!o.isMesh) return;
