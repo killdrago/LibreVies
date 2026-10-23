@@ -2128,9 +2128,12 @@ function appliquerTexture(entree, canevas) {
     g.modifie = true;
     g.texture = 'personnalisee';
   });
-  etat.textContent = familles.length > 1
-    ? 'Texture appliquee a tout l objet (' + familles.length + ' parties).'
-    : 'Texture appliquee.';
+  let maillages = 0;
+  familles.forEach((g) => g.groupe.traverse((o) => { if (o.isMesh) maillages++; }));
+  const noms = familles.map(g => g.nom).join(' | ');
+  etat.textContent = 'Texture appliquee : ' + familles.length + ' piece(s), ' + maillages
+    + ' maillage(s). Pieces : ' + noms;
+  console.log('[LV texture]', familles.length, maillages, noms);
 }
 
 function restaurerTextureOrigine(entree) {
