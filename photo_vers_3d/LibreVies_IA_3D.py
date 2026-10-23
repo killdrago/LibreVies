@@ -1892,9 +1892,8 @@ function extraireTriangles(geo, debuts) {
 
 function decouperZone(x0, y0, x1, y1) {
   const rect = rendu.domElement.getBoundingClientRect();
-  const cibles = choix.value === 'tous'
-    ? groupes.filter(g => !g.supprime)
-    : [groupes[parseInt(choix.value, 10)]].filter(g => g && !g.supprime);
+  // Toutes les pieces visibles : une zone peut couper une piece deja decoupee.
+  const cibles = groupes.filter(g => !g.supprime);
   let nbTriangles = 0;
   const nouvelles = [];
   const operation = { modifs: [], sources: [], nouvelles: [] };
@@ -1922,11 +1921,11 @@ function decouperZone(x0, y0, x1, y1) {
       }
       if (dedans.length === 0) return;
       nbTriangles += dedans.length;
-      operation.modifs.push({ o: o, ancienGeo: o.geometry, ancienVisible: o.visible });
+      operation.modifs.push({ o: o, ancienGeo: o.geometry, ancienVisible: o.visible, ancienParent: o.parent });
       const matOrig = o.userData.matOrig !== undefined ? o.userData.matOrig : o.material;
       // Partie restee sur le modele d'origine
       if (dehors.length === 0) {
-        o.visible = false;
+        o.removeFromParent();
       } else {
         const ancienne = o.geometry;
         o.geometry = extraireTriangles(geo, dehors);
@@ -1972,10 +1971,11 @@ function annulerDecoupe() {
     etat.textContent = 'Rien a annuler.';
     return;
   }
-  op.modifs.slice().reverse().forEach(({ o, ancienGeo, ancienVisible }) => {
+  op.modifs.slice().reverse().forEach(({ o, ancienGeo, ancienVisible, ancienParent }) => {
     if (o.geometry !== ancienGeo) o.geometry.dispose();
     o.geometry = ancienGeo;
     o.visible = ancienVisible;
+    if (ancienParent && !o.parent) ancienParent.add(o);
   });
   op.nouvelles.forEach((entree) => {
     const idx = groupes.indexOf(entree);
