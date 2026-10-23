@@ -46,11 +46,24 @@ def _nom_automatique(morceau, centre_total, taille_totale):
     return base + (" " + " ".join(positions) if positions else " centrale")
 
 
-def _decouper_en_composantes(mesh, taille_min_faces):
-    # Chaque morceau relie devient une piece ; seuls les minuscules fragments (bruit) sont ignores.
+def _decouper_en_composantes(mesh, taille_min_faces, max_pieces=8):
+    """Pieces = gros morceaux relies. Les petits fragments (bruit de generation) sont
+    rattaches au gros morceau le plus proche. Renvoie None si un seul gros morceau."""
     morceaux = mesh.split(only_watertight=False)
-    gardes = [m for m in morceaux if len(m.faces) >= taille_min_faces]
-    return gardes if gardes else [mesh]
+    total = sum(len(m.faces) for m in morceaux)
+    seuil = max(taille_min_faces, int(0.02 * total))
+    majeurs = sorted([m for m in morceaux if len(m.faces) >= seuil], key=lambda m: -len(m.faces))
+    if len(majeurs) <= 1:
+        return None
+    majeurs = majeurs[:max_pieces]
+    groupes = [[m] for m in majeurs]
+    centres = np.array([m.bounds.mean(axis=0) for m in majeurs])
+    for m in morceaux:
+        if any(m is g for lst in groupes for g in lst):
+            continue
+        proche = int(np.argmin(np.linalg.norm(centres - m.bounds.mean(axis=0), axis=1)))
+        groupes[proche].append(m)
+    return [trimesh.util.concatenate(lst) if len(lst) > 1 else lst[0] for lst in groupes]
 
 
 def _decouper_par_groupes(mesh, k):
@@ -81,7 +94,7 @@ def decouper(fichier_glb, dossier_sortie, k=4, taille_min_faces=4):
     os.makedirs(dossier_sortie, exist_ok=True)
 
     morceaux = _decouper_en_composantes(mesh, taille_min_faces)
-    if len(morceaux) == 1:
+    if morceaux is None:
         morceaux = _decouper_par_groupes(mesh, k)
 
     centre_total = mesh.bounds.mean(axis=0)
