@@ -936,13 +936,17 @@ def sf3d_installe():
 
 
 def moteur_actif():
-    """'sf3d' ou 'triposr' (choix du menu deroulant, enregistre dans IA/moteur.txt)."""
+    """'sf3d', 'triposr' ou 'les_deux' (choix du menu deroulant, enregistre dans IA/moteur.txt)."""
     try:
         with open(os.path.join(IA, MOTEUR_FICHIER), encoding="utf-8") as f:
             valeur = f.read().strip()
-            return valeur if valeur in ("sf3d", "triposr") else "sf3d"
+            return valeur if valeur in ("sf3d", "triposr", "les_deux") else "sf3d"
     except OSError:
         return "sf3d"
+
+
+ETIQUETTE_MOTEUR = {"sf3d": "Stable Fast 3D", "triposr": "TripoSR", "les_deux": "TripoSR + Stable Fast 3D"}
+VALEUR_MOTEUR = {v: k for k, v in ETIQUETTE_MOTEUR.items()}
 
 
 def ecrire_moteur(valeur):
@@ -1045,9 +1049,31 @@ def generer_sf3d(args):
     print("Termine en %d secondes." % int(time.time() - debut), flush=True)
 
 
+def _cmd_avec_nom(cmd, nouveau_nom):
+    """Copie de la commande worker avec un autre --nom (pour garder les deux resultats)."""
+    copie = list(cmd)
+    copie[copie.index("--nom") + 1] = nouveau_nom
+    return copie
+
+
 def lancer_generation(cmd_triposr, log):
     """Genere depuis une photo avec le moteur choisi. Si Stable Fast 3D echoue, TripoSR prend le relais.
-    Renvoie le code de sortie."""
+    Mode « les deux » : Stable Fast 3D garde le nom d'origine, TripoSR sort dans <nom>_triposr.
+    Renvoie le code de sortie (0 si le resultat principal est la)."""
+    if moteur_actif() == "les_deux":
+        nom = cmd_triposr[cmd_triposr.index("--nom") + 1]
+        if not sf3d_installe():
+            log("Stable Fast 3D n'est pas installe : TripoSR seul est lance (resultat principal).")
+            return executer_worker(cmd_triposr, log)
+        log("=== Moteur 1/2 : Stable Fast 3D ===")
+        code_sf3d = executer_worker([venv_sf3d_python()] + cmd_triposr[1:] + ["--moteur", "sf3d"], log)
+        log("=== Moteur 2/2 : TripoSR (resultat separe : " + nom + "_triposr) ===")
+        code_triposr = executer_worker(_cmd_avec_nom(cmd_triposr, nom + "_triposr"), log)
+        if code_triposr == 0:
+            log("TripoSR a produit : sorties\\" + nom + "_triposr\\" + nom + "_triposr.glb")
+        if code_sf3d == 0:
+            return 0
+        return code_triposr
     if moteur_actif() == "sf3d":
         if sf3d_installe():
             cmd_sf3d = [venv_sf3d_python()] + cmd_triposr[1:] + ["--moteur", "sf3d"]
@@ -2686,14 +2712,15 @@ def interface():
     cadre_moteur = ttk.Frame(cadre)
     cadre_moteur.grid(row=4, column=2, sticky="w", padx=5)
     ttk.Label(cadre_moteur, text="Moteur :").pack(side="left")
-    etat["moteur"] = tk.StringVar(value="Stable Fast 3D" if moteur_actif() == "sf3d" else "TripoSR")
-    ecrire_moteur("sf3d" if etat["moteur"].get() == "Stable Fast 3D" else "triposr")
+    etat["moteur"] = tk.StringVar(value=ETIQUETTE_MOTEUR.get(moteur_actif(), "Stable Fast 3D"))
+    ecrire_moteur(VALEUR_MOTEUR.get(etat["moteur"].get(), "sf3d"))
 
     def changer_moteur(_evenement=None):
-        ecrire_moteur("sf3d" if etat["moteur"].get() == "Stable Fast 3D" else "triposr")
+        ecrire_moteur(VALEUR_MOTEUR.get(etat["moteur"].get(), "sf3d"))
 
     combo_moteur = ttk.Combobox(cadre_moteur, textvariable=etat["moteur"],
-                                values=["Stable Fast 3D", "TripoSR"], width=16, state="readonly")
+                                values=["Stable Fast 3D", "TripoSR", "TripoSR + Stable Fast 3D"],
+                                width=24, state="readonly")
     combo_moteur.pack(side="left", padx=4)
     combo_moteur.bind("<<ComboboxSelected>>", changer_moteur)
 
