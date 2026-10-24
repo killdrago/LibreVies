@@ -855,6 +855,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void Update()
     {
+        if (herbeBrins && Time.time >= prochaineMajBrins)
+        {
+            prochaineMajBrins = Time.time + 0.5f;
+            MettreAJourHerbeBrins();
+        }
         if (screenAdjustEffect != null)
         {
             screenAdjustEffect.SetAdjustments(brightness, contrast);
@@ -5344,15 +5349,24 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Vraie herbe : brins fins et denses, en option (case dans GRAPHIQUE).
-    // Desactivee par defaut : la touffe basse reste l'herbe normale.
+    // Le champ est decoupe en cases de 25 m : seules les cases proches de la
+    // camera sont rendues, ce qui allege fortement la carte graphique.
+    private const float TailleCaseBrins = 25f;
+    private const float DistanceBrins = 90f;
+    private readonly List<GameObject> casesBrins = new List<GameObject>();
+    private readonly List<Vector3> centresCasesBrins = new List<Vector3>();
+    private float prochaineMajBrins;
+
     private void ActualiserHerbeBrins()
     {
         if (objetHerbeBrins != null) Destroy(objetHerbeBrins);
         objetHerbeBrins = null;
+        casesBrins.Clear();
+        centresCasesBrins.Clear();
         if (!herbeBrins) return;
         var rng = new System.Random(11);
         string[] nuances = { "Touffe1", "Touffe2", "Touffe3" };
-        var maillages = new Maillage[] { new Maillage(), new Maillage(), new Maillage() };
+        var cases = new Dictionary<int, Maillage[]>();
         int nombre = herbeBrinsNombre;
         int poses = 0;
         int essais = 0;
@@ -5365,7 +5379,12 @@ public sealed class LibreViesGame : MonoBehaviour
             if (DistRoute(p) < 3.2f || EstDansEau(p)) continue;
             if (!EmplacementLibre(x, z, 0.3f)) continue;
             int nuance = rng.Next(3);
-            maillages[nuance].Brin(
+            int ix = Mathf.FloorToInt((x + WorldSize) / TailleCaseBrins);
+            int iz = Mathf.FloorToInt((z + WorldSize) / TailleCaseBrins);
+            int cle = ix * 1000 + iz;
+            if (!cases.ContainsKey(cle))
+                cases[cle] = new Maillage[] { new Maillage(), new Maillage(), new Maillage() };
+            cases[cle][nuance].Brin(
                 new Vector3(x, TerrainHeight(x, z) - 0.02f, z),
                 (float)(0.22 + rng.NextDouble() * 0.30),
                 (float)(0.010 + rng.NextDouble() * 0.008),
@@ -5374,11 +5393,38 @@ public sealed class LibreViesGame : MonoBehaviour
             poses++;
         }
         objetHerbeBrins = new GameObject("HerbeBrins");
-        for (int i = 0; i < nuances.Length; i++)
+        foreach (var paire in cases)
         {
-            GameObject morceau = ObjetMaillage("Brins_" + (i + 1),
-                maillages[i].VersMesh("Brins"), nuances[i]);
-            morceau.transform.SetParent(objetHerbeBrins.transform, false);
+            int ix = paire.Key / 1000;
+            int iz = paire.Key % 1000;
+            Vector3 centre = new Vector3(ix * TailleCaseBrins - WorldSize + TailleCaseBrins * 0.5f,
+                0f, iz * TailleCaseBrins - WorldSize + TailleCaseBrins * 0.5f);
+            var parent = new GameObject("Case_" + ix + "_" + iz);
+            parent.transform.SetParent(objetHerbeBrins.transform, false);
+            for (int i = 0; i < nuances.Length; i++)
+            {
+                GameObject morceau = ObjetMaillage("Brins_" + (i + 1),
+                    paire.Value[i].VersMesh("Brins"), nuances[i]);
+                morceau.transform.SetParent(parent.transform, false);
+            }
+            casesBrins.Add(parent);
+            centresCasesBrins.Add(centre);
+        }
+        MettreAJourHerbeBrins();
+    }
+
+    // Affiche seulement les cases proches de la camera.
+    private void MettreAJourHerbeBrins()
+    {
+        if (objetHerbeBrins == null || gameCamera == null) return;
+        Vector3 position = gameCamera.transform.position;
+        for (int i = 0; i < casesBrins.Count; i++)
+        {
+            Vector3 centre = centresCasesBrins[i];
+            float distance = Vector2.Distance(new Vector2(centre.x, centre.z),
+                new Vector2(position.x, position.z));
+            bool visible = distance < DistanceBrins + TailleCaseBrins;
+            if (casesBrins[i].activeSelf != visible) casesBrins[i].SetActive(visible);
         }
     }
 
