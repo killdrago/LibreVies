@@ -265,6 +265,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private float qualiteGraphique = 1f;
     private float qualiteAppliquee = -1f;
     private float intensiteHalo = 0.15f;
+    private bool herbeBrins;                  // vraie herbe (brins), option GRAPHIQUE
+    private GameObject objetHerbeBrins;
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
     private int antialiasingChoix;
     private int anisotropeChoix;
@@ -339,6 +341,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public int antialiasingChoix;          // 0 = par defaut
         public int anisotropeChoix;            // 0 = par defaut
         public float intensiteHalo = -1f;      // -1 = absent : 15 %
+        public bool herbeBrins;                // vraie herbe, desactivee par defaut
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -2449,6 +2452,25 @@ public sealed class LibreViesGame : MonoBehaviour
                 Triangle(c1, c2, pointe);
                 Triangle(c2, c0, pointe);
             }
+        }
+
+        // Brin d'herbe : lame effilee (3 triangles), vue des deux cotes.
+        public void Brin(Vector3 pied, float hauteur, float largeur, float rotation, float courbure)
+        {
+            Vector3 cote = new Vector3(Mathf.Cos(rotation), 0f, Mathf.Sin(rotation)) * largeur;
+            Vector3 penche = new Vector3(Mathf.Cos(rotation + 1.7f), 0f, Mathf.Sin(rotation + 1.7f))
+                * (hauteur * courbure);
+            Vector3 b0 = pied - cote;
+            Vector3 b1 = pied + cote;
+            Vector3 m0 = pied - cote * 0.5f + Vector3.up * hauteur * 0.5f + penche * 0.25f;
+            Vector3 m1 = pied + cote * 0.5f + Vector3.up * hauteur * 0.5f + penche * 0.25f;
+            Vector3 t = pied + Vector3.up * hauteur + penche;
+            Triangle(b0, b1, m1);
+            Triangle(b0, m1, m0);
+            Triangle(m0, m1, t);
+            Triangle(m1, b1, b0);
+            Triangle(m0, b0, m1);
+            Triangle(t, m1, m0);
         }
 
         // Rocher : cube de 8 sommets deplaces au hasard (hexaedre facette).
@@ -5314,6 +5336,46 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             ObjetMaillage("Herbe_" + (teinte + 1), maillage.VersMesh("Touffes"),
                 nuances[teinte]);
+        }
+        ActualiserHerbeBrins();
+    }
+
+    // Vraie herbe : brins fins et denses, en option (case dans GRAPHIQUE).
+    // Desactivee par defaut : la touffe basse reste l'herbe normale.
+    private void ActualiserHerbeBrins()
+    {
+        if (objetHerbeBrins != null) Destroy(objetHerbeBrins);
+        objetHerbeBrins = null;
+        if (!herbeBrins) return;
+        var rng = new System.Random(11);
+        string[] nuances = { "Touffe1", "Touffe2", "Touffe3" };
+        var maillages = new Maillage[] { new Maillage(), new Maillage(), new Maillage() };
+        const int nombre = 26000;
+        int poses = 0;
+        int essais = 0;
+        while (poses < nombre && essais < nombre * 3)
+        {
+            essais++;
+            float x = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+            float z = (float)(rng.NextDouble() * (WorldSize * 2 - 8) - (WorldSize - 4));
+            var p = new Vector2(x, z);
+            if (DistRoute(p) < 3.2f || EstDansEau(p)) continue;
+            if (!EmplacementLibre(x, z, 0.3f)) continue;
+            int nuance = rng.Next(3);
+            maillages[nuance].Brin(
+                new Vector3(x, TerrainHeight(x, z) - 0.02f, z),
+                (float)(0.22 + rng.NextDouble() * 0.30),
+                (float)(0.010 + rng.NextDouble() * 0.008),
+                (float)(rng.NextDouble() * Mathf.PI * 2f),
+                (float)(0.2 + rng.NextDouble() * 0.5));
+            poses++;
+        }
+        objetHerbeBrins = new GameObject("HerbeBrins");
+        for (int i = 0; i < nuances.Length; i++)
+        {
+            GameObject morceau = ObjetMaillage("Brins_" + (i + 1),
+                maillages[i].VersMesh("Brins"), nuances[i]);
+            morceau.transform.SetParent(objetHerbeBrins.transform, false);
         }
     }
 
@@ -8624,6 +8686,13 @@ public sealed class LibreViesGame : MonoBehaviour
                 GUI.Label(new Rect(0, 256, 130, 24), "Halo des lumieres", smallStyle);
                 intensiteHalo = GUI.HorizontalSlider(new Rect(135, 265, 220, 18), intensiteHalo, 0f, 1f);
                 GUI.Label(new Rect(360, 256, 55, 24), Mathf.RoundToInt(intensiteHalo * 100) + "%", smallStyle);
+                bool herbeAvant = herbeBrins;
+                herbeBrins = GUI.Toggle(new Rect(135, 292, 260, 24), herbeBrins, " Vraie herbe (brins)");
+                if (herbeBrins != herbeAvant)
+                {
+                    ActualiserHerbeBrins();
+                    SauverConfiguration();
+                }
             }
             else
             {
@@ -8745,6 +8814,7 @@ public sealed class LibreViesGame : MonoBehaviour
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
         intensiteHalo = config.intensiteHalo < 0f ? 0.15f : Mathf.Clamp01(config.intensiteHalo);
+        herbeBrins = config.herbeBrins;
         antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
         anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);
         AppliquerFiltrage();
@@ -8816,7 +8886,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
                 antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
-                intensiteHalo = intensiteHalo,
+                intensiteHalo = intensiteHalo, herbeBrins = herbeBrins,
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
