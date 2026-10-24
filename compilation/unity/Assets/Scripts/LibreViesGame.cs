@@ -8785,7 +8785,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 {
                     int valeur;
                     if (!int.TryParse(herbeBrinsTexte, out valeur)) valeur = herbeBrinsNombre;
-                    herbeBrinsNombre = Mathf.Clamp(valeur, 1000, 120000);
+                    herbeBrinsNombre = Mathf.Clamp(valeur, 1000, 300000);
                     herbeBrinsTexte = herbeBrinsNombre.ToString();
                     if (herbeBrins) ActualiserHerbeBrins();
                     SauverConfiguration();
@@ -8913,7 +8913,7 @@ public sealed class LibreViesGame : MonoBehaviour
         intensiteHalo = config.intensiteHalo < 0f ? 0.15f : Mathf.Clamp01(config.intensiteHalo);
         herbeBrins = config.herbeBrins;
         herbeBrinsNombre = config.herbeBrinsNombre <= 0 ? 26000
-            : Mathf.Clamp(config.herbeBrinsNombre, 1000, 120000);
+            : Mathf.Clamp(config.herbeBrinsNombre, 1000, 300000);
         herbeBrinsTexte = herbeBrinsNombre.ToString();
         antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
         anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);
