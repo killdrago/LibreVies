@@ -269,6 +269,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int herbeBrinsNombre = 26000;     // nombre de brins (saisi dans GRAPHIQUE)
     private string herbeBrinsTexte = "26000";
     private GameObject objetHerbeBrins;
+    private Transform jetFontaine;
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
     private int antialiasingChoix;
     private int anisotropeChoix;
@@ -4347,15 +4348,51 @@ public sealed class LibreViesGame : MonoBehaviour
         toit.transform.localPosition = new Vector3(0f, taille.y - 0.02f, 0f);
     }
 
+    // Cuvette : mur exterieur, mur interieur, rebord et fond. Chaque face est
+    // ecrite dans le sens qui la rend visible (sens horaire vu de dessus/dehors).
+    private Maillage MailleBassin(float rayon, float rayonInt, float hauteur, float fond, int segments)
+    {
+        var m = new Maillage();
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = Mathf.PI * 2f * i / segments;
+            float a1 = Mathf.PI * 2f * (i + 1) / segments;
+            Vector3 ext0 = new Vector3(Mathf.Cos(a0) * rayon, 0f, Mathf.Sin(a0) * rayon);
+            Vector3 ext1 = new Vector3(Mathf.Cos(a1) * rayon, 0f, Mathf.Sin(a1) * rayon);
+            Vector3 int0 = new Vector3(Mathf.Cos(a0) * rayonInt, 0f, Mathf.Sin(a0) * rayonInt);
+            Vector3 int1 = new Vector3(Mathf.Cos(a1) * rayonInt, 0f, Mathf.Sin(a1) * rayonInt);
+            Vector3 haut = Vector3.up * hauteur;
+            Vector3 bas = Vector3.up * fond;
+            // Mur exterieur
+            m.Triangle(ext0, ext1 + haut, ext1);
+            m.Triangle(ext0, ext0 + haut, ext1 + haut);
+            // Mur interieur (face vers le centre)
+            m.Triangle(int0 + bas, int1 + bas, int1 + haut);
+            m.Triangle(int0 + bas, int1 + haut, int0 + haut);
+            // Rebord superieur
+            m.Triangle(ext0 + haut, int1 + haut, ext1 + haut);
+            m.Triangle(ext0 + haut, int0 + haut, int1 + haut);
+            // Fond
+            m.Triangle(bas, int1 + bas, int0 + bas);
+        }
+        return m;
+    }
+
     private void CreateFountain(Vector3 position)
     {
         var root = new GameObject("Fontaine").transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
-        Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(3.4f, 0.18f, 3.4f), "Stone", root, "Bassin");
+        // Cuvette creuse : rebord en pierre, fond, puis eau a l'interieur.
+        var cuvette = ObjetMaillage("Bassin", MailleBassin(1.7f, 1.45f, 0.6f, 0.12f, 28).VersMesh("Bassin"), "Stone");
+        cuvette.transform.SetParent(root, false);
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.42f, 0), new Vector3(2.9f, 0.01f, 2.9f), "Water", root, "EauBassin");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.1f, 0), new Vector3(0.32f, 1.1f, 0.32f), "Stone", root, "Colonne");
-        // Eau plate au sommet : l'ancienne boule bleue flottante est supprimee.
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.05f, 0), new Vector3(0.72f, 0.035f, 0.72f), "Water", root, "Eau");
-        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.17f, 0), new Vector3(0.12f, 0.12f, 0.12f), "Water", root, "Jet");
+        // Jet d'eau : colonne fine qui part du haut de la colonne et retombe dans la cuvette.
+        // Sa largeur pulse dans UpdateEffects (eau qui coule).
+        GameObject jet = Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.31f, 0), new Vector3(0.1f, 0.89f, 0.1f), "Water", root, "Jet");
+        jetFontaine = jet.transform;
+        // Vasque au sommet, pleine d'eau.
+        Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.2f, 0), new Vector3(0.56f, 0.03f, 0.56f), "Water", root, "Eau");
         ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
         ColCercle(position.x, position.z, 0.32f, 2.2f);   // colonne
     }
@@ -9129,6 +9166,12 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void UpdateEffects(float dt)
     {
+        // Jet d'eau : largeur qui pulse, pour donner l'impression qu'il coule.
+        if (jetFontaine != null)
+        {
+            float echelle = 1f + 0.12f * Mathf.Sin(Time.time * 9f);
+            jetFontaine.localScale = new Vector3(0.1f * echelle, 0.89f, 0.1f * echelle);
+        }
         // Eau : la riviere coule lentement (la texture defile dans deux directions).
         if (materielEauRiviere == null) materielEauRiviere = Mat("Eau_Riviere");
         if (materielEauRiviere != null)
