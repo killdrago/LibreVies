@@ -266,8 +266,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private float qualiteAppliquee = -1f;
     private float intensiteHalo = 0.15f;
     private bool herbeBrins;                  // vraie herbe (brins), option GRAPHIQUE
-    private int herbeBrinsNombre = 26000;     // nombre de brins (saisi dans GRAPHIQUE)
-    private string herbeBrinsTexte = "26000";
+    private const int herbeBrinsNombre = 1000000;   // nombre fixe quand la case est cochee
     private GameObject objetHerbeBrins;
     private Transform jetFontaine;
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
@@ -345,7 +344,6 @@ public sealed class LibreViesGame : MonoBehaviour
         public int anisotropeChoix;            // 0 = par defaut
         public float intensiteHalo = -1f;      // -1 = absent : 15 %
         public bool herbeBrins;                // vraie herbe, desactivee par defaut
-        public int herbeBrinsNombre = -1;      // -1 = absent : 26 000
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -8779,17 +8777,6 @@ public sealed class LibreViesGame : MonoBehaviour
                     ActualiserHerbeBrins();
                     SauverConfiguration();
                 }
-                GUI.Label(new Rect(0, 322, 130, 24), "Nombre de brins", smallStyle);
-                herbeBrinsTexte = GUI.TextField(new Rect(135, 320, 100, 26), herbeBrinsTexte, 7);
-                if (GUI.Button(new Rect(240, 320, 115, 26), "Appliquer", buttonStyle))
-                {
-                    int valeur;
-                    if (!int.TryParse(herbeBrinsTexte, out valeur)) valeur = herbeBrinsNombre;
-                    herbeBrinsNombre = Mathf.Clamp(valeur, 1000, 1000000);
-                    herbeBrinsTexte = herbeBrinsNombre.ToString();
-                    if (herbeBrins) ActualiserHerbeBrins();
-                    SauverConfiguration();
-                }
             }
             else
             {
@@ -8912,9 +8899,6 @@ public sealed class LibreViesGame : MonoBehaviour
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
         intensiteHalo = config.intensiteHalo < 0f ? 0.15f : Mathf.Clamp01(config.intensiteHalo);
         herbeBrins = config.herbeBrins;
-        herbeBrinsNombre = config.herbeBrinsNombre <= 0 ? 26000
-            : Mathf.Clamp(config.herbeBrinsNombre, 1000, 1000000);
-        herbeBrinsTexte = herbeBrinsNombre.ToString();
         antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
         anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);
         AppliquerFiltrage();
@@ -8987,7 +8971,6 @@ public sealed class LibreViesGame : MonoBehaviour
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
                 antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
                 intensiteHalo = intensiteHalo, herbeBrins = herbeBrins,
-                herbeBrinsNombre = herbeBrinsNombre,
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
