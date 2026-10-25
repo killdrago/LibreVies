@@ -129,7 +129,7 @@ Shader "LibreVies/StablePBR"
                 float diffuse = saturate(dot(normal, lightDirection));
                 float highlight = pow(saturate(dot(normal, halfDirection)), lerp(8.0, 64.0, smoothness));
                 fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz * 0.75 + fixed3(0.18, 0.18, 0.18);
-                fixed3 couleurEclairee = albedo * (ambient + diffuse * 0.72) + highlight * _Metallic * 0.18;
+                fixed3 couleurEclairee = albedo * (ambient + diffuse * 0.72) + highlight * (_Metallic * 0.18 + _RoughStrength * 0.10 * smoothness);
                 fixed3 couleurOmbree = albedo * (ambient * 0.72);
                 fixed3 colour = lerp(couleurOmbree, couleurEclairee, ombre);
                 // Un plancher de lumiere evite le noir complet sur une vieille

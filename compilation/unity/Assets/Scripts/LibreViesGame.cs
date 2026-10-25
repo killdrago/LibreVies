@@ -1644,8 +1644,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (material.HasProperty("_BumpStrength"))
         {
-            float relief = name == "Terrain" || name == "Dirt" || name == "Route_Terre" ? 0.20f
-                : (name.Contains("Roof") ? 0.16f : 0.11f);
+            float relief = name == "Terrain" || name == "Dirt" || name == "Route_Terre" ? 0.40f
+                : (name.Contains("Roof") ? 0.50f : 0.45f);
             material.SetFloat("_BumpStrength", relief);
         }
         if (material.HasProperty("_Metallic"))
