@@ -1612,6 +1612,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private int CategorieTextureMateriau(string nom)
     {
         if (string.IsNullOrEmpty(nom)) return -1;
+        // Une copie creee par rendu.material (luminosite, couleur) porte ce suffixe.
+        if (nom.EndsWith(" (Instance)")) nom = nom.Substring(0, nom.Length - " (Instance)".Length);
         for (int c = 0; c < MateriauxTextures.Length; c++)
         {
             foreach (string materiau in MateriauxTextures[c])
@@ -1741,7 +1743,9 @@ public sealed class LibreViesGame : MonoBehaviour
         return liste;
     }
 
-    // Applique tout de suite la texture choisie aux materiaux de la famille.
+    // Applique tout de suite la texture choisie. Les materiaux partages ET les
+    // copies par rendu (luminosite des murs) sont mis a jour, sinon la maison
+    // garde l'ancienne texture.
     private void ChoisirFamilleTexture(int c, string chemin)
     {
         cheminsFamilles[c] = chemin ?? "";
@@ -1754,14 +1758,51 @@ public sealed class LibreViesGame : MonoBehaviour
         foreach (Material materiau in materials)
         {
             if (materiau == null || CategorieTextureMateriau(materiau.name) != c) continue;
-            if (a != null && materiau.HasProperty("_MainTex")) materiau.SetTexture("_MainTex", a);
-            if (n != null && materiau.HasProperty("_BumpMap")) materiau.SetTexture("_BumpMap", n);
-            if (r != null && materiau.HasProperty("_RoughMap"))
+            AppliquerTexturesFamille(materiau, a, n, r);
+        }
+        Renderer[] rendus = FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Renderer rendu in rendus)
+        {
+            Material[] mats = rendu.sharedMaterials;
+            foreach (Material materiau in mats)
             {
-                materiau.SetTexture("_RoughMap", r);
-                materiau.SetFloat("_RoughStrength", 0.9f);
+                if (materiau == null || CategorieTextureMateriau(materiau.name) != c) continue;
+                AppliquerTexturesFamille(materiau, a, n, r);
             }
         }
+    }
+
+    private static void AppliquerTexturesFamille(Material materiau, Texture2D a, Texture2D n, Texture2D r)
+    {
+        if (a != null && materiau.HasProperty("_MainTex")) materiau.SetTexture("_MainTex", a);
+        if (n != null && materiau.HasProperty("_BumpMap")) materiau.SetTexture("_BumpMap", n);
+        if (r != null && materiau.HasProperty("_RoughMap"))
+        {
+            materiau.SetTexture("_RoughMap", r);
+            materiau.SetFloat("_RoughStrength", 0.9f);
+        }
+    }
+
+    // Choix en attente : ENREGISTRER les garde, ANNULER / X revient a l'etat d'avant.
+    private string[] cheminsAvantTextures = new string[5];
+
+    private void AnnulerChoixTextures()
+    {
+        for (int c = 0; c < cheminsFamilles.Length; c++)
+        {
+            if (cheminsFamilles[c] != cheminsAvantTextures[c])
+                ChoisirFamilleTexture(c, cheminsAvantTextures[c]);
+        }
+        texturesOpen = false;
+        familleTexturesFiltre = -1;
+    }
+
+    private void EnregistrerChoixTextures()
+    {
+        SauverConfiguration();
+        for (int c = 0; c < cheminsFamilles.Length; c++) cheminsAvantTextures[c] = cheminsFamilles[c];
+        texturesOpen = false;
+        familleTexturesFiltre = -1;
     }
 
     // Ouvre le menu TEXTURES sur une seule famille (0 Mur, 1 Toit, 2 Sol,
@@ -1770,6 +1811,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         familleTexturesFiltre = famille;
         if (famille >= 0) familleTexturesOuverte = famille;
+        if (!texturesOpen) cheminsFamilles.CopyTo(cheminsAvantTextures, 0);
         texturesOpen = true;
     }
 
@@ -1785,8 +1827,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Box(cadre, titre, boxStyle);
         if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
         {
-            texturesOpen = false;
-            familleTexturesFiltre = -1;
+            AnnulerChoixTextures();
             return;
         }
         // Une seule famille : pas d'onglets, la liste monte d'autant.
@@ -1815,17 +1856,18 @@ public sealed class LibreViesGame : MonoBehaviour
             if (choix.Apercu != null) GUI.DrawTexture(carre, choix.Apercu, ScaleMode.StretchToFill, false);
             GUI.Label(new Rect(x, y + 98f, 100f, 22f), choix.Nom);
             if (GUI.Button(carre, GUIContent.none, GUIStyle.none))
-            {
                 ChoisirFamilleTexture(famille, choix.Chemin);
-                SauverConfiguration();
-            }
         }
         if (liste.Count == 0)
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f + decalageListe, largeur - 32f, 22f),
                 "Aucune texture dans ce dossier pour l'instant.");
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + hauteur - 44f, largeur - 32f, 36f),
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + hauteur - 44f, 360f, 36f),
             "Pour ajouter une texture : deposez nom.png, nom_N.png et nom_R.png dans LVTextures/"
             + DossiersTextures[famille] + ", puis refaites le build.");
+        if (GUI.Button(new Rect(cadre.x + largeur - 176f, cadre.y + hauteur - 42f, 80f, 30f), "ANNULER", buttonStyle))
+            AnnulerChoixTextures();
+        if (GUI.Button(new Rect(cadre.x + largeur - 90f, cadre.y + hauteur - 42f, 80f, 30f), "ENREGISTRER", buttonStyle))
+            EnregistrerChoixTextures();
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
@@ -8871,7 +8913,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 76f, 164f, 28f),
             "TEXTURES", buttonStyle))
         {
-            if (texturesOpen) { texturesOpen = false; familleTexturesFiltre = -1; }
+            if (texturesOpen) AnnulerChoixTextures();
             else OuvrirMenuTextures(-1);
         }
         if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
