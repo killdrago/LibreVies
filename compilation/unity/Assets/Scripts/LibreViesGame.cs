@@ -1568,12 +1568,12 @@ public sealed class LibreViesGame : MonoBehaviour
             && albedoDossier != null)
             return albedoDossier;
         string chemin = null;
-        if (nom == "Route_Bord" || nom == "Brique") chemin = "LVTextures/LV_Stone";
-        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
-        else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
-        else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
-        else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
-        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/LV_Water";
+        if (nom == "Route_Bord" || nom == "Brique") chemin = "LVTextures/divers/LV_Stone";
+        else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/divers/LV_Stone";
+        else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/divers/LV_Metal";
+        else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/divers/LV_Leaf";
+        else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/divers/LV_Cloth";
+        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/divers/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
     }
 
@@ -1613,6 +1613,13 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (nom.StartsWith("Touffe")) return 2;
         return -1;
+    }
+
+    // Textures generales du jeu (pierre, metal, feuillage, eau, tissu, nuages)
+    // rangees dans LVTextures/divers ; les familles restent dans leur dossier.
+    private static string DossierTexture(string nom)
+    {
+        return nom.StartsWith("LV_") ? "LVTextures/divers" : "LVTextures";
     }
 
     private static bool EstCarteTexture(string nom)
@@ -1709,8 +1716,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (texture != null)
         {
             // Cartes PBR associees (relief et rugosite), seulement si elles existent.
-            Texture2D normale = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_N");
-            Texture2D rugosite = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_R");
+            Texture2D normale = Resources.Load<Texture2D>(DossierTexture(texture.name) + "/" + texture.name + "_N");
+            Texture2D rugosite = Resources.Load<Texture2D>(DossierTexture(texture.name) + "/" + texture.name + "_R");
             Texture2D albedoFamille, normaleFamille, rugositeFamille;
             if (TexturesCategorieMateriau(name, out albedoFamille, out normaleFamille, out rugositeFamille)
                 && albedoFamille != null)
@@ -5823,7 +5830,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Vrais nuages : plans transparents avec une texture de nuage douce, poses
         // haut dans le ciel. Ils derivent lentement comme un seul ensemble.
         Shader shader = Shader.Find("Sprites/Default");
-        Texture2D texture = Resources.Load<Texture2D>("LVTextures/LV_Cloud");
+        Texture2D texture = Resources.Load<Texture2D>("LVTextures/divers/LV_Cloud");
         if (shader == null || texture == null)
         {
             Debug.LogWarning("[LV] nuages : shader ou texture absent, ciel sans nuages.");
