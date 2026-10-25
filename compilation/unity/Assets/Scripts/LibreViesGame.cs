@@ -269,6 +269,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private const int herbeBrinsNombre = 1000000;   // nombre fixe quand la case est cochee
     private GameObject objetHerbeBrins;
     private Transform glareSoleil;
+    private Transform disqueSoleil;
     private Material glareMaterial;
     private Vector3 directionSoleilVisible = new Vector3(-0.18f, 0.48f, 0.86f).normalized;
     private readonly List<Transform> filetsFontaine = new List<Transform>();
@@ -1857,6 +1858,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // blanc devant la camera (CreerEblouissementSoleil), et le disque reste petit et blanc.
         halo.SetActive(false);
         glareSoleil = CreerEblouissementSoleil();
+        disqueSoleil = disque.transform;
         directionSoleilVisible = directionSoleil;
         Renderer haloRenderer = halo.GetComponent<Renderer>();
         Renderer disqueRenderer = disque.GetComponent<Renderer>();
@@ -9216,13 +9218,28 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void UpdateEffects(float dt)
     {
-        // Eblouissement : plus la camera regarde vers le soleil, plus le voile blanc
-        // couvre l'image devant la camera.
-        if (glareSoleil != null && gameCamera != null)
+        // Eblouissement : le voile ne commence que lorsque le disque du soleil entre dans
+        // le cadre, et il devient plus fort a mesure qu'une plus grande part du disque
+        // est visible (fraction du disque dans l'image, calculee a l'ecran).
+        if (glareSoleil != null && gameCamera != null && disqueSoleil != null)
         {
             Transform cam = gameCamera.transform;
-            float alignement = Vector3.Dot(cam.forward, directionSoleilVisible);
-            float eblouissement = Mathf.SmoothStep(0.85f, 0.995f, alignement);
+            Vector3 centre = disqueSoleil.position;
+            Vector3 bord = centre + cam.right * 2f;   // bord du disque (rayon 2 unites)
+            Vector3 vCentre = gameCamera.WorldToViewportPoint(centre);
+            Vector3 vBord = gameCamera.WorldToViewportPoint(bord);
+            float rayon = Mathf.Abs(vBord.x - vCentre.x);
+            float eblouissement = 0f;
+            if (vCentre.z > 0f)
+            {
+                float ex = Mathf.Max(0f, Mathf.Max(-vCentre.x, vCentre.x - 1f));
+                float ey = Mathf.Max(0f, Mathf.Max(-vCentre.y, vCentre.y - 1f));
+                float dehors = Mathf.Sqrt(ex * ex + ey * ey);
+                if (dehors <= 0f)
+                    eblouissement = 1f;   // centre du soleil dans l'image
+                else
+                    eblouissement = Mathf.Clamp01(0.5f + (rayon - dehors) / (2f * Mathf.Max(rayon, 0.0001f)));
+            }
             const float distanceVoile = 0.5f;
             float demiHauteur = distanceVoile * Mathf.Tan(gameCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
             float taille = demiHauteur * 2f * (0.7f + 1.8f * eblouissement);
