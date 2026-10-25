@@ -268,6 +268,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool herbeBrins;                  // vraie herbe (brins), option GRAPHIQUE
     private const int herbeBrinsNombre = 1000000;   // nombre fixe quand la case est cochee
     private GameObject objetHerbeBrins;
+    private Transform soleilHalo;
+    private Transform soleilDisque;
+    private Vector3 directionSoleilVisible = new Vector3(-0.18f, 0.48f, 0.86f).normalized;
     private readonly List<Transform> filetsFontaine = new List<Transform>();
     private readonly List<Transform> gouttesFontaine = new List<Transform>();
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
@@ -1850,6 +1853,9 @@ public sealed class LibreViesGame : MonoBehaviour
         GameObject disque = Primitive(PrimitiveType.Sphere,
             positionSoleil - directionSoleil * 1.5f, Vector3.one * 8f,
             "Soleil_Visible", null, "Soleil_Disque");
+        soleilHalo = halo.transform;
+        soleilDisque = disque.transform;
+        directionSoleilVisible = directionSoleil;
         Renderer haloRenderer = halo.GetComponent<Renderer>();
         Renderer disqueRenderer = disque.GetComponent<Renderer>();
         if (haloRenderer != null)
@@ -4396,8 +4402,8 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < 4; i++)
         {
             float angle = 0.4f + i * Mathf.PI * 0.5f;
-            Vector3 position = new Vector3(Mathf.Cos(angle) * 0.335f, 1.35f, Mathf.Sin(angle) * 0.335f);
-            GameObject filet = Primitive(PrimitiveType.Cylinder, position, new Vector3(0.05f, 0.85f, 0.05f), "Water", root, "FiletFontaine");
+            Vector3 positionFilet = new Vector3(Mathf.Cos(angle) * 0.335f, 1.35f, Mathf.Sin(angle) * 0.335f);
+            GameObject filet = Primitive(PrimitiveType.Cylinder, positionFilet, new Vector3(0.05f, 0.85f, 0.05f), "Water", root, "FiletFontaine");
             filetsFontaine.Add(filet.transform);
         }
         for (int i = 0; i < 8; i++)
@@ -9165,6 +9171,15 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void UpdateEffects(float dt)
     {
+        // Soleil : quand le joueur regarde vers lui, le halo grossit et eblouit un peu.
+        if (soleilHalo != null && gameCamera != null)
+        {
+            float alignement = Vector3.Dot(gameCamera.transform.forward, directionSoleilVisible);
+            float eblouissement = Mathf.SmoothStep(0.80f, 0.99f, alignement);
+            soleilHalo.localScale = Vector3.one * (14f * (1f + eblouissement * 1.6f));
+            if (soleilDisque != null)
+                soleilDisque.localScale = Vector3.one * (8f * (1f + eblouissement * 0.25f));
+        }
         // Fontaine : les filets pulsent legerement et les gouttes descendent de la vasque au bassin.
         if (filetsFontaine.Count > 0)
         {
