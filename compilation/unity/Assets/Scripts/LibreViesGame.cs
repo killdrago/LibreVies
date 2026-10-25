@@ -268,8 +268,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool herbeBrins;                  // vraie herbe (brins), option GRAPHIQUE
     private const int herbeBrinsNombre = 1000000;   // nombre fixe quand la case est cochee
     private GameObject objetHerbeBrins;
-    private Transform soleilHalo;
-    private Transform soleilDisque;
+    private Transform glareSoleil;
+    private Material glareMaterial;
     private Vector3 directionSoleilVisible = new Vector3(-0.18f, 0.48f, 0.86f).normalized;
     private readonly List<Transform> filetsFontaine = new List<Transform>();
     private readonly List<Transform> gouttesFontaine = new List<Transform>();
@@ -1851,13 +1851,16 @@ public sealed class LibreViesGame : MonoBehaviour
             positionSoleil + directionSoleil * 1.5f, Vector3.one * 14f,
             "Soleil_Halo", null, "Soleil_Halo");
         GameObject disque = Primitive(PrimitiveType.Sphere,
-            positionSoleil - directionSoleil * 1.5f, Vector3.one * 8f,
+            positionSoleil - directionSoleil * 1.5f, Vector3.one * 4f,
             "Soleil_Visible", null, "Soleil_Disque");
-        soleilHalo = halo.transform;
-        soleilDisque = disque.transform;
+        // Plus de grosse boule autour du soleil : le halo est remplace par un voile
+        // blanc devant la camera (CreerEblouissementSoleil), et le disque reste petit et blanc.
+        halo.SetActive(false);
+        glareSoleil = CreerEblouissementSoleil();
         directionSoleilVisible = directionSoleil;
         Renderer haloRenderer = halo.GetComponent<Renderer>();
         Renderer disqueRenderer = disque.GetComponent<Renderer>();
+        if (disqueRenderer != null) disqueRenderer.material.color = Color.white;
         if (haloRenderer != null)
         {
             haloRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -9169,16 +9172,64 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Material materielEauRiviere;
 
+    // Voile blanc devant la camera : son opacite suit la direction du regard vers le soleil.
+    private Transform CreerEblouissementSoleil()
+    {
+        GameObject voile = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        voile.name = "EblouissementSoleil";
+        Collider collision = voile.GetComponent<Collider>();
+        if (collision != null) Destroy(collision);
+        Renderer rendu = voile.GetComponent<Renderer>();
+        rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rendu.receiveShadows = false;
+        glareMaterial = new Material(Shader.Find("Sprites/Default"))
+        {
+            mainTexture = TextureEblouissement(),
+            color = new Color(1f, 1f, 1f, 0f)
+        };
+        rendu.sharedMaterial = glareMaterial;
+        return voile.transform;
+    }
+
+    // Tache circulaire douce (blanc, bord transparent), generee au demarrage.
+    private static Texture2D TextureEblouissement()
+    {
+        const int taille = 128;
+        var texture = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        var pixels = new Color[taille * taille];
+        for (int y = 0; y < taille; y++)
+        {
+            for (int x = 0; x < taille; x++)
+            {
+                float dx = (x + 0.5f) / taille * 2f - 1f;
+                float dy = (y + 0.5f) / taille * 2f - 1f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float alpha = Mathf.Pow(Mathf.Clamp01(1f - r), 2.2f);
+                pixels[y * taille + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return texture;
+    }
+
     private void UpdateEffects(float dt)
     {
-        // Soleil : quand le joueur regarde vers lui, le halo grossit et eblouit un peu.
-        if (soleilHalo != null && gameCamera != null)
+        // Eblouissement : plus la camera regarde vers le soleil, plus le voile blanc
+        // couvre l'image devant la camera.
+        if (glareSoleil != null && gameCamera != null)
         {
-            float alignement = Vector3.Dot(gameCamera.transform.forward, directionSoleilVisible);
-            float eblouissement = Mathf.SmoothStep(0.80f, 0.99f, alignement);
-            soleilHalo.localScale = Vector3.one * (14f * (1f + eblouissement * 1.6f));
-            if (soleilDisque != null)
-                soleilDisque.localScale = Vector3.one * (8f * (1f + eblouissement * 0.25f));
+            Transform cam = gameCamera.transform;
+            float alignement = Vector3.Dot(cam.forward, directionSoleilVisible);
+            float eblouissement = Mathf.SmoothStep(0.85f, 0.995f, alignement);
+            const float distanceVoile = 0.5f;
+            float demiHauteur = distanceVoile * Mathf.Tan(gameCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float taille = demiHauteur * 2f * (0.7f + 1.8f * eblouissement);
+            glareSoleil.position = cam.position + directionSoleilVisible * distanceVoile;
+            glareSoleil.rotation = cam.rotation;
+            glareSoleil.localScale = new Vector3(taille * gameCamera.aspect, taille, 1f);
+            glareMaterial.color = new Color(1f, 1f, 1f, eblouissement * 0.92f);
         }
         // Fontaine : les filets pulsent legerement et les gouttes descendent de la vasque au bassin.
         if (filetsFontaine.Count > 0)
