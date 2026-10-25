@@ -387,6 +387,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float HauteurPancarte;
         public float HauteurPorte;
         public float LuminositePancarte;
+        public string MateriauSupportPancarte;
         public float LuminositeMur;
         public float LuminositePorte;
         public float LuminositeToit;
@@ -1347,6 +1348,8 @@ public sealed class LibreViesGame : MonoBehaviour
                     AppliquerTaillePancarte(element.Facade);
                     AppliquerStylePancarte(element.Facade);
                     AppliquerLuminositePancarte(element.Facade);
+                    if (!string.IsNullOrEmpty(coordonnee.MateriauSupportPancarte))
+                        AppliquerMateriauPancarte(element.Facade, coordonnee.MateriauSupportPancarte);
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -1435,6 +1438,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.LargeurPancarte = element.Facade.LargeurPanneau;
                     coordonnee.HauteurPancarte = element.Facade.HauteurPanneau;
                     coordonnee.LuminositePancarte = element.Facade.Luminosite;
+                    coordonnee.MateriauSupportPancarte = LireMateriauSupportPancarte(element.Facade);
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -1712,6 +1716,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<ChoixTexture>[] listesChoixFamilles = new List<ChoixTexture>[5];
     private bool texturesOpen;
     private int familleTexturesOuverte;
+    // -1 : menu complet (cinq onglets). 0 a 4 : une seule famille, ouverte
+    // depuis un lien (murs, toit, pancarte, admin...).
+    private int familleTexturesFiltre = -1;
 
     private List<ChoixTexture> ListeChoixFamille(int c)
     {
@@ -1757,26 +1764,41 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // Ouvre le menu TEXTURES sur une seule famille (0 Mur, 1 Toit, 2 Sol,
+    // 3 Pave, 4 Bois), ou sur toutes les familles si famille est -1.
+    private void OuvrirMenuTextures(int famille)
+    {
+        familleTexturesFiltre = famille;
+        if (famille >= 0) familleTexturesOuverte = famille;
+        texturesOpen = true;
+    }
+
     private void DessinerChoixTextures()
     {
         float largeur = 560f;
         float hauteur = 500f;
         Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f,
             largeur, hauteur);
-        GUI.Box(cadre, "TEXTURES", boxStyle);
+        string titre = familleTexturesFiltre >= 0
+            ? "TEXTURES : " + NomsFamillesTextures[familleTexturesFiltre].ToUpperInvariant()
+            : "TEXTURES";
+        GUI.Box(cadre, titre, boxStyle);
         if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
         {
             texturesOpen = false;
+            familleTexturesFiltre = -1;
             return;
         }
-        for (int c = 0; c < NomsFamillesTextures.Length; c++)
+        // Une seule famille : pas d'onglets, la liste monte d'autant.
+        float decalageListe = familleTexturesFiltre >= 0 ? -40f : 0f;
+        for (int c = 0; c < NomsFamillesTextures.Length && familleTexturesFiltre < 0; c++)
         {
             Rect onglet = new Rect(cadre.x + 16f + c * 106f, cadre.y + 44f, 100f, 30f);
             GUIStyle style = c == familleTexturesOuverte ? tabActifStyle : buttonStyle;
             if (GUI.Button(onglet, NomsFamillesTextures[c], style)) familleTexturesOuverte = c;
         }
 
-        int famille = familleTexturesOuverte;
+        int famille = familleTexturesFiltre >= 0 ? familleTexturesFiltre : familleTexturesOuverte;
         List<ChoixTexture> liste = ListeChoixFamille(famille);
         string actif = string.IsNullOrEmpty(cheminsFamilles[famille])
             ? "LVTextures/" + DossiersTextures[famille] + "/" + NomsDefautTextures[famille]
@@ -1785,7 +1807,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             ChoixTexture choix = liste[i];
             float x = cadre.x + 16f + (i % 5) * 108f;
-            float y = cadre.y + 90f + (i / 5) * 128f;
+            float y = cadre.y + 90f + decalageListe + (i / 5) * 128f;
             Rect carre = new Rect(x, y, 96f, 96f);
             GUI.color = choix.Chemin == actif ? Color.yellow : new Color(0.35f, 0.35f, 0.35f, 1f);
             GUI.DrawTexture(new Rect(x - 3f, y - 3f, 102f, 102f), Texture2D.whiteTexture);
@@ -1799,7 +1821,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         if (liste.Count == 0)
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f, largeur - 32f, 22f),
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f + decalageListe, largeur - 32f, 22f),
                 "Aucune texture dans ce dossier pour l'instant.");
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + hauteur - 44f, largeur - 32f, 36f),
             "Pour ajouter une texture : deposez nom.png, nom_N.png et nom_R.png dans LVTextures/"
@@ -3628,7 +3650,14 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Rect CadreEditionMaison()
     {
-        return new Rect(18f, Screen.height - 410f, 480f, 390f);
+        return new Rect(18f, Screen.height - 450f, 480f, 430f);
+    }
+
+    // Lien vers le menu TEXTURES limite a une famille (Mur, Toit, Pave, Bois...).
+    private void DessinerLienTextures(Rect cadre, float y, string libelle, int famille)
+    {
+        if (GUI.Button(new Rect(cadre.x + 16f, y, 448f, 28f), libelle, buttonStyle))
+            OuvrirMenuTextures(famille);
     }
 
     private bool SourisSurPanneauMaison()
@@ -3703,6 +3732,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new[] { "MUR", "BOIS", "BRIQUE" },
                 new[] { "Wall", "Bois_Clair", "Brique" }, cadre.y + 320f);
             DessinerSliderLuminositeMaison(batiment, "mur", cadre.y + 350f);
+            DessinerLienTextures(cadre, cadre.y + 386f, "TEXTURE DES MURS...", 0);
         }
         else if (editionOutilMaison == 2)
         {
@@ -3736,6 +3766,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new[] { "ROUGE", "BOIS" },
                 new[] { "RoofRed", "Bois_Clair" }, cadre.y + 220f);
             DessinerSliderLuminositeMaison(batiment, "toit", cadre.y + 255f);
+            DessinerLienTextures(cadre, cadre.y + 290f, "TEXTURE DES TOITS...", 1);
         }
     }
 
@@ -4497,7 +4528,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!modeEdition || elementEditionDernierSelectionne == null
             || elementEditionDernierSelectionne.Facade == null) return;
         FacadeTextState facade = elementEditionDernierSelectionne.Facade;
-        Rect cadre = new Rect(18f, Screen.height - 405f, 470f, 385f);
+        Rect cadre = new Rect(18f, Screen.height - 445f, 470f, 425f);
         GUI.Box(cadre, "", boxStyle);
         GUI.Label(new Rect(cadre.x + 14f, cadre.y + 30f, 90f, 24f), "Texte :", labelStyle);
         string texte = GUI.TextField(new Rect(cadre.x + 88f, cadre.y + 28f, 350f, 28f),
@@ -4591,6 +4622,38 @@ public sealed class LibreViesGame : MonoBehaviour
             if (maison != null) elementEditionDernierSelectionne = maison;
             editionOutilMaison = 0;
         }
+        DessinerChoixSupportPancarte(facade, cadre);
+    }
+
+    // Support de la pancarte : acier, bois, ou texture de bois complete.
+    private void DessinerChoixSupportPancarte(FacadeTextState facade, Rect cadre)
+    {
+        float y = cadre.y + 388f;
+        GUI.Label(new Rect(cadre.x + 14f, y, 80f, 26f), "SUPPORT :", smallStyle);
+        if (GUI.Button(new Rect(cadre.x + 96f, y - 2f, 90f, 28f), "ACIER", buttonStyle))
+            AppliquerMateriauPancarte(facade, "MetalAluminium");
+        if (GUI.Button(new Rect(cadre.x + 192f, y - 2f, 90f, 28f), "BOIS", buttonStyle))
+            AppliquerMateriauPancarte(facade, "Bois_Clair");
+        if (GUI.Button(new Rect(cadre.x + 288f, y - 2f, 168f, 28f), "TEXTURE DU BOIS...", buttonStyle))
+            OuvrirMenuTextures(4);
+    }
+
+    private void AppliquerMateriauPancarte(FacadeTextState facade, string materiau)
+    {
+        if (facade == null || facade.Panneau == null || string.IsNullOrEmpty(materiau)) return;
+        Material materiel = Mat(materiau);
+        // Mat renvoie le premier materiau si le nom est absent : on refuse ce repli.
+        if (materiel == null || materiel.name != materiau) return;
+        Renderer rendu = facade.Panneau.GetComponent<Renderer>();
+        if (rendu != null) rendu.sharedMaterial = materiel;
+    }
+
+    private string LireMateriauSupportPancarte(FacadeTextState facade)
+    {
+        if (facade == null || facade.Panneau == null) return "";
+        Renderer rendu = facade.Panneau.GetComponent<Renderer>();
+        if (rendu == null || rendu.sharedMaterial == null) return "";
+        return rendu.sharedMaterial.name;
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
@@ -8596,6 +8659,26 @@ public sealed class LibreViesGame : MonoBehaviour
         get { return compteJoueur != null && compteJoueur.EstAdministrateur; }
     }
 
+    // Onglet Textures de l'administration : liens vers le menu TEXTURES pour
+    // chaque famille (murs, toits, gazon et sol, route et paves, bois).
+    private void DessinerAdminTextures(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f), "TEXTURES", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, 600f, 40f),
+            "Choisissez la famille a modifier. Les textures viennent des dossiers LVTextures.",
+            smallStyle);
+        string[] libelles = { "MURS", "TOITS", "GAZON ET SOL", "ROUTE ET PAVES", "BOIS" };
+        for (int c = 0; c < libelles.Length; c++)
+        {
+            if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 104f + c * 42f, 260f, 34f),
+                libelles[c], buttonStyle))
+                OuvrirMenuTextures(c);
+        }
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 104f + 5 * 42f, 260f, 34f),
+            "TOUTES LES TEXTURES", buttonStyle))
+            OuvrirMenuTextures(-1);
+    }
+
     private void DessinerAdmin()
     {
         if (!CompteAdministrateur) { adminOpen = false; return; }
@@ -8616,7 +8699,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 return;
             }
 
-            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre" };
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures" };
             for (int i = 0; i < onglets.Length; i++)
             {
                 Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -8667,6 +8750,10 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (adminTab == 4)
             {
                 DessinerAdminMonstres(contenu);
+            }
+            else if (adminTab == 5)
+            {
+                DessinerAdminTextures(contenu);
             }
         }
         finally { GUI.matrix = ancienneMatrice; }
@@ -8784,7 +8871,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 76f, 164f, 28f),
             "TEXTURES", buttonStyle))
         {
-            texturesOpen = !texturesOpen;
+            if (texturesOpen) { texturesOpen = false; familleTexturesFiltre = -1; }
+            else OuvrirMenuTextures(-1);
         }
         if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
         if (conversationOpen) DessinerConversation();
