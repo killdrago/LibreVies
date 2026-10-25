@@ -12,6 +12,10 @@ Shader "LibreVies/StablePBR"
         _Metallic ("Metallic", Range(0,1)) = 0.05
         _Smoothness ("Brillance", Range(0,1)) = 0.28
         _EmissionColor ("Emission", Color) = (0,0,0,0)
+        _BumpMap ("Relief (normale)", 2D) = "bump" {}
+        _BumpStrength ("Relief", Range(0,2)) = 0
+        _RoughMap ("Rugosite", 2D) = "white" {}
+        _RoughStrength ("Force rugosite", Range(0,1)) = 0
     }
     SubShader
     {
@@ -35,6 +39,10 @@ Shader "LibreVies/StablePBR"
             float _Metallic;
             float _Smoothness;
             fixed4 _EmissionColor;
+            sampler2D _BumpMap;
+            float _BumpStrength;
+            sampler2D _RoughMap;
+            float _RoughStrength;
 
             struct AppData
             {
@@ -72,16 +80,54 @@ Shader "LibreVies/StablePBR"
                 return sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
             }
 
+            // Normale triplanaire : la carte de relief est projetee sur les trois axes
+            // puis ramenee dans l'espace du monde. Une carte plate donne la normale
+            // geometrique, donc les materiaux sans carte ne changent pas.
+            float3 NormaleTriplanaire(float3 position, float3 normal)
+            {
+                float scale = max(_Tiling, 0.001);
+                float3 poids = abs(normal);
+                poids /= max(poids.x + poids.y + poids.z, 0.001);
+                float3 tX = tex2D(_BumpMap, position.zy * scale).rgb * 2.0 - 1.0;
+                float3 tY = tex2D(_BumpMap, position.xz * scale).rgb * 2.0 - 1.0;
+                float3 tZ = tex2D(_BumpMap, position.xy * scale).rgb * 2.0 - 1.0;
+                float sX = normal.x >= 0.0 ? 1.0 : -1.0;
+                float sY = normal.y >= 0.0 ? 1.0 : -1.0;
+                float sZ = normal.z >= 0.0 ? 1.0 : -1.0;
+                float3 nX = float3(tX.z * sX, tX.y, tX.x);
+                float3 nY = float3(tY.x, tY.z * sY, tY.y);
+                float3 nZ = float3(tZ.x, tZ.y, tZ.z * sZ);
+                return normalize(nX * poids.x + nY * poids.y + nZ * poids.z);
+            }
+
+            // Rugosite triplanaire (0 = lisse, 1 = rugueux).
+            float RugositeTriplanaire(float3 position, float3 normal)
+            {
+                float scale = max(_Tiling, 0.001);
+                float3 poids = abs(normal);
+                poids /= max(poids.x + poids.y + poids.z, 0.001);
+                float rX = tex2D(_RoughMap, position.zy * scale).r;
+                float rY = tex2D(_RoughMap, position.xz * scale).r;
+                float rZ = tex2D(_RoughMap, position.xy * scale).r;
+                return rX * poids.x + rY * poids.y + rZ * poids.z;
+            }
+
             fixed4 frag(Varyings input) : SV_Target
             {
-                float3 normal = normalize(input.worldNormal);
-                fixed3 albedo = SampleTriplanar(input.worldPosition, normal).rgb * _Color.rgb;
+                float3 normalGeometrique = normalize(input.worldNormal);
+                float3 normal = normalGeometrique;
+                float smoothness = _Smoothness;
+                if (_BumpStrength > 0.001)
+                    normal = normalize(lerp(normal, NormaleTriplanaire(input.worldPosition, normal), saturate(_BumpStrength * 4.0)));
+                if (_RoughStrength > 0.001)
+                    smoothness = lerp(_Smoothness, 1.0 - RugositeTriplanaire(input.worldPosition, normalGeometrique), _RoughStrength);
+                fixed3 albedo = SampleTriplanar(input.worldPosition, normalGeometrique).rgb * _Color.rgb;
                 UNITY_LIGHT_ATTENUATION(ombre, input, input.worldPosition);
                 float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz);
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - input.worldPosition);
                 float3 halfDirection = normalize(lightDirection + viewDirection);
                 float diffuse = saturate(dot(normal, lightDirection));
-                float highlight = pow(saturate(dot(normal, halfDirection)), lerp(8.0, 64.0, _Smoothness));
+                float highlight = pow(saturate(dot(normal, halfDirection)), lerp(8.0, 64.0, smoothness));
                 fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz * 0.75 + fixed3(0.18, 0.18, 0.18);
                 fixed3 couleurEclairee = albedo * (ambient + diffuse * 0.72) + highlight * _Metallic * 0.18;
                 fixed3 couleurOmbree = albedo * (ambient * 0.72);

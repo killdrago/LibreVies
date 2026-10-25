@@ -1610,6 +1610,19 @@ public sealed class LibreViesGame : MonoBehaviour
         if (material.HasProperty("_Color")) material.color = color;
         Texture2D texture = TextureRealiste(name);
         if (texture != null && material.HasProperty("_MainTex")) material.SetTexture("_MainTex", texture);
+        if (texture != null)
+        {
+            // Cartes PBR associees (relief et rugosite), seulement si elles existent.
+            Texture2D normale = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_N");
+            Texture2D rugosite = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_R");
+            if (normale != null && material.HasProperty("_BumpMap"))
+                material.SetTexture("_BumpMap", normale);
+            if (rugosite != null && material.HasProperty("_RoughMap"))
+            {
+                material.SetTexture("_RoughMap", rugosite);
+                material.SetFloat("_RoughStrength", 0.6f);
+            }
+        }
         if (pbr)
         {
             if (texture == null)
