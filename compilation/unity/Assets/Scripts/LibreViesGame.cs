@@ -349,6 +349,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public int anisotropeChoix;            // 0 = par defaut
         public float intensiteHalo = -1f;      // -1 = absent : 15 %
         public bool herbeBrins;                // vraie herbe, desactivee par defaut
+        public string[] texturesChoisies;      // Mur, Toit, Sol, Pave, Bois : "" ou null = texture d'origine
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -1561,13 +1562,19 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Texture2D TextureRealiste(string nom)
     {
+        // Une texture choisie dans le menu TEXTURES remplace l'origine.
+        Texture2D choisie, choisieNormale, choisieRugosite;
+        if (TexturesCategorieMateriau(nom, out choisie, out choisieNormale, out choisieRugosite)
+            && choisie != null)
+            return choisie;
         string chemin = null;
-        if (nom == "Wall") chemin = "LVTextures/LV_PlasterWall";
+        // Les pavés de la route utilisent la texture de pavés (PavingStones142).
+        if (nom == "Route_PBR" || nom == "Pave_Route") chemin = "LVTextures/LV_ConcretePaving";
+        else if (nom == "Wall") chemin = "LVTextures/LV_PlasterWall";
         else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
         else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
         else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route"
-            || nom == "Brique") chemin = "LVTextures/LV_Stone";
+        else if (nom == "Route_Bord" || nom == "Brique") chemin = "LVTextures/LV_Stone";
         else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
         else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
@@ -1575,6 +1582,227 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
         else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
+    }
+
+    // ------------------------------------------------------------------
+    // Textures par categorie (menu TEXTURES). Chaque categorie correspond a
+    // un dossier de Assets/Resources/LVTextures : l'utilisateur y depose ses
+    // images (nom.png, nom_N.png, nom_R.png), puis refait le build. Sans
+    // choix, la texture d'origine du jeu est utilisee.
+    // ------------------------------------------------------------------
+    private static readonly string[] NomsCategoriesTextures = { "Mur", "Toit", "Sol", "Pave", "Bois" };
+    private static readonly string[] DossiersCategoriesTextures =
+    {
+        "LVTextures/Mur", "LVTextures/Toit", "LVTextures/Sol", "LVTextures/Pave", "LVTextures/Bois"
+    };
+    private static readonly string[] AlbedoOrigineCategoriesTextures =
+    {
+        "LVTextures/LV_PlasterWall", "LVTextures/LV_TerracottaRoof", "LVTextures/LV_Ground",
+        "LVTextures/LV_ConcretePaving", "LVTextures/LV_Wood"
+    };
+    private static readonly string[][] MateriauxCategoriesTextures =
+    {
+        new[] { "Wall" },
+        new[] { "Roof", "RoofBlue", "RoofRed" },
+        new[] { "Terrain", "Dirt", "Route_Terre" },
+        new[] { "Route_PBR", "Pave_Route" },
+        new[] { "Wood", "Bois_Clair" }
+    };
+
+    private sealed class ChoixTexture
+    {
+        public string Nom;      // libelle affiche
+        public string Chemin;   // "" = texture d'origine, sinon "LVTextures/Dossier/nom"
+        public Texture2D Apercu;
+    }
+
+    private readonly string[] cheminsTexturesCategorie = new string[5];
+    private readonly Texture2D[] albedoCategorieActif = new Texture2D[5];
+    private readonly Texture2D[] normaleCategorieActive = new Texture2D[5];
+    private readonly Texture2D[] rugositeCategorieActive = new Texture2D[5];
+    private readonly List<ChoixTexture>[] listesChoixTextures = new List<ChoixTexture>[5];
+    private bool texturesOpen;
+    private int categorieTexturesOuverte;
+
+    private int CategorieTextureMateriau(string nom)
+    {
+        if (string.IsNullOrEmpty(nom)) return -1;
+        for (int c = 0; c < MateriauxCategoriesTextures.Length; c++)
+        {
+            foreach (string materiau in MateriauxCategoriesTextures[c])
+                if (materiau == nom) return c;
+        }
+        if (nom.StartsWith("Touffe")) return 2;
+        return -1;
+    }
+
+    private static bool EstCarteTexture(string nom)
+    {
+        return nom.EndsWith("_N") || nom.EndsWith("_NormalGL")
+            || nom.EndsWith("_R") || nom.EndsWith("_Roughness");
+    }
+
+    private static string NomBaseTexture(string nom)
+    {
+        return nom.EndsWith("_Color") ? nom.Substring(0, nom.Length - 6) : nom;
+    }
+
+    private static Texture2D ChercherCarteTexture(string dossier, string nomBase, string[] suffixes)
+    {
+        foreach (string suffixe in suffixes)
+        {
+            Texture2D carte = Resources.Load<Texture2D>(dossier + "/" + nomBase + suffixe);
+            if (carte != null) return carte;
+        }
+        return null;
+    }
+
+    // Resout l'albedo, la normale et la rugosite d'une categorie. Une carte
+    // absente du dossier choisi est remplacee par celle de l'origine.
+    private void ResoudreTexturesCategorie(int c, string cheminAlbedo,
+        out Texture2D albedo, out Texture2D normale, out Texture2D rugosite)
+    {
+        albedo = null;
+        normale = null;
+        rugosite = null;
+        string origine = AlbedoOrigineCategoriesTextures[c];
+        if (!string.IsNullOrEmpty(cheminAlbedo))
+        {
+            albedo = Resources.Load<Texture2D>(cheminAlbedo);
+            if (albedo != null)
+            {
+                int barre = cheminAlbedo.LastIndexOf('/');
+                string dossier = cheminAlbedo.Substring(0, barre);
+                string nomBase = NomBaseTexture(cheminAlbedo.Substring(barre + 1));
+                normale = ChercherCarteTexture(dossier, nomBase, new[] { "_N", "_NormalGL" });
+                rugosite = ChercherCarteTexture(dossier, nomBase, new[] { "_R", "_Roughness" });
+            }
+        }
+        if (albedo == null)
+        {
+            albedo = Resources.Load<Texture2D>(origine);
+            normale = null;
+            rugosite = null;
+        }
+        if (normale == null) normale = Resources.Load<Texture2D>(origine + "_N");
+        if (rugosite == null) rugosite = Resources.Load<Texture2D>(origine + "_R");
+    }
+
+    private bool TexturesCategorieMateriau(string nom, out Texture2D albedo,
+        out Texture2D normale, out Texture2D rugosite)
+    {
+        albedo = null;
+        normale = null;
+        rugosite = null;
+        int c = CategorieTextureMateriau(nom);
+        if (c < 0) return false;
+        if (albedoCategorieActif[c] == null && normaleCategorieActive[c] == null)
+        {
+            Texture2D a, n, r;
+            ResoudreTexturesCategorie(c, cheminsTexturesCategorie[c], out a, out n, out r);
+            albedoCategorieActif[c] = a;
+            normaleCategorieActive[c] = n;
+            rugositeCategorieActive[c] = r;
+        }
+        albedo = albedoCategorieActif[c];
+        normale = normaleCategorieActive[c];
+        rugosite = rugositeCategorieActive[c];
+        return true;
+    }
+
+    private List<ChoixTexture> ListeChoixTextures(int c)
+    {
+        if (listesChoixTextures[c] != null) return listesChoixTextures[c];
+        var liste = new List<ChoixTexture>();
+        liste.Add(new ChoixTexture
+        {
+            Nom = "Origine",
+            Chemin = "",
+            Apercu = Resources.Load<Texture2D>(AlbedoOrigineCategoriesTextures[c])
+        });
+        Texture2D[] trouvees = Resources.LoadAll<Texture2D>(DossiersCategoriesTextures[c]);
+        Array.Sort(trouvees, (a, b) => string.CompareOrdinal(a.name, b.name));
+        foreach (Texture2D texture in trouvees)
+        {
+            if (texture == null || EstCarteTexture(texture.name)) continue;
+            liste.Add(new ChoixTexture
+            {
+                Nom = NomBaseTexture(texture.name).Replace("_2K-JPG", ""),
+                Chemin = DossiersCategoriesTextures[c] + "/" + texture.name,
+                Apercu = texture
+            });
+        }
+        listesChoixTextures[c] = liste;
+        return liste;
+    }
+
+    // Applique une texture a tous les materiaux de la categorie deja crees.
+    private void ChoisirTextureCategorie(int c, string chemin)
+    {
+        cheminsTexturesCategorie[c] = chemin ?? "";
+        Texture2D albedo, normale, rugosite;
+        ResoudreTexturesCategorie(c, cheminsTexturesCategorie[c], out albedo, out normale, out rugosite);
+        albedoCategorieActif[c] = albedo;
+        normaleCategorieActive[c] = normale;
+        rugositeCategorieActive[c] = rugosite;
+        foreach (Material materiau in materials)
+        {
+            if (materiau == null || CategorieTextureMateriau(materiau.name) != c) continue;
+            if (albedo != null && materiau.HasProperty("_MainTex")) materiau.SetTexture("_MainTex", albedo);
+            if (normale != null && materiau.HasProperty("_BumpMap")) materiau.SetTexture("_BumpMap", normale);
+            if (rugosite != null && materiau.HasProperty("_RoughMap"))
+            {
+                materiau.SetTexture("_RoughMap", rugosite);
+                materiau.SetFloat("_RoughStrength", 0.9f);
+            }
+        }
+    }
+
+    private void DessinerChoixTextures()
+    {
+        float largeur = 560f;
+        float hauteur = 500f;
+        Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f,
+            largeur, hauteur);
+        GUI.Box(cadre, "TEXTURES", boxStyle);
+        if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
+        {
+            texturesOpen = false;
+            return;
+        }
+        for (int c = 0; c < NomsCategoriesTextures.Length; c++)
+        {
+            Rect onglet = new Rect(cadre.x + 16f + c * 106f, cadre.y + 44f, 100f, 30f);
+            GUIStyle style = c == categorieTexturesOuverte ? tabActifStyle : buttonStyle;
+            if (GUI.Button(onglet, NomsCategoriesTextures[c], style)) categorieTexturesOuverte = c;
+        }
+
+        int categorie = categorieTexturesOuverte;
+        List<ChoixTexture> liste = ListeChoixTextures(categorie);
+        for (int i = 0; i < liste.Count; i++)
+        {
+            ChoixTexture choix = liste[i];
+            float x = cadre.x + 16f + (i % 5) * 108f;
+            float y = cadre.y + 90f + (i / 5) * 128f;
+            Rect carre = new Rect(x, y, 96f, 96f);
+            bool selection = cheminsTexturesCategorie[categorie] == choix.Chemin;
+            GUI.color = selection ? Color.yellow : new Color(0.35f, 0.35f, 0.35f, 1f);
+            GUI.DrawTexture(new Rect(x - 3f, y - 3f, 102f, 102f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (choix.Apercu != null) GUI.DrawTexture(carre, choix.Apercu, ScaleMode.StretchToFill, false);
+            GUI.Label(new Rect(x, y + 98f, 100f, 22f), choix.Nom);
+            if (GUI.Button(carre, GUIContent.none, GUIStyle.none))
+            {
+                ChoisirTextureCategorie(categorie, choix.Chemin);
+                SauverConfiguration();
+            }
+        }
+        if (liste.Count <= 1)
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f, largeur - 32f, 22f),
+                "Aucune texture ajoutee dans ce dossier pour l'instant.");
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + hauteur - 44f, largeur - 32f, 36f),
+            "Pour ajouter une texture : deposez nom.png, nom_N.png et nom_R.png dans LVTextures/"
+            + NomsCategoriesTextures[categorie] + ", puis refaites le build.");
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
@@ -1620,6 +1848,13 @@ public sealed class LibreViesGame : MonoBehaviour
             // Cartes PBR associees (relief et rugosite), seulement si elles existent.
             Texture2D normale = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_N");
             Texture2D rugosite = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_R");
+            Texture2D albedoCategorie, normaleCategorie, rugositeCategorie;
+            if (TexturesCategorieMateriau(name, out albedoCategorie, out normaleCategorie, out rugositeCategorie)
+                && albedoCategorie != null)
+            {
+                normale = normaleCategorie;
+                rugosite = rugositeCategorie;
+            }
             if (normale != null && material.HasProperty("_BumpMap"))
                 material.SetTexture("_BumpMap", normale);
             if (rugosite != null && material.HasProperty("_RoughMap"))
@@ -8545,6 +8780,12 @@ public sealed class LibreViesGame : MonoBehaviour
             adminOpen = false;
             BasculerModeEdition();
         }
+        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 76f, 164f, 28f),
+            "TEXTURES", buttonStyle))
+        {
+            texturesOpen = !texturesOpen;
+        }
+        if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
         if (conversationOpen) DessinerConversation();
         GUI.enabled = ancienEnabledHud; // Le fond du modal ne recoit aucun clic.
         if (creationPersonnageOpen) DessinerCreationPersonnage();
@@ -8931,6 +9172,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void AppliquerConfiguration(Configuration config)
     {
+        if (config.texturesChoisies != null)
+        {
+            for (int c = 0; c < cheminsTexturesCategorie.Length && c < config.texturesChoisies.Length; c++)
+                cheminsTexturesCategorie[c] = config.texturesChoisies[c] ?? "";
+        }
         brightness = Mathf.Clamp01(config.brightness);
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
@@ -9008,6 +9254,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
                 antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
                 intensiteHalo = intensiteHalo, herbeBrins = herbeBrins,
+                texturesChoisies = (string[])cheminsTexturesCategorie.Clone(),
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
