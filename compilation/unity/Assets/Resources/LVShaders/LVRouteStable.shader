@@ -96,9 +96,13 @@ Shader "LibreVies/StablePBR"
                 float scale = max(_Tiling, 0.001);
                 float3 poids = abs(normal);
                 poids /= max(poids.x + poids.y + poids.z, 0.001);
+                // Pentes renforcees (x2,2) : les cartes de relief sont assez douces.
                 float3 tX = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, position.zy * scale).rgb * 2.0 - 1.0;
                 float3 tY = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, position.xz * scale).rgb * 2.0 - 1.0;
                 float3 tZ = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, position.xy * scale).rgb * 2.0 - 1.0;
+                tX.xy *= 2.2;
+                tY.xy *= 2.2;
+                tZ.xy *= 2.2;
                 float sX = normal.x >= 0.0 ? 1.0 : -1.0;
                 float sY = normal.y >= 0.0 ? 1.0 : -1.0;
                 float sZ = normal.z >= 0.0 ? 1.0 : -1.0;

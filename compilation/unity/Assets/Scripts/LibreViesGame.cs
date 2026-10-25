@@ -1620,7 +1620,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (rugosite != null && material.HasProperty("_RoughMap"))
             {
                 material.SetTexture("_RoughMap", rugosite);
-                material.SetFloat("_RoughStrength", 0.6f);
+                material.SetFloat("_RoughStrength", 0.9f);
             }
         }
         if (pbr)

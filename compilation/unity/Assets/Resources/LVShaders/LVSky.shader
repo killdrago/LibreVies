@@ -1,9 +1,5 @@
-// Ciel de secours du projet LibreVies (degrade bleu vif -> horizon chaud).
-//
-// Meme raison que LVColor.shader : "Skybox/Procedural" est un shader integre
-// qu'Unity peut retirer de la build (Shader.Find renvoie alors NULL et le ciel
-// n'est plus celui voulu). Ce shader est dans Assets/Resources/, donc toujours
-// embarque. Le code l'utilise quand "Skybox/Procedural" n'est pas trouve.
+// Ciel de secours du projet LibreVies (degrade bleu vif -> horizon chaud), version URP.
+// Embarque dans Assets/Resources/ : toujours present dans la build.
 Shader "LibreVies/Ciel"
 {
     Properties
@@ -12,50 +8,58 @@ Shader "LibreVies/Ciel"
         _HorizonColor ("Horizon", Color) = (0.98,0.74,0.48,1)
         _GroundColor ("Sol lointain", Color) = (0.45,0.50,0.26,1)
     }
+
     SubShader
     {
-        Tags { "Queue" = "Background" "RenderType" = "Background" "PreviewType" = "Skybox" }
+        Tags { "Queue" = "Background" "RenderType" = "Background" "PreviewType" = "Skybox" "RenderPipeline" = "UniversalPipeline" }
         Cull Off
         ZWrite Off
 
-        CGPROGRAM
-        #pragma vertex vert
-        #pragma fragment frag
-        #include "UnityCG.cginc"
-
-        struct appdata
+        Pass
         {
-            float4 vertex : POSITION;
-            float2 uv : TEXCOORD0;
-        };
+            Name "SkyUnlit"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
 
-        struct v2f
-        {
-            float4 position : SV_POSITION;
-            float3 direction : TEXCOORD0;
-        };
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-        fixed4 _SkyColor;
-        fixed4 _HorizonColor;
-        fixed4 _GroundColor;
+            CBUFFER_START(UnityPerMaterial)
+                half4 _SkyColor;
+                half4 _HorizonColor;
+                half4 _GroundColor;
+            CBUFFER_END
 
-        v2f vert(appdata v)
-        {
-            v2f o;
-            o.position = UnityObjectToClipPos(v.vertex);
-            // La sphere du cielbox est centree sur la camera : la position du
-            // sommet est donc directement la direction a colorer.
-            o.direction = v.vertex.xyz;
-            return o;
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 direction : TEXCOORD0;
+            };
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output;
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                // La sphere du ciel est centree sur la camera : la position du sommet
+                // donne directement la direction a colorer.
+                output.direction = input.positionOS.xyz;
+                return output;
+            }
+
+            half4 frag(Varyings input) : SV_Target
+            {
+                float h = normalize(input.direction).y;
+                half4 ciel = lerp(_HorizonColor, _SkyColor, saturate(h * 1.15 + 0.05));
+                return lerp(_GroundColor, ciel, saturate(h * 6.0 + 0.55));
+            }
+            ENDHLSL
         }
-
-        fixed4 frag(v2f i) : SV_Target
-        {
-            float h = normalize(i.direction).y;
-            fixed4 ciel = lerp(_HorizonColor, _SkyColor, saturate(h * 1.15 + 0.05));
-            return lerp(_GroundColor, ciel, saturate(h * 6.0 + 0.55));
-        }
-        ENDCG
     }
     Fallback Off
 }

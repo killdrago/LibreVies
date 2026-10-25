@@ -1,84 +1,98 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
-// Effet d'image porte par la camera principale. LibreViesGame est un objet
-// gestionnaire et ne recoit donc pas OnRenderImage directement.
+// Reglages d'image (luminosite, contraste, vivacite, halo, etalonnage, vignettage)
+// appliques en URP par un Volume global cree au demarrage.
+// En URP, OnRenderImage n'est plus appele : on passe par les effets de post-traitement.
+// Le post-traitement doit rester active dans le URP Asset et sur la camera (par defaut : oui).
 public sealed class LibreViesScreenAdjust : MonoBehaviour
 {
-    private Material material;
+    private GameObject volumeObjet;
+    private ColorAdjustments couleurs;
+    private Bloom bloom;
+    private Vignette vignette;
+
     private float brightness = 0.5f;
     private float contrast = 1f;
-    private float nettete = 0f;
     private float vivacite = 0f;
-    private float halo = 0f;
+    private float haloIntensite = 0f;
     private float etalonnage = 0f;
     private float vignettage = 0f;
+
+    private void Awake()
+    {
+        CreerVolume();
+    }
 
     // q entre 0 (faible) et 1 (maximum).
     public void SetQualite(float q)
     {
         q = Mathf.Clamp01(q);
-        nettete = q * 0.6f;
         vivacite = q * 0.15f;
         etalonnage = q * 0.5f;
         vignettage = q * 0.25f;
+        Appliquer();
     }
 
-    // intensite 0..1 (curseur « Halo des lumieres » des options). 100 % = 0,5 d'ajout.
+    // intensite 0..1 (curseur « Halo des lumieres » des options).
     public void SetHalo(float intensite)
     {
-        halo = Mathf.Clamp01(intensite) * 0.5f;
+        haloIntensite = Mathf.Clamp01(intensite) * 0.5f;
+        Appliquer();
     }
 
     public void SetAdjustments(float newBrightness, float newContrast)
     {
         brightness = Mathf.Clamp01(newBrightness);
         contrast = Mathf.Clamp(newContrast, 0.5f, 1.5f);
+        Appliquer();
     }
 
-    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    private void CreerVolume()
     {
-        if (material == null)
-        {
-            Shader shader = Resources.Load<Shader>("LVShaders/LVScreenAdjust");
-            if (shader != null) material = new Material(shader);
-        }
-        if (material == null)
-        {
-            Graphics.Blit(source, destination);
-            return;
-        }
-        material.SetFloat("_Brightness", brightness);
-        material.SetFloat("_Contrast", contrast);
-        material.SetFloat("_Nettete", nettete);
-        material.SetFloat("_Vivacite", vivacite);
-        material.SetFloat("_Etalonnage", etalonnage);
-        material.SetFloat("_Vignettage", vignettage);
-        material.SetFloat("_HaloIntensite", halo);
+        if (volumeObjet != null) return;
+        var profil = ScriptableObject.CreateInstance<VolumeProfile>();
+        couleurs = profil.Add<ColorAdjustments>(true);
+        couleurs.postExposure.overrideState = true;
+        couleurs.contrast.overrideState = true;
+        couleurs.saturation.overrideState = true;
+        couleurs.colorFilter.overrideState = true;
+        bloom = profil.Add<Bloom>(true);
+        bloom.intensity.overrideState = true;
+        bloom.threshold.overrideState = true;
+        vignette = profil.Add<Vignette>(true);
+        vignette.intensity.overrideState = true;
+        vignette.smoothness.overrideState = true;
 
-        if (halo > 0.001f)
-        {
-            // Halo : seuil puis flou sur un quart de la resolution (peu couteux).
-            int largeur = Mathf.Max(1, source.width / 4);
-            int hauteur = Mathf.Max(1, source.height / 4);
-            RenderTexture a = RenderTexture.GetTemporary(largeur, hauteur, 0, source.format);
-            RenderTexture b = RenderTexture.GetTemporary(largeur, hauteur, 0, source.format);
-            Graphics.Blit(source, a, material, 1);
-            Graphics.Blit(a, b, material, 2);
-            Graphics.Blit(b, a, material, 3);
-            material.SetTexture("_Halo", a);
-            Graphics.Blit(source, destination, material, 0);
-            RenderTexture.ReleaseTemporary(a);
-            RenderTexture.ReleaseTemporary(b);
-        }
-        else
-        {
-            material.SetTexture("_Halo", Texture2D.blackTexture);
-            Graphics.Blit(source, destination, material, 0);
-        }
+        volumeObjet = new GameObject("LibreViesReglagesEcran");
+        var volume = volumeObjet.AddComponent<Volume>();
+        volume.isGlobal = true;
+        volume.priority = 10f;
+        volume.profile = profil;
+        Appliquer();
+    }
+
+    private void Appliquer()
+    {
+        if (couleurs == null) return;
+        // 0,5 = image neutre ; luminosite en paliers d'exposition (EV).
+        couleurs.postExposure.value = Mathf.Log(Mathf.Max(0.05f, 1f + (brightness - 0.5f) * 0.9f), 2f);
+        // Contraste : 1 = neutre dans les options, 0 = neutre dans URP.
+        couleurs.contrast.value = Mathf.Clamp((contrast - 1f) * 100f, -100f, 100f);
+        couleurs.saturation.value = Mathf.Clamp(vivacite * 100f, -100f, 100f);
+        // Etalonnage chaud, en approximation (URP n'a pas le meme reglage ombres/lumieres).
+        couleurs.colorFilter.value = Color.Lerp(Color.white, new Color(1.04f, 1.0f, 0.95f), etalonnage);
+
+        bloom.intensity.value = haloIntensite * 2f;
+        bloom.threshold.value = 0.85f;
+
+        vignette.intensity.value = vignettage * 0.5f;
+        vignette.smoothness.value = 0.4f;
     }
 
     private void OnDestroy()
     {
-        if (material != null) Destroy(material);
+        if (volumeObjet != null) Destroy(volumeObjet);
     }
 }
