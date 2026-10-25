@@ -1561,20 +1561,111 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Texture2D TextureRealiste(string nom)
     {
+        // Familles de materiaux (murs, toits, sol, pavés, bois) : lues dans
+        // le dossier LVTextures/<famille>.
+        Texture2D albedoDossier, normaleDossier, rugositeDossier;
+        if (TexturesCategorieMateriau(nom, out albedoDossier, out normaleDossier, out rugositeDossier)
+            && albedoDossier != null)
+            return albedoDossier;
         string chemin = null;
-        if (nom == "Wall") chemin = "LVTextures/LV_PlasterWall";
-        else if (nom == "Roof" || nom == "RoofBlue" || nom == "RoofRed") chemin = "LVTextures/LV_TerracottaRoof";
-        else if (nom == "Wood" || nom == "Bois_Clair") chemin = "LVTextures/LV_Wood";
-        else if (nom == "Terrain" || nom == "Dirt" || nom.StartsWith("Touffe")) chemin = "LVTextures/LV_Ground";
-        else if (nom == "Route_PBR" || nom == "Route_Bord" || nom == "Pave_Route"
-            || nom == "Brique") chemin = "LVTextures/LV_Stone";
-        else if (nom == "Route_Terre") chemin = "LVTextures/LV_Ground";
+        if (nom == "Route_Bord" || nom == "Brique") chemin = "LVTextures/LV_Stone";
         else if (nom == "Stone" || nom.StartsWith("Roche") || nom == "Pierre_Mur") chemin = "LVTextures/LV_Stone";
         else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/LV_Metal";
         else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/LV_Leaf";
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/LV_Cloth";
         else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
+    }
+
+    // ------------------------------------------------------------------
+    // Textures par famille : chaque dossier de Assets/Resources/LVTextures
+    // correspond a une famille de materiaux. Le jeu lit directement les
+    // fichiers du dossier : pour ajouter une texture, on la depose dans le
+    // dossier (nom.png, nom_N.png, nom_R.png) puis on refait le build.
+    // La texture par defaut est NomsDefautTextures ; si elle est absente,
+    // la premiere texture du dossier est prise.
+    // ------------------------------------------------------------------
+    private static readonly string[] DossiersTextures = { "mur", "toit", "sol", "pave", "bois" };
+    private static readonly string[] NomsDefautTextures =
+    {
+        "Bricks047", "RoofingTiles014A", "Grass004", "PavingStones142", "Bark008"
+    };
+    private static readonly string[][] MateriauxTextures =
+    {
+        new[] { "Wall" },
+        new[] { "Roof", "RoofBlue", "RoofRed" },
+        new[] { "Terrain", "Dirt", "Route_Terre" },
+        new[] { "Route_PBR", "Pave_Route" },
+        new[] { "Wood", "Bois_Clair" }
+    };
+    private readonly Texture2D[] albedosFamilles = new Texture2D[5];
+    private readonly Texture2D[] normalesFamilles = new Texture2D[5];
+    private readonly Texture2D[] rugositesFamilles = new Texture2D[5];
+    private readonly bool[] famillesChargees = new bool[5];
+
+    private int CategorieTextureMateriau(string nom)
+    {
+        if (string.IsNullOrEmpty(nom)) return -1;
+        for (int c = 0; c < MateriauxTextures.Length; c++)
+        {
+            foreach (string materiau in MateriauxTextures[c])
+                if (materiau == nom) return c;
+        }
+        if (nom.StartsWith("Touffe")) return 2;
+        return -1;
+    }
+
+    private static bool EstCarteTexture(string nom)
+    {
+        return nom.EndsWith("_N") || nom.EndsWith("_NormalGL")
+            || nom.EndsWith("_R") || nom.EndsWith("_Roughness");
+    }
+
+    private static Texture2D ChercherCarteFamille(string dossier, string nomBase, string[] suffixes)
+    {
+        foreach (string suffixe in suffixes)
+        {
+            Texture2D carte = Resources.Load<Texture2D>(dossier + "/" + nomBase + suffixe);
+            if (carte != null) return carte;
+        }
+        return null;
+    }
+
+    private void ChargerFamilleTextures(int c)
+    {
+        famillesChargees[c] = true;
+        string dossier = "LVTextures/" + DossiersTextures[c];
+        Texture2D albedo = Resources.Load<Texture2D>(dossier + "/" + NomsDefautTextures[c]);
+        if (albedo == null)
+        {
+            foreach (Texture2D texture in Resources.LoadAll<Texture2D>(dossier))
+            {
+                if (texture == null || EstCarteTexture(texture.name)) continue;
+                albedo = texture;
+                break;
+            }
+        }
+        albedosFamilles[c] = albedo;
+        if (albedo == null) return;
+        string nomBase = albedo.name;
+        if (nomBase.EndsWith("_Color")) nomBase = nomBase.Substring(0, nomBase.Length - 6);
+        normalesFamilles[c] = ChercherCarteFamille(dossier, nomBase, new[] { "_N", "_NormalGL" });
+        rugositesFamilles[c] = ChercherCarteFamille(dossier, nomBase, new[] { "_R", "_Roughness" });
+    }
+
+    private bool TexturesCategorieMateriau(string nom, out Texture2D albedo,
+        out Texture2D normale, out Texture2D rugosite)
+    {
+        albedo = null;
+        normale = null;
+        rugosite = null;
+        int c = CategorieTextureMateriau(nom);
+        if (c < 0) return false;
+        if (!famillesChargees[c]) ChargerFamilleTextures(c);
+        albedo = albedosFamilles[c];
+        normale = normalesFamilles[c];
+        rugosite = rugositesFamilles[c];
+        return true;
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
@@ -1620,6 +1711,13 @@ public sealed class LibreViesGame : MonoBehaviour
             // Cartes PBR associees (relief et rugosite), seulement si elles existent.
             Texture2D normale = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_N");
             Texture2D rugosite = Resources.Load<Texture2D>("LVTextures/" + texture.name + "_R");
+            Texture2D albedoFamille, normaleFamille, rugositeFamille;
+            if (TexturesCategorieMateriau(name, out albedoFamille, out normaleFamille, out rugositeFamille)
+                && albedoFamille != null)
+            {
+                normale = normaleFamille;
+                rugosite = rugositeFamille;
+            }
             if (normale != null && material.HasProperty("_BumpMap"))
                 material.SetTexture("_BumpMap", normale);
             if (rugosite != null && material.HasProperty("_RoughMap"))
@@ -1631,10 +1729,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (pbr)
         {
             if (texture == null)
-                Debug.LogError("[LV_SHADER_ROUTE] texture absente pour Route_PBR : LVTextures/LV_ConcretePaving");
+                Debug.LogError("[LV_SHADER_ROUTE] texture absente pour Route_PBR : LVTextures/pave/PavingStones142");
             else
                 Debug.Log("[LV_SHADER_ROUTE] Route_PBR construit avec shader=" + shader.name
-                    + " texture=LVTextures/LV_ConcretePaving pbr=" + routePbrActif);
+                    + " texture=LVTextures/pave/PavingStones142 pbr=" + routePbrActif);
         }
         if (material.HasProperty("_Tiling"))
         {
