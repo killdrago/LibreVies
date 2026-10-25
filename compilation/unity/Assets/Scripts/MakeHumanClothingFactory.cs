@@ -433,10 +433,13 @@ public static class MakeHumanClothingFactory
     private static Material BuildMaterial(Option option)
     {
         bool isHair = option.resourceFolder.StartsWith(HairFolder, StringComparison.Ordinal);
-        Shader shader = Shader.Find("Standard")
-            ?? Shader.Find("Universal Render Pipeline/Lit")
+        // URP : le shader Standard (built-in) n'a pas de passe de rendu en URP
+        // (seule son ombre reste visible). On utilise donc URP Lit en premier.
+        Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
+        Shader shader = urpLit
+            ?? Shader.Find("Standard")
             ?? Shader.Find("Unlit/Color");
-        if (isHair)
+        if (isHair && urpLit == null)
         {
             // Preferer le shader cutout historique de Unity pour que l'alpha
             // des PNG hair01 soit traite comme une transparence de meches,
