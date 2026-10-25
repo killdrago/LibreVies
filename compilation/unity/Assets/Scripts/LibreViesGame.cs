@@ -388,6 +388,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public float HauteurPorte;
         public float LuminositePancarte;
         public string MateriauSupportPancarte;
+        public string TexturePanneau;
+        public string TextureMur;
+        public string TextureToit;
         public float LuminositeMur;
         public float LuminositePorte;
         public float LuminositeToit;
@@ -494,6 +497,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public float LuminositePorte = 1f;
         public float LuminositeToit = 1f;
         public bool EditionSoulevee;
+        // Texture propre a cette maison (chemin LVTextures/...), "" = famille.
+        public string TextureMur = "";
+        public string TextureToit = "";
         public Obstacle Collision;
     }
 
@@ -565,6 +571,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public GameObject Root;
         public Transform Maison;
         public Transform Panneau;
+        public string TexturePanneau = "";
         public TextMesh Texte;
         public Material MateriauTexte;
         public GameObject Soulignement;
@@ -1348,6 +1355,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     AppliquerTaillePancarte(element.Facade);
                     AppliquerStylePancarte(element.Facade);
                     AppliquerLuminositePancarte(element.Facade);
+                    element.Facade.TexturePanneau = coordonnee.TexturePanneau ?? "";
                     if (!string.IsNullOrEmpty(coordonnee.MateriauSupportPancarte))
                         AppliquerMateriauPancarte(element.Facade, coordonnee.MateriauSupportPancarte);
                 }
@@ -1369,6 +1377,8 @@ public sealed class LibreViesGame : MonoBehaviour
                         element.Maison.LuminositePorte = Mathf.Clamp(coordonnee.LuminositePorte, 0.2f, 2f);
                     if (coordonnee.LuminositeToit > 0f)
                         element.Maison.LuminositeToit = Mathf.Clamp(coordonnee.LuminositeToit, 0.2f, 2f);
+                    element.Maison.TextureMur = coordonnee.TextureMur ?? "";
+                    element.Maison.TextureToit = coordonnee.TextureToit ?? "";
                     if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
                         AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
@@ -1378,6 +1388,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     if (!string.IsNullOrEmpty(coordonnee.MateriauToit))
                         AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
                     AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
+                    AppliquerTexturesLocalesMaison(element.Maison);
                     AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
                     AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
                 }
@@ -1439,6 +1450,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.HauteurPancarte = element.Facade.HauteurPanneau;
                     coordonnee.LuminositePancarte = element.Facade.Luminosite;
                     coordonnee.MateriauSupportPancarte = LireMateriauSupportPancarte(element.Facade);
+                    coordonnee.TexturePanneau = element.Facade.TexturePanneau;
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -1448,6 +1460,8 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.MateriauFenetre = element.Maison.MateriauFenetre;
                     coordonnee.MateriauPorte = element.Maison.MateriauPorte;
                     coordonnee.MateriauToit = element.Maison.MateriauToit;
+                    coordonnee.TextureMur = element.Maison.TextureMur;
+                    coordonnee.TextureToit = element.Maison.TextureToit;
                     coordonnee.LuminositeMur = element.Maison.LuminositeMur;
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
@@ -1763,6 +1777,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Renderer[] rendus = FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (Renderer rendu in rendus)
         {
+            // Une maison ou pancarte avec sa propre texture garde son choix.
+            if (rendusTexturesLocales.Contains(rendu)) continue;
             Material[] mats = rendu.sharedMaterials;
             foreach (Material materiau in mats)
             {
@@ -1786,33 +1802,185 @@ public sealed class LibreViesGame : MonoBehaviour
     // Choix en attente : ENREGISTRER les garde, ANNULER / X revient a l'etat d'avant.
     private string[] cheminsAvantTextures = new string[5];
 
+    // Cible locale : une seule maison (zone "mur" ou "toit") ou la pancarte
+    // d'une maison (zone "pancarte"). Sans cible, le menu change la famille
+    // entiere (admin, bouton TEXTURES).
+    private Batiment texturesMaisonCible;
+    private FacadeTextState texturesPancarteCible;
+    private string texturesZoneCible;
+    private string texturesLocaleAvant;
+    // Rendus ayant leur propre texture : la famille globale ne les modifie pas.
+    private readonly HashSet<Renderer> rendusTexturesLocales = new HashSet<Renderer>();
+
+    private bool MenuTexturesLocal()
+    {
+        return texturesMaisonCible != null || texturesPancarteCible != null;
+    }
+
+    private string LireTextureCible()
+    {
+        if (texturesMaisonCible != null)
+            return texturesZoneCible == "toit" ? texturesMaisonCible.TextureToit : texturesMaisonCible.TextureMur;
+        if (texturesPancarteCible != null) return texturesPancarteCible.TexturePanneau;
+        return null;
+    }
+
+    private void EcrireTextureCible(string chemin)
+    {
+        if (texturesMaisonCible != null)
+        {
+            if (texturesZoneCible == "toit") texturesMaisonCible.TextureToit = chemin;
+            else texturesMaisonCible.TextureMur = chemin;
+        }
+        else if (texturesPancarteCible != null) texturesPancarteCible.TexturePanneau = chemin;
+    }
+
+    // Applique le choix au(x) rendu(s) de la cible ; "" = texture de la famille.
+    private void ChoisirTextureCible(string chemin)
+    {
+        EcrireTextureCible(chemin);
+        if (texturesMaisonCible != null)
+        {
+            int c = texturesZoneCible == "toit" ? 1 : 0;
+            foreach (Renderer rendu in RendusZoneMaison(texturesMaisonCible, texturesZoneCible))
+                AppliquerTextureLocale(rendu, c, chemin);
+        }
+        else if (texturesPancarteCible != null)
+        {
+            AppliquerTextureSupportPancarte(texturesPancarteCible);
+        }
+    }
+
     private void AnnulerChoixTextures()
     {
-        for (int c = 0; c < cheminsFamilles.Length; c++)
+        if (MenuTexturesLocal())
         {
-            if (cheminsFamilles[c] != cheminsAvantTextures[c])
-                ChoisirFamilleTexture(c, cheminsAvantTextures[c]);
+            if (texturesLocaleAvant != LireTextureCible()) ChoisirTextureCible(texturesLocaleAvant);
         }
-        texturesOpen = false;
-        familleTexturesFiltre = -1;
+        else
+        {
+            for (int c = 0; c < cheminsFamilles.Length; c++)
+            {
+                if (cheminsFamilles[c] != cheminsAvantTextures[c])
+                    ChoisirFamilleTexture(c, cheminsAvantTextures[c]);
+            }
+        }
+        FermerMenuTextures();
     }
 
     private void EnregistrerChoixTextures()
     {
-        SauverConfiguration();
-        for (int c = 0; c < cheminsFamilles.Length; c++) cheminsAvantTextures[c] = cheminsFamilles[c];
+        if (MenuTexturesLocal())
+        {
+            EnregistrerCoordonneesEdition();
+        }
+        else
+        {
+            SauverConfiguration();
+            for (int c = 0; c < cheminsFamilles.Length; c++) cheminsAvantTextures[c] = cheminsFamilles[c];
+        }
+        FermerMenuTextures();
+    }
+
+    private void FermerMenuTextures()
+    {
         texturesOpen = false;
         familleTexturesFiltre = -1;
+        texturesMaisonCible = null;
+        texturesPancarteCible = null;
+        texturesZoneCible = null;
     }
 
     // Ouvre le menu TEXTURES sur une seule famille (0 Mur, 1 Toit, 2 Sol,
     // 3 Pave, 4 Bois), ou sur toutes les familles si famille est -1.
     private void OuvrirMenuTextures(int famille)
     {
+        if (texturesOpen) AnnulerChoixTextures();
+        texturesMaisonCible = null;
+        texturesPancarteCible = null;
+        texturesZoneCible = null;
         familleTexturesFiltre = famille;
         if (famille >= 0) familleTexturesOuverte = famille;
-        if (!texturesOpen) cheminsFamilles.CopyTo(cheminsAvantTextures, 0);
+        cheminsFamilles.CopyTo(cheminsAvantTextures, 0);
         texturesOpen = true;
+    }
+
+    // Ouvre le menu TEXTURES pour une seule maison (mur ou toit) ou pour la
+    // pancarte de cette maison. Le choix ne touche que cet objet.
+    private void OuvrirTexturesLocales(Batiment maison, FacadeTextState pancarte, string zone, int famille)
+    {
+        if (texturesOpen) AnnulerChoixTextures();
+        texturesMaisonCible = maison;
+        texturesPancarteCible = pancarte;
+        texturesZoneCible = zone;
+        texturesLocaleAvant = LireTextureCible() ?? "";
+        familleTexturesFiltre = famille;
+        familleTexturesOuverte = famille;
+        texturesOpen = true;
+    }
+
+    // Rendus d'une zone de maison, comme pour la couleur et la luminosite.
+    private List<Renderer> RendusZoneMaison(Batiment batiment, string zone)
+    {
+        var liste = new List<Renderer>();
+        if (batiment == null || batiment.Root == null) return liste;
+        Renderer[] tous = batiment.Root.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer rendu in tous)
+        {
+            string nom = rendu.gameObject.name ?? "";
+            bool concerne = zone == "toit"
+                ? nom.StartsWith("Toit_")
+                : (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                    || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"));
+            if (concerne) liste.Add(rendu);
+        }
+        return liste;
+    }
+
+    // Applique une texture a un seul rendu. chemin vide : retour a la famille
+    // globale, et le rendu redevient sensible au menu general.
+    private void AppliquerTextureLocale(Renderer rendu, int c, string chemin)
+    {
+        if (rendu == null) return;
+        bool local = !string.IsNullOrEmpty(chemin);
+        if (!local && !rendusTexturesLocales.Contains(rendu)) return;
+        if (local) rendusTexturesLocales.Add(rendu);
+        else rendusTexturesLocales.Remove(rendu);
+        string source = local ? chemin : cheminsFamilles[c];
+        Texture2D a, n, r;
+        ResoudreFamille(c, source, out a, out n, out r);
+        Material[] mats = rendu.materials;
+        foreach (Material materiau in mats) AppliquerTexturesFamille(materiau, a, n, r);
+        rendu.materials = mats;
+    }
+
+    private void AppliquerTexturesLocalesMaison(Batiment batiment)
+    {
+        if (batiment == null) return;
+        if (!string.IsNullOrEmpty(batiment.TextureMur) || HasRendusLocaux(batiment, "mur"))
+            foreach (Renderer rendu in RendusZoneMaison(batiment, "mur"))
+                AppliquerTextureLocale(rendu, 0, batiment.TextureMur);
+        if (!string.IsNullOrEmpty(batiment.TextureToit) || HasRendusLocaux(batiment, "toit"))
+            foreach (Renderer rendu in RendusZoneMaison(batiment, "toit"))
+                AppliquerTextureLocale(rendu, 1, batiment.TextureToit);
+    }
+
+    private bool HasRendusLocaux(Batiment batiment, string zone)
+    {
+        foreach (Renderer rendu in RendusZoneMaison(batiment, zone))
+            if (rendusTexturesLocales.Contains(rendu)) return true;
+        return false;
+    }
+
+    // La pancarte n'a une texture de bois que lorsque son support est en bois.
+    private void AppliquerTextureSupportPancarte(FacadeTextState facade)
+    {
+        if (facade == null || facade.Panneau == null) return;
+        Renderer rendu = facade.Panneau.GetComponent<Renderer>();
+        if (rendu == null) return;
+        // Support metal : rien a faire, le metal n'a pas de texture de bois.
+        if (LireMateriauSupportPancarte(facade) == "Bois_Clair")
+            AppliquerTextureLocale(rendu, 4, facade.TexturePanneau);
     }
 
     private void DessinerChoixTextures()
@@ -1824,6 +1992,11 @@ public sealed class LibreViesGame : MonoBehaviour
         string titre = familleTexturesFiltre >= 0
             ? "TEXTURES : " + NomsFamillesTextures[familleTexturesFiltre].ToUpperInvariant()
             : "TEXTURES";
+        if (MenuTexturesLocal())
+        {
+            string nomCible = texturesMaisonCible != null ? texturesMaisonCible.Root.name : "PANCARTE";
+            titre += " - " + nomCible + " uniquement";
+        }
         GUI.Box(cadre, titre, boxStyle);
         if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
         {
@@ -1844,6 +2017,9 @@ public sealed class LibreViesGame : MonoBehaviour
         string actif = string.IsNullOrEmpty(cheminsFamilles[famille])
             ? "LVTextures/" + DossiersTextures[famille] + "/" + NomsDefautTextures[famille]
             : cheminsFamilles[famille];
+        // Pour une cible locale, la texture en surbrillance est celle de la cible.
+        string locale = MenuTexturesLocal() ? LireTextureCible() : null;
+        if (!string.IsNullOrEmpty(locale)) actif = locale;
         for (int i = 0; i < liste.Count; i++)
         {
             ChoixTexture choix = liste[i];
@@ -1856,7 +2032,10 @@ public sealed class LibreViesGame : MonoBehaviour
             if (choix.Apercu != null) GUI.DrawTexture(carre, choix.Apercu, ScaleMode.StretchToFill, false);
             GUI.Label(new Rect(x, y + 98f, 100f, 22f), choix.Nom);
             if (GUI.Button(carre, GUIContent.none, GUIStyle.none))
-                ChoisirFamilleTexture(famille, choix.Chemin);
+            {
+                if (MenuTexturesLocal()) ChoisirTextureCible(choix.Chemin);
+                else ChoisirFamilleTexture(famille, choix.Chemin);
+            }
         }
         if (liste.Count == 0)
             GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f + decalageListe, largeur - 32f, 22f),
@@ -3619,6 +3798,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (cible == "mur") AppliquerLuminositeMaison(batiment, "mur", batiment.LuminositeMur);
         else if (cible == "porte") AppliquerLuminositeMaison(batiment, "porte", batiment.LuminositePorte);
         else if (cible == "toit") AppliquerLuminositeMaison(batiment, "toit", batiment.LuminositeToit);
+        // Le changement de materiau remplace les copies : on remet la texture propre a la maison.
+        if (cible == "mur" || cible == "toit") AppliquerTexturesLocalesMaison(batiment);
     }
 
     private float LireLuminositeMaison(Batiment batiment, string cible)
@@ -3696,10 +3877,10 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Lien vers le menu TEXTURES limite a une famille (Mur, Toit, Pave, Bois...).
-    private void DessinerLienTextures(Rect cadre, float y, string libelle, int famille)
+    private void DessinerLienTextures(Rect cadre, float y, string libelle, Batiment maison, string zone, int famille)
     {
         if (GUI.Button(new Rect(cadre.x + 16f, y, 448f, 28f), libelle, buttonStyle))
-            OuvrirMenuTextures(famille);
+            OuvrirTexturesLocales(maison, null, zone, famille);
     }
 
     private bool SourisSurPanneauMaison()
@@ -3774,7 +3955,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new[] { "MUR", "BOIS", "BRIQUE" },
                 new[] { "Wall", "Bois_Clair", "Brique" }, cadre.y + 320f);
             DessinerSliderLuminositeMaison(batiment, "mur", cadre.y + 350f);
-            DessinerLienTextures(cadre, cadre.y + 386f, "TEXTURE DES MURS...", 0);
+            DessinerLienTextures(cadre, cadre.y + 386f, "TEXTURE DES MURS DE CETTE MAISON...", batiment, "mur", 0);
         }
         else if (editionOutilMaison == 2)
         {
@@ -3808,7 +3989,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new[] { "ROUGE", "BOIS" },
                 new[] { "RoofRed", "Bois_Clair" }, cadre.y + 220f);
             DessinerSliderLuminositeMaison(batiment, "toit", cadre.y + 255f);
-            DessinerLienTextures(cadre, cadre.y + 290f, "TEXTURE DES TOITS...", 1);
+            DessinerLienTextures(cadre, cadre.y + 290f, "TEXTURE DU TOIT DE CETTE MAISON...", batiment, "toit", 1);
         }
     }
 
@@ -4677,7 +4858,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(cadre.x + 192f, y - 2f, 90f, 28f), "BOIS", buttonStyle))
             AppliquerMateriauPancarte(facade, "Bois_Clair");
         if (GUI.Button(new Rect(cadre.x + 288f, y - 2f, 168f, 28f), "TEXTURE DU BOIS...", buttonStyle))
-            OuvrirMenuTextures(4);
+            OuvrirTexturesLocales(null, facade, "pancarte", 4);
     }
 
     private void AppliquerMateriauPancarte(FacadeTextState facade, string materiau)
@@ -4688,6 +4869,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (materiel == null || materiel.name != materiau) return;
         Renderer rendu = facade.Panneau.GetComponent<Renderer>();
         if (rendu != null) rendu.sharedMaterial = materiel;
+        AppliquerTextureSupportPancarte(facade);
     }
 
     private string LireMateriauSupportPancarte(FacadeTextState facade)
