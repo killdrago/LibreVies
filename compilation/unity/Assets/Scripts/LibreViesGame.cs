@@ -268,7 +268,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool herbeBrins;                  // vraie herbe (brins), option GRAPHIQUE
     private const int herbeBrinsNombre = 1000000;   // nombre fixe quand la case est cochee
     private GameObject objetHerbeBrins;
-    private Transform jetFontaine;
+    private readonly List<Transform> filetsFontaine = new List<Transform>();
+    private readonly List<Transform> gouttesFontaine = new List<Transform>();
     // 0 = reglage du projet Unity (inchange), puis les valeurs proposees.
     private int antialiasingChoix;
     private int anisotropeChoix;
@@ -1830,7 +1831,9 @@ public sealed class LibreViesGame : MonoBehaviour
         sun.shadowStrength = 0.82f;
         sun.shadowBias = 0.045f;
         sun.shadowNormalBias = 0.32f;
-        sunObject.transform.rotation = Quaternion.Euler(52f, -32f, 0f);
+        // La lumiere d'une directionnelle va du soleil vers le sol : son axe avant doit
+        // etre l'oppose de la position du soleil visible, sinon les ombres partent vers le soleil.
+        sunObject.transform.rotation = Quaternion.LookRotation(-new Vector3(-0.18f, 0.48f, 0.86f).normalized);
         RenderSettings.sun = sun;
         AppliquerQualiteGraphique();
 
@@ -2773,7 +2776,6 @@ public sealed class LibreViesGame : MonoBehaviour
         var fond = new Maillage();
         var bord = new Maillage();
         var pave = new Maillage();
-        var dalles = new Maillage();
         const int echantillons = 120;
         Vector2[] centres = new Vector2[echantillons + 1];
         Vector2[] normales = new Vector2[echantillons + 1];
@@ -2791,22 +2793,12 @@ public sealed class LibreViesGame : MonoBehaviour
             AjouterBandeRoute(fond, centres, normales, i, 3.62f, 0.025f);
             AjouterBandeRoute(bord, centres, normales, i, 3.52f, 0.075f);
             AjouterBandeRoute(pave, centres, normales, i, 3.34f, 0.13f);
-            if (i % 2 == 0)
-            {
-                // Quatre rangées par travée donnent un pavage continu, avec
-                // des joints visibles mais sans trous d'herbe ou de terre.
-                AjouterDalleRoute(dalles, centres, normales, i, -2.48f, 0.82f, 0.70f);
-                AjouterDalleRoute(dalles, centres, normales, i, -0.83f, 0.82f, 0.70f);
-                AjouterDalleRoute(dalles, centres, normales, i, 0.83f, 0.82f, 0.70f);
-                AjouterDalleRoute(dalles, centres, normales, i, 2.48f, 0.82f, 0.70f);
-            }
         }
         // Même la bordure et le fond restent minéraux : aucune bande brune ne
         // doit réapparaître au milieu de la route si la caméra s'abaisse.
         ObjetMaillage("Route_Soubassement", fond.VersMesh("Route_Soubassement"), "Pave_Route");
         ObjetMaillage("Route_Sinueuse", bord.VersMesh("Route_Sinueuse"), "Route_Bord");
         ObjetMaillage("Paves_Route", pave.VersMesh("Paves_Route"), "Pave_Route");
-        ObjetMaillage("Dalles_Route", dalles.VersMesh("Dalles_Route"), "Pave_Route");
     }
 
     private void AjouterDalleRoute(Maillage maillage, Vector2[] centres, Vector2[] normales,
@@ -4398,10 +4390,21 @@ public sealed class LibreViesGame : MonoBehaviour
         cuvette.transform.SetParent(root, false);
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 0.42f, 0), new Vector3(2.9f, 0.01f, 2.9f), "Water", root, "EauBassin");
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.1f, 0), new Vector3(0.32f, 1.1f, 0.32f), "Stone", root, "Colonne");
-        // Jet d'eau : colonne fine qui part du haut de la colonne et retombe dans la cuvette.
-        // Sa largeur pulse dans UpdateEffects (eau qui coule).
-        GameObject jet = Primitive(PrimitiveType.Cylinder, new Vector3(0, 1.31f, 0), new Vector3(0.1f, 0.89f, 0.1f), "Water", root, "Jet");
-        jetFontaine = jet.transform;
+        // Eau qui coule du haut de la fontaine vers le bas : quatre filets le long
+        // de la colonne (de la vasque jusqu'au bassin) et des gouttes qui descendent
+        // en boucle (animees dans UpdateEffects).
+        for (int i = 0; i < 4; i++)
+        {
+            float angle = 0.4f + i * Mathf.PI * 0.5f;
+            Vector3 position = new Vector3(Mathf.Cos(angle) * 0.335f, 1.35f, Mathf.Sin(angle) * 0.335f);
+            GameObject filet = Primitive(PrimitiveType.Cylinder, position, new Vector3(0.05f, 0.85f, 0.05f), "Water", root, "FiletFontaine");
+            filetsFontaine.Add(filet.transform);
+        }
+        for (int i = 0; i < 8; i++)
+        {
+            GameObject goutte = Primitive(PrimitiveType.Sphere, new Vector3(0, 1.35f, 0), new Vector3(0.05f, 0.09f, 0.05f), "Water", root, "GouttesFontaine");
+            gouttesFontaine.Add(goutte.transform);
+        }
         // Vasque au sommet, pleine d'eau.
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.2f, 0), new Vector3(0.56f, 0.03f, 0.56f), "Water", root, "Eau");
         ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
@@ -9162,11 +9165,20 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void UpdateEffects(float dt)
     {
-        // Jet d'eau : largeur qui pulse, pour donner l'impression qu'il coule.
-        if (jetFontaine != null)
+        // Fontaine : les filets pulsent legerement et les gouttes descendent de la vasque au bassin.
+        if (filetsFontaine.Count > 0)
         {
-            float echelle = 1f + 0.12f * Mathf.Sin(Time.time * 9f);
-            jetFontaine.localScale = new Vector3(0.1f * echelle, 0.89f, 0.1f * echelle);
+            float echelleFilet = 1f + 0.10f * Mathf.Sin(Time.time * 7f);
+            for (int i = 0; i < filetsFontaine.Count; i++)
+                filetsFontaine[i].localScale = new Vector3(0.05f * echelleFilet, 0.85f, 0.05f * echelleFilet);
+        }
+        for (int i = 0; i < gouttesFontaine.Count; i++)
+        {
+            float progression = Mathf.Repeat(Time.time * 0.9f + i / (float)gouttesFontaine.Count, 1f);
+            float chute = progression * progression;   // accelere en tombant
+            float hauteur = Mathf.Lerp(2.2f, 0.5f, chute);
+            float angle = (i / (float)gouttesFontaine.Count) * Mathf.PI * 2f + 0.4f;
+            gouttesFontaine[i].localPosition = new Vector3(Mathf.Cos(angle) * 0.345f, hauteur, Mathf.Sin(angle) * 0.345f);
         }
         // Eau : la riviere coule lentement (la texture defile dans deux directions).
         if (materielEauRiviere == null) materielEauRiviere = Mat("Eau_Riviere");
