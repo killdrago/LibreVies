@@ -9499,11 +9499,11 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             const float distanceVoile = 0.5f;
             float demiHauteur = distanceVoile * Mathf.Tan(gameCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            float taille = demiHauteur * 2f * (0.7f + 1.8f * eblouissement);
+            float taille = demiHauteur * 2f * (0.5f + 0.9f * eblouissement);
             glareSoleil.position = cam.position + directionSoleilVisible * distanceVoile;
             glareSoleil.rotation = cam.rotation;
             glareSoleil.localScale = new Vector3(taille * gameCamera.aspect, taille, 1f);
-            glareMaterial.color = new Color(1f, 1f, 1f, eblouissement * 0.92f);
+            glareMaterial.color = new Color(1f, 1f, 1f, eblouissement * 0.35f);   // voile doux : le disque reste net
         }
         // Fontaine : les filets pulsent legerement et les gouttes descendent de la vasque au bassin.
         if (filetsFontaine.Count > 0)
