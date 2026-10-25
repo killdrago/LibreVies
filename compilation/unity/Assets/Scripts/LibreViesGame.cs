@@ -9238,7 +9238,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (dehors <= 0f)
                     eblouissement = 1f;   // centre du soleil dans l'image
                 else
-                    eblouissement = Mathf.Clamp01(0.5f + (rayon - dehors) / (2f * Mathf.Max(rayon, 0.0001f)));
+                    eblouissement = Mathf.Clamp01(1f - dehors / Mathf.Max(rayon, 0.0001f));   // 0 quand le disque touche juste le bord
             }
             const float distanceVoile = 0.5f;
             float demiHauteur = distanceVoile * Mathf.Tan(gameCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
