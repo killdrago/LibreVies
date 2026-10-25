@@ -348,7 +348,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public int antialiasingChoix;          // 0 = par defaut
         public int anisotropeChoix;            // 0 = par defaut
         public float intensiteHalo = -1f;      // -1 = absent : 15 %
-        public bool herbeBrins;                // vraie herbe, desactivee par defaut
+        public bool herbeBrins;
+        public string[] texturesChoisies;      // Mur, Toit, Sol, Pave, Bois : chemin de la texture, "" = par defaut                // vraie herbe, desactivee par defaut
         public float cameraSensitivity = 3f;
         public bool invertX;
         public bool invertY;
@@ -1586,6 +1587,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // la premiere texture du dossier est prise.
     // ------------------------------------------------------------------
     private static readonly string[] DossiersTextures = { "mur", "toit", "sol", "pave", "bois" };
+    private static readonly string[] NomsFamillesTextures = { "Mur", "Toit", "Sol", "Pave", "Bois" };
     private static readonly string[] NomsDefautTextures =
     {
         "Bricks047", "RoofingTiles014A", "Grass004", "PavingStones142", "Bark008"
@@ -1640,9 +1642,24 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void ChargerFamilleTextures(int c)
     {
+        Texture2D a, n, r;
+        ResoudreFamille(c, cheminsFamilles[c], out a, out n, out r);
+        albedosFamilles[c] = a;
+        normalesFamilles[c] = n;
+        rugositesFamilles[c] = r;
         famillesChargees[c] = true;
+    }
+
+    // Albedo choisi, sinon texture par defaut, sinon premiere texture du dossier.
+    private void ResoudreFamille(int c, string cheminAlbedo,
+        out Texture2D albedo, out Texture2D normale, out Texture2D rugosite)
+    {
         string dossier = "LVTextures/" + DossiersTextures[c];
-        Texture2D albedo = Resources.Load<Texture2D>(dossier + "/" + NomsDefautTextures[c]);
+        albedo = null;
+        if (!string.IsNullOrEmpty(cheminAlbedo))
+            albedo = Resources.Load<Texture2D>(cheminAlbedo);
+        if (albedo == null)
+            albedo = Resources.Load<Texture2D>(dossier + "/" + NomsDefautTextures[c]);
         if (albedo == null)
         {
             foreach (Texture2D texture in Resources.LoadAll<Texture2D>(dossier))
@@ -1652,12 +1669,17 @@ public sealed class LibreViesGame : MonoBehaviour
                 break;
             }
         }
-        albedosFamilles[c] = albedo;
+        normale = null;
+        rugosite = null;
         if (albedo == null) return;
-        string nomBase = albedo.name;
-        if (nomBase.EndsWith("_Color")) nomBase = nomBase.Substring(0, nomBase.Length - 6);
-        normalesFamilles[c] = ChercherCarteFamille(dossier, nomBase, new[] { "_N", "_NormalGL" });
-        rugositesFamilles[c] = ChercherCarteFamille(dossier, nomBase, new[] { "_R", "_Roughness" });
+        string nomBase = NomBaseTexture(albedo.name);
+        normale = ChercherCarteFamille(dossier, nomBase, new[] { "_N", "_NormalGL" });
+        rugosite = ChercherCarteFamille(dossier, nomBase, new[] { "_R", "_Roughness" });
+    }
+
+    private static string NomBaseTexture(string nom)
+    {
+        return nom.EndsWith("_Color") ? nom.Substring(0, nom.Length - 6) : nom;
     }
 
     private bool TexturesCategorieMateriau(string nom, out Texture2D albedo,
@@ -1673,6 +1695,115 @@ public sealed class LibreViesGame : MonoBehaviour
         normale = normalesFamilles[c];
         rugosite = rugositesFamilles[c];
         return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Menu TEXTURES (bouton en bas a droite) : choix de la texture de chaque
+    // famille parmi les fichiers du dossier. Le choix est sauvegarde.
+    // ------------------------------------------------------------------
+    private sealed class ChoixTexture
+    {
+        public string Nom;
+        public string Chemin;
+        public Texture2D Apercu;
+    }
+
+    private readonly string[] cheminsFamilles = new string[5];
+    private readonly List<ChoixTexture>[] listesChoixFamilles = new List<ChoixTexture>[5];
+    private bool texturesOpen;
+    private int familleTexturesOuverte;
+
+    private List<ChoixTexture> ListeChoixFamille(int c)
+    {
+        if (listesChoixFamilles[c] != null) return listesChoixFamilles[c];
+        var liste = new List<ChoixTexture>();
+        string dossier = "LVTextures/" + DossiersTextures[c];
+        Texture2D[] trouvees = Resources.LoadAll<Texture2D>(dossier);
+        Array.Sort(trouvees, (x, y) => string.CompareOrdinal(x.name, y.name));
+        foreach (Texture2D texture in trouvees)
+        {
+            if (texture == null || EstCarteTexture(texture.name)) continue;
+            liste.Add(new ChoixTexture
+            {
+                Nom = NomBaseTexture(texture.name).Replace("_2K-JPG", ""),
+                Chemin = dossier + "/" + texture.name,
+                Apercu = texture
+            });
+        }
+        listesChoixFamilles[c] = liste;
+        return liste;
+    }
+
+    // Applique tout de suite la texture choisie aux materiaux de la famille.
+    private void ChoisirFamilleTexture(int c, string chemin)
+    {
+        cheminsFamilles[c] = chemin ?? "";
+        Texture2D a, n, r;
+        ResoudreFamille(c, cheminsFamilles[c], out a, out n, out r);
+        albedosFamilles[c] = a;
+        normalesFamilles[c] = n;
+        rugositesFamilles[c] = r;
+        famillesChargees[c] = true;
+        foreach (Material materiau in materials)
+        {
+            if (materiau == null || CategorieTextureMateriau(materiau.name) != c) continue;
+            if (a != null && materiau.HasProperty("_MainTex")) materiau.SetTexture("_MainTex", a);
+            if (n != null && materiau.HasProperty("_BumpMap")) materiau.SetTexture("_BumpMap", n);
+            if (r != null && materiau.HasProperty("_RoughMap"))
+            {
+                materiau.SetTexture("_RoughMap", r);
+                materiau.SetFloat("_RoughStrength", 0.9f);
+            }
+        }
+    }
+
+    private void DessinerChoixTextures()
+    {
+        float largeur = 560f;
+        float hauteur = 500f;
+        Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f,
+            largeur, hauteur);
+        GUI.Box(cadre, "TEXTURES", boxStyle);
+        if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
+        {
+            texturesOpen = false;
+            return;
+        }
+        for (int c = 0; c < NomsFamillesTextures.Length; c++)
+        {
+            Rect onglet = new Rect(cadre.x + 16f + c * 106f, cadre.y + 44f, 100f, 30f);
+            GUIStyle style = c == familleTexturesOuverte ? tabActifStyle : buttonStyle;
+            if (GUI.Button(onglet, NomsFamillesTextures[c], style)) familleTexturesOuverte = c;
+        }
+
+        int famille = familleTexturesOuverte;
+        List<ChoixTexture> liste = ListeChoixFamille(famille);
+        string actif = string.IsNullOrEmpty(cheminsFamilles[famille])
+            ? "LVTextures/" + DossiersTextures[famille] + "/" + NomsDefautTextures[famille]
+            : cheminsFamilles[famille];
+        for (int i = 0; i < liste.Count; i++)
+        {
+            ChoixTexture choix = liste[i];
+            float x = cadre.x + 16f + (i % 5) * 108f;
+            float y = cadre.y + 90f + (i / 5) * 128f;
+            Rect carre = new Rect(x, y, 96f, 96f);
+            GUI.color = choix.Chemin == actif ? Color.yellow : new Color(0.35f, 0.35f, 0.35f, 1f);
+            GUI.DrawTexture(new Rect(x - 3f, y - 3f, 102f, 102f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (choix.Apercu != null) GUI.DrawTexture(carre, choix.Apercu, ScaleMode.StretchToFill, false);
+            GUI.Label(new Rect(x, y + 98f, 100f, 22f), choix.Nom);
+            if (GUI.Button(carre, GUIContent.none, GUIStyle.none))
+            {
+                ChoisirFamilleTexture(famille, choix.Chemin);
+                SauverConfiguration();
+            }
+        }
+        if (liste.Count == 0)
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 170f, largeur - 32f, 22f),
+                "Aucune texture dans ce dossier pour l'instant.");
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + hauteur - 44f, largeur - 32f, 36f),
+            "Pour ajouter une texture : deposez nom.png, nom_N.png et nom_R.png dans LVTextures/"
+            + DossiersTextures[famille] + ", puis refaites le build.");
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
@@ -8650,6 +8781,12 @@ public sealed class LibreViesGame : MonoBehaviour
             adminOpen = false;
             BasculerModeEdition();
         }
+        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 76f, 164f, 28f),
+            "TEXTURES", buttonStyle))
+        {
+            texturesOpen = !texturesOpen;
+        }
+        if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
         if (conversationOpen) DessinerConversation();
         GUI.enabled = ancienEnabledHud; // Le fond du modal ne recoit aucun clic.
         if (creationPersonnageOpen) DessinerCreationPersonnage();
@@ -9036,6 +9173,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void AppliquerConfiguration(Configuration config)
     {
+        if (config.texturesChoisies != null)
+        {
+            for (int c = 0; c < cheminsFamilles.Length && c < config.texturesChoisies.Length; c++)
+                cheminsFamilles[c] = config.texturesChoisies[c] ?? "";
+        }
         brightness = Mathf.Clamp01(config.brightness);
         contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
@@ -9113,6 +9255,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 brightness = brightness, contrast = contrast, qualiteGraphique = qualiteGraphique,
                 antialiasingChoix = antialiasingChoix, anisotropeChoix = anisotropeChoix,
                 intensiteHalo = intensiteHalo, herbeBrins = herbeBrins,
+                texturesChoisies = (string[])cheminsFamilles.Clone(),
                 cameraSensitivity = cameraSensitivity,
                 invertX = inverserAxeX, invertY = inverserAxeY, azerty = clavierAzerty,
                 resolution = resolutionIndex, avant = toucheAvant, arriere = toucheArriere,
