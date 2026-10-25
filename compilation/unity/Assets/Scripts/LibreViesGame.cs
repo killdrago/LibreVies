@@ -3037,7 +3037,17 @@ public sealed class LibreViesGame : MonoBehaviour
             new Vector3(size.x + 0.95f, 0.18f, 0.20f), "Wood", root, "Rive_Arriere");
         if (name == "Forge" || name == "Auberge" || name == "Mairie")
         {
-            Box(new Vector3(size.x * 0.24f, size.y + 2.05f, 0f), new Vector3(0.48f, 1.05f, 0.48f),
+            // La cheminee suit la pente du toit : sa base est calculee a la hauteur reelle
+            // du toit a cet endroit (faitage a 2,2 m au-dessus de la base, pans lineaires),
+            // puis elle s'enfonce un peu dans le toit et depasse de 1,3 m.
+            float xCheminee = size.x * 0.24f;
+            float baseToit = size.y - 0.02f;
+            float demiLargeurToit = (size.x + 0.8f) * 0.5f;
+            float surfaceToit = baseToit + 2.2f * (1f - Mathf.Abs(xCheminee) / demiLargeurToit);
+            float basCheminee = surfaceToit - 0.3f;
+            float hautCheminee = surfaceToit + 1.3f;
+            Box(new Vector3(xCheminee, (basCheminee + hautCheminee) * 0.5f, 0f),
+                new Vector3(0.48f, hautCheminee - basCheminee, 0.48f),
                 "Stone", root, "Cheminee");
         }
         // On ne traverse plus les maisons (0,5 m de marge comme la reference).
