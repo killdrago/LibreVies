@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "name": "dmtrader",
+  "version": "1.4.4",
+  "author": {
+    "name": "Alexandre Debieb",
+    "email": "dividuals.com@gmail.com"
+  },
+  "main": "./index.html",
+  "single-instance": false,
+  "window": {
+    "width": 1280,
+    "height": 720
+  }
+}
