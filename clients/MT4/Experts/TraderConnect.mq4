@@ -78,25 +78,25 @@ void DispatchCommands(string response)
    for(int step = 0; step < 12; step++)
    {
       string action = "";
-      string input = "";
+      string actionInput = "";
       if(!JsonStringField(response, "action", action) || StringLen(action) == 0)
          return;
-      JsonStringField(response, "input", input);
+      JsonStringField(response, "input", actionInput);
 
       string result = "null";
       string error = "";
       if(action == "rates")
-         result = BuildRatesResult(input);
+         result = BuildRatesResult(actionInput);
       else if(action == "orders")
          result = BuildOrdersJSON(true);
       else if(action == "send")
-         result = ExecuteSend(input, error);
+         result = ExecuteSend(actionInput, error);
       else if(action == "modify")
-         result = ExecuteModify(input, error);
+         result = ExecuteModify(actionInput, error);
       else if(action == "close")
-         result = ExecuteClose(input, error);
+         result = ExecuteClose(actionInput, error);
       else if(action == "delete")
-         result = ExecuteDelete(input, error);
+         result = ExecuteDelete(actionInput, error);
       else
       {
          error = "Unsupported DMTrader action: " + action;
@@ -390,10 +390,10 @@ string SerializeSelectedOrder()
    return(json);
 }
 
-string BuildRatesResult(const string input)
+string BuildRatesResult(const string requestInput)
 {
    string fields[];
-   int count = StringSplit(input, (ushort)126, fields);
+   int count = StringSplit(requestInput, (ushort)126, fields);
    if(count < 4)
       return("{}");
 
@@ -497,7 +497,7 @@ int TimeframeFromMinutes(const int minutes)
    return(0);
 }
 
-string ExecuteSend(const string input, string &error)
+string ExecuteSend(const string requestInput, string &error)
 {
    if(!AllowTradeCommands)
    {
@@ -511,7 +511,7 @@ string ExecuteSend(const string input, string &error)
    }
 
    string fields[];
-   int count = StringSplit(input, (ushort)126, fields);
+   int count = StringSplit(requestInput, (ushort)126, fields);
    if(count < 3)
    {
       error = "Invalid send command; expected symbol, type and lots.";
@@ -583,7 +583,7 @@ string ExecuteSend(const string input, string &error)
    return(IntegerToString(ticket));
 }
 
-string ExecuteModify(const string input, string &error)
+string ExecuteModify(const string requestInput, string &error)
 {
    if(!AllowTradeCommands)
    {
@@ -597,7 +597,7 @@ string ExecuteModify(const string input, string &error)
    }
 
    string fields[];
-   int count = StringSplit(input, (ushort)126, fields);
+   int count = StringSplit(requestInput, (ushort)126, fields);
    if(count < 1)
    {
       error = "Invalid modify command; missing ticket.";
@@ -649,7 +649,7 @@ string ExecuteModify(const string input, string &error)
    return("true");
 }
 
-string ExecuteClose(const string input, string &error)
+string ExecuteClose(const string requestInput, string &error)
 {
    if(!AllowTradeCommands)
    {
@@ -663,7 +663,7 @@ string ExecuteClose(const string input, string &error)
    }
 
    string fields[];
-   int count = StringSplit(input, (ushort)126, fields);
+   int count = StringSplit(requestInput, (ushort)126, fields);
    if(count < 1)
    {
       error = "Invalid close command; missing ticket.";
@@ -733,7 +733,7 @@ string ExecuteClose(const string input, string &error)
    return("true");
 }
 
-string ExecuteDelete(const string input, string &error)
+string ExecuteDelete(const string requestInput, string &error)
 {
    if(!AllowTradeCommands)
    {
@@ -747,7 +747,7 @@ string ExecuteDelete(const string input, string &error)
    }
 
    string fields[];
-   int count = StringSplit(input, (ushort)126, fields);
+   int count = StringSplit(requestInput, (ushort)126, fields);
    if(count < 1)
    {
       error = "Invalid delete command; missing ticket.";
@@ -896,9 +896,9 @@ bool JsonStringField(const string json, const string key, string &value)
          else if(ch == 116)
             value += "\t";
          else if(ch == 98)
-            value += "\b";
+            value += " ";
          else if(ch == 102)
-            value += "\f";
+            value += " ";
          else
             value += StringSubstr(json, i, 1);
          escaped = false;
