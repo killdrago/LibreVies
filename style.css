@@ -44,11 +44,13 @@
 .pair-list{box-sizing:border-box;display:block;flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;margin:0;padding:8px 10px 12px;color:#ddd}
 .pair-list-heading{position:relative;z-index:1;display:flex;align-items:center;gap:5px;padding:8px 0 8px 4px;margin-bottom:4px;border-bottom:1px solid #333;color:#aaa;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .pair-list-heading:focus-within,.pair-list-heading:hover{z-index:120}
+.pair-list-heading.has-open-dropdown{z-index:1200}
 .pair-list-all{display:flex;flex:1 1 auto;align-items:center;min-width:0;gap:5px;color:#bbb;font-size:11px;font-weight:400;letter-spacing:normal;text-transform:none;white-space:nowrap;cursor:pointer}
 .pair-list-all input{width:14px;height:14px;margin:0;accent-color:#4682b4;cursor:pointer}
 .pair-list-all input:disabled{cursor:default}
 .pair-list-entry{position:relative;z-index:0;display:flex;align-items:center;gap:5px;margin:2px 0}
 .pair-list-entry:focus-within,.pair-list-entry:hover{z-index:100}
+.pair-list-entry.has-open-dropdown{z-index:1000}
 .pair-list-checkbox{box-sizing:border-box;flex:0 0 14px;width:14px;height:14px;margin:0 0 0 4px;accent-color:#4682b4;cursor:pointer}
 .pair-list-row{display:block;box-sizing:border-box;flex:1 1 auto;min-width:0;width:auto;min-height:30px;margin:0;padding:6px 9px;border:0;border-left:2px solid transparent;background:transparent;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer}
 .pair-list-row:hover{background:#202020;color:#fff}
