@@ -86,3 +86,16 @@
 .sidebar-levels-slot .levelsClearButton{border:0;border-bottom:3px solid #4b2d2d;background:#633b3b;color:#fefefe}
 .sidebar-levels-slot .levelsClearButton:not(:disabled):hover{border-bottom-color:#5d3030;background:#754242}
 .sidebar-levels-slot .levelsClearButton:disabled{border-bottom-color:#222;background:#292929;color:#777;cursor:not-allowed}
+
+/* Manual market-order controls beside each MT4 account login. */
+.clients__account__3P0dI{box-sizing:border-box;display:flex;align-items:center;height:48px;line-height:normal;padding-right:12px}
+.clients__account__3P0dI .clients__active__3YQtS{float:none;flex:0 0 16px;margin:0 0 0 16px}
+.clients__account__3P0dI .clients__login__1GZ2x{float:none;flex:0 0 auto;margin:0 0 0 8px;font-size:14px}
+.client-order-actions{display:flex;flex:0 0 auto;align-items:center;gap:3px;margin-left:8px}
+.client-order-button{box-sizing:border-box;width:41px;height:24px;margin:0;padding:0 2px;border:1px solid transparent;border-bottom-width:2px;border-radius:2px;color:#fff;font:600 10px/21px Segoe UI,sans-serif;cursor:pointer}
+.client-order-buy{background:#356c49;border-bottom-color:#284f36}
+.client-order-buy:not(:disabled):hover{background:#43845b}
+.client-order-sell{background:#733939;border-bottom-color:#582b2b}
+.client-order-sell:not(:disabled):hover{background:#8b4545}
+.client-order-button:disabled{border-color:#252525;background:#303030;color:#777;cursor:not-allowed}
+.clients__account__3P0dI .clients__profit__1h53M{float:none;flex:0 1 auto;min-width:0;max-width:90px;margin:0 0 0 auto;padding-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
