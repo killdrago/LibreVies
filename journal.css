@@ -1,0 +1,55 @@
+#dmt-journal-root{font-family:"Segoe UI",Arial,sans-serif;color:#30343a}
+#dmt-journal-toggle{position:fixed;bottom:12px;left:14px;z-index:10001;display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid #c9cdd1;border-bottom-width:2px;border-radius:3px;background:#fff;color:#3c454d;font:600 12px "Segoe UI",Arial,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+#dmt-journal-toggle:hover{background:#f2f6f9;border-color:#8ea9bc}
+#dmt-journal-toggle:focus{outline:2px solid #4682b4;outline-offset:2px}
+#dmt-journal-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#dmt-journal-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border:2px solid #fff;border-radius:10px;background:#c74747;color:#fff;font-size:10px;line-height:13px;text-align:center}
+#dmt-journal-badge[hidden]{display:none}
+.dmt-journal-overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(12,16,20,.58)}
+.dmt-journal-overlay[hidden]{display:none!important}
+.dmt-journal-panel{display:flex;flex-direction:column;box-sizing:border-box;width:calc(100vw - 36px);max-width:1050px;height:calc(100vh - 36px);max-height:780px;overflow:hidden;border:1px solid #cbd0d5;border-radius:5px;background:#f7f8fa;box-shadow:0 18px 70px rgba(0,0,0,.4);outline:none}
+.dmt-journal-header{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:18px;padding:15px 20px;background:#20252a;color:#f4f6f7}
+.dmt-journal-kicker{margin-bottom:3px;color:#8fb4d0;font-size:10px;font-weight:700;letter-spacing:.13em}
+.dmt-journal-header h2{margin:0;color:#fff;font-size:21px;font-weight:400}
+.dmt-journal-status{margin-top:4px;color:#b7c0c7;font-size:12px}
+.dmt-journal-status.is-connected{color:#8fd1a4}
+.dmt-journal-status.is-stale{color:#f0bd70}
+.dmt-journal-icon-button{flex:0 0 auto;width:34px;height:34px;border:1px solid #56616a;border-radius:3px;background:transparent;color:#fff;font:28px/28px "Segoe UI",Arial,sans-serif;cursor:pointer}
+.dmt-journal-icon-button:hover{background:#343b42}
+.dmt-journal-toolbar{display:flex;flex:0 0 auto;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px;border-bottom:1px solid #d9dde1;background:#fff}
+.dmt-journal-filters{display:flex;flex:1 1 540px;flex-wrap:wrap;gap:5px}
+.dmt-journal-filter,.dmt-journal-actions button{height:29px;padding:0 10px;border:1px solid #d4d9dd;border-radius:3px;background:#fff;color:#505a62;font:12px "Segoe UI",Arial,sans-serif;cursor:pointer}
+.dmt-journal-filter:hover,.dmt-journal-actions button:hover{background:#f0f4f7}
+.dmt-journal-filter.is-selected{border-color:#477da3;background:#e8f1f7;color:#285978;font-weight:600}
+.dmt-journal-search{box-sizing:border-box;flex:1 1 180px;min-width:160px;height:30px;padding:4px 9px;border:1px solid #ccd2d7;border-radius:3px;background:#fff;color:#333;font:12px "Segoe UI",Arial,sans-serif}
+.dmt-journal-actions{display:flex;gap:5px}
+.dmt-journal-note{flex:0 0 auto;padding:8px 17px;border-bottom:1px solid #e2e5e8;background:#f0f3f5;color:#66717a;font-size:11px}
+.dmt-journal-list{flex:1 1 auto;min-height:0;overflow:auto;padding:10px 14px 14px;scroll-behavior:smooth}
+.dmt-journal-entry{margin:0 0 8px;padding:9px 12px;border:1px solid #e0e4e7;border-left:3px solid #7b9db4;border-radius:3px;background:#fff;box-shadow:0 1px 2px rgba(20,30,40,.04)}
+.dmt-journal-entry.level-success{border-left-color:#4c9a68}
+.dmt-journal-entry.level-warning{border-left-color:#d39a3f}
+.dmt-journal-entry.level-error{border-left-color:#c94e4e}
+.dmt-journal-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:5px;color:#79838b;font-size:11px}
+.dmt-journal-category{display:inline-block;padding:2px 7px;border-radius:10px;background:#e8edf0;color:#53616a;font-size:10px;font-weight:700}
+.dmt-journal-category.category-analysis{background:#e8eff9;color:#426894}
+.dmt-journal-category.category-check{background:#e7f3ef;color:#357463}
+.dmt-journal-category.category-orders{background:#f7efe2;color:#906624}
+.dmt-journal-category.category-connection{background:#e6f4e9;color:#39754b}
+.dmt-journal-category.category-error{background:#f9e8e8;color:#a63f3f}
+.dmt-journal-category.category-system{background:#ececf0;color:#626476}
+.dmt-journal-message{color:#333b41;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.dmt-journal-details{margin-top:6px;color:#68737b;font-size:11px}
+.dmt-journal-details summary{width:max-content;cursor:pointer}
+.dmt-journal-details pre{max-height:190px;margin:6px 0 0;padding:8px;overflow:auto;border:1px solid #e2e6e9;border-radius:3px;background:#f5f7f8;color:#424b52;font:11px/1.45 Consolas,"Courier New",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.dmt-journal-empty{padding:42px 15px;color:#7a838a;font-size:14px;text-align:center}
+.dmt-journal-footer{display:flex;flex:0 0 auto;justify-content:space-between;gap:10px;padding:8px 16px;border-top:1px solid #d9dde1;background:#fff;color:#7b858d;font-size:11px}
+@media (max-width:700px){
+  #dmt-journal-toggle{left:8px;bottom:7px;height:34px;padding:0 9px}
+  .dmt-journal-overlay{padding:7px}
+  .dmt-journal-panel{width:calc(100vw - 14px);height:calc(100vh - 14px);max-height:none}
+  .dmt-journal-header{padding:12px}
+  .dmt-journal-toolbar{padding:8px}
+  .dmt-journal-filters{flex-basis:100%}
+  .dmt-journal-filter{padding:0 7px;font-size:11px}
+  .dmt-journal-footer{font-size:10px}
+}
