@@ -80,4 +80,9 @@
 .pair-list-empty{padding:8px 7px;color:#888;font-size:11px}
 .sidebar-levels-slot{position:absolute;z-index:10;right:16px;bottom:16px;left:16px;height:46px}
 .sidebar-levels-slot>div{width:100%;height:100%}
-.sidebar-levels-slot .levelsDraw__levelsDraw__3JIMo{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;box-sizing:border-box;width:100%;height:46px;margin:0}
+.sidebar-levels-slot .levels-controls{display:flex;box-sizing:border-box;width:100%;height:46px;gap:6px}
+.sidebar-levels-slot .levels-controls .levelsDraw__levelsDraw__3JIMo,.sidebar-levels-slot .levelsClearButton{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;box-sizing:border-box;flex:1 1 0;width:0;min-width:0;height:46px;margin:0;padding:0 3px;line-height:43px;font-size:13px;font-weight:lighter;font-family:inherit;white-space:nowrap;cursor:pointer;outline:none!important}
+.sidebar-levels-slot .levelsDraw__levelsDraw__3JIMo{border-bottom:3px solid #333}
+.sidebar-levels-slot .levelsClearButton{border:0;border-bottom:3px solid #4b2d2d;background:#633b3b;color:#fefefe}
+.sidebar-levels-slot .levelsClearButton:not(:disabled):hover{border-bottom-color:#5d3030;background:#754242}
+.sidebar-levels-slot .levelsClearButton:disabled{border-bottom-color:#222;background:#292929;color:#777;cursor:not-allowed}
