@@ -42,9 +42,9 @@
 .sidebar-pairs-slot{display:flex;flex:1 1 auto;min-width:0;min-height:0;margin-bottom:68px;overflow:hidden}
 .sidebar-pairs-slot>div{box-sizing:border-box;display:flex;flex:1 1 auto;min-width:0;min-height:0}
 .pair-list{box-sizing:border-box;display:block;flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;margin:0;padding:8px 10px 12px;color:#ddd}
-.pair-list-heading{position:relative;z-index:1;display:flex;align-items:center;justify-content:flex-start;gap:6px;padding:8px 7px;margin-bottom:4px;border-bottom:1px solid #333;color:#aaa;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.pair-list-heading{position:relative;z-index:1;display:grid;grid-template-columns:14px minmax(0,1fr) 92px 54px;column-gap:5px;align-items:center;padding:8px 0 8px 4px;margin-bottom:4px;border-bottom:1px solid #333;color:#aaa;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .pair-list-heading:focus-within{z-index:120}
-.pair-list-all{display:flex;align-items:center;gap:5px;color:#bbb;font-size:11px;font-weight:400;letter-spacing:normal;text-transform:none;white-space:nowrap;cursor:pointer}
+.pair-list-all{grid-column:1/3;display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:5px;align-items:center;color:#bbb;font-size:11px;font-weight:400;letter-spacing:normal;text-transform:none;white-space:nowrap;cursor:pointer}
 .pair-list-all input{width:14px;height:14px;margin:0;accent-color:#4682b4;cursor:pointer}
 .pair-list-all input:disabled{cursor:default}
 .pair-list-entry{position:relative;z-index:0;display:flex;align-items:center;gap:5px;margin:2px 0}
@@ -63,7 +63,7 @@
 .pair-list-entry .Select.is-open{z-index:250}
 .pair-list-entry .Select-menu-outer{z-index:260;max-height:160px}
 .pair-list-entry .Select-menu{max-height:158px}
-.pair-global-controls{display:flex;align-items:center;gap:5px}
+.pair-global-controls{grid-column:3/5;display:grid;grid-template-columns:92px 54px;column-gap:5px;align-items:center}
 .pair-global-controls .pair-global-strategy,.pair-global-controls .pair-global-timeframe{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:block;box-sizing:border-box;flex:0 0 auto;height:30px;margin:0;padding:2px 0 0;border-bottom:2px solid #ddd!important;background:#fff;z-index:20}
 .pair-global-controls .pair-global-strategy{width:92px}
 .pair-global-controls .pair-global-timeframe{width:54px}
