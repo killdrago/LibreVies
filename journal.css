@@ -1,10 +1,4 @@
 #dmt-journal-root{font-family:"Segoe UI",Arial,sans-serif;color:#30343a}
-#dmt-journal-toggle{position:fixed;bottom:12px;left:14px;z-index:10001;display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid #c9cdd1;border-bottom-width:2px;border-radius:3px;background:#fff;color:#3c454d;font:600 12px "Segoe UI",Arial,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12)}
-#dmt-journal-toggle:hover{background:#f2f6f9;border-color:#8ea9bc}
-#dmt-journal-toggle:focus{outline:2px solid #4682b4;outline-offset:2px}
-#dmt-journal-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-#dmt-journal-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border:2px solid #fff;border-radius:10px;background:#c74747;color:#fff;font-size:10px;line-height:13px;text-align:center}
-#dmt-journal-badge[hidden]{display:none}
 .dmt-journal-overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(12,16,20,.58)}
 .dmt-journal-overlay[hidden]{display:none!important}
 .dmt-journal-panel{display:flex;flex-direction:column;box-sizing:border-box;width:calc(100vw - 36px);max-width:1050px;height:calc(100vh - 36px);max-height:780px;overflow:hidden;border:1px solid #cbd0d5;border-radius:5px;background:#f7f8fa;box-shadow:0 18px 70px rgba(0,0,0,.4);outline:none}
@@ -44,7 +38,6 @@
 .dmt-journal-empty{padding:42px 15px;color:#7a838a;font-size:14px;text-align:center}
 .dmt-journal-footer{display:flex;flex:0 0 auto;justify-content:space-between;gap:10px;padding:8px 16px;border-top:1px solid #d9dde1;background:#fff;color:#7b858d;font-size:11px}
 @media (max-width:700px){
-  #dmt-journal-toggle{left:8px;bottom:7px;height:34px;padding:0 9px}
   .dmt-journal-overlay{padding:7px}
   .dmt-journal-panel{width:calc(100vw - 14px);height:calc(100vh - 14px);max-height:none}
   .dmt-journal-header{padding:12px}

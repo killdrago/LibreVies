@@ -99,3 +99,9 @@
 .client-order-sell:not(:disabled):hover{background:#8b4545}
 .client-order-button:disabled{border-color:#252525;background:#303030;color:#777;cursor:not-allowed}
 .clients__account__3P0dI .clients__profit__1h53M{float:none;flex:0 1 auto;min-width:0;max-width:90px;margin:0 0 0 auto;padding-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+
+/* Activity journal icon beside the account's manual Buy/Sell controls. */
+.client-order-button.client-order-journal{display:flex;flex:0 0 26px;align-items:center;justify-content:center;width:26px;height:24px;padding:0;background:#47535d;border-bottom-color:#35404a}
+.client-order-button.client-order-journal:hover{background:#5c6d79}
+.client-order-button.client-order-journal:focus{outline:2px solid #86adc6;outline-offset:1px}
+.client-order-journal svg{display:block;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}

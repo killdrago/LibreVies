@@ -9,14 +9,12 @@
   var lastTickAt = {};
   var staleLinks = {};
   var orderSnapshots = {};
-  var unread = 0;
   var isOpen = false;
   var activeFilter = "all";
   var searchText = "";
-  var toggleButton;
-  var badge;
   var dialog;
   var panelNode;
+  var lastTrigger;
   var listNode;
   var statusNode;
   var searchNode;
@@ -90,19 +88,7 @@
     if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
     saveEntries();
 
-    if (!isOpen) unread += 1;
-    updateBadge();
     if (isOpen) renderEntries();
-  }
-
-  function updateBadge() {
-    if (!badge) return;
-    badge.textContent = unread > 99 ? "99+" : String(unread);
-    badge.hidden = unread < 1;
-    toggleButton.setAttribute(
-      "aria-label",
-      unread ? "Ouvrir le journal, nouveaux événements : " + unread : "Ouvrir le journal d’activité"
-    );
   }
 
   function formattedTime(timestamp) {
@@ -544,14 +530,13 @@
     if (!dialog || !isOpen) return;
     dialog.hidden = true;
     isOpen = false;
-    toggleButton.focus();
+    if (lastTrigger && typeof lastTrigger.focus === "function") lastTrigger.focus();
   }
 
-  function openDialog() {
+  function openDialog(event) {
     if (!dialog) return;
+    lastTrigger = event && event.currentTarget ? event.currentTarget : document.activeElement;
     isOpen = true;
-    unread = 0;
-    updateBadge();
     dialog.hidden = false;
     renderEntries();
     window.setTimeout(function () {
@@ -563,9 +548,7 @@
   function clearEntries() {
     if (!window.confirm("Effacer l’historique local du journal ?")) return;
     entries = [];
-    unread = 0;
     saveEntries();
-    updateBadge();
     renderEntries();
     add("Système", "info", "Historique du journal effacé par l’utilisateur.");
   }
@@ -574,10 +557,6 @@
     var root = document.createElement("div");
     root.id = "dmt-journal-root";
     root.innerHTML =
-      '<button id="dmt-journal-toggle" type="button" title="Journal d’activité" aria-label="Ouvrir le journal d’activité">' +
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h9.5L19 7.2v13.05H6z"></path><path d="M15.5 3.75V7.5H19M9 11h7M9 14.5h7M9 18h5"></path></svg>' +
-        '<span>Journal</span><span id="dmt-journal-badge" hidden></span>' +
-      '</button>' +
       '<div id="dmt-journal-dialog" class="dmt-journal-overlay" role="presentation" hidden>' +
         '<section class="dmt-journal-panel" role="dialog" aria-modal="true" aria-labelledby="dmt-journal-title" tabindex="-1">' +
           '<header class="dmt-journal-header">' +
@@ -604,8 +583,6 @@
       '</div>';
     document.body.appendChild(root);
 
-    toggleButton = document.getElementById("dmt-journal-toggle");
-    badge = document.getElementById("dmt-journal-badge");
     dialog = document.getElementById("dmt-journal-dialog");
     panelNode = root.querySelector(".dmt-journal-panel");
     listNode = document.getElementById("dmt-journal-list");
@@ -617,7 +594,6 @@
     var exportButton = document.getElementById("dmt-journal-export");
     var countNode = document.getElementById("dmt-journal-count");
 
-    toggleButton.addEventListener("click", openDialog);
     closeButton.addEventListener("click", closeDialog);
     dialog.addEventListener("click", function (event) {
       if (event.target === dialog) closeDialog();
@@ -656,7 +632,6 @@
         }
       });
     }, 1000);
-    updateBadge();
     renderEntries();
   }
 
@@ -703,6 +678,7 @@
     alert: alert,
     request: request,
     response: response,
+    open: openDialog,
     tick: tick,
     serverListening: serverListening
   };
