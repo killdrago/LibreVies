@@ -1,6 +1,6 @@
 #property strict
 #property copyright "Gregory Lechanoine"
-#property version   "1.02"
+#property version   "1.03"
 #property description "DMTrader MT4 bridge using the WinINet HTTP transport"
 
 // Clean-room replacement for the unavailable original TraderConnect.mq4.
@@ -17,6 +17,12 @@ int HttpQueryInfoW(int request, int infoLevel, int &buffer, int &bufferLength, i
 int InternetReadFile(int request, uchar &buffer[], int bytesToRead, int &bytesRead);
 int InternetSetOptionW(int handle, int option, int &buffer, int bufferLength);
 int InternetCloseHandle(int handle);
+#import
+
+// MQL4's built-in GetLastError() reports MQL runtime errors, not always the
+// Win32 last-error value set by a failed WinINet call.
+#import "ntdll.dll"
+int RtlGetLastWin32Error();
 #import
 
 #define INTERNET_OPEN_TYPE_DIRECT       1
@@ -182,6 +188,14 @@ void CloseWinInetHandles(const int request, const int connection, const int sess
       InternetCloseHandle(session);
 }
 
+int GetWinInetLastError()
+{
+   int errorCode = RtlGetLastWin32Error();
+   if(errorCode == 0)
+      errorCode = GetLastError();
+   return(errorCode);
+}
+
 void LogWinInetError(const string operation, const int errorCode)
 {
    datetime now = TimeLocal();
@@ -212,10 +226,10 @@ bool HttpPost(const string body, string &response)
    int request = 0;
 
    ResetLastError();
-   session = InternetOpenW("TraderConnect/1.02", INTERNET_OPEN_TYPE_DIRECT, "", "", 0);
+   session = InternetOpenW("TraderConnect/1.03", INTERNET_OPEN_TYPE_DIRECT, "", "", 0);
    if(session == 0)
    {
-      int err = GetLastError();
+      int err = GetWinInetLastError();
       LogWinInetError("InternetOpen", err);
       return(false);
    }
@@ -234,7 +248,7 @@ bool HttpPost(const string body, string &response)
                                  INTERNET_SERVICE_HTTP, 0, 0);
    if(connection == 0)
    {
-      int err = GetLastError();
+      int err = GetWinInetLastError();
       CloseWinInetHandles(0, 0, session);
       LogWinInetError("InternetConnect", err);
       return(false);
@@ -244,18 +258,17 @@ bool HttpPost(const string body, string &response)
    request = HttpOpenRequestW(connection, "POST", "/", "HTTP/1.1", "", 0, 0, 0);
    if(request == 0)
    {
-      int err = GetLastError();
+      int err = GetWinInetLastError();
       CloseWinInetHandles(0, connection, session);
       LogWinInetError("HttpOpenRequest", err);
       return(false);
    }
 
    string headers = "Content-Type: application/json; charset=utf-8\r\n";
-   headers += "Accept: application/json\r\nConnection: close\r\n";
    ResetLastError();
-   if(HttpSendRequestW(request, headers, -1, postData, ArraySize(postData)) == 0)
+   if(HttpSendRequestW(request, headers, StringLen(headers), postData, ArraySize(postData)) == 0)
    {
-      int err = GetLastError();
+      int err = GetWinInetLastError();
       CloseWinInetHandles(request, connection, session);
       LogWinInetError("HttpSendRequest", err);
       return(false);
@@ -276,7 +289,7 @@ bool HttpPost(const string body, string &response)
       ResetLastError();
       if(InternetReadFile(request, responseChunk, ArraySize(responseChunk), bytesRead) == 0)
       {
-         int err = GetLastError();
+         int err = GetWinInetLastError();
          CloseWinInetHandles(request, connection, session);
          LogWinInetError("InternetReadFile", err);
          return(false);
