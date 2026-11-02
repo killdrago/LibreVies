@@ -42,8 +42,13 @@
 .sidebar-pairs-slot{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
 .sidebar-pairs-slot>div{box-sizing:border-box;display:flex;flex:1 1 auto;min-width:0;min-height:0}
 .pair-list{box-sizing:border-box;display:block;flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;margin:0;padding:8px 10px 12px;color:#ddd}
-.pair-list-heading{padding:8px 7px;margin-bottom:4px;border-bottom:1px solid #333;color:#aaa;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
-.pair-list-row{display:block;box-sizing:border-box;flex:0 0 auto;width:100%;min-height:30px;margin:2px 0;padding:6px 9px;border:0;border-left:2px solid transparent;background:transparent;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer}
+.pair-list-heading{display:flex;align-items:center;justify-content:space-between;padding:8px 7px;margin-bottom:4px;border-bottom:1px solid #333;color:#aaa;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.pair-list-all{display:flex;align-items:center;gap:5px;color:#bbb;font-size:11px;font-weight:400;letter-spacing:normal;text-transform:none;white-space:nowrap;cursor:pointer}
+.pair-list-all input{width:14px;height:14px;margin:0;accent-color:#4682b4;cursor:pointer}
+.pair-list-all input:disabled{cursor:default}
+.pair-list-entry{display:flex;align-items:center;gap:5px;margin:2px 0}
+.pair-list-checkbox{box-sizing:border-box;flex:0 0 14px;width:14px;height:14px;margin:0 0 0 4px;accent-color:#4682b4;cursor:pointer}
+.pair-list-row{display:block;box-sizing:border-box;flex:1 1 auto;min-width:0;width:auto;min-height:30px;margin:0;padding:6px 9px;border:0;border-left:2px solid transparent;background:transparent;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer}
 .pair-list-row:hover{background:#202020;color:#fff}
 .pair-list-row.is-selected{border-left-color:#4682b4;background:#1b2933;color:#fff}
 .pair-list-empty{padding:8px 7px;color:#888;font-size:11px}
