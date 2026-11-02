@@ -1,5 +1,6 @@
 #property strict
-#property version   "1.00"
+#property copyright "Gregory Lechanoine"
+#property version   "1.01"
 #property description "DMTrader HTTP bridge for MetaTrader 4"
 
 // Clean-room replacement for the unavailable TraderConnect.mq4 source.
