@@ -54,7 +54,7 @@
 .pair-list-entry .files__tradingFiles__3pwdV,.pair-list-entry .timeFrames__strategyTimeFrames__3yiiM{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:block;box-sizing:border-box;flex:0 0 auto;height:30px;margin:0;padding:2px 0 0;border-bottom:2px solid #ddd!important;background:#fff;z-index:20}
 .pair-list-entry .files__tradingFiles__3pwdV{width:92px}
 .pair-list-entry .timeFrames__strategyTimeFrames__3yiiM{width:54px}
-.pair-list-entry .Select{box-sizing:border-box;width:100%;height:26px;line-height:26px;font-size:11px}
+.pair-list-entry .Select{box-sizing:border-box;height:26px;line-height:26px;font-size:11px}
 .pair-list-entry .Select .Select-control,.pair-list-entry .Select .Select-control .Select-value{height:26px;line-height:26px}
 .pair-list-entry .Select--single>.Select-control .Select-value,.pair-list-entry .Select-placeholder{padding-left:4px;padding-right:4px}
 .pair-list-entry .Select-arrow-zone{width:16px;padding-right:2px}
