@@ -1,26 +1,74 @@
 #property strict
 #property copyright "Gregory Lechanoine"
-#property version   "1.01"
-#property description "DMTrader HTTP bridge for MetaTrader 4"
+#property version   "1.02"
+#property description "DMTrader MT4 bridge using the WinINet HTTP transport"
 
-// Clean-room replacement for the unavailable TraderConnect.mq4 source.
-// It implements the DMTrader local HTTP/JSON protocol; it is not a
-// decompilation or an exact binary conversion of TraderConnect.ex4.
+// Clean-room replacement for the unavailable original TraderConnect.mq4.
+// The old source is not present in the repository; Host/Port/Interval and the
+// historical "+Open Inet..." log indicate an Internet API transport. This
+// implementation uses WinINet HTTP, but is not a decompilation of TraderConnect.ex4.
 
-input string ServerURL              = "http://127.0.0.1:2122/";
+#import "wininet.dll"
+int InternetOpenW(string agent, int accessType, string proxyName, string proxyBypass, int flags);
+int InternetConnectW(int session, string serverName, int serverPort, string username, string password, int service, int flags, int context);
+int HttpOpenRequestW(int connection, string verb, string objectName, string version, string referer, int acceptTypes, int flags, int context);
+int HttpSendRequestW(int request, string headers, int headersLength, uchar &optionalData[], int optionalDataLength);
+int HttpQueryInfoW(int request, int infoLevel, int &buffer, int &bufferLength, int &index);
+int InternetReadFile(int request, uchar &buffer[], int bytesToRead, int &bytesRead);
+int InternetSetOptionW(int handle, int option, int &buffer, int bufferLength);
+int InternetCloseHandle(int handle);
+#import
+
+#define INTERNET_OPEN_TYPE_DIRECT       1
+#define INTERNET_SERVICE_HTTP           3
+#define INTERNET_OPTION_CONNECT_TIMEOUT 2
+#define INTERNET_OPTION_SEND_TIMEOUT    5
+#define INTERNET_OPTION_RECEIVE_TIMEOUT 6
+#define HTTP_QUERY_STATUS_CODE          19
+#define HTTP_QUERY_FLAG_NUMBER          0x20000000
+#define MAX_HTTP_RESPONSE_BYTES         16777216
+
+input string Host                   = "127.0.0.1";
+input int    Port                   = 2122;
+input int    Interval               = 1000; // milliseconds
 input string TerminalLabel          = "";
-input int    PollIntervalSeconds    = 1;
 input int    RequestTimeoutMs       = 3000;
 input int    DefaultSlippagePoints  = 5;
 input int    HistoryOrdersLimit     = 250;
 input bool   AllowTradeCommands     = false; // Enable only after demo-account testing.
 
+string   g_host = "";
 string   g_terminalName = "";
 bool     g_busy = false;
+bool     g_loggedInetOpen = false;
 datetime g_lastHttpLog = 0;
+
+string NormalizeHost(const string configuredHost)
+{
+   string normalized = configuredHost;
+   StringTrimLeft(normalized);
+   StringTrimRight(normalized);
+   if(StringFind(normalized, "https://", 0) == 0)
+      return(""); // The DMTrader local bridge is plain HTTP.
+   if(StringFind(normalized, "http://", 0) == 0)
+      normalized = StringSubstr(normalized, 7);
+   int slash = StringFind(normalized, "/", 0);
+   if(slash >= 0)
+      normalized = StringSubstr(normalized, 0, slash);
+   StringTrimLeft(normalized);
+   StringTrimRight(normalized);
+   return(normalized);
+}
 
 int OnInit()
 {
+   g_host = NormalizeHost(Host);
+   if(StringLen(g_host) == 0 || Port < 1 || Port > 65535)
+   {
+      Print("[TraderConnect] Invalid Host or Port. Use a hostname/IP and a port from 1 to 65535.");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+
    g_terminalName = TerminalLabel;
    if(StringLen(g_terminalName) == 0)
    {
@@ -31,19 +79,19 @@ int OnInit()
          g_terminalName += " - " + AccountServer();
    }
 
-   int interval = PollIntervalSeconds;
-   if(interval < 1)
-      interval = 1;
-   if(!EventSetTimer(interval))
+   int interval = Interval;
+   if(interval < 250)
+      interval = 250;
+   if(!EventSetMillisecondTimer(interval))
    {
       Print("[TraderConnect] Could not start the polling timer. MT4 error ", GetLastError());
       return(INIT_FAILED);
    }
 
-   Print("[TraderConnect] DMTrader URL: ", ServerURL,
-         "; terminal id: ", g_terminalName,
+   Print("[TraderConnect] DMTrader endpoint: http://", g_host, ":", Port,
+         "/; interval: ", interval, " ms; terminal id: ", g_terminalName,
          "; trade commands: ", (AllowTradeCommands ? "ENABLED" : "DISABLED"));
-   Print("[TraderConnect] Add http://127.0.0.1:2122 under MT4 Tools > Options > Expert Advisors > Allow WebRequest.");
+   Print("[TraderConnect] Transport: WinINet (wininet.dll). Enable Allow DLL imports in MT4 and in this EA; no WebRequest URL whitelist is needed.");
    if(AccountNumber() <= 0)
       Print("[TraderConnect] MT4 is not logged in; DMTrader requires a positive account login number.");
    return(INIT_SUCCEEDED);
@@ -124,47 +172,144 @@ string MakeEnvelope(const string action, const string resultJSON, const string e
    return(body);
 }
 
+void CloseWinInetHandles(const int request, const int connection, const int session)
+{
+   if(request != 0)
+      InternetCloseHandle(request);
+   if(connection != 0)
+      InternetCloseHandle(connection);
+   if(session != 0)
+      InternetCloseHandle(session);
+}
+
+void LogWinInetError(const string operation, const int errorCode)
+{
+   datetime now = TimeLocal();
+   if(g_lastHttpLog == 0 || now - g_lastHttpLog >= 30)
+   {
+      Print("[TraderConnect] WinINet ", operation, " failed (error ", errorCode,
+            "). Check DMTrader at http://", g_host, ":", Port,
+            " and enable Allow DLL imports in MT4 and this EA.");
+      g_lastHttpLog = now;
+   }
+   ResetLastError();
+}
+
 bool HttpPost(const string body, string &response)
 {
-   char postData[];
-   char responseData[];
-   string responseHeaders = "";
-   string headers = "Content-Type: application/json\r\n";
-
+   uchar postData[];
    int byteCount = StringToCharArray(body, postData, 0, WHOLE_ARRAY, CP_UTF8);
    if(byteCount <= 1)
    {
       Print("[TraderConnect] Could not encode HTTP request.");
       return(false);
    }
-   // StringToCharArray includes the trailing zero byte; JSON does not.
+   // StringToCharArray includes the trailing zero byte; HTTP JSON does not.
    ArrayResize(postData, byteCount - 1);
 
+   int session = 0;
+   int connection = 0;
+   int request = 0;
+
    ResetLastError();
-   int status = WebRequest("POST", ServerURL, headers, RequestTimeoutMs,
-                           postData, responseData, responseHeaders);
-   if(status == -1)
+   session = InternetOpenW("TraderConnect/1.02", INTERNET_OPEN_TYPE_DIRECT, "", "", 0);
+   if(session == 0)
    {
       int err = GetLastError();
-      datetime now = TimeLocal();
-      if(g_lastHttpLog == 0 || now - g_lastHttpLog >= 30)
-      {
-         Print("[TraderConnect] WebRequest failed (MT4 error ", err,
-               "). Check that DMTrader is running, the port is correct, and ",
-               "http://127.0.0.1:2122 is allowed in MT4 WebRequest settings.");
-         g_lastHttpLog = now;
-      }
-      ResetLastError();
+      LogWinInetError("InternetOpen", err);
       return(false);
    }
 
+   int timeout = RequestTimeoutMs;
+   if(timeout < 500)
+      timeout = 500;
+   if(timeout > 30000)
+      timeout = 30000;
+   InternetSetOptionW(session, INTERNET_OPTION_CONNECT_TIMEOUT, timeout, 4);
+   InternetSetOptionW(session, INTERNET_OPTION_SEND_TIMEOUT, timeout, 4);
+   InternetSetOptionW(session, INTERNET_OPTION_RECEIVE_TIMEOUT, timeout, 4);
+
+   ResetLastError();
+   connection = InternetConnectW(session, g_host, Port, "", "",
+                                 INTERNET_SERVICE_HTTP, 0, 0);
+   if(connection == 0)
+   {
+      int err = GetLastError();
+      CloseWinInetHandles(0, 0, session);
+      LogWinInetError("InternetConnect", err);
+      return(false);
+   }
+
+   ResetLastError();
+   request = HttpOpenRequestW(connection, "POST", "/", "HTTP/1.1", "", 0, 0, 0);
+   if(request == 0)
+   {
+      int err = GetLastError();
+      CloseWinInetHandles(0, connection, session);
+      LogWinInetError("HttpOpenRequest", err);
+      return(false);
+   }
+
+   string headers = "Content-Type: application/json; charset=utf-8\r\n";
+   headers += "Accept: application/json\r\nConnection: close\r\n";
+   ResetLastError();
+   if(HttpSendRequestW(request, headers, -1, postData, ArraySize(postData)) == 0)
+   {
+      int err = GetLastError();
+      CloseWinInetHandles(request, connection, session);
+      LogWinInetError("HttpSendRequest", err);
+      return(false);
+   }
+
+   int statusCode = 0;
+   int statusLength = 4;
+   int statusIndex = 0;
+   bool hasStatus = (HttpQueryInfoW(request,
+                                    HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                                    statusCode, statusLength, statusIndex) != 0);
+
+   uchar responseChunk[4096];
+   uchar responseData[];
+   while(true)
+   {
+      int bytesRead = 0;
+      ResetLastError();
+      if(InternetReadFile(request, responseChunk, ArraySize(responseChunk), bytesRead) == 0)
+      {
+         int err = GetLastError();
+         CloseWinInetHandles(request, connection, session);
+         LogWinInetError("InternetReadFile", err);
+         return(false);
+      }
+      if(bytesRead <= 0)
+         break;
+
+      int previousSize = ArraySize(responseData);
+      int newSize = previousSize + bytesRead;
+      if(newSize > MAX_HTTP_RESPONSE_BYTES || ArrayResize(responseData, newSize) < 0)
+      {
+         CloseWinInetHandles(request, connection, session);
+         LogWinInetError("response read (response too large)", 0);
+         return(false);
+      }
+      for(int i = 0; i < bytesRead; i++)
+         responseData[previousSize + i] = responseChunk[i];
+   }
+
    response = CharArrayToString(responseData, 0, WHOLE_ARRAY, CP_UTF8);
-   if(status < 200 || status >= 300)
+   CloseWinInetHandles(request, connection, session);
+
+   if(!g_loggedInetOpen)
+   {
+      Print("[TraderConnect] +Open Inet... HTTP connection to ", g_host, ":", Port, " succeeded.");
+      g_loggedInetOpen = true;
+   }
+   if(hasStatus && (statusCode < 200 || statusCode >= 300))
    {
       datetime now = TimeLocal();
       if(g_lastHttpLog == 0 || now - g_lastHttpLog >= 30)
       {
-         Print("[TraderConnect] DMTrader returned HTTP status ", status,
+         Print("[TraderConnect] DMTrader returned HTTP status ", statusCode,
                ". Response: ", StringSubstr(response, 0, 300));
          g_lastHttpLog = now;
       }
