@@ -13,8 +13,8 @@ L'application reçoit ainsi des données de graphique sous forme de bougies et n
 
 ## Installation et compilation
 
-1. Ouvrir `TraderConnect.mq4` dans MetaEditor et compiler avec **F7**. MetaEditor doit produire `TraderConnect.ex4` dans ce dossier. Le fichier `.ex4` déjà présent dans le paquet est l'ancien binaire et n'est pas remplacé tant qu'une compilation n'a pas été faite.
-2. Relancer DMTrader : au démarrage, l'application copie le `clients/MT4/Experts/TraderConnect.ex4` du paquet vers les dossiers Experts MT4 qu'elle détecte.
+1. Ouvrir `TraderConnect.mq4` dans MetaEditor et compiler avec **F7**. MetaEditor doit produire `TraderConnect.ex4` à côté du source. Le `.ex4` fourni avec l'application peut être ancien.
+2. Dans MT4, utiliser **Fichier > Ouvrir le dossier de données**, puis copier le `.ex4` compilé dans `MQL4/Experts`, en remplaçant l'ancien fichier du terminal utilisé. L'application ne copie désormais son EA intégré que si le fichier cible est absent : elle ne remplacera plus une version déjà installée à chaque démarrage.
 3. Dans MT4, ouvrir **Outils > Options > Expert Advisors**, autoriser WebRequest pour `http://127.0.0.1:2122`, puis activer **Autoriser le trading algorithmique**.
 4. Attacher l'EA à un seul graphique de ce terminal. Le serveur DMTrader écoute par défaut sur le port `2122` ; adapter `ServerURL` si le port a été changé dans DMTrader.
 5. Tester d'abord sur un compte démo. Le paramètre `AllowTradeCommands` est volontairement désactivé par défaut : l'activer dans les propriétés de l'EA seulement après vérification du flux de signaux et des volumes.
