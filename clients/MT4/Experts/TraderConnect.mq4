@@ -686,12 +686,15 @@ string ExecuteSend(const string requestInput, string &error)
       return("-1");
    }
 
-   double stopLoss = OptionalNumber(fields, count, 3, 0.0);
-   double takeProfit = OptionalNumber(fields, count, 4, 0.0);
+   // Match the legacy EA's wire order, which mirrors OrderSend parameters:
+   // symbol, type, lots, price, slippage, stop loss, take profit, comment,
+   // magic number, and expiration. DMTrader sends market price as zero.
+   double requestedPrice = OptionalNumber(fields, count, 3, 0.0);
    int slippage = DefaultSlippagePoints;
-   if(count > 5 && StringLen(fields[5]) > 0)
-      slippage = (int)StringToInteger(fields[5]);
-   double requestedPrice = OptionalNumber(fields, count, 6, 0.0);
+   if(count > 4 && StringLen(fields[4]) > 0)
+      slippage = (int)StringToInteger(fields[4]);
+   double stopLoss = OptionalNumber(fields, count, 5, 0.0);
+   double takeProfit = OptionalNumber(fields, count, 6, 0.0);
    string comment = (count > 7 ? fields[7] : "");
    int magic = (count > 8 && StringLen(fields[8]) > 0 ? (int)StringToInteger(fields[8]) : 0);
    datetime expiration = (count > 9 ? ParseExpiration(fields[9]) : 0);
