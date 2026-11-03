@@ -202,10 +202,10 @@
       } catch (e) {}
       if (!appDir) appDir = path.dirname(process.execPath);
       try {
-        var src = fs.readFileSync(path.join(appDir, "index.js"), "utf8");
-        var zoneOk = src.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?10:void 0") !== -1;
-        var updOk = src.indexOf("checkNewVersion(") === -1;
-        line("VERIF bundle index.js: taille=" + src.length + " octets" +
+        var bundleSrc = fs.readFileSync(path.join(appDir, "index.js"), "utf8");
+        var zoneOk = bundleSrc.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?10:void 0") !== -1;
+        var updOk = bundleSrc.indexOf("checkNewVersion(") === -1;
+        line("VERIF bundle index.js: taille=" + bundleSrc.length + " octets" +
              " patchZones10Chandelles=" + (zoneOk ? "OK" : "ABSENT") +
              " checkMAJ=" + (updOk ? "RETIRÉ" : "ENCOURS"));
       } catch (e) {
