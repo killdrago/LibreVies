@@ -688,5 +688,5 @@
     stockage: "localStorage",
     limiteEvenements: MAX_ENTRIES
   });
-  add("Analyse", "info", "Fonctionnement actuel : une stratégie est sélectionnée par paire. Le moteur peut émettre des ordres si l’automatisation du compte est activée, la paire autorisée et AllowTradeCommands actif dans l’EA.");
+  add("Analyse", "info", "Fonctionnement : en mode normal, une stratégie est sélectionnée par paire. Avec « Tout », les signaux sont comparés : meilleur gain estimé au TP, sinon SL le plus proche; une seule stratégie est retenue. Un ordre ne peut partir que si l’automatisation du compte, la paire et AllowTradeCommands dans l’EA l’autorisent.");
 })();
