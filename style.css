@@ -66,8 +66,8 @@
 .pair-list-entry .Select.is-open{z-index:250}
 .pair-list-entry .Select-menu-outer{z-index:260;max-height:160px}
 .pair-list-entry .Select-menu{max-height:158px}
-.strategy-all-option{display:flex;align-items:center;gap:7px;min-height:18px;white-space:nowrap}
-.strategy-all-option input{width:13px;height:13px;margin:0;accent-color:#4682b4;pointer-events:none}
+.strategy-all-value,.strategy-all-option{display:flex;align-items:center;gap:7px;min-height:18px;white-space:nowrap}
+.strategy-all-value input,.strategy-all-option input{width:13px;height:13px;margin:0;accent-color:#4682b4;pointer-events:none}
 .pair-global-controls{display:flex;flex:0 0 auto;align-items:center;gap:5px}
 .pair-global-controls .pair-global-strategy,.pair-global-controls .pair-global-timeframe{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:block;box-sizing:border-box;flex:0 0 auto;height:30px;margin:0;padding:2px 0 0;border-bottom:2px solid #ddd!important;background:#fff;z-index:20}
 .pair-global-controls .pair-global-strategy{width:92px}
