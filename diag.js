@@ -190,6 +190,29 @@
     }
   } catch (e) {}
 
+  /* ---------------- vérification du bundle courant ---------------- */
+
+  try {
+    if (fs && path) {
+      var appDir = null;
+      try {
+        if (typeof nw !== "undefined" && nw.App && nw.App.getAppPath) {
+          appDir = path.dirname(nw.App.getAppPath());
+        }
+      } catch (e) {}
+      if (!appDir) appDir = path.dirname(process.execPath);
+      try {
+        var src = fs.readFileSync(path.join(appDir, "index.js"), "utf8");
+        var zoneOk = src.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?10:void 0") !== -1;
+        var updOk = src.indexOf("checkNewVersion(") === -1;
+        line("VERIF bundle index.js: patchZones10Chandelles=" + (zoneOk ? "OK" : "ABSENT") +
+             " checkMAJ=" + (updOk ? "RETIRÉ" : "ENCOURS"));
+      } catch (e) {
+        line("VERIF bundle index.js: inaccessible(" + (e && e.message ? e.message : "?") + ")");
+      }
+    }
+  } catch (e) {}
+
   /* ---------------- erreurs JS ---------------- */
 
   try {
