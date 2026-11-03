@@ -205,7 +205,8 @@
         var src = fs.readFileSync(path.join(appDir, "index.js"), "utf8");
         var zoneOk = src.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?10:void 0") !== -1;
         var updOk = src.indexOf("checkNewVersion(") === -1;
-        line("VERIF bundle index.js: patchZones10Chandelles=" + (zoneOk ? "OK" : "ABSENT") +
+        line("VERIF bundle index.js: taille=" + src.length + " octets" +
+             " patchZones10Chandelles=" + (zoneOk ? "OK" : "ABSENT") +
              " checkMAJ=" + (updOk ? "RETIRÉ" : "ENCOURS"));
       } catch (e) {
         line("VERIF bundle index.js: inaccessible(" + (e && e.message ? e.message : "?") + ")");
