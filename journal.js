@@ -576,7 +576,7 @@
             '<input id="dmt-journal-search" class="dmt-journal-search" type="search" placeholder="Rechercher dans le journal…" aria-label="Rechercher dans le journal">' +
             '<div class="dmt-journal-actions"><button id="dmt-journal-export" type="button">Exporter</button><button id="dmt-journal-clear" type="button">Effacer</button></div>' +
           '</div>' +
-          '<div class="dmt-journal-note">Le journal décrit les faits observables (données de marché, contrôles, simulations, ordres, réponses et alertes). Il n’invente pas de signaux et ne révèle pas de raisonnement interne caché.</div>' +
+          '<div class="dmt-journal-note">Le journal décrit les faits observables (données de marché, contrôles, simulations, ordres, réponses et alertes) sans afficher de raisonnement interne caché. Une stratégie active peut envoyer un ordre si le compte, la paire et AllowTradeCommands dans l’EA l’autorisent.</div>' +
           '<div id="dmt-journal-list" class="dmt-journal-list" aria-live="polite"></div>' +
           '<footer class="dmt-journal-footer"><span>Historique enregistré localement sur cet ordinateur.</span><span id="dmt-journal-count">0 événement</span></footer>' +
         '</section>' +
@@ -688,5 +688,5 @@
     stockage: "localStorage",
     limiteEvenements: MAX_ENTRIES
   });
-  add("Analyse", "info", "Limite de cette version : aucune ouverture automatique issue des stratégies n’a été trouvée dans le code ; les simulations restent historiques et ne transmettent pas d’ordre. Le journal ne créera pas de signaux absents.");
+  add("Analyse", "info", "Fonctionnement actuel : une stratégie est sélectionnée par paire. Le moteur peut émettre des ordres si l’automatisation du compte est activée, la paire autorisée et AllowTradeCommands actif dans l’EA.");
 })();
