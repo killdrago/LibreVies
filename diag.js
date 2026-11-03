@@ -203,7 +203,7 @@
       if (!appDir) appDir = path.dirname(process.execPath);
       try {
         var bundleSrc = fs.readFileSync(path.join(appDir, "index.js"), "utf8");
-        var zoneOk = bundleSrc.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?10:void 0") !== -1;
+        var zoneOk = bundleSrc.indexOf("xLimit:r>=(t.props.levels[e]||[]).length?20:void 0") !== -1;
         var updOk = bundleSrc.indexOf("checkNewVersion(") === -1;
         line("VERIF bundle index.js: taille=" + bundleSrc.length + " octets" +
              " patchZones10Chandelles=" + (zoneOk ? "OK" : "ABSENT") +
