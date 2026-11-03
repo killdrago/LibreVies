@@ -591,4 +591,35 @@
   } catch (e) {}
 
   line("INFO instrumentation prete — chargement de journal.js / index.js...");
+
+// ===== sondes interactions : clics + durée du dispatch + réponse UI =====
+try {
+  var raf = (window.requestAnimationFrame || function (fn) { return window.setTimeout(fn, 16); });
+  function interactionLabel(evt) {
+    var el = evt && evt.target;
+    if (!el) return "?";
+    var parts = [];
+    if (el.tagName) parts.push(String(el.tagName).toLowerCase());
+    if (el.value) parts.push(String(el.value));
+    if (el.className && typeof el.className === "string") parts.push(el.className.slice(0, 60));
+    return parts.join(" | ");
+  }
+  function instrumentInteraction(evt, type) {
+    var t0 = Date.now();
+    line("INTERACTION " + type + ": " + interactionLabel(evt));
+    function onBubble() {
+      line("DISPATCH " + type + ": " + (Date.now() - t0) + "ms");
+      try { window.removeEventListener(type, onBubble); } catch (e) {}
+    }
+    try { window.addEventListener(type, onBubble, false); } catch (e) {}
+    try {
+      raf(function () {
+        line("RESPONSE " + type + ": " + (Date.now() - t0) + "ms");
+      });
+    } catch (e) {}
+  }
+  document.addEventListener("mousedown", function (evt) { instrumentInteraction(evt, "mousedown"); }, true);
+  document.addEventListener("click", function (evt) { instrumentInteraction(evt, "click"); }, true);
+  line("sondes interactions pretes (clics + dispatch + réponse UI)");
+} catch (e) {}
 })();
