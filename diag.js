@@ -428,12 +428,21 @@
 
   var lagLast = -1, lagSamples = [], lastLagAlert = 0;
   try {
+    // NW.js (page contexte) n'expose pas toujours setImmediate : on utilise
+    // setTimeout(0) qui est toujours disponible. hrtime indisponible ⇒
+    // repli sur Date.now(). On mesure le temps entre l'armement du timer
+    // et son exécution : c'est le temps perdu par l'event loop.
+    var hasHrtime = typeof process !== "undefined" && typeof process.hrtime === "function";
     (function loop() {
-      var start = process.hrtime();
-      setImmediate(function () {
+      var start = hasHrtime ? process.hrtime() : Date.now();
+      var tick = function () {
         try {
-          var d = process.hrtime(start);
-          lagLast = Math.round(d[0] * 1000 + d[1] / 1e6);
+          if (hasHrtime) {
+            var d = process.hrtime(start);
+            lagLast = Math.round(d[0] * 1000 + d[1] / 1e6);
+          } else {
+            lagLast = Date.now() - start;
+          }
           if (lagSamples.length < 900) lagSamples.push(lagLast);
           if (lagLast > cfg.slowLag && Date.now() - lastLagAlert > 10000) {
             lastLagAlert = Date.now();
@@ -441,7 +450,9 @@
           }
         } catch (e) {}
         loop();
-      });
+      };
+      if (typeof setImmediate === "function") setImmediate(tick);
+      else setTimeout(tick, 0);
     })();
   } catch (e) {}
 
