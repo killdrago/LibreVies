@@ -414,7 +414,15 @@
       var holder = { period: period, stack: src(), count: 0, t0: Date.now(), gone: false };
       var id;
       if (typeof fn === "function") {
-        var w = function () { holder.count++; totalExecs++; return fn.apply(this, arguments); };
+        var w = function () {
+          var t0 = Date.now();
+          holder.count++; totalExecs++;
+          try { return fn.apply(this, arguments); } finally {
+            var dt = Date.now() - t0;
+            holder.totalMs = (holder.totalMs || 0) + dt;
+            if (dt > 200) line("SLOW callback: " + dt + "ms @ " + holder.stack);
+          }
+        };
         id = oSI.call(this, w, period);
       } else {
         id = oSI.call(this, fn, period);
