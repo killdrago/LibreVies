@@ -510,35 +510,54 @@ rem synchronisation est donc lui-meme rafraichi depuis la branche demandee
 rem avant son execution : une ancienne copie locale ne peut plus empecher la
 rem mise a jour du script C#.
 set "LV_SYNC=%ROOT%outils\synchroniser_sources.ps1"
-rem Telecharger l'outil au commit exact deja recupere par Git : l'URL de
-rem branche peut etre servie par le cache raw GitHub pendant une avance de la
-rem branche, ce qui provoque ensuite un hash incoherent.
-set "LV_SYNC_COMMIT="
-for /f "delims=" %%S in ('"%GIT%" -C "%LV_GIT_ROOT%" rev-parse HEAD 2^>nul') do if not defined LV_SYNC_COMMIT set "LV_SYNC_COMMIT=%%S"
-if defined LV_SYNC_COMMIT (
-    set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%LV_SYNC_COMMIT%/compilation/outils/synchroniser_sources.ps1"
-) else (
-    rem Aucun depot Git n'est necessaire si aucune edition n'est a publier.
-    rem Un parametre aleatoire evite alors une ancienne reponse du CDN raw.
-    set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%BRANCHE%/compilation/outils/synchroniser_sources.ps1?v=%RANDOM%"
-)
 set "LV_SYNC_REMOTE=%BUILD%\synchroniser_sources.remote.ps1"
 if not exist "%ROOT%outils" mkdir "%ROOT%outils"
+if not exist "%BUILD%" mkdir "%BUILD%"
+if exist "%LV_SYNC_REMOTE%" del /q "%LV_SYNC_REMOTE%" >nul 2>&1
+
+rem L'outil est lu au commit exact que "git fetch" vient de recuperer, donc
+rem directement dans la base Git locale : les identifiants Git du poste sont
+rem deja ceux qui ont servi au fetch. Une lecture HTTP anonyme de
+rem raw.githubusercontent.com ou de api.github.com repond 404 "Introuvable"
+rem quand le depot GitHub est prive, et c'etait le blocage du build.
+if not defined GIT call :detecter_git
+if not defined LV_GIT_ROOT set "LV_GIT_ROOT=%ROOT%.."
+set "LV_SYNC_RECU=non"
+set "LV_SYNC_COMMIT="
+if not defined GIT goto :sync_par_http
+if not exist "%LV_GIT_ROOT%\.git" goto :sync_par_http
+for /f "delims=" %%S in ('"%GIT%" -C "%LV_GIT_ROOT%" rev-parse HEAD 2^>nul') do if not defined LV_SYNC_COMMIT set "LV_SYNC_COMMIT=%%S"
+if not defined LV_SYNC_COMMIT goto :sync_par_http
+"%GIT%" -C "%LV_GIT_ROOT%" cat-file -p "%LV_SYNC_COMMIT%:compilation/outils/synchroniser_sources.ps1" > "%LV_SYNC_REMOTE%" 2>nul
+findstr /C:"Synchronisation differentielle" "%LV_SYNC_REMOTE%" >nul 2>&1
+if errorlevel 1 goto :sync_par_http
+set "LV_SYNC_RECU=oui"
+
+:sync_par_http
+if "%LV_SYNC_RECU%"=="oui" goto :sync_outil_pret
+rem Secours : depot public, ou base Git locale inutilisable.
+rem Un parametre aleatoire evite une ancienne reponse du CDN raw.
+set "LV_SYNC_URL=https://raw.githubusercontent.com/%DEPOT%/%BRANCHE%/compilation/outils/synchroniser_sources.ps1?v=%RANDOM%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -UseBasicParsing -Headers @{'User-Agent'='LibreVies-build'} -Uri $env:LV_SYNC_URL -OutFile $env:LV_SYNC_REMOTE"
-if errorlevel 1 (
+if not errorlevel 1 set "LV_SYNC_RECU=oui"
+
+:sync_outil_pret
+if "%LV_SYNC_RECU%"=="oui" (
+    copy /y "%LV_SYNC_REMOTE%" "%LV_SYNC%" >nul
+) else (
     if not exist "%LV_SYNC%" (
-        echo ERREUR : impossible de telecharger l'outil de synchronisation.
+        echo.
+        echo ERREUR : impossible de recuperer l'outil de synchronisation.
         echo Verifie la connexion Internet puis relance build_launcher.bat.
         exit /b 1
     )
     echo AVERTISSEMENT : nouvel outil de synchronisation indisponible, copie locale conservee.
-) else (
-    copy /y "%LV_SYNC_REMOTE%" "%LV_SYNC%" >nul
 )
 if not exist "%LV_SYNC%" (
     echo ERREUR : l'outil de synchronisation reste introuvable : %LV_SYNC%
     exit /b 1
 )
+set "LV_GIT=%GIT%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%LV_SYNC%"
 
 if errorlevel 1 (

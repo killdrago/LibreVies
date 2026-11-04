@@ -133,6 +133,15 @@ Deux garanties importantes :
   sauvegarde locale précède leur remplacement ; les coordonnées d'édition
   sont publiées avant cette synchronisation. La configuration MySQL réelle
   `config.php` n'est pas remplacée.
+* **Le dépôt GitHub peut être privé.** Les sources sont lues dans la base Git
+  locale, remplie juste avant par `git fetch` : ce sont donc les identifiants
+  Git du poste qui servent, et aucune lecture anonyme n'est faite. Une lecture
+  anonyme de `raw.githubusercontent.com` ou de `api.github.com` répond en effet
+  **404 « Introuvable »** sur un dépôt privé, même pour un commit qui existe.
+  L'API GitHub n'est utilisée qu'en secours, avec le jeton du poste
+  (`LV_GH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, sinon `git credential fill`).
+  En revanche, si le launcher des joueurs doit télécharger le jeu depuis
+  `raw_url`, cet emplacement doit rester accessible publiquement.
 * **Rien de tout cela n'arrive chez le joueur.** Ni Python, ni PyInstaller, ni
   Unity, ni ce dossier `compilation\` : le joueur ne reçoit que `LibreVies.exe`.
   La licence Unity (compte Unity + licence Personal, demandée par Unity Hub)
