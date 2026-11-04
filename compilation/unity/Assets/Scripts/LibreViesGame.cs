@@ -2143,12 +2143,21 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // Fenetres de choix : elles se deplacent par leur barre de titre et gardent
+    // leur position d'une ouverture a l'autre.
+    private const int IdFenetreTextures = 4101;
+    private const float HauteurTitreFenetre = 24f;
+    private Rect fenetreTextures;
+
     private void DessinerChoixTextures()
     {
         float largeur = 760f;
         float hauteur = 500f;
-        Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f,
-            largeur, hauteur);
+        if (fenetreTextures.width < 1f)
+            fenetreTextures = new Rect(Screen.width * 0.5f - largeur * 0.5f,
+                Screen.height * 0.5f - hauteur * 0.5f, largeur, hauteur + HauteurTitreFenetre);
+        fenetreTextures.width = largeur;
+        fenetreTextures.height = hauteur + HauteurTitreFenetre;
         string titre = familleTexturesFiltre >= 0
             ? "TEXTURES : " + NomsFamillesTextures[familleTexturesFiltre].ToUpperInvariant()
             : "TEXTURES";
@@ -2157,7 +2166,13 @@ public sealed class LibreViesGame : MonoBehaviour
             string nomCible = texturesMaisonCible != null ? texturesMaisonCible.Root.name : "PANCARTE";
             titre += " - " + nomCible + " uniquement";
         }
-        GUI.Box(cadre, titre, boxStyle);
+        fenetreTextures = GUI.Window(IdFenetreTextures, fenetreTextures,
+            id => ContenuChoixTextures(largeur, hauteur), titre);
+    }
+
+    private void ContenuChoixTextures(float largeur, float hauteur)
+    {
+        Rect cadre = new Rect(0f, 0f, largeur, hauteur);
         if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
         {
             AnnulerChoixTextures();
@@ -4026,10 +4041,25 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private bool porteMenuOuvert;
     private Batiment porteMenuMaison;
+    private List<string> modelesPorteAffiches = new List<string>();
+    private readonly Dictionary<string, Texture2D> iconesPorte = new Dictionary<string, Texture2D>();
+    private const int IdFenetrePorte = 4102;
+    private const float YModelesPorte = 136f;
+    private Rect fenetrePorte;
+
+    private sealed class ElementPorte
+    {
+        public string Nom;
+        public Texture2D Icone;
+        public bool Actif;
+        public string Materiau;
+        public string Modele;
+    }
 
     private void OuvrirMenuPorte(Batiment batiment)
     {
         porteMenuMaison = batiment;
+        modelesPorteAffiches = ModelesPorte();
         porteMenuOuvert = true;
     }
 
@@ -4039,7 +4069,7 @@ public sealed class LibreViesGame : MonoBehaviour
         porteMenuMaison = null;
     }
 
-    // Fenetre PORTE : revetement (bois, aluminium, verre) et modele 3D de LVTextures/porte.
+    // Fenetre PORTE : revetements et modeles en icones, comme les murs exterieurs.
     private void DessinerMenuPorte()
     {
         if (porteMenuMaison == null || porteMenuMaison.Root == null || !modeEdition)
@@ -4048,49 +4078,157 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
         Batiment batiment = porteMenuMaison;
-        float largeur = 560f;
-        float hauteur = 380f;
-        Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f, largeur, hauteur);
-        GUI.Box(cadre, "PORTE : " + batiment.Root.name, boxStyle);
-        if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
+        var revetements = new List<ElementPorte>
+        {
+            new ElementPorte { Nom = "BOIS", Icone = IconeMateriau("Bois_Clair"),
+                Actif = batiment.MateriauPorte != "GlassBleu", Materiau = "Bois_Clair" },
+            new ElementPorte { Nom = "TRANSPARENT", Icone = IconeMateriau("GlassBleu"),
+                Actif = batiment.MateriauPorte == "GlassBleu", Materiau = "GlassBleu" }
+        };
+        var modeles = new List<ElementPorte>
+        {
+            new ElementPorte { Nom = "ORIGINE", Icone = IconeMateriau(batiment.MateriauPorte),
+                Actif = string.IsNullOrEmpty(batiment.PorteModele), Modele = "" }
+        };
+        foreach (string nom in modelesPorteAffiches)
+        {
+            modeles.Add(new ElementPorte { Nom = nom, Icone = IconeModelePorte(nom),
+                Actif = batiment.PorteModele == nom, Modele = nom });
+        }
+        const float largeur = 560f;
+        float hauteur = YModelesPorte + Mathf.CeilToInt(modeles.Count / 5f) * 128f + 8f;
+        if (fenetrePorte.width < 1f)
+            fenetrePorte = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - 200f,
+                largeur, hauteur + HauteurTitreFenetre);
+        fenetrePorte.width = largeur;
+        fenetrePorte.height = hauteur + HauteurTitreFenetre;
+        fenetrePorte = GUI.Window(IdFenetrePorte, fenetrePorte,
+            id => ContenuMenuPorte(largeur, revetements, modeles), "PORTE");
+    }
+
+    private void ContenuMenuPorte(float largeur, List<ElementPorte> revetements, List<ElementPorte> modeles)
+    {
+        Batiment batiment = porteMenuMaison;
+        if (GUI.Button(new Rect(largeur - 36f, 4f, 28f, 24f), "X", buttonStyle))
         {
             FermerMenuPorte();
             return;
         }
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 44f, 300f, 22f), "REVETEMENT", smallStyle);
-        string[] revLibelles = { "BOIS", "TRANSPARENT" };
-        string[] revMateriaux = { "Bois_Clair", "GlassBleu" };
-        for (int i = 0; i < revLibelles.Length; i++)
+        for (int i = 0; i < revetements.Count; i++)
         {
-            Rect bouton = new Rect(cadre.x + 16f + i * 176f, cadre.y + 70f, 168f, 34f);
-            GUIStyle style = batiment.MateriauPorte == revMateriaux[i] ? tabActifStyle : buttonStyle;
-            if (GUI.Button(bouton, revLibelles[i], style))
+            if (DessinerTuileIcone(new Rect(16f + i * 108f, 8f, 96f, 96f), revetements[i]))
             {
-                AppliquerMateriauMaison(batiment, "porte", revMateriaux[i]);
+                AppliquerMateriauMaison(batiment, "porte", revetements[i].Materiau);
                 EnregistrerCoordonneesEdition();
             }
         }
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 120f, 520f, 22f),
-            "Le revetement s'applique au vantail d'origine (un modele garde ses materiaux).", smallStyle);
-        List<string> modeles = ModelesPorte();
-        var choix = new List<string> { "" };
-        choix.AddRange(modeles);
-        string actuel = batiment.PorteModele ?? "";
-        for (int i = 0; i < choix.Count; i++)
+        for (int i = 0; i < modeles.Count; i++)
         {
-            Rect bouton = new Rect(cadre.x + 16f + (i % 3) * 180f, cadre.y + 150f + (i / 3) * 40f, 172f, 34f);
-            string libelle = choix[i] == "" ? "ORIGINE" : choix[i];
-            GUIStyle style = actuel == choix[i] ? tabActifStyle : buttonStyle;
-            if (GUI.Button(bouton, libelle, style))
+            Rect carre = new Rect(16f + (i % 5) * 108f, YModelesPorte + (i / 5) * 128f, 96f, 96f);
+            if (DessinerTuileIcone(carre, modeles[i]))
             {
-                batiment.PorteModele = choix[i];
+                batiment.PorteModele = modeles[i].Modele;
                 AppliquerModelePorte(batiment);
                 EnregistrerCoordonneesEdition();
             }
         }
-        if (modeles.Count == 0)
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 150f, 520f, 22f),
-                "Aucun modele : deposez un fichier 3D dans LVTextures/porte, puis refaites le build.", smallStyle);
+    }
+
+    // Tuile avec icone ; cadre jaune si c'est le choix actuel. Renvoie true au clic.
+    private bool DessinerTuileIcone(Rect carre, ElementPorte element)
+    {
+        GUI.color = element.Actif ? Color.yellow : new Color(0.35f, 0.35f, 0.35f, 1f);
+        GUI.DrawTexture(new Rect(carre.x - 3f, carre.y - 3f, carre.width + 6f, carre.height + 6f),
+            Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        if (element.Icone != null) GUI.DrawTexture(carre, element.Icone, ScaleMode.StretchToFill, false);
+        GUI.Label(new Rect(carre.x, carre.y + carre.height + 2f, carre.width + 8f, 22f), element.Nom, smallStyle);
+        return GUI.Button(carre, GUIContent.none, GUIStyle.none);
+    }
+
+    // Couleur ou texture d'un materiau, pour l'icone du revetement.
+    private Texture2D IconeMateriau(string nom)
+    {
+        string cle = "mat:" + nom;
+        Texture2D deja;
+        if (iconesPorte.TryGetValue(cle, out deja) && deja != null) return deja;
+        Material materiau = Mat(nom);
+        Texture2D icone = materiau != null ? materiau.mainTexture as Texture2D : null;
+        if (icone == null)
+        {
+            Color couleur = nom == "GlassBleu" ? new Color(0.6f, 0.85f, 1f, 1f)
+                : (materiau != null ? materiau.color : Color.gray);
+            couleur.a = 1f;
+            icone = new Texture2D(4, 4, TextureFormat.RGB24, false);
+            var pixels = new Color[16];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = couleur;
+            icone.SetPixels(pixels);
+            icone.Apply();
+        }
+        iconesPorte[cle] = icone;
+        return icone;
+    }
+
+    private Texture2D IconeModelePorte(string nom)
+    {
+        string cle = "modele:" + nom;
+        Texture2D deja;
+        if (iconesPorte.TryGetValue(cle, out deja) && deja != null) return deja;
+        GameObject prefab = Resources.Load<GameObject>(DossierModelesPorte + "/" + nom);
+        if (prefab == null) return null;
+        Texture2D rendu = RendrePrefab(prefab, 128);
+        if (rendu != null) iconesPorte[cle] = rendu;
+        return rendu;
+    }
+
+    // Rend un modele hors de la scene (loin sous le monde) pour en faire une icone.
+    private Texture2D RendrePrefab(GameObject prefab, int taille)
+    {
+        var racine = new GameObject("ApercuPorteRacine");
+        racine.transform.position = new Vector3(0f, -5000f, 0f);
+        GameObject instance = Instantiate(prefab, racine.transform);
+        Vector3 min, max;
+        if (!BoitePivot(racine.transform, instance, out min, out max))
+        {
+            Destroy(racine);
+            return null;
+        }
+        Vector3 centre = racine.transform.position + (min + max) * 0.5f;
+        float cote = Mathf.Max(max.x - min.x, Mathf.Max(max.y - min.y, max.z - min.z), 0.05f);
+
+        var camObj = new GameObject("ApercuPorteCamera");
+        Camera cam = camObj.AddComponent<Camera>();
+        cam.enabled = false;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.16f, 0.18f, 0.21f, 1f);
+        cam.fieldOfView = 30f;
+        cam.nearClipPlane = 0.05f;
+        cam.farClipPlane = 500f;
+        camObj.transform.position = centre + new Vector3(cote * 0.7f, cote * 0.35f, -cote * 1.8f);
+        camObj.transform.LookAt(centre);
+
+        var lumiereObj = new GameObject("ApercuPorteLumiere");
+        Light lumiere = lumiereObj.AddComponent<Light>();
+        lumiere.type = LightType.Directional;
+        lumiere.intensity = 1.2f;
+        lumiereObj.transform.rotation = Quaternion.Euler(40f, -35f, 0f);
+
+        var rt = new RenderTexture(taille, taille, 16, RenderTextureFormat.ARGB32);
+        cam.targetTexture = rt;
+        cam.Render();
+        RenderTexture ancienne = RenderTexture.active;
+        RenderTexture.active = rt;
+        var resultat = new Texture2D(taille, taille, TextureFormat.RGB24, false);
+        resultat.ReadPixels(new Rect(0f, 0f, taille, taille), 0, 0);
+        resultat.Apply();
+        RenderTexture.active = ancienne;
+        cam.targetTexture = null;
+        Destroy(camObj);
+        Destroy(lumiereObj);
+        Destroy(racine);
+        rt.Release();
+        Destroy(rt);
+        return resultat;
     }
 
     private void ModifierHauteurPorte(Batiment batiment, bool agrandir)
@@ -7572,6 +7710,8 @@ public sealed class LibreViesGame : MonoBehaviour
             if (maisonInterieure.PorteRoot != null
                 && rendu.transform.IsChildOf(maisonInterieure.PorteRoot)) continue;
             if (rendu.transform.name == "Sol_Interieur") continue;
+            // Les murs interieurs (papier peint) restent visibles de l'interieur.
+            if (rendu.transform.name == "Murs_Interieur") continue;
             if (!renderersMasquesInterieur.ContainsKey(rendu))
                 renderersMasquesInterieur.Add(rendu, rendu.enabled);
             rendu.enabled = false;
