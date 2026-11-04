@@ -1544,6 +1544,9 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Dirt", new Color(0.45f, 0.30f, 0.17f));
         MakeMaterial("Stone", new Color(0.42f, 0.45f, 0.48f));
         MakeMaterial("Wood", new Color(0.35f, 0.17f, 0.07f));
+        // Materiau propre au sol des maisons : le menu BOIS ne le change pas.
+        // Il garde l'aspect d'origine tant que le joueur ne choisit pas de sol.
+        if (Mat("Wood") != null) materials.Add(new Material(Mat("Wood")) { name = "SolOrigine" });
         MakeMaterial("Carton", new Color(0.62f, 0.35f, 0.12f));
         MakeMaterial("Wall", new Color(0.70f, 0.61f, 0.47f));
         // La brique de maison est volontairement gris neutre : aucune teinte
@@ -2038,7 +2041,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
         // Sol de la maison : seulement Sol_Interieur. ORIGINE = bois d'origine.
         foreach (Renderer rendu in RendusNommesMaison(batiment, "Sol_Interieur"))
-            AppliquerChoixZone(rendu, FamilleSol, batiment.TextureSol, Mat("Wood"));
+            AppliquerChoixZone(rendu, FamilleSol, batiment.TextureSol, Mat("SolOrigine"));
 
         // Papier peint : Murs_Interieur. "" suit le mur de la maison ;
         // ORIGINE = materiau des murs de la maison.
@@ -3757,7 +3760,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // l'exterieur. Elle reste donc invisible depuis l'exterieur.
         Box(new Vector3(0f, 0.31f, 0f),
             new Vector3(Mathf.Max(size.x - EpaisseurMurInterieur, 1.2f), 0.08f,
-                Mathf.Max(size.z - EpaisseurMurInterieur, 1.2f)), "Wood", root, "Sol_Interieur");
+                Mathf.Max(size.z - EpaisseurMurInterieur, 1.2f)), "SolOrigine", root, "Sol_Interieur");
         // Socle, chaînages d'angle et poutres de rive donnent une silhouette
         // bâtie plus crédible sans modifier l'emprise de collision du bâtiment.
         Box(new Vector3(0f, 0.14f, 0f), new Vector3(size.x + 0.30f, 0.28f, size.z + 0.30f),
