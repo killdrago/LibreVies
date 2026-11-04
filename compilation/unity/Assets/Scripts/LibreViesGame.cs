@@ -394,7 +394,6 @@ public sealed class LibreViesGame : MonoBehaviour
         public string TextureSol;
         public string TexturePorte;
         public string TexturePapier;
-        public string PorteModele;
         public float LuminositeMur;
         public float LuminositePorte;
         public float LuminositeToit;
@@ -510,8 +509,6 @@ public sealed class LibreViesGame : MonoBehaviour
         // Texture de porte (dossier LVTextures/porte) : "" = le revetement BOIS/VERRE.
         public string TexturePorte = "";
         public string TexturePapier = "";
-        // Modele 3D de porte (LVTextures/porte), "" = porte d'origine.
-        public string PorteModele = "";
         public Obstacle Collision;
     }
 
@@ -1418,8 +1415,6 @@ public sealed class LibreViesGame : MonoBehaviour
                         AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
                     AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
                     AppliquerTexturesLocalesMaison(element.Maison);
-                    element.Maison.PorteModele = coordonnee.PorteModele ?? "";
-                    AppliquerModelePorte(element.Maison);
                     AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
                     AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
                 }
@@ -1496,7 +1491,6 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.TextureSol = element.Maison.TextureSol ?? "";
                     coordonnee.TexturePapier = element.Maison.TexturePapier ?? "";
                     coordonnee.TexturePorte = element.Maison.TexturePorte ?? "";
-                    coordonnee.PorteModele = element.Maison.PorteModele ?? "";
                     coordonnee.LuminositeMur = element.Maison.LuminositeMur;
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
@@ -1640,13 +1634,13 @@ public sealed class LibreViesGame : MonoBehaviour
     // la premiere texture du dossier est prise.
     // ------------------------------------------------------------------
     private static readonly string[] DossiersTextures =
-        { "mur", "toit", "sol", "pave", "bois", "gazon", "papier_peint" };
+        { "mur", "toit", "sol", "pave", "bois", "gazon", "papier_peint", "porte" };
     private static readonly string[] NomsFamillesTextures =
-        { "Mur", "Toit", "Sol", "Pave", "Bois", "Gazon", "Papier peint" };
+        { "Mur", "Toit", "Sol", "Pave", "Bois", "Gazon", "Papier peint", "Porte" };
     // Sol et papier peint n'ont pas de texture par defaut : ils suivent la zone.
     private static readonly string[] NomsDefautTextures =
     {
-        "Bricks047", "RoofingTiles014A", "", "PavingStones142", "Bark008", "Grass004", ""
+        "Bricks047", "RoofingTiles014A", "", "PavingStones142", "Bark008", "Grass004", "", ""
     };
     // Sol (Sol_Interieur) et papier peint (Murs_Interieur) sont relies a leur zone
     // par nom d'objet, pas par materiau : leurs listes sont vides.
@@ -1658,6 +1652,7 @@ public sealed class LibreViesGame : MonoBehaviour
         new[] { "Route_PBR", "Pave_Route" },
         new[] { "Wood", "Bois_Clair" },
         new[] { "Terrain" },
+        new string[0],
         new string[0]
     };
     private readonly Texture2D[] albedosFamilles = new Texture2D[DossiersTextures.Length];
@@ -1883,6 +1878,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 case "toit": return texturesMaisonCible.TextureToit;
                 case "sol": return texturesMaisonCible.TextureSol;
                 case "papier": return texturesMaisonCible.TexturePapier;
+                case "porte": return texturesMaisonCible.TexturePorte;
                 default: return texturesMaisonCible.TextureMur;
             }
         }
@@ -1899,6 +1895,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 case "toit": texturesMaisonCible.TextureToit = chemin; break;
                 case "sol": texturesMaisonCible.TextureSol = chemin; break;
                 case "papier": texturesMaisonCible.TexturePapier = chemin; break;
+                case "porte": texturesMaisonCible.TexturePorte = chemin; break;
                 default: texturesMaisonCible.TextureMur = chemin; break;
             }
         }
@@ -2117,6 +2114,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private const int FamilleSol = 2;
     private const int FamilleBois = 4;
     private const int FamillePapierPeint = 6;
+    private const int FamillePorte = 7;
+    // Onglets du menu general (la famille porte n'a que le choix par maison).
+    private const int NombreOngletsTextures = 7;
 
     private static bool EstZoneNommee(string nom)
     {
@@ -2200,7 +2200,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // Une seule famille : pas d'onglets, la liste monte d'autant.
         float decalageListe = familleTexturesFiltre >= 0 ? -40f : 0f;
-        for (int c = 0; c < NomsFamillesTextures.Length && familleTexturesFiltre < 0; c++)
+        for (int c = 0; c < NombreOngletsTextures && familleTexturesFiltre < 0; c++)
         {
             Rect onglet = new Rect(cadre.x + 16f + c * 106f, cadre.y + 44f, 100f, 30f);
             GUIStyle style = c == familleTexturesOuverte ? tabActifStyle : buttonStyle;
@@ -3980,298 +3980,6 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo((agrandir ? "Murs rehausses de 0,5 m" : "Murs abaisses de 0,5 m"));
     }
 
-    // Modeles de porte : chaque fichier 3D de LVTextures/porte (FBX ou prefab).
-    private const string DossierModelesPorte = "LVTextures/porte";
-
-    private List<string> ModelesPorte()
-    {
-        var noms = new List<string>();
-        GameObject[] trouves = Resources.LoadAll<GameObject>(DossierModelesPorte);
-        foreach (GameObject modele in trouves)
-        {
-            if (modele != null && !noms.Contains(modele.name)) noms.Add(modele.name);
-        }
-        noms.Sort((x, y) => string.CompareOrdinal(x, y));
-        return noms;
-    }
-
-    // Boite englobante d'un objet, exprimee dans le repere du pivot de la porte.
-    private static bool BoitePivot(Transform pivot, GameObject objet, out Vector3 min, out Vector3 max)
-    {
-        min = Vector3.positiveInfinity;
-        max = Vector3.negativeInfinity;
-        bool trouve = false;
-        foreach (Renderer rendu in objet.GetComponentsInChildren<Renderer>(true))
-        {
-            Bounds boite = rendu.bounds;
-            for (int i = 0; i < 8; i++)
-            {
-                Vector3 coin = boite.center + new Vector3(
-                    (i & 1) == 0 ? -boite.extents.x : boite.extents.x,
-                    (i & 2) == 0 ? -boite.extents.y : boite.extents.y,
-                    (i & 4) == 0 ? -boite.extents.z : boite.extents.z);
-                Vector3 local = pivot.InverseTransformPoint(coin);
-                min = Vector3.Min(min, local);
-                max = Vector3.Max(max, local);
-                trouve = true;
-            }
-        }
-        return trouve;
-    }
-
-    // Remplace le vantail d'origine par le modele choisi : le modele tient dans
-    // la largeur et la hauteur de la porte, charniere a gauche, centre en hauteur.
-    private void AppliquerModelePorte(Batiment batiment)
-    {
-        if (batiment == null || batiment.PorteRoot == null) return;
-        Transform ancien = batiment.PorteRoot.Find("Porte_Modele");
-        if (ancien != null) DestroyImmediate(ancien.gameObject);
-        GameObject prefab = null;
-        if (!string.IsNullOrEmpty(batiment.PorteModele))
-            prefab = Resources.Load<GameObject>(DossierModelesPorte + "/" + batiment.PorteModele);
-        foreach (Renderer rendu in batiment.PorteRoot.GetComponentsInChildren<Renderer>(true))
-            rendu.enabled = prefab == null;
-        if (prefab == null) return;
-
-        GameObject instance = Instantiate(prefab, batiment.PorteRoot);
-        instance.name = "Porte_Modele";
-        instance.transform.localPosition = Vector3.zero;
-        instance.transform.localRotation = Quaternion.identity;
-        instance.transform.localScale = Vector3.one;
-        Vector3 min, max;
-        if (!BoitePivot(batiment.PorteRoot, instance, out min, out max)) return;
-        float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
-        float hauteurCible = batiment.PorteHauteur > 0.001f ? batiment.PorteHauteur / echelleY : HauteurPorteConfortable;
-        float largeurCible = batiment.PorteLargeur > 0.001f ? batiment.PorteLargeur : 1.2f;
-        float hauteurModele = Mathf.Max(max.y - min.y, 0.001f);
-        float largeurModele = Mathf.Max(max.x - min.x, 0.001f);
-        float echelle = Mathf.Min(largeurCible / largeurModele, hauteurCible / hauteurModele);
-        instance.transform.localScale = Vector3.one * echelle;
-        if (!BoitePivot(batiment.PorteRoot, instance, out min, out max)) return;
-        instance.transform.localPosition = new Vector3(-min.x, -(min.y + max.y) * 0.5f, -(min.z + max.z) * 0.5f);
-    }
-
-    private string LibellePorteActuelle(Batiment batiment)
-    {
-        string revetement = batiment.MateriauPorte == "MetalAluminium" ? "ALUMINIUM"
-            : (batiment.MateriauPorte == "GlassBleu" ? "VERRE" : "BOIS");
-        string modele = string.IsNullOrEmpty(batiment.PorteModele) ? "porte d'origine" : batiment.PorteModele;
-        return revetement + ", " + modele;
-    }
-
-    private bool porteMenuOuvert;
-    private Batiment porteMenuMaison;
-    private List<string> modelesPorteAffiches = new List<string>();
-    private readonly Dictionary<string, Texture2D> iconesPorte = new Dictionary<string, Texture2D>();
-    private const int IdFenetrePorte = 4102;
-    private const float YModelesPorte = 136f;
-    private Rect fenetrePorte;
-
-    private sealed class ElementPorte
-    {
-        public string Nom;
-        public Texture2D Icone;
-        public bool Actif;
-        public string Materiau;
-        public string Chemin;
-        public string Modele;
-    }
-
-    private void OuvrirMenuPorte(Batiment batiment)
-    {
-        porteMenuMaison = batiment;
-        modelesPorteAffiches = ModelesPorte();
-        porteMenuOuvert = true;
-    }
-
-    private void FermerMenuPorte()
-    {
-        porteMenuOuvert = false;
-        porteMenuMaison = null;
-    }
-
-    // Fenetre PORTE : revetements (BOIS, TRANSPARENT, textures du dossier porte)
-    // puis modeles, le tout en icones comme les murs exterieurs.
-    private void DessinerMenuPorte()
-    {
-        if (porteMenuMaison == null || porteMenuMaison.Root == null || !modeEdition)
-        {
-            FermerMenuPorte();
-            return;
-        }
-        Batiment batiment = porteMenuMaison;
-        var revetements = new List<ElementPorte>
-        {
-            new ElementPorte { Nom = "BOIS", Icone = IconeMateriau("Bois_Clair"),
-                Actif = string.IsNullOrEmpty(batiment.TexturePorte) && batiment.MateriauPorte != "GlassBleu",
-                Materiau = "Bois_Clair" },
-            new ElementPorte { Nom = "TRANSPARENT", Icone = IconeMateriau("GlassBleu"),
-                Actif = string.IsNullOrEmpty(batiment.TexturePorte) && batiment.MateriauPorte == "GlassBleu",
-                Materiau = "GlassBleu" }
-        };
-        foreach (ChoixTexture choix in ListeChoixDossier("LVTextures/porte"))
-        {
-            revetements.Add(new ElementPorte { Nom = choix.Nom, Icone = choix.Apercu,
-                Actif = batiment.TexturePorte == choix.Chemin, Chemin = choix.Chemin });
-        }
-        var modeles = new List<ElementPorte>
-        {
-            new ElementPorte { Nom = "ORIGINE", Icone = IconeMateriau(batiment.MateriauPorte),
-                Actif = string.IsNullOrEmpty(batiment.PorteModele), Modele = "" }
-        };
-        foreach (string nom in modelesPorteAffiches)
-        {
-            modeles.Add(new ElementPorte { Nom = nom, Icone = IconeModelePorte(nom),
-                Actif = batiment.PorteModele == nom, Modele = nom });
-        }
-        const float largeur = 560f;
-        float yModeles = 8f + Mathf.CeilToInt(revetements.Count / 5f) * 128f + 8f;
-        float hauteur = yModeles + Mathf.CeilToInt(modeles.Count / 5f) * 128f + 8f;
-        if (fenetrePorte.width < 1f)
-            fenetrePorte = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - 200f,
-                largeur, hauteur + HauteurTitreFenetre);
-        fenetrePorte.width = largeur;
-        fenetrePorte.height = hauteur + HauteurTitreFenetre;
-        fenetrePorte = GUI.Window(IdFenetrePorte, fenetrePorte,
-            id => ContenuMenuPorte(largeur, yModeles, revetements, modeles), "PORTE");
-    }
-
-    private void ContenuMenuPorte(float largeur, float yModeles, List<ElementPorte> revetements,
-        List<ElementPorte> modeles)
-    {
-        Batiment batiment = porteMenuMaison;
-        if (GUI.Button(new Rect(largeur - 36f, 4f, 28f, 24f), "X", buttonStyle))
-        {
-            FermerMenuPorte();
-            return;
-        }
-        for (int i = 0; i < revetements.Count; i++)
-        {
-            Rect carre = new Rect(16f + (i % 5) * 108f, 8f + (i / 5) * 128f, 96f, 96f);
-            if (DessinerTuileIcone(carre, revetements[i]))
-            {
-                if (!string.IsNullOrEmpty(revetements[i].Chemin))
-                {
-                    batiment.TexturePorte = revetements[i].Chemin;
-                }
-                else
-                {
-                    batiment.TexturePorte = "";
-                    AppliquerMateriauMaison(batiment, "porte", revetements[i].Materiau);
-                }
-                AppliquerTexturesLocalesMaison(batiment);
-                EnregistrerCoordonneesEdition();
-            }
-        }
-        for (int i = 0; i < modeles.Count; i++)
-        {
-            Rect carre = new Rect(16f + (i % 5) * 108f, yModeles + (i / 5) * 128f, 96f, 96f);
-            if (DessinerTuileIcone(carre, modeles[i]))
-            {
-                batiment.PorteModele = modeles[i].Modele;
-                AppliquerModelePorte(batiment);
-                EnregistrerCoordonneesEdition();
-            }
-        }
-    }
-
-    // Tuile avec icone ; cadre jaune si c'est le choix actuel. Renvoie true au clic.
-    private bool DessinerTuileIcone(Rect carre, ElementPorte element)
-    {
-        GUI.color = element.Actif ? Color.yellow : new Color(0.35f, 0.35f, 0.35f, 1f);
-        GUI.DrawTexture(new Rect(carre.x - 3f, carre.y - 3f, carre.width + 6f, carre.height + 6f),
-            Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        if (element.Icone != null) GUI.DrawTexture(carre, element.Icone, ScaleMode.StretchToFill, false);
-        GUI.Label(new Rect(carre.x, carre.y + carre.height + 2f, carre.width + 8f, 22f), element.Nom, smallStyle);
-        return GUI.Button(carre, GUIContent.none, GUIStyle.none);
-    }
-
-    // Couleur ou texture d'un materiau, pour l'icone du revetement.
-    private Texture2D IconeMateriau(string nom)
-    {
-        string cle = "mat:" + nom;
-        Texture2D deja;
-        if (iconesPorte.TryGetValue(cle, out deja) && deja != null) return deja;
-        Material materiau = Mat(nom);
-        Texture2D icone = materiau != null ? materiau.mainTexture as Texture2D : null;
-        if (icone == null)
-        {
-            Color couleur = nom == "GlassBleu" ? new Color(0.6f, 0.85f, 1f, 1f)
-                : (materiau != null ? materiau.color : Color.gray);
-            couleur.a = 1f;
-            icone = new Texture2D(4, 4, TextureFormat.RGB24, false);
-            var pixels = new Color[16];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = couleur;
-            icone.SetPixels(pixels);
-            icone.Apply();
-        }
-        iconesPorte[cle] = icone;
-        return icone;
-    }
-
-    private Texture2D IconeModelePorte(string nom)
-    {
-        string cle = "modele:" + nom;
-        Texture2D deja;
-        if (iconesPorte.TryGetValue(cle, out deja) && deja != null) return deja;
-        GameObject prefab = Resources.Load<GameObject>(DossierModelesPorte + "/" + nom);
-        if (prefab == null) return null;
-        Texture2D rendu = RendrePrefab(prefab, 128);
-        if (rendu != null) iconesPorte[cle] = rendu;
-        return rendu;
-    }
-
-    // Rend un modele hors de la scene (loin sous le monde) pour en faire une icone.
-    private Texture2D RendrePrefab(GameObject prefab, int taille)
-    {
-        var racine = new GameObject("ApercuPorteRacine");
-        racine.transform.position = new Vector3(0f, -5000f, 0f);
-        GameObject instance = Instantiate(prefab, racine.transform);
-        Vector3 min, max;
-        if (!BoitePivot(racine.transform, instance, out min, out max))
-        {
-            Destroy(racine);
-            return null;
-        }
-        Vector3 centre = racine.transform.position + (min + max) * 0.5f;
-        float cote = Mathf.Max(max.x - min.x, Mathf.Max(max.y - min.y, max.z - min.z), 0.05f);
-
-        var camObj = new GameObject("ApercuPorteCamera");
-        Camera cam = camObj.AddComponent<Camera>();
-        cam.enabled = false;
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.16f, 0.18f, 0.21f, 1f);
-        cam.fieldOfView = 30f;
-        cam.nearClipPlane = 0.05f;
-        cam.farClipPlane = 500f;
-        camObj.transform.position = centre + new Vector3(cote * 0.7f, cote * 0.35f, -cote * 1.8f);
-        camObj.transform.LookAt(centre);
-
-        var lumiereObj = new GameObject("ApercuPorteLumiere");
-        Light lumiere = lumiereObj.AddComponent<Light>();
-        lumiere.type = LightType.Directional;
-        lumiere.intensity = 1.2f;
-        lumiereObj.transform.rotation = Quaternion.Euler(40f, -35f, 0f);
-
-        var rt = new RenderTexture(taille, taille, 16, RenderTextureFormat.ARGB32);
-        cam.targetTexture = rt;
-        cam.Render();
-        RenderTexture ancienne = RenderTexture.active;
-        RenderTexture.active = rt;
-        var resultat = new Texture2D(taille, taille, TextureFormat.RGB24, false);
-        resultat.ReadPixels(new Rect(0f, 0f, taille, taille), 0, 0);
-        resultat.Apply();
-        RenderTexture.active = ancienne;
-        cam.targetTexture = null;
-        Destroy(camObj);
-        Destroy(lumiereObj);
-        Destroy(racine);
-        rt.Release();
-        Destroy(rt);
-        return resultat;
-    }
-
     private void ModifierHauteurPorte(Batiment batiment, bool agrandir)
     {
         ElementEdition element = TrouverElementMaison(batiment, "Porte");
@@ -4286,7 +3994,6 @@ public sealed class LibreViesGame : MonoBehaviour
         batiment.PorteHauteur = nouvelleHauteur;
         ActualiserDimensionsBatiment(batiment);
         ActualiserOuverturePorteVisuelle(batiment);
-        AppliquerModelePorte(batiment);
         elementEditionDernierSelectionne = TrouverElementEdition(batiment.Root);
         AjouterHistoriqueEdition(element);
         ShowInfo((agrandir ? "Porte rehaussee de 0,5 m" : "Porte abaissee de 0,5 m"));
@@ -4302,6 +4009,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (cible == "mur" && materiau == "Moquette") materiau = "Wall";
         if (cible == "fenetre" && (materiau == "Glass" || materiau == "Wood" || materiau == "Metal"))
             materiau = "GlassBleu";
+        if (cible == "porte") batiment.TexturePorte = "";
         if (cible == "porte" && materiau == "Wood") materiau = "Bois_Clair";
         if (cible == "porte" && (materiau == "Bois_Clair" || materiau == "Metal" || materiau == "Brique"))
             materiau = materiau == "Metal" ? "MetalAluminium" : "Bois_Clair";
@@ -4513,11 +4221,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 ModifierHauteurPorte(batiment, false);
             if (GUI.Button(new Rect(cadre.x + 304f, yc + 218f, 54f, 26f), "↑", buttonStyle))
                 ModifierHauteurPorte(batiment, true);
-            if (GUI.Button(new Rect(cadre.x + 16f, yc + 258f, 448f, 28f),
-                "COULEUR / REVETEMENT ET MODELE DE LA PORTE...", buttonStyle))
-                OuvrirMenuPorte(batiment);
+            DessinerChoixMateriaux(batiment, "porte",
+                new[] { "BOIS", "ALUMINIUM" },
+                new[] { "Bois_Clair", "MetalAluminium" }, yc + 258f);
             DessinerSliderLuminositeMaison(batiment, "porte", yc + 293f);
-            GUI.Label(new Rect(34f, yc + 330f, 430f, 24f), "Actuel : " + LibellePorteActuelle(batiment), smallStyle);
+            DessinerLienTextures(cadre, yc + 330f, "TEXTURE DE LA PORTE DE CETTE MAISON...", batiment, "porte", FamillePorte);
         }
         else if (editionOutilMaison == 4)
         {
@@ -9663,7 +9371,6 @@ public sealed class LibreViesGame : MonoBehaviour
             else OuvrirMenuTextures(-1);
         }
         if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
-        if (porteMenuOuvert && !creationPersonnageOpen) DessinerMenuPorte();
         if (conversationOpen) DessinerConversation();
         GUI.enabled = ancienEnabledHud; // Le fond du modal ne recoit aucun clic.
         if (creationPersonnageOpen) DessinerCreationPersonnage();
