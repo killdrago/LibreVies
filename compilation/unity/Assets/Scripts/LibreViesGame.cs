@@ -1183,7 +1183,9 @@ public sealed class LibreViesGame : MonoBehaviour
         if (filtre == null) return;
         float largeur = batiment.LargeurInitiale;
         float profondeur = batiment.ProfondeurInitiale;
-        float hauteur = HauteurMurs(batiment.HauteurInitiale);
+        // Exterieur : hauteur d'origine. Interieur (papier) : moitie de la porte.
+        float hauteur = batiment.HauteurInitiale;
+        float hauteurInterieure = HauteurMurs(hauteur);
         Vector3 positionPorte = batiment.PorteRoot.localPosition;
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
         float hauteurPorte = (batiment.PorteHauteur > 0.001f
@@ -1206,9 +1208,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 Mathf.Abs(enfants[i].localScale.y)));
         }
         var maillage = new Maillage();
+        var maillageInterieur = new Maillage();
+        maillageInterieur.MurAvecOuvertures(largeur, profondeur, hauteurInterieure,
+            centres.ToArray(), tailles.ToArray());
+        Maillage murInterieur = maillageInterieur.CopieMursInterieurs(new Vector3(0f, hauteurInterieure * 0.5f, 0f), 0.004f);
         maillage.MurAvecOuvertures(largeur, profondeur, hauteur,
             centres.ToArray(), tailles.ToArray());
-        Maillage murInterieur = maillage.CopieMursInterieurs(new Vector3(0f, hauteur * 0.5f, 0f), 0.004f);
         maillage.DoublerFacesVerticales();
         Mesh nouveau = maillage.VersMesh("Murs_" + batiment.Root.name);
         filtre.sharedMesh = nouveau;
@@ -3738,10 +3743,11 @@ public sealed class LibreViesGame : MonoBehaviour
         // de la porte. Le toit, les fenetres, la porte et la pancarte gardent
         // leur hauteur d'origine (size.y).
         float hauteurMurs = HauteurMurs(size.y);
+        var maillageInterieurCree = new Maillage();
         var root = new GameObject(name).transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         var murMaillage = new Maillage();
-        murMaillage.MurAvecOuvertures(size.x, size.z, hauteurMurs,
+        murMaillage.MurAvecOuvertures(size.x, size.z, size.y,
             new[]
             {
                 new Vector2(0f, HauteurPorteConfortable * 0.5f),
@@ -3756,7 +3762,20 @@ public sealed class LibreViesGame : MonoBehaviour
             });
         // Les faces interieures forment un objet a part (Murs_Interieur) : il
         // recevra le papier peint sans toucher l'exterieur. Les deux ont un collider.
-        var murInterieur = murMaillage.CopieMursInterieurs(new Vector3(0f, hauteurMurs * 0.5f, 0f), 0.004f);
+        maillageInterieurCree.MurAvecOuvertures(size.x, size.z, hauteurMurs,
+            new[]
+            {
+                new Vector2(0f, HauteurPorteConfortable * 0.5f),
+                new Vector2(-size.x * 0.27f, 1.8f),
+                new Vector2(size.x * 0.27f, 1.8f)
+            },
+            new[]
+            {
+                new Vector2(1.2f, HauteurPorteConfortable),
+                new Vector2(1.0f, 0.75f),
+                new Vector2(1.0f, 0.75f)
+            });
+        var murInterieur = maillageInterieurCree.CopieMursInterieurs(new Vector3(0f, hauteurMurs * 0.5f, 0f), 0.004f);
         murMaillage.DoublerFacesVerticales();
         var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
         var murCollider = murs.AddComponent<MeshCollider>();
