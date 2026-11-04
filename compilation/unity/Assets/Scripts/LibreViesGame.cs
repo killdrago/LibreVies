@@ -4877,7 +4877,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (facade == null || facade.Panneau == null) return "";
         Renderer rendu = facade.Panneau.GetComponent<Renderer>();
         if (rendu == null || rendu.sharedMaterial == null) return "";
-        return rendu.sharedMaterial.name;
+        // La luminosite cree une copie "Bois_Clair (Instance)" : on garde le nom du materiau.
+        string nom = rendu.sharedMaterial.name;
+        if (nom.EndsWith(" (Instance)")) nom = nom.Substring(0, nom.Length - " (Instance)".Length);
+        return nom;
     }
 
     private void CreerToitTriangle(Transform parent, Vector3 taille, string materiau, string nom)
