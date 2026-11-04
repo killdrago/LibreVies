@@ -391,6 +391,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public string TexturePanneau;
         public string TextureMur;
         public string TextureToit;
+        public string PorteModele;
         public float LuminositeMur;
         public float LuminositePorte;
         public float LuminositeToit;
@@ -500,6 +501,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // Texture propre a cette maison (chemin LVTextures/...), "" = famille.
         public string TextureMur = "";
         public string TextureToit = "";
+        // Modele 3D de porte (LVTextures/porte), "" = porte d'origine.
+        public string PorteModele = "";
         public Obstacle Collision;
     }
 
@@ -822,6 +825,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
+        RafraichirZonesNommees();
         RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
         prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
@@ -1198,12 +1202,25 @@ public sealed class LibreViesGame : MonoBehaviour
         var maillage = new Maillage();
         maillage.MurAvecOuvertures(largeur, profondeur, hauteur,
             centres.ToArray(), tailles.ToArray());
+        Maillage murInterieur = maillage.ExtraireFacesInterieures(new Vector3(0f, hauteur * 0.5f, 0f));
         Mesh nouveau = maillage.VersMesh("Murs_" + batiment.Root.name);
         filtre.sharedMesh = nouveau;
         if (collision != null)
         {
             collision.sharedMesh = null;
             collision.sharedMesh = nouveau;
+        }
+        Transform interieurRoot = batiment.Root.Find("Murs_Interieur");
+        if (interieurRoot != null)
+        {
+            Mesh nouveauInterieur = murInterieur.VersMesh("Murs_Interieur_" + batiment.Root.name);
+            interieurRoot.GetComponent<MeshFilter>().sharedMesh = nouveauInterieur;
+            MeshCollider collisionInterieur = interieurRoot.GetComponent<MeshCollider>();
+            if (collisionInterieur != null)
+            {
+                collisionInterieur.sharedMesh = null;
+                collisionInterieur.sharedMesh = nouveauInterieur;
+            }
         }
         ActualiserMurBasInterieur(batiment, centres, tailles);
     }
@@ -1389,6 +1406,8 @@ public sealed class LibreViesGame : MonoBehaviour
                         AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
                     AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
                     AppliquerTexturesLocalesMaison(element.Maison);
+                    element.Maison.PorteModele = coordonnee.PorteModele ?? "";
+                    AppliquerModelePorte(element.Maison);
                     AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
                     AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
                 }
@@ -1462,6 +1481,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.MateriauToit = element.Maison.MateriauToit;
                     coordonnee.TextureMur = element.Maison.TextureMur;
                     coordonnee.TextureToit = element.Maison.TextureToit;
+                    coordonnee.PorteModele = element.Maison.PorteModele ?? "";
                     coordonnee.LuminositeMur = element.Maison.LuminositeMur;
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
@@ -1604,24 +1624,31 @@ public sealed class LibreViesGame : MonoBehaviour
     // La texture par defaut est NomsDefautTextures ; si elle est absente,
     // la premiere texture du dossier est prise.
     // ------------------------------------------------------------------
-    private static readonly string[] DossiersTextures = { "mur", "toit", "sol", "pave", "bois" };
-    private static readonly string[] NomsFamillesTextures = { "Mur", "Toit", "Sol", "Pave", "Bois" };
+    private static readonly string[] DossiersTextures =
+        { "mur", "toit", "sol", "pave", "bois", "gazon", "papier_peint" };
+    private static readonly string[] NomsFamillesTextures =
+        { "Mur", "Toit", "Sol", "Pave", "Bois", "Gazon", "Papier peint" };
+    // Sol et papier peint n'ont pas de texture par defaut : ils suivent la zone.
     private static readonly string[] NomsDefautTextures =
     {
-        "Bricks047", "RoofingTiles014A", "Grass004", "PavingStones142", "Bark008"
+        "Bricks047", "RoofingTiles014A", "", "PavingStones142", "Bark008", "Grass004", ""
     };
+    // Sol (Sol_Interieur) et papier peint (Murs_Interieur) sont relies a leur zone
+    // par nom d'objet, pas par materiau : leurs listes sont vides.
     private static readonly string[][] MateriauxTextures =
     {
         new[] { "Wall" },
         new[] { "Roof", "RoofBlue", "RoofRed" },
-        new[] { "Terrain", "Dirt", "Route_Terre" },
+        new string[0],
         new[] { "Route_PBR", "Pave_Route" },
-        new[] { "Wood", "Bois_Clair" }
+        new[] { "Wood", "Bois_Clair" },
+        new[] { "Terrain" },
+        new string[0]
     };
-    private readonly Texture2D[] albedosFamilles = new Texture2D[5];
-    private readonly Texture2D[] normalesFamilles = new Texture2D[5];
-    private readonly Texture2D[] rugositesFamilles = new Texture2D[5];
-    private readonly bool[] famillesChargees = new bool[5];
+    private readonly Texture2D[] albedosFamilles = new Texture2D[DossiersTextures.Length];
+    private readonly Texture2D[] normalesFamilles = new Texture2D[DossiersTextures.Length];
+    private readonly Texture2D[] rugositesFamilles = new Texture2D[DossiersTextures.Length];
+    private readonly bool[] famillesChargees = new bool[DossiersTextures.Length];
 
     private int CategorieTextureMateriau(string nom)
     {
@@ -1633,7 +1660,7 @@ public sealed class LibreViesGame : MonoBehaviour
             foreach (string materiau in MateriauxTextures[c])
                 if (materiau == nom) return c;
         }
-        if (nom.StartsWith("Touffe")) return 2;
+        if (nom.StartsWith("Touffe")) return 5;
         return -1;
     }
 
@@ -1679,7 +1706,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!string.IsNullOrEmpty(cheminAlbedo))
             albedo = Resources.Load<Texture2D>(cheminAlbedo);
         if (albedo == null)
-            albedo = Resources.Load<Texture2D>(dossier + "/" + NomsDefautTextures[c]);
+            if (!string.IsNullOrEmpty(NomsDefautTextures[c]))
+                albedo = Resources.Load<Texture2D>(dossier + "/" + NomsDefautTextures[c]);
         if (albedo == null)
         {
             foreach (Texture2D texture in Resources.LoadAll<Texture2D>(dossier))
@@ -1728,8 +1756,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public Texture2D Apercu;
     }
 
-    private readonly string[] cheminsFamilles = new string[5];
-    private readonly List<ChoixTexture>[] listesChoixFamilles = new List<ChoixTexture>[5];
+    private readonly string[] cheminsFamilles = new string[DossiersTextures.Length];
+    private readonly List<ChoixTexture>[] listesChoixFamilles = new List<ChoixTexture>[DossiersTextures.Length];
     private bool texturesOpen;
     private int familleTexturesOuverte;
     // -1 : menu complet (cinq onglets). 0 a 4 : une seule famille, ouverte
@@ -1763,6 +1791,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void ChoisirFamilleTexture(int c, string chemin)
     {
         cheminsFamilles[c] = chemin ?? "";
+        RafraichirZonesNommees();
         Texture2D a, n, r;
         ResoudreFamille(c, cheminsFamilles[c], out a, out n, out r);
         albedosFamilles[c] = a;
@@ -1779,6 +1808,8 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             // Une maison ou pancarte avec sa propre texture garde son choix.
             if (rendusTexturesLocales.Contains(rendu)) continue;
+            // Les zones nommees (murs interieurs, sol) suivent RafraichirZonesNommees.
+            if (EstZoneNommee(rendu.gameObject.name)) continue;
             Material[] mats = rendu.sharedMaterials;
             foreach (Material materiau in mats)
             {
@@ -1800,7 +1831,7 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Choix en attente : ENREGISTRER les garde, ANNULER / X revient a l'etat d'avant.
-    private string[] cheminsAvantTextures = new string[5];
+    private string[] cheminsAvantTextures = new string[DossiersTextures.Length];
 
     // Cible locale : une seule maison (zone "mur" ou "toit") ou la pancarte
     // d'une maison (zone "pancarte"). Sans cible, le menu change la famille
@@ -1839,6 +1870,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void ChoisirTextureCible(string chemin)
     {
         EcrireTextureCible(chemin);
+        RafraichirZonesNommees();
         if (texturesMaisonCible != null)
         {
             int c = texturesZoneCible == "toit" ? 1 : 0;
@@ -1930,7 +1962,7 @@ public sealed class LibreViesGame : MonoBehaviour
             string nom = rendu.gameObject.name ?? "";
             bool concerne = zone == "toit"
                 ? nom.StartsWith("Toit_")
-                : (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                : (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"));
             if (concerne) liste.Add(rendu);
         }
@@ -1983,9 +2015,60 @@ public sealed class LibreViesGame : MonoBehaviour
             AppliquerTextureLocale(rendu, 4, facade.TexturePanneau);
     }
 
+    // ------------------------------------------------------------------
+    // Zones nommees : Murs_Interieur (papier peint) et Sol_Interieur (sol des
+    // maisons). Elles ont leur propre copie de materiau : leur texture ne touche
+    // ni les murs exterieurs ni le bois des autres objets.
+    // ------------------------------------------------------------------
+    private const int FamilleMur = 0;
+    private const int FamilleSol = 2;
+    private const int FamilleBois = 4;
+    private const int FamillePapierPeint = 6;
+
+    private static bool EstZoneNommee(string nom)
+    {
+        return nom == "Murs_Interieur" || nom == "Sol_Interieur";
+    }
+
+    private bool FamilleAUneTexture(int c)
+    {
+        Texture2D a, n, r;
+        ResoudreFamille(c, cheminsFamilles[c], out a, out n, out r);
+        return a != null;
+    }
+
+    // Famille d'une zone : sa propre famille si elle a une texture, sinon la
+    // famille de repli (mur pour les murs interieurs, bois pour le sol).
+    private int FamilleZoneNommee(string nom)
+    {
+        if (nom == "Murs_Interieur")
+            return FamilleAUneTexture(FamillePapierPeint) ? FamillePapierPeint : FamilleMur;
+        if (nom == "Sol_Interieur")
+            return FamilleAUneTexture(FamilleSol) ? FamilleSol : FamilleBois;
+        return -1;
+    }
+
+    // Reapplique la texture de chaque zone nommee (hors maisons a choix propre).
+    private void RafraichirZonesNommees()
+    {
+        Renderer[] rendus = FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Renderer rendu in rendus)
+        {
+            if (rendu == null || rendusTexturesLocales.Contains(rendu)) continue;
+            int c = FamilleZoneNommee(rendu.gameObject.name);
+            if (c < 0) continue;
+            Texture2D a, n, r;
+            ResoudreFamille(c, cheminsFamilles[c], out a, out n, out r);
+            if (a == null) continue;
+            Material[] mats = rendu.materials;
+            foreach (Material materiau in mats) AppliquerTexturesFamille(materiau, a, n, r);
+            rendu.materials = mats;
+        }
+    }
+
     private void DessinerChoixTextures()
     {
-        float largeur = 560f;
+        float largeur = 760f;
         float hauteur = 500f;
         Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f,
             largeur, hauteur);
@@ -3201,6 +3284,36 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(avantG, arriereG, arriereD, avantD);
         }
 
+        // Sépare les triangles dont la face regarde vers le centre (faces
+        // interieures). Ils partent dans le maillage retourne ; le reste reste ici.
+        public Maillage ExtraireFacesInterieures(Vector3 centre)
+        {
+            var interieur = new Maillage();
+            var gardes = new List<Vector3>();
+            for (int i = 0; i + 2 < triangles.Count; i += 3)
+            {
+                Vector3 a = sommets[triangles[i]];
+                Vector3 b = sommets[triangles[i + 1]];
+                Vector3 c = sommets[triangles[i + 2]];
+                Vector3 normale = Vector3.Cross(b - a, c - a);
+                Vector3 milieu = (a + b + c) / 3f;
+                if (Vector3.Dot(normale, centre - milieu) > 0f)
+                {
+                    interieur.Triangle(a, b, c);
+                }
+                else
+                {
+                    gardes.Add(a);
+                    gardes.Add(b);
+                    gardes.Add(c);
+                }
+            }
+            sommets.Clear();
+            triangles.Clear();
+            for (int i = 0; i + 2 < gardes.Count; i += 3) Triangle(gardes[i], gardes[i + 1], gardes[i + 2]);
+            return interieur;
+        }
+
         public Mesh VersMesh(string nom)
         {
             var mesh = new Mesh { name = nom };
@@ -3489,10 +3602,17 @@ public sealed class LibreViesGame : MonoBehaviour
                 new Vector2(1.0f, 0.75f),
                 new Vector2(1.0f, 0.75f)
             });
+        // Les faces interieures forment un objet a part (Murs_Interieur) : il
+        // recevra le papier peint sans toucher l'exterieur. Les deux ont un collider.
+        var murInterieur = murMaillage.ExtraireFacesInterieures(new Vector3(0f, size.y * 0.5f, 0f));
         var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
         var murCollider = murs.AddComponent<MeshCollider>();
         murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
         murs.transform.SetParent(root, false);
+        var murIntObjet = ObjetMaillage("Murs_Interieur", murInterieur.VersMesh("Murs_Interieur_" + name), "Wall");
+        var murIntCollider = murIntObjet.AddComponent<MeshCollider>();
+        murIntCollider.sharedMesh = murIntObjet.GetComponent<MeshFilter>().sharedMesh;
+        murIntObjet.transform.SetParent(root, false);
         // Un sol interieur donne une vraie profondeur visible par les ouvertures
         // au lieu de laisser le mur oppose remplir la vitre.
         // La dalle s'arrete au milieu de l'epaisseur du mur : elle penetre
@@ -3742,6 +3862,100 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo((agrandir ? "Murs rehausses de 0,5 m" : "Murs abaisses de 0,5 m"));
     }
 
+    // Modeles de porte : chaque fichier 3D de LVTextures/porte (FBX ou prefab).
+    private const string DossierModelesPorte = "LVTextures/porte";
+
+    private List<string> ModelesPorte()
+    {
+        var noms = new List<string>();
+        GameObject[] trouves = Resources.LoadAll<GameObject>(DossierModelesPorte);
+        foreach (GameObject modele in trouves)
+        {
+            if (modele != null && !noms.Contains(modele.name)) noms.Add(modele.name);
+        }
+        noms.Sort((x, y) => string.CompareOrdinal(x, y));
+        return noms;
+    }
+
+    // Boite englobante d'un objet, exprimee dans le repere du pivot de la porte.
+    private static bool BoitePivot(Transform pivot, GameObject objet, out Vector3 min, out Vector3 max)
+    {
+        min = Vector3.positiveInfinity;
+        max = Vector3.negativeInfinity;
+        bool trouve = false;
+        foreach (Renderer rendu in objet.GetComponentsInChildren<Renderer>(true))
+        {
+            Bounds boite = rendu.bounds;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 coin = boite.center + new Vector3(
+                    (i & 1) == 0 ? -boite.extents.x : boite.extents.x,
+                    (i & 2) == 0 ? -boite.extents.y : boite.extents.y,
+                    (i & 4) == 0 ? -boite.extents.z : boite.extents.z);
+                Vector3 local = pivot.InverseTransformPoint(coin);
+                min = Vector3.Min(min, local);
+                max = Vector3.Max(max, local);
+                trouve = true;
+            }
+        }
+        return trouve;
+    }
+
+    // Remplace le vantail d'origine par le modele choisi : le modele tient dans
+    // la largeur et la hauteur de la porte, charniere a gauche, centre en hauteur.
+    private void AppliquerModelePorte(Batiment batiment)
+    {
+        if (batiment == null || batiment.PorteRoot == null) return;
+        Transform ancien = batiment.PorteRoot.Find("Porte_Modele");
+        if (ancien != null) DestroyImmediate(ancien.gameObject);
+        GameObject prefab = null;
+        if (!string.IsNullOrEmpty(batiment.PorteModele))
+            prefab = Resources.Load<GameObject>(DossierModelesPorte + "/" + batiment.PorteModele);
+        foreach (Renderer rendu in batiment.PorteRoot.GetComponentsInChildren<Renderer>(true))
+            rendu.enabled = prefab == null;
+        if (prefab == null) return;
+
+        GameObject instance = Instantiate(prefab, batiment.PorteRoot);
+        instance.name = "Porte_Modele";
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localScale = Vector3.one;
+        Vector3 min, max;
+        if (!BoitePivot(batiment.PorteRoot, instance, out min, out max)) return;
+        float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
+        float hauteurCible = batiment.PorteHauteur > 0.001f ? batiment.PorteHauteur / echelleY : HauteurPorteConfortable;
+        float largeurCible = batiment.PorteLargeur > 0.001f ? batiment.PorteLargeur : 1.2f;
+        float hauteurModele = Mathf.Max(max.y - min.y, 0.001f);
+        float largeurModele = Mathf.Max(max.x - min.x, 0.001f);
+        float echelle = Mathf.Min(largeurCible / largeurModele, hauteurCible / hauteurModele);
+        instance.transform.localScale = Vector3.one * echelle;
+        if (!BoitePivot(batiment.PorteRoot, instance, out min, out max)) return;
+        instance.transform.localPosition = new Vector3(-min.x, -(min.y + max.y) * 0.5f, -(min.z + max.z) * 0.5f);
+    }
+
+    // Bouton qui parcourt : ORIGINE, puis chaque modele du dossier porte.
+    private void DessinerChoixModelePorte(Batiment batiment, float y)
+    {
+        GUI.Label(new Rect(34f, y, 135f, 24f), "MODELE :", smallStyle);
+        List<string> modeles = ModelesPorte();
+        if (modeles.Count == 0)
+        {
+            GUI.Label(new Rect(174f, y, 380f, 24f), "Aucun modele dans LVTextures/porte", smallStyle);
+            return;
+        }
+        string actuel = batiment.PorteModele ?? "";
+        int index = string.IsNullOrEmpty(actuel) ? -1 : modeles.IndexOf(actuel);
+        string libelle = index < 0 ? "ORIGINE" : modeles[index];
+        if (GUI.Button(new Rect(174f, y - 2f, 300f, 28f), libelle + "  (changer)", buttonStyle))
+        {
+            int suivant = index + 1;
+            if (suivant >= modeles.Count) suivant = -1;
+            batiment.PorteModele = suivant < 0 ? "" : modeles[suivant];
+            AppliquerModelePorte(batiment);
+            ShowInfo("Porte : " + (suivant < 0 ? "ORIGINE" : modeles[suivant]));
+        }
+    }
+
     private void ModifierHauteurPorte(Batiment batiment, bool agrandir)
     {
         ElementEdition element = TrouverElementMaison(batiment, "Porte");
@@ -3756,6 +3970,7 @@ public sealed class LibreViesGame : MonoBehaviour
         batiment.PorteHauteur = nouvelleHauteur;
         ActualiserDimensionsBatiment(batiment);
         ActualiserOuverturePorteVisuelle(batiment);
+        AppliquerModelePorte(batiment);
         elementEditionDernierSelectionne = TrouverElementEdition(batiment.Root);
         AjouterHistoriqueEdition(element);
         ShowInfo((agrandir ? "Porte rehaussee de 0,5 m" : "Porte abaissee de 0,5 m"));
@@ -3786,7 +4001,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             string nom = enfants[i].name ?? "";
             bool concerne = cible == "mur"
-                ? (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "fenetre" ? nom == "Fenetre"
                 : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
@@ -3800,6 +4015,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (cible == "toit") AppliquerLuminositeMaison(batiment, "toit", batiment.LuminositeToit);
         // Le changement de materiau remplace les copies : on remet la texture propre a la maison.
         if (cible == "mur" || cible == "toit") AppliquerTexturesLocalesMaison(batiment);
+        RafraichirZonesNommees();
     }
 
     private float LireLuminositeMaison(Batiment batiment, string cible)
@@ -3832,7 +4048,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             string nom = enfants[i].name ?? "";
             bool concerne = cible == "mur"
-                ? (nom == "Murs" || nom == "Murs_Bas_Interieur"
+                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
                     : nom.StartsWith("Toit_"));
@@ -3980,6 +4196,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new[] { "BOIS", "ALUMINIUM" },
                 new[] { "Bois_Clair", "MetalAluminium" }, cadre.y + 258f);
             DessinerSliderLuminositeMaison(batiment, "porte", cadre.y + 293f);
+            DessinerChoixModelePorte(batiment, cadre.y + 330f);
         }
         else if (editionOutilMaison == 4)
         {
@@ -8894,14 +9111,18 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, 600f, 40f),
             "Choisissez la famille a modifier. Les textures viennent des dossiers LVTextures.",
             smallStyle);
-        string[] libelles = { "MURS", "TOITS", "GAZON ET SOL", "ROUTE ET PAVES", "BOIS" };
+        string[] libelles =
+        {
+            "MURS (EXTERIEUR)", "TOITS", "SOL DES MAISONS", "ROUTE ET PAVES", "BOIS",
+            "GAZON", "PAPIER PEINT (MAISONS)"
+        };
         for (int c = 0; c < libelles.Length; c++)
         {
             if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 104f + c * 42f, 260f, 34f),
                 libelles[c], buttonStyle))
                 OuvrirMenuTextures(c);
         }
-        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 104f + 5 * 42f, 260f, 34f),
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 104f + libelles.Length * 42f, 260f, 34f),
             "TOUTES LES TEXTURES", buttonStyle))
             OuvrirMenuTextures(-1);
     }

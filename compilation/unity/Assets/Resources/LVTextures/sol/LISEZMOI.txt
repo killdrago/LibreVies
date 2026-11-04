@@ -1,0 +1,2 @@
+Dossier des textures du sol des maisons (interieur).
+Deposez ici nom.png, nom_N.png (normale) et nom_R.png (rugosite), puis refaites le build.

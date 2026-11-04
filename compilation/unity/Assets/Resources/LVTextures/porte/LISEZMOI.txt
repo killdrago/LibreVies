@@ -1,0 +1,3 @@
+Dossier des modeles de porte (fichier 3D : FBX ou prefab).
+Deposez ici un fichier 3D ; il apparait dans le menu de porte, a cote de la porte d'origine.
+La porte est redimensionnee a la taille de l'ouverture.

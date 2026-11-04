@@ -1,0 +1,2 @@
+Dossier de l herbe uniquement (terrain et touffes).
+Deposez ici nom.png, nom_N.png et nom_R.png, puis refaites le build.

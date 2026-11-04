@@ -1,0 +1,2 @@
+Dossier des papiers peints des murs interieurs des maisons.
+Deposez ici nom.png, nom_N.png et nom_R.png, puis refaites le build.
