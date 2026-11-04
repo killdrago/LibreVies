@@ -3728,6 +3728,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateBuilding(Vector3 position, Vector3 size, string name)
     {
+        // Hauteur des murs (exterieur, interieur et papier peint) : la moitie
+        // de la porte, comme pour le soubassement en briques. Le toit suit.
+        size = new Vector3(size.x, Mathf.Min(size.y, HauteurPorteConfortable * 0.5f), size.z);
         var root = new GameObject(name).transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
         var murMaillage = new Maillage();
