@@ -1208,7 +1208,7 @@ public sealed class LibreViesGame : MonoBehaviour
         var maillage = new Maillage();
         maillage.MurAvecOuvertures(largeur, profondeur, hauteur,
             centres.ToArray(), tailles.ToArray());
-        Maillage murInterieur = maillage.ExtraireFacesInterieures(new Vector3(0f, hauteur * 0.5f, 0f));
+        Maillage murInterieur = maillage.CopieMursInterieurs(new Vector3(0f, hauteur * 0.5f, 0f), 0.004f);
         Mesh nouveau = maillage.VersMesh("Murs_" + batiment.Root.name);
         filtre.sharedMesh = nouveau;
         if (collision != null)
@@ -2012,7 +2012,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (batiment == null) return;
         if (!string.IsNullOrEmpty(batiment.TextureMur) || HasRendusLocaux(batiment, "mur"))
             foreach (Renderer rendu in RendusZoneMaison(batiment, "mur"))
-                AppliquerTextureLocale(rendu, 0, batiment.TextureMur);
+                if (rendu.gameObject.name != "Murs_Interieur")
+                    AppliquerTextureLocale(rendu, 0, batiment.TextureMur);
         if (!string.IsNullOrEmpty(batiment.TextureToit) || HasRendusLocaux(batiment, "toit"))
             foreach (Renderer rendu in RendusZoneMaison(batiment, "toit"))
                 AppliquerTextureLocale(rendu, 1, batiment.TextureToit);
@@ -2052,8 +2053,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (rendu == null) return;
         if (string.IsNullOrEmpty(choix))
         {
-            // Le rendu redevient sensible au menu general : RafraichirZonesNommees
-            // lui remet la famille de sa zone (appele en fin d'AppliquerTexturesLocalesMaison).
+            // Retour au materiau d'origine de la maison (sans texture propre).
+            if (rendusTexturesLocales.Contains(rendu) && origine != null) rendu.sharedMaterial = origine;
             rendusTexturesLocales.Remove(rendu);
             return;
         }
@@ -2111,12 +2112,16 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // Famille d'une zone : sa propre famille si elle a une texture, sinon la
     // famille de repli (mur pour les murs interieurs, bois pour le sol).
+    // Sans choix general (dossier de la famille rempli dans le menu), la zone garde
+    // son materiau d'origine : le bois du sol n'est pas remplace par une texture.
     private int FamilleZoneNommee(string nom)
     {
         if (nom == "Murs_Interieur")
-            return FamilleAUneTexture(FamillePapierPeint) ? FamillePapierPeint : FamilleMur;
+            return !string.IsNullOrEmpty(cheminsFamilles[FamillePapierPeint]) && FamilleAUneTexture(FamillePapierPeint)
+                ? FamillePapierPeint : -1;
         if (nom == "Sol_Interieur")
-            return FamilleAUneTexture(FamilleSol) ? FamilleSol : FamilleBois;
+            return !string.IsNullOrEmpty(cheminsFamilles[FamilleSol]) && FamilleAUneTexture(FamilleSol)
+                ? FamilleSol : -1;
         return -1;
     }
 
@@ -3361,33 +3366,34 @@ public sealed class LibreViesGame : MonoBehaviour
             Quad(avantG, arriereG, arriereD, avantD);
         }
 
-        // Sépare les triangles dont la face regarde vers le centre (faces
-        // interieures). Ils partent dans le maillage retourne ; le reste reste ici.
-        public Maillage ExtraireFacesInterieures(Vector3 centre)
+        // Copie des faces verticales (murs) orientees vers le centre de la maison,
+        // decalees de quelques millimetres dans la piece. Les normales des murs
+        // ne sont pas coherentes d'un mur a l'autre : on ne se fie donc pas au
+        // sens de l'enroulement, seulement a la direction vers le centre.
+        // Le maillage d'origine n'est pas modifie.
+        public Maillage CopieMursInterieurs(Vector3 centre, float decalage)
         {
             var interieur = new Maillage();
-            var gardes = new List<Vector3>();
             for (int i = 0; i + 2 < triangles.Count; i += 3)
             {
                 Vector3 a = sommets[triangles[i]];
                 Vector3 b = sommets[triangles[i + 1]];
                 Vector3 c = sommets[triangles[i + 2]];
                 Vector3 normale = Vector3.Cross(b - a, c - a);
+                if (normale.sqrMagnitude < 1e-10f) continue;
+                normale.Normalize();
+                if (Mathf.Abs(normale.y) > 0.5f) continue;   // sols et toits : pas de papier
                 Vector3 milieu = (a + b + c) / 3f;
-                if (Vector3.Dot(normale, centre - milieu) > 0f)
+                if (Vector3.Dot(normale, centre - milieu) < 0f)
                 {
-                    interieur.Triangle(a, b, c);
+                    Vector3 echange = b;
+                    b = c;
+                    c = echange;
+                    normale = -normale;
                 }
-                else
-                {
-                    gardes.Add(a);
-                    gardes.Add(b);
-                    gardes.Add(c);
-                }
+                Vector3 decal = normale * decalage;
+                interieur.Triangle(a + decal, b + decal, c + decal);
             }
-            sommets.Clear();
-            triangles.Clear();
-            for (int i = 0; i + 2 < gardes.Count; i += 3) Triangle(gardes[i], gardes[i + 1], gardes[i + 2]);
             return interieur;
         }
 
@@ -3681,7 +3687,7 @@ public sealed class LibreViesGame : MonoBehaviour
             });
         // Les faces interieures forment un objet a part (Murs_Interieur) : il
         // recevra le papier peint sans toucher l'exterieur. Les deux ont un collider.
-        var murInterieur = murMaillage.ExtraireFacesInterieures(new Vector3(0f, size.y * 0.5f, 0f));
+        var murInterieur = murMaillage.CopieMursInterieurs(new Vector3(0f, size.y * 0.5f, 0f), 0.004f);
         var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
         var murCollider = murs.AddComponent<MeshCollider>();
         murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
@@ -4052,8 +4058,8 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 44f, 300f, 22f), "REVETEMENT", smallStyle);
-        string[] revLibelles = { "BOIS", "ALUMINIUM", "VERRE (TRANSPARENT)" };
-        string[] revMateriaux = { "Bois_Clair", "MetalAluminium", "GlassBleu" };
+        string[] revLibelles = { "BOIS", "TRANSPARENT" };
+        string[] revMateriaux = { "Bois_Clair", "GlassBleu" };
         for (int i = 0; i < revLibelles.Length; i++)
         {
             Rect bouton = new Rect(cadre.x + 16f + i * 176f, cadre.y + 70f, 168f, 34f);
@@ -4066,14 +4072,13 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 120f, 520f, 22f),
             "Le revetement s'applique au vantail d'origine (un modele garde ses materiaux).", smallStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 150f, 300f, 22f), "MODELE 3D", smallStyle);
         List<string> modeles = ModelesPorte();
         var choix = new List<string> { "" };
         choix.AddRange(modeles);
         string actuel = batiment.PorteModele ?? "";
         for (int i = 0; i < choix.Count; i++)
         {
-            Rect bouton = new Rect(cadre.x + 16f + (i % 3) * 180f, cadre.y + 176f + (i / 3) * 40f, 172f, 34f);
+            Rect bouton = new Rect(cadre.x + 16f + (i % 3) * 180f, cadre.y + 150f + (i / 3) * 40f, 172f, 34f);
             string libelle = choix[i] == "" ? "ORIGINE" : choix[i];
             GUIStyle style = actuel == choix[i] ? tabActifStyle : buttonStyle;
             if (GUI.Button(bouton, libelle, style))
@@ -4084,7 +4089,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         if (modeles.Count == 0)
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 176f + 40f, 520f, 22f),
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 150f, 520f, 22f),
                 "Aucun modele : deposez un fichier 3D dans LVTextures/porte, puis refaites le build.", smallStyle);
     }
 
