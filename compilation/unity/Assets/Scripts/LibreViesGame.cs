@@ -2251,6 +2251,9 @@ public sealed class LibreViesGame : MonoBehaviour
             AnnulerChoixTextures();
         if (GUI.Button(new Rect(cadre.x + largeur - 90f, cadre.y + hauteur - 42f, 80f, 30f), "ENREGISTRER", buttonStyle))
             EnregistrerChoixTextures();
+        // Sans cet appel, Unity ne deplace pas la fenetre : la barre de titre
+        // devient la zone de glisser (les boutons, deja dessines, restent prioritaires).
+        GUI.DragWindow(new Rect(0f, 0f, largeur, HauteurTitreFenetre));
     }
 
     private Material MakeMaterial(string name, Color color, bool emission = false, bool pbr = false)
