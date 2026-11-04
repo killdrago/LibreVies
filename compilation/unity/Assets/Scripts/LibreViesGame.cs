@@ -391,6 +391,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public string TexturePanneau;
         public string TextureMur;
         public string TextureToit;
+        public string TextureSol;
+        public string TexturePapier;
         public string PorteModele;
         public float LuminositeMur;
         public float LuminositePorte;
@@ -501,6 +503,10 @@ public sealed class LibreViesGame : MonoBehaviour
         // Texture propre a cette maison (chemin LVTextures/...), "" = famille.
         public string TextureMur = "";
         public string TextureToit = "";
+        // Sol et papier peint par maison : "" = suit le menu general,
+        // "ORIGINE" = materiau d'origine, sinon chemin de texture.
+        public string TextureSol = "";
+        public string TexturePapier = "";
         // Modele 3D de porte (LVTextures/porte), "" = porte d'origine.
         public string PorteModele = "";
         public Obstacle Collision;
@@ -1396,6 +1402,8 @@ public sealed class LibreViesGame : MonoBehaviour
                         element.Maison.LuminositeToit = Mathf.Clamp(coordonnee.LuminositeToit, 0.2f, 2f);
                     element.Maison.TextureMur = coordonnee.TextureMur ?? "";
                     element.Maison.TextureToit = coordonnee.TextureToit ?? "";
+                    element.Maison.TextureSol = coordonnee.TextureSol ?? "";
+                    element.Maison.TexturePapier = coordonnee.TexturePapier ?? "";
                     if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
                         AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
                     if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
@@ -1481,6 +1489,8 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.MateriauToit = element.Maison.MateriauToit;
                     coordonnee.TextureMur = element.Maison.TextureMur;
                     coordonnee.TextureToit = element.Maison.TextureToit;
+                    coordonnee.TextureSol = element.Maison.TextureSol ?? "";
+                    coordonnee.TexturePapier = element.Maison.TexturePapier ?? "";
                     coordonnee.PorteModele = element.Maison.PorteModele ?? "";
                     coordonnee.LuminositeMur = element.Maison.LuminositeMur;
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
@@ -1851,7 +1861,15 @@ public sealed class LibreViesGame : MonoBehaviour
     private string LireTextureCible()
     {
         if (texturesMaisonCible != null)
-            return texturesZoneCible == "toit" ? texturesMaisonCible.TextureToit : texturesMaisonCible.TextureMur;
+        {
+            switch (texturesZoneCible)
+            {
+                case "toit": return texturesMaisonCible.TextureToit;
+                case "sol": return texturesMaisonCible.TextureSol;
+                case "papier": return texturesMaisonCible.TexturePapier;
+                default: return texturesMaisonCible.TextureMur;
+            }
+        }
         if (texturesPancarteCible != null) return texturesPancarteCible.TexturePanneau;
         return null;
     }
@@ -1860,27 +1878,30 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (texturesMaisonCible != null)
         {
-            if (texturesZoneCible == "toit") texturesMaisonCible.TextureToit = chemin;
-            else texturesMaisonCible.TextureMur = chemin;
+            switch (texturesZoneCible)
+            {
+                case "toit": texturesMaisonCible.TextureToit = chemin; break;
+                case "sol": texturesMaisonCible.TextureSol = chemin; break;
+                case "papier": texturesMaisonCible.TexturePapier = chemin; break;
+                default: texturesMaisonCible.TextureMur = chemin; break;
+            }
         }
         else if (texturesPancarteCible != null) texturesPancarteCible.TexturePanneau = chemin;
     }
 
-    // Applique le choix au(x) rendu(s) de la cible ; "" = texture de la famille.
+    // Applique le choix a la maison (ou a la pancarte) ; "" = suit le menu general.
     private void ChoisirTextureCible(string chemin)
     {
         EcrireTextureCible(chemin);
-        RafraichirZonesNommees();
         if (texturesMaisonCible != null)
         {
-            int c = texturesZoneCible == "toit" ? 1 : 0;
-            foreach (Renderer rendu in RendusZoneMaison(texturesMaisonCible, texturesZoneCible))
-                AppliquerTextureLocale(rendu, c, chemin);
+            AppliquerTexturesLocalesMaison(texturesMaisonCible);
         }
         else if (texturesPancarteCible != null)
         {
             AppliquerTextureSupportPancarte(texturesPancarteCible);
         }
+        RafraichirZonesNommees();
     }
 
     private void AnnulerChoixTextures()
@@ -1995,7 +2016,58 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!string.IsNullOrEmpty(batiment.TextureToit) || HasRendusLocaux(batiment, "toit"))
             foreach (Renderer rendu in RendusZoneMaison(batiment, "toit"))
                 AppliquerTextureLocale(rendu, 1, batiment.TextureToit);
+
+        // Sol de la maison : seulement Sol_Interieur. ORIGINE = bois d'origine.
+        foreach (Renderer rendu in RendusNommesMaison(batiment, "Sol_Interieur"))
+            AppliquerChoixZone(rendu, FamilleSol, batiment.TextureSol, Mat("Wood"));
+
+        // Papier peint : Murs_Interieur. "" suit le mur de la maison ;
+        // ORIGINE = materiau des murs de la maison.
+        string papier = batiment.TexturePapier ?? "";
+        foreach (Renderer rendu in RendusNommesMaison(batiment, "Murs_Interieur"))
+        {
+            if (papier == "ORIGINE")
+                AppliquerChoixZone(rendu, FamillePapierPeint, papier, Mat(batiment.MateriauMur));
+            else if (!string.IsNullOrEmpty(papier))
+                AppliquerChoixZone(rendu, FamillePapierPeint, papier, null);
+            else
+                AppliquerChoixZone(rendu, 0, batiment.TextureMur, null);
+        }
+        RafraichirZonesNommees();
     }
+
+    private static List<Renderer> RendusNommesMaison(Batiment batiment, string nom)
+    {
+        var liste = new List<Renderer>();
+        if (batiment == null || batiment.Root == null) return liste;
+        foreach (Renderer rendu in batiment.Root.GetComponentsInChildren<Renderer>(true))
+            if (rendu.gameObject.name == nom) liste.Add(rendu);
+        return liste;
+    }
+
+    // Choix d'une zone sur un rendu : "" libere le rendu (le menu general reprend la main),
+    // ORIGINE remet le materiau d'origine, sinon une texture de la famille c.
+    private void AppliquerChoixZone(Renderer rendu, int c, string choix, Material origine)
+    {
+        if (rendu == null) return;
+        if (string.IsNullOrEmpty(choix))
+        {
+            // Le rendu redevient sensible au menu general : RafraichirZonesNommees
+            // lui remet la famille de sa zone (appele en fin d'AppliquerTexturesLocalesMaison).
+            rendusTexturesLocales.Remove(rendu);
+            return;
+        }
+        if (choix == "ORIGINE")
+        {
+            if (origine == null) return;
+            rendusTexturesLocales.Add(rendu);
+            rendu.sharedMaterial = origine;
+            return;
+        }
+        AppliquerTextureLocale(rendu, c, choix);
+    }
+
+
 
     private bool HasRendusLocaux(Batiment batiment, string zone)
     {
@@ -2097,6 +2169,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
         int famille = familleTexturesFiltre >= 0 ? familleTexturesFiltre : familleTexturesOuverte;
         List<ChoixTexture> liste = ListeChoixFamille(famille);
+        if (MenuTexturesLocal() && (texturesZoneCible == "sol" || texturesZoneCible == "papier"))
+        {
+            liste = new List<ChoixTexture>(liste);
+            liste.Insert(0, new ChoixTexture { Nom = "ORIGINE", Chemin = "ORIGINE", Apercu = null });
+        }
         string actif = string.IsNullOrEmpty(cheminsFamilles[famille])
             ? "LVTextures/" + DossiersTextures[famille] + "/" + NomsDefautTextures[famille]
             : cheminsFamilles[famille];
@@ -3933,27 +4010,82 @@ public sealed class LibreViesGame : MonoBehaviour
         instance.transform.localPosition = new Vector3(-min.x, -(min.y + max.y) * 0.5f, -(min.z + max.z) * 0.5f);
     }
 
-    // Bouton qui parcourt : ORIGINE, puis chaque modele du dossier porte.
-    private void DessinerChoixModelePorte(Batiment batiment, float y)
+    private string LibellePorteActuelle(Batiment batiment)
     {
-        GUI.Label(new Rect(34f, y, 135f, 24f), "MODELE :", smallStyle);
-        List<string> modeles = ModelesPorte();
-        if (modeles.Count == 0)
+        string revetement = batiment.MateriauPorte == "MetalAluminium" ? "ALUMINIUM"
+            : (batiment.MateriauPorte == "GlassBleu" ? "VERRE" : "BOIS");
+        string modele = string.IsNullOrEmpty(batiment.PorteModele) ? "porte d'origine" : batiment.PorteModele;
+        return revetement + ", " + modele;
+    }
+
+    private bool porteMenuOuvert;
+    private Batiment porteMenuMaison;
+
+    private void OuvrirMenuPorte(Batiment batiment)
+    {
+        porteMenuMaison = batiment;
+        porteMenuOuvert = true;
+    }
+
+    private void FermerMenuPorte()
+    {
+        porteMenuOuvert = false;
+        porteMenuMaison = null;
+    }
+
+    // Fenetre PORTE : revetement (bois, aluminium, verre) et modele 3D de LVTextures/porte.
+    private void DessinerMenuPorte()
+    {
+        if (porteMenuMaison == null || porteMenuMaison.Root == null || !modeEdition)
         {
-            GUI.Label(new Rect(174f, y, 380f, 24f), "Aucun modele dans LVTextures/porte", smallStyle);
+            FermerMenuPorte();
             return;
         }
-        string actuel = batiment.PorteModele ?? "";
-        int index = string.IsNullOrEmpty(actuel) ? -1 : modeles.IndexOf(actuel);
-        string libelle = index < 0 ? "ORIGINE" : modeles[index];
-        if (GUI.Button(new Rect(174f, y - 2f, 300f, 28f), libelle + "  (changer)", buttonStyle))
+        Batiment batiment = porteMenuMaison;
+        float largeur = 560f;
+        float hauteur = 380f;
+        Rect cadre = new Rect(Screen.width * 0.5f - largeur * 0.5f, Screen.height * 0.5f - hauteur * 0.5f, largeur, hauteur);
+        GUI.Box(cadre, "PORTE : " + batiment.Root.name, boxStyle);
+        if (GUI.Button(new Rect(cadre.x + largeur - 40f, cadre.y + 10f, 28f, 26f), "X", buttonStyle))
         {
-            int suivant = index + 1;
-            if (suivant >= modeles.Count) suivant = -1;
-            batiment.PorteModele = suivant < 0 ? "" : modeles[suivant];
-            AppliquerModelePorte(batiment);
-            ShowInfo("Porte : " + (suivant < 0 ? "ORIGINE" : modeles[suivant]));
+            FermerMenuPorte();
+            return;
         }
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 44f, 300f, 22f), "REVETEMENT", smallStyle);
+        string[] revLibelles = { "BOIS", "ALUMINIUM", "VERRE (TRANSPARENT)" };
+        string[] revMateriaux = { "Bois_Clair", "MetalAluminium", "GlassBleu" };
+        for (int i = 0; i < revLibelles.Length; i++)
+        {
+            Rect bouton = new Rect(cadre.x + 16f + i * 176f, cadre.y + 70f, 168f, 34f);
+            GUIStyle style = batiment.MateriauPorte == revMateriaux[i] ? tabActifStyle : buttonStyle;
+            if (GUI.Button(bouton, revLibelles[i], style))
+            {
+                AppliquerMateriauMaison(batiment, "porte", revMateriaux[i]);
+                EnregistrerCoordonneesEdition();
+            }
+        }
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 120f, 520f, 22f),
+            "Le revetement s'applique au vantail d'origine (un modele garde ses materiaux).", smallStyle);
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 150f, 300f, 22f), "MODELE 3D", smallStyle);
+        List<string> modeles = ModelesPorte();
+        var choix = new List<string> { "" };
+        choix.AddRange(modeles);
+        string actuel = batiment.PorteModele ?? "";
+        for (int i = 0; i < choix.Count; i++)
+        {
+            Rect bouton = new Rect(cadre.x + 16f + (i % 3) * 180f, cadre.y + 176f + (i / 3) * 40f, 172f, 34f);
+            string libelle = choix[i] == "" ? "ORIGINE" : choix[i];
+            GUIStyle style = actuel == choix[i] ? tabActifStyle : buttonStyle;
+            if (GUI.Button(bouton, libelle, style))
+            {
+                batiment.PorteModele = choix[i];
+                AppliquerModelePorte(batiment);
+                EnregistrerCoordonneesEdition();
+            }
+        }
+        if (modeles.Count == 0)
+            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 176f + 40f, 520f, 22f),
+                "Aucun modele : deposez un fichier 3D dans LVTextures/porte, puis refaites le build.", smallStyle);
     }
 
     private void ModifierHauteurPorte(Batiment batiment, bool agrandir)
@@ -4089,7 +4221,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Rect CadreEditionMaison()
     {
-        return new Rect(18f, Screen.height - 450f, 480f, 430f);
+        return new Rect(18f, Screen.height - 485f, 480f, 465f);
     }
 
     // Lien vers le menu TEXTURES limite a une famille (Mur, Toit, Pave, Bois...).
@@ -4119,6 +4251,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Box(cadre, "", boxStyle);
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
             "Choisissez une action : une seule action a la fois.", smallStyle);
+        float yc = cadre.y + 35f;
         if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 56f, 190f, 30f),
             "DEPLACER LA MAISON", buttonStyle)) editionOutilMaison = 0;
         if (GUI.Button(new Rect(cadre.x + 216f, cadre.y + 56f, 190f, 30f),
@@ -4136,9 +4269,13 @@ public sealed class LibreViesGame : MonoBehaviour
             ElementEdition pancarte = TrouverElementMaison(batiment, "Affiche_Maison");
             if (pancarte != null) elementEditionDernierSelectionne = pancarte;
         }
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 161f, 190f, 30f),
+            "MODIFIER LE SOL", buttonStyle)) editionOutilMaison = 6;
+        if (GUI.Button(new Rect(cadre.x + 216f, cadre.y + 161f, 190f, 30f),
+            "PAPIER PEINT", buttonStyle)) editionOutilMaison = 7;
         if (editionOutilMaison == 0)
         {
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 176f, 390f, 54f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 176f, 390f, 54f),
                 "Maintenez le clic sur la maison pour la deplacer.\n"
                     + "Les autres boutons ne deplacent pas la maison.", smallStyle);
             return;
@@ -4149,7 +4286,7 @@ public sealed class LibreViesGame : MonoBehaviour
             int[] cotes = { -1, 1, -2, 2 };
             for (int i = 0; i < noms.Length; i++)
             {
-                float y = cadre.y + 166f + i * 29f;
+                float y = yc + 166f + i * 29f;
                 // Les faces avant et arriere n'ont plus de fleches dont le
                 // sens depend de la camera : moins reduit, plus agrandit.
                 // Le redimensionnement garde ainsi le bon cote fixe, y compris
@@ -4161,52 +4298,66 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (GUI.Button(new Rect(cadre.x + 304f, y, 54f, 26f), "+", buttonStyle))
                     ModifierTailleMur(elementEditionDernierSelectionne, cotes[i], !inverse);
             }
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 282f, 165f, 36f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 282f, 165f, 36f),
                 "HAUTEUR\nDES MURS", smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 282f, 54f, 26f), "↓", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 242f, yc + 282f, 54f, 26f), "↓", buttonStyle))
                 ModifierHauteurMur(elementEditionDernierSelectionne, false);
-            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 282f, 54f, 26f), "↑", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 304f, yc + 282f, 54f, 26f), "↑", buttonStyle))
                 ModifierHauteurMur(elementEditionDernierSelectionne, true);
             DessinerChoixMateriaux(batiment, "mur",
                 new[] { "MUR", "BOIS", "BRIQUE" },
-                new[] { "Wall", "Bois_Clair", "Brique" }, cadre.y + 320f);
-            DessinerSliderLuminositeMaison(batiment, "mur", cadre.y + 350f);
-            DessinerLienTextures(cadre, cadre.y + 386f, "TEXTURE DES MURS DE CETTE MAISON...", batiment, "mur", 0);
+                new[] { "Wall", "Bois_Clair", "Brique" }, yc + 320f);
+            DessinerSliderLuminositeMaison(batiment, "mur", yc + 350f);
+            DessinerLienTextures(cadre, yc + 386f, "TEXTURE DES MURS DE CETTE MAISON...", batiment, "mur", 0);
         }
         else if (editionOutilMaison == 2)
         {
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 42f),
                 "Les fenetres restent attachees a la maison.", smallStyle);
             DessinerChoixMateriaux(batiment, "fenetre",
                 new[] { "VERRE BLEU" },
-                new[] { "GlassBleu" }, cadre.y + 220f);
+                new[] { "GlassBleu" }, yc + 220f);
         }
         else if (editionOutilMaison == 3)
         {
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 42f),
                 "Maintenez le clic sur la porte pour la deplacer.\n"
                     + "Elle s'ouvre devant vous si elle est assez haute.", smallStyle);
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 218f, 165f, 36f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 218f, 165f, 36f),
                 "HAUTEUR\nDE LA PORTE", smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 218f, 54f, 26f), "↓", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 242f, yc + 218f, 54f, 26f), "↓", buttonStyle))
                 ModifierHauteurPorte(batiment, false);
-            if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 218f, 54f, 26f), "↑", buttonStyle))
+            if (GUI.Button(new Rect(cadre.x + 304f, yc + 218f, 54f, 26f), "↑", buttonStyle))
                 ModifierHauteurPorte(batiment, true);
-            DessinerChoixMateriaux(batiment, "porte",
-                new[] { "BOIS", "ALUMINIUM" },
-                new[] { "Bois_Clair", "MetalAluminium" }, cadre.y + 258f);
-            DessinerSliderLuminositeMaison(batiment, "porte", cadre.y + 293f);
-            DessinerChoixModelePorte(batiment, cadre.y + 330f);
+            if (GUI.Button(new Rect(cadre.x + 16f, yc + 258f, 448f, 28f),
+                "COULEUR / REVETEMENT ET MODELE DE LA PORTE...", buttonStyle))
+                OuvrirMenuPorte(batiment);
+            DessinerSliderLuminositeMaison(batiment, "porte", yc + 293f);
+            GUI.Label(new Rect(34f, yc + 330f, 430f, 24f), "Actuel : " + LibellePorteActuelle(batiment), smallStyle);
         }
         else if (editionOutilMaison == 4)
         {
-            GUI.Label(new Rect(cadre.x + 16f, cadre.y + 168f, 390f, 42f),
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 42f),
                 "Le toit s'adapte automatiquement aux dimensions.", smallStyle);
             DessinerChoixMateriaux(batiment, "toit",
                 new[] { "ROUGE", "BOIS" },
-                new[] { "RoofRed", "Bois_Clair" }, cadre.y + 220f);
-            DessinerSliderLuminositeMaison(batiment, "toit", cadre.y + 255f);
-            DessinerLienTextures(cadre, cadre.y + 290f, "TEXTURE DU TOIT DE CETTE MAISON...", batiment, "toit", 1);
+                new[] { "RoofRed", "Bois_Clair" }, yc + 220f);
+            DessinerSliderLuminositeMaison(batiment, "toit", yc + 255f);
+            DessinerLienTextures(cadre, yc + 290f, "TEXTURE DU TOIT DE CETTE MAISON...", batiment, "toit", 1);
+        }
+        else if (editionOutilMaison == 6)
+        {
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 42f),
+                "Le sol de cette maison : ORIGINE ou une texture.\n"
+                    + "Les autres maisons ne changent pas.", smallStyle);
+            DessinerLienTextures(cadre, yc + 220f, "SOL DE CETTE MAISON (ORIGINE, TEXTURES)...", batiment, "sol", FamilleSol);
+        }
+        else if (editionOutilMaison == 7)
+        {
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 42f),
+                "Papier peint des murs interieurs de cette maison.\n"
+                    + "ORIGINE : les murs de la maison. Les autres maisons ne changent pas.", smallStyle);
+            DessinerLienTextures(cadre, yc + 220f, "PAPIER PEINT DE CETTE MAISON (ORIGINE, TEXTURES)...", batiment, "papier", FamillePapierPeint);
         }
     }
 
@@ -4286,7 +4437,8 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (element == null) return false;
         if (element.Maison != null)
-            return editionOutilMaison == 0 || editionOutilMaison == 1 || editionOutilMaison == 4;
+            return editionOutilMaison == 0 || editionOutilMaison == 1 || editionOutilMaison == 4
+                || editionOutilMaison == 6 || editionOutilMaison == 7;
         if (element.MaisonParent != null)
         {
             if (editionOutilMaison == 2) return element.Type == "Fenetre";
@@ -4323,7 +4475,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 else if (editionOutilMaison == 5 && toucheTransform.name == "Affiche_Maison")
                     meilleur = TrouverElementEdition(toucheTransform);
                 else if (!toitSeulement && (editionOutilMaison == 0
-                    || editionOutilMaison == 1 || editionOutilMaison == 4))
+                    || editionOutilMaison == 1 || editionOutilMaison == 4
+                    || editionOutilMaison == 6 || editionOutilMaison == 7))
                     meilleur = TrouverElementEdition(batiment.Root);
                 break;
             }
@@ -4561,7 +4714,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!TryTrouverElementEdition(out cible)) return;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
             PoserElementEdition(elementEditionSelectionne);
-        if (editionOutilMaison == 1 || editionOutilMaison == 4)
+        if (editionOutilMaison == 1 || editionOutilMaison == 4
+            || editionOutilMaison == 6 || editionOutilMaison == 7)
         {
             if (cible.Maison != null) elementEditionDernierSelectionne = cible;
             return;
@@ -9323,6 +9477,7 @@ public sealed class LibreViesGame : MonoBehaviour
             else OuvrirMenuTextures(-1);
         }
         if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
+        if (porteMenuOuvert && !creationPersonnageOpen) DessinerMenuPorte();
         if (conversationOpen) DessinerConversation();
         GUI.enabled = ancienEnabledHud; // Le fond du modal ne recoit aucun clic.
         if (creationPersonnageOpen) DessinerCreationPersonnage();
