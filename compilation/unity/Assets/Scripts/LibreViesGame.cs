@@ -1209,6 +1209,7 @@ public sealed class LibreViesGame : MonoBehaviour
         maillage.MurAvecOuvertures(largeur, profondeur, hauteur,
             centres.ToArray(), tailles.ToArray());
         Maillage murInterieur = maillage.CopieMursInterieurs(new Vector3(0f, hauteur * 0.5f, 0f), 0.004f);
+        maillage.DoublerFacesVerticales();
         Mesh nouveau = maillage.VersMesh("Murs_" + batiment.Root.name);
         filtre.sharedMesh = nouveau;
         if (collision != null)
@@ -3432,6 +3433,23 @@ public sealed class LibreViesGame : MonoBehaviour
             return interieur;
         }
 
+        // Ajoute une copie retournee de chaque face verticale : le mur reste visible
+        // de l'exterieur, quel que soit le sens d'enroulement de ses triangles.
+        public void DoublerFacesVerticales()
+        {
+            int total = triangles.Count;
+            for (int i = 0; i + 2 < total; i += 3)
+            {
+                Vector3 a = sommets[triangles[i]];
+                Vector3 b = sommets[triangles[i + 1]];
+                Vector3 c = sommets[triangles[i + 2]];
+                Vector3 normale = Vector3.Cross(b - a, c - a);
+                if (normale.sqrMagnitude < 1e-10f) continue;
+                if (Mathf.Abs(normale.normalized.y) > 0.5f) continue;
+                Triangle(a, c, b);
+            }
+        }
+
         public Mesh VersMesh(string nom)
         {
             var mesh = new Mesh { name = nom };
@@ -3723,6 +3741,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Les faces interieures forment un objet a part (Murs_Interieur) : il
         // recevra le papier peint sans toucher l'exterieur. Les deux ont un collider.
         var murInterieur = murMaillage.CopieMursInterieurs(new Vector3(0f, size.y * 0.5f, 0f), 0.004f);
+        murMaillage.DoublerFacesVerticales();
         var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
         var murCollider = murs.AddComponent<MeshCollider>();
         murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
@@ -4748,6 +4767,7 @@ public sealed class LibreViesGame : MonoBehaviour
             && new Rect(18f, Screen.height - 405f, 470f, 385f).Contains(souris))
             return true;
         if (SourisSurPanneauMaison()) return true;
+        if (texturesOpen && fenetreTextures.Contains(souris)) return true;
         return new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f).Contains(souris);
     }
 
