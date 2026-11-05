@@ -4994,7 +4994,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // conserve sa largeur historique, nettement superieure a la porte.
         float hauteurPancarte = Mathf.Min(taille.y - 0.40f, 3.25f);
         GameObject panneau = Box(new Vector3(0f, hauteurPancarte, z),
-            new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison");
+            new Vector3(largeur, 0.68f, 0.08f), "Bois_Clair", parent, "Affiche_Maison", true);
+        // Collider : sans lui, le clic ne peut pas viser la pancarte directement.
         Vector3 position = parent.TransformPoint(new Vector3(0f, hauteurPancarte, z + 0.06f));
         string libelle = LibelleMaison(nom);
         Color couleur = new Color(0.16f, 0.09f, 0.04f);
