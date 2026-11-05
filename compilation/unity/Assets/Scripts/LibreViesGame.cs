@@ -388,6 +388,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public float HauteurPorte;
         public float LuminositePancarte;
         public string MateriauSupportPancarte;
+        public bool PancartePositionSauvee;
+        public float PancarteX;
+        public float PancarteY;
         public string TexturePanneau;
         public string TextureMur;
         public string TextureToit;
@@ -1385,6 +1388,12 @@ public sealed class LibreViesGame : MonoBehaviour
                     AppliquerStylePancarte(element.Facade);
                     AppliquerLuminositePancarte(element.Facade);
                     element.Facade.TexturePanneau = coordonnee.TexturePanneau ?? "";
+                    if (coordonnee.PancartePositionSauvee && element.Facade.Panneau != null)
+                    {
+                        Vector3 positionPanneau = element.Facade.Panneau.localPosition;
+                        element.Facade.Panneau.localPosition =
+                            new Vector3(coordonnee.PancarteX, coordonnee.PancarteY, positionPanneau.z);
+                    }
                     if (!string.IsNullOrEmpty(coordonnee.MateriauSupportPancarte))
                         AppliquerMateriauPancarte(element.Facade, coordonnee.MateriauSupportPancarte);
                 }
@@ -1483,6 +1492,12 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.LuminositePancarte = element.Facade.Luminosite;
                     coordonnee.MateriauSupportPancarte = LireMateriauSupportPancarte(element.Facade);
                     coordonnee.TexturePanneau = element.Facade.TexturePanneau;
+                    if (element.Facade.Panneau != null)
+                    {
+                        coordonnee.PancartePositionSauvee = true;
+                        coordonnee.PancarteX = element.Facade.Panneau.localPosition.x;
+                        coordonnee.PancarteY = element.Facade.Panneau.localPosition.y;
+                    }
                 }
                 if (element != null && element.Maison != null)
                 {
@@ -4792,6 +4807,105 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo("Objet pose a sa nouvelle position");
     }
 
+    // Deplacement de la pancarte sur la facade avant de la maison. Securite : la
+    // pancarte ne se pose jamais sur une fenetre ni sur la porte (elle reste
+    // a sa place tant que le curseur vise un emplacement occupe).
+    private bool deplacementPancarteActive;
+    private bool pancarteEnDeplacement;
+    private bool pancarteBloquee;
+    private const float MargePancarte = 0.05f;
+
+    private void GererDeplacementPancarte()
+    {
+        FacadeTextState facade = elementEditionDernierSelectionne.Facade;
+        Batiment maison = elementEditionDernierSelectionne.MaisonParent;
+        if (maison == null || maison.Root == null || facade.Panneau == null) return;
+        if (Input.GetMouseButtonDown(0) && !SourisSurInterfaceEdition())
+            pancarteEnDeplacement = true;
+        if (!Input.GetMouseButton(0))
+        {
+            pancarteEnDeplacement = false;
+            return;
+        }
+        if (!pancarteEnDeplacement) return;
+        Vector2 visee;
+        if (!PointSurFacadeAvant(maison, out visee)) return;
+        PlacerPancarteSurFacade(facade, maison, visee);
+    }
+
+    // Point vise par le curseur sur le plan de la facade avant (coordonnees locales de la maison).
+    private bool PointSurFacadeAvant(Batiment maison, out Vector2 point)
+    {
+        point = Vector2.zero;
+        if (gameCamera == null) return false;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        Vector3 origine = maison.Root.InverseTransformPoint(rayon.origin);
+        Vector3 direction = maison.Root.InverseTransformDirection(rayon.direction);
+        float face = maison.ProfondeurInitiale * 0.5f;
+        if (origine.z <= face || direction.z > -1e-4f) return false;
+        float t = (face - origine.z) / direction.z;
+        Vector3 p = origine + direction * t;
+        point = new Vector2(p.x, p.y);
+        return true;
+    }
+
+    private void PlacerPancarteSurFacade(FacadeTextState facade, Batiment maison, Vector2 visee)
+    {
+        float demiLargeur = facade.LargeurPanneau * 0.5f;
+        float demiHauteur = facade.HauteurPanneau * 0.5f;
+        // Reste sur la facade : jamais en dehors des murs, ni trop bas ou trop haut.
+        float xMax = maison.LargeurInitiale * 0.5f - demiLargeur - MargePancarte;
+        float yMin = demiHauteur + MargePancarte;
+        float yMax = maison.HauteurInitiale - demiHauteur - MargePancarte;
+        if (xMax < 0f || yMax < yMin) return;
+        float x = Mathf.Clamp(visee.x, -xMax, xMax);
+        float y = Mathf.Clamp(visee.y, yMin, yMax);
+        foreach (Rect zone in ZonesOccupeesFacade(maison))
+        {
+            bool chevauche = x - demiLargeur < zone.xMax + MargePancarte
+                && x + demiLargeur > zone.xMin - MargePancarte
+                && y - demiHauteur < zone.yMax + MargePancarte
+                && y + demiHauteur > zone.yMin - MargePancarte;
+            if (!chevauche) continue;
+            if (!pancarteBloquee)
+                ShowInfo("Emplacement occupe : la pancarte ne se pose pas sur une fenetre ou la porte");
+            pancarteBloquee = true;
+            return;
+        }
+        pancarteBloquee = false;
+        Vector3 position = facade.Panneau.localPosition;
+        facade.Panneau.localPosition = new Vector3(x, y, position.z);
+        facade.Position = facade.Root.transform.position;
+    }
+
+    // Zones de la facade avant occupees par une fenetre ou la porte (xy locaux).
+    private List<Rect> ZonesOccupeesFacade(Batiment maison)
+    {
+        var zones = new List<Rect>();
+        foreach (Renderer rendu in maison.Root.GetComponentsInChildren<Renderer>(true))
+        {
+            bool fenetre = rendu.gameObject.name == "Fenetre";
+            bool porte = maison.PorteRoot != null && rendu.transform.IsChildOf(maison.PorteRoot);
+            if (!fenetre && !porte) continue;
+            Bounds b = rendu.bounds;
+            float xMin = float.MaxValue, xMax = float.MinValue;
+            float yMin = float.MaxValue, yMax = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 coin = new Vector3((i & 1) != 0 ? b.max.x : b.min.x,
+                    (i & 2) != 0 ? b.max.y : b.min.y,
+                    (i & 4) != 0 ? b.max.z : b.min.z);
+                Vector3 local = maison.Root.InverseTransformPoint(coin);
+                xMin = Mathf.Min(xMin, local.x);
+                xMax = Mathf.Max(xMax, local.x);
+                yMin = Mathf.Min(yMin, local.y);
+                yMax = Mathf.Max(yMax, local.y);
+            }
+            zones.Add(Rect.MinMaxRect(xMin, yMin, xMax, yMax));
+        }
+        return zones;
+    }
+
     private bool SourisSurInterfaceEdition()
     {
         if (!modeEdition) return false;
@@ -4808,6 +4922,12 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void GererSourisEdition()
     {
+        if (deplacementPancarteActive && elementEditionDernierSelectionne != null
+            && elementEditionDernierSelectionne.Facade != null)
+        {
+            GererDeplacementPancarte();
+            return;
+        }
         if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0)
             && !SourisSurInterfaceEdition())
             CommencerDeplacementMaisonEdition();
@@ -4819,6 +4939,8 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void BasculerModeEdition()
     {
+        deplacementPancarteActive = false;
+        pancarteEnDeplacement = false;
         if (modeEdition)
         {
             if (editionMaisonEnDeplacement)
@@ -5156,6 +5278,15 @@ public sealed class LibreViesGame : MonoBehaviour
             ModifierTaillePancarte(facade, true, false);
         if (GUI.Button(new Rect(cadre.x + 304f, cadre.y + 273f, 54f, 26f), "↑", buttonStyle))
             ModifierTaillePancarte(facade, true, true);
+        if (GUI.Button(new Rect(cadre.x + 14f, cadre.y + 348f, 190f, 28f),
+            deplacementPancarteActive ? "DEPLACER : ACTIF" : "DEPLACER LA PANCARTE", buttonStyle))
+        {
+            deplacementPancarteActive = !deplacementPancarteActive;
+            pancarteEnDeplacement = false;
+            ShowInfo(deplacementPancarteActive
+                ? "Glissez la pancarte sur la facade avant de la maison"
+                : "Deplacement de la pancarte arrete");
+        }
         if (GUI.Button(new Rect(cadre.x + 242f, cadre.y + 348f, 190f, 28f),
             "RETOUR AU MENU MAISON", buttonStyle))
         {
