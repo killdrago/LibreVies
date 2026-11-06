@@ -2021,12 +2021,36 @@ class App(tk.Tk):
         if not self.session_token or self.session_expires_at <= time.time():
             self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
             return
+        self._verrouiller_fermeture()
         try:
             launch(self.game, self.logged_pseudo, self.session_token, self.connected_api_url)
         except Exception as e:
+            self._deverrouiller_fermeture()
             self._upd_bar(0, 'Lancement impossible : %s' % e)
             return
         self.destroy()
+
+    def _verrouiller_fermeture(self):
+        """Grise la croix de fermeture : le jeu se lance, le launcher se ferme seul."""
+        self.protocol("WM_DELETE_WINDOW", lambda: None)
+        self._fermeture_grisee(True)
+
+    def _deverrouiller_fermeture(self):
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self._fermeture_grisee(False)
+
+    def _fermeture_grisee(self, grisee):
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            menu = ctypes.windll.user32.GetSystemMenu(hwnd, False)
+            # SC_CLOSE = 0xF060 ; MF_GRAYED = 0x1 ; MF_ENABLED = 0x0
+            ctypes.windll.user32.EnableMenuItem(menu, 0xF060, 0x1 if grisee else 0x0)
+            ctypes.windll.user32.DrawMenuBar(hwnd)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

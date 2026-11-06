@@ -9714,6 +9714,15 @@ public sealed class LibreViesGame : MonoBehaviour
             DessinerLigneMiniCarte(c, d, centreMonde, rayonMonde, couleurMaison, 1);
             DessinerLigneMiniCarte(d, a, centreMonde, rayonMonde, couleurMaison, 1);
         }
+        // Monstres vivants : points rouges.
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyState monstre = enemies[i];
+            if (monstre == null || !monstre.Alive || monstre.Root == null || !monstre.Root.activeInHierarchy) continue;
+            Vector3 position = monstre.Root.transform.position;
+            DessinerPointMiniCarte(new Vector2(position.x, position.z), centreMonde, rayonMonde,
+                new Color(0.95f, 0.10f, 0.10f, 1f), 2);
+        }
         if (player != null)
             DessinerPointMiniCarte(centreMonde, centreMonde, rayonMonde, Color.white, 3);
         miniCarteTexture.Apply(false, false);
@@ -9811,12 +9820,6 @@ public sealed class LibreViesGame : MonoBehaviour
         qualiteGraphique = GUI.HorizontalSlider(new Rect(135, 51, 220, 18), qualiteGraphique, 0f, 1f);
         GUI.Label(new Rect(360, 42, 55, 24), Mathf.RoundToInt(qualiteGraphique * 100) + "%", smallStyle);
         GUI.Label(new Rect(135, 66, 240, 20), "Niveau : " + NomNiveauQualite(), smallStyle);
-        GUI.Label(new Rect(0, 84, 130, 24), "Luminosite", smallStyle);
-        brightness = GUI.HorizontalSlider(new Rect(135, 93, 220, 18), brightness, 0f, 1f);
-        GUI.Label(new Rect(360, 84, 55, 24), Mathf.RoundToInt(brightness * 100) + "%", smallStyle);
-        GUI.Label(new Rect(0, 120, 130, 24), "Contraste", smallStyle);
-        contrast = GUI.HorizontalSlider(new Rect(135, 129, 220, 18), contrast, 0.5f, 1.5f);
-        GUI.Label(new Rect(360, 120, 55, 24), Mathf.RoundToInt(contrast * 100) + "%", smallStyle);
         GUI.Label(new Rect(0, 156, 160, 24), "Resolution", smallStyle);
         if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle))
         {
@@ -9971,8 +9974,9 @@ public sealed class LibreViesGame : MonoBehaviour
             for (int c = 0; c < cheminsFamilles.Length && c < config.texturesChoisies.Length; c++)
                 cheminsFamilles[c] = config.texturesChoisies[c] ?? "";
         }
-        brightness = Mathf.Clamp01(config.brightness);
-        contrast = Mathf.Clamp(config.contrast, 0.5f, 1.5f);
+        // Reglages luminosite et contraste retires des options : valeurs neutres.
+        brightness = 0.5f;
+        contrast = 1f;
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
         intensiteHalo = config.intensiteHalo < 0f ? 0.15f : Mathf.Clamp01(config.intensiteHalo);
         herbeBrins = config.herbeBrins;
@@ -10031,8 +10035,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // Compatibilite avec les builds qui avaient seulement PlayerPrefs.
         if (!File.Exists(CheminConfiguration))
         {
-            brightness = PlayerPrefs.GetFloat("brightness", brightness);
-            contrast = PlayerPrefs.GetFloat("contrast", contrast);
+            brightness = 0.5f;
+            contrast = 1f;
             cameraSensitivity = PlayerPrefs.GetFloat("cameraSensitivity", cameraSensitivity);
         }
         Vector2Int resolution = resolutions[resolutionIndex];
