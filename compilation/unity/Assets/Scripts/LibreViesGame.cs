@@ -9748,10 +9748,60 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Fond semi-transparent du HUD : la couleur de fond est appliquee avant le texte.
+    // Panneaux HUD : fond noir opaque aux coins arrondis, contour blanc fin.
+    // Les textures sont generees une seule fois et etirees en 9 morceaux.
+    private GUIStyle styleFondArrondi, styleContourArrondi, styleBarreFond, styleBarreContour;
+
+    private void AssurerStylesArrondis()
+    {
+        if (styleFondArrondi != null) return;
+        styleFondArrondi = StyleArrondi(CreerTextureArrondie(10, 0f), 10);
+        styleContourArrondi = StyleArrondi(CreerTextureArrondie(10, 1.2f), 10);
+        styleBarreFond = StyleArrondi(CreerTextureArrondie(5, 0f), 5);
+        styleBarreContour = StyleArrondi(CreerTextureArrondie(5, 1.2f), 5);
+    }
+
+    private static GUIStyle StyleArrondi(Texture2D texture, int rayon)
+    {
+        GUIStyle style = new GUIStyle();
+        style.normal.background = texture;
+        style.border = new RectOffset(rayon, rayon, rayon, rayon);
+        return style;
+    }
+
+    // Carre de taille 2*rayon+4 : coins arrondis de rayon px, bord anti-crenele.
+    // Si contour > 0, seul un anneau de cette epaisseur (px) reste visible.
+    private static Texture2D CreerTextureArrondie(int rayon, float contour)
+    {
+        int taille = 2 * rayon + 4;
+        Texture2D texture = new Texture2D(taille, taille, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+        Color[] pixels = new Color[taille * taille];
+        for (int y = 0; y < taille; y++)
+        for (int x = 0; x < taille; x++)
+        {
+            float px = x + 0.5f, py = y + 0.5f;
+            float cx = Mathf.Clamp(px, rayon, taille - rayon);
+            float cy = Mathf.Clamp(py, rayon, taille - rayon);
+            float d = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy)) - rayon;
+            float alpha = Mathf.Clamp01(0.5f - d);
+            if (contour > 0f)
+                alpha *= 1f - Mathf.Clamp01(0.5f - (d + contour));
+            pixels[y * taille + x] = new Color(1f, 1f, 1f, alpha);
+        }
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
     private void FondHudTransparent(Rect rect)
     {
-        GUI.color = new Color(0f, 0f, 0f, 1f);
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        AssurerStylesArrondis();
+        GUI.color = Color.black;
+        GUI.Box(rect, GUIContent.none, styleFondArrondi);
+        GUI.color = Color.white;
+        GUI.Box(rect, GUIContent.none, styleContourArrondi);
         GUI.color = Color.white;
     }
 
@@ -9787,10 +9837,15 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerBarre(Rect rect, float valeur, string texte)
     {
-        GUI.color = new Color(0f, 0f, 0f, 1f);
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        AssurerStylesArrondis();
+        GUI.color = Color.black;
+        GUI.Box(rect, GUIContent.none, styleBarreFond);
+        GUI.color = Color.white;
+        GUI.Box(rect, GUIContent.none, styleBarreContour);
+        // Remplissage pose a l'interieur du contour blanc.
+        Rect interieur = new Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4);
         GUI.color = texte == "PV" ? new Color(0.90f, 0.16f, 0.12f) : (texte == "ENDURANCE" ? new Color(0.20f, 0.78f, 0.28f) : new Color(0.92f, 0.68f, 0.12f));
-        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(valeur), rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(interieur.x, interieur.y, interieur.width * Mathf.Clamp01(valeur), interieur.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
         string affichage = texte == "PV" ? hp + "/" + MaxHp : texte;
         GUI.color = Color.white;
