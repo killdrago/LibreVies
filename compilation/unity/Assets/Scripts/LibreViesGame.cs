@@ -1272,6 +1272,15 @@ public sealed class LibreViesGame : MonoBehaviour
                 collisionInterieur.sharedMesh = nouveauInterieur;
             }
         }
+        Transform hautRoot = batiment.Root.Find("Murs_Interieur_Haut");
+        if (hautRoot != null)
+        {
+            Maillage bandeHaute = new Maillage();
+            bandeHaute.MurAvecOuvertures(largeur, profondeur, hauteur, centres.ToArray(), tailles.ToArray());
+            Maillage haut = bandeHaute.CopieMursInterieurs(new Vector3(0f, hauteur * 0.5f, 0f), 0.004f)
+                .ClipperAuDessus(hauteurInterieure);
+            hautRoot.GetComponent<MeshFilter>().sharedMesh = haut.VersMesh("Murs_Interieur_Haut_" + batiment.Root.name);
+        }
         ActualiserMurBasInterieur(batiment, centres, tailles);
     }
 
@@ -2054,7 +2063,7 @@ public sealed class LibreViesGame : MonoBehaviour
             string nom = rendu.gameObject.name ?? "";
             bool concerne = zone == "toit"
                 ? nom.StartsWith("Toit_")
-                : (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
+                : (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Interieur_Haut" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"));
             if (concerne) liste.Add(rendu);
         }
@@ -2083,7 +2092,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (batiment == null) return;
         if (!string.IsNullOrEmpty(batiment.TextureMur) || HasRendusLocaux(batiment, "mur"))
             foreach (Renderer rendu in RendusZoneMaison(batiment, "mur"))
-                if (rendu.gameObject.name != "Murs_Interieur")
+                if (rendu.gameObject.name != "Murs_Interieur" && rendu.gameObject.name != "Murs_Interieur_Haut")
                     AppliquerTextureLocale(rendu, 0, batiment.TextureMur);
         if (!string.IsNullOrEmpty(batiment.TextureToit) || HasRendusLocaux(batiment, "toit"))
             foreach (Renderer rendu in RendusZoneMaison(batiment, "toit"))
@@ -2105,7 +2114,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // Papier peint : Murs_Interieur. "" suit le mur de la maison ;
         // ORIGINE = materiau des murs de la maison.
         string papier = batiment.TexturePapier ?? "";
-        foreach (Renderer rendu in RendusNommesMaison(batiment, "Murs_Interieur"))
+        var rendusPapier = new List<Renderer>(RendusNommesMaison(batiment, "Murs_Interieur"));
+        rendusPapier.AddRange(RendusNommesMaison(batiment, "Murs_Interieur_Haut"));
+        foreach (Renderer rendu in rendusPapier)
         {
             if (papier == "ORIGINE")
                 AppliquerChoixZone(rendu, FamillePapierPeint, papier, Mat(batiment.MateriauMur));
@@ -2183,7 +2194,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private static bool EstZoneNommee(string nom)
     {
-        return nom == "Murs_Interieur" || nom == "Sol_Interieur";
+        return nom == "Murs_Interieur" || nom == "Murs_Interieur_Haut" || nom == "Sol_Interieur";
     }
 
     private bool FamilleAUneTexture(int c)
@@ -2199,7 +2210,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // son materiau d'origine : le bois du sol n'est pas remplace par une texture.
     private int FamilleZoneNommee(string nom)
     {
-        if (nom == "Murs_Interieur")
+        if (nom == "Murs_Interieur" || nom == "Murs_Interieur_Haut")
             return !string.IsNullOrEmpty(cheminsFamilles[FamillePapierPeint]) && FamilleAUneTexture(FamillePapierPeint)
                 ? FamillePapierPeint : -1;
         if (nom == "Sol_Interieur")
@@ -3498,6 +3509,33 @@ public sealed class LibreViesGame : MonoBehaviour
             return interieur;
         }
 
+        // Garde, pour chaque triangle, la partie situee au-dessus de hauteurBas.
+        public Maillage ClipperAuDessus(float hauteurBas)
+        {
+            var haut = new Maillage();
+            for (int i = 0; i + 2 < triangles.Count; i += 3)
+            {
+                Vector3[] poly = { sommets[triangles[i]], sommets[triangles[i + 1]], sommets[triangles[i + 2]] };
+                var sortie = new List<Vector3>(4);
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 p = poly[k];
+                    Vector3 q = poly[(k + 1) % 3];
+                    bool pDedans = p.y >= hauteurBas;
+                    bool qDedans = q.y >= hauteurBas;
+                    if (pDedans) sortie.Add(p);
+                    if (pDedans != qDedans)
+                    {
+                        float t = (hauteurBas - p.y) / (q.y - p.y);
+                        sortie.Add(p + (q - p) * t);
+                    }
+                }
+                for (int j = 1; j + 1 < sortie.Count; j++)
+                    haut.Triangle(sortie[0], sortie[j], sortie[j + 1]);
+            }
+            return haut;
+        }
+
         // Oriente chaque face verticale vers l'exterieur (normales coherentes, meme
         // eclairage des deux cotes). Pas de doublon : le maillage reste propre.
         public void OrienterFacesVerticalesVersExterieur(Vector3 centre)
@@ -3847,6 +3885,26 @@ public sealed class LibreViesGame : MonoBehaviour
         var murIntCollider = murIntObjet.AddComponent<MeshCollider>();
         murIntCollider.sharedMesh = murIntObjet.GetComponent<MeshFilter>().sharedMesh;
         murIntObjet.transform.SetParent(root, false);
+        // Partie haute du mur (au-dessus de la copie interieure) : meme surface que le
+        // mur exterieur, decoupee au-dessus de hauteurMurs. Recoit le papier peint.
+        var maillageHaut = new Maillage();
+        maillageHaut.MurAvecOuvertures(size.x, size.z, size.y,
+            new[]
+            {
+                new Vector2(0f, HauteurPorteConfortable * 0.5f),
+                new Vector2(-size.x * 0.27f, 1.8f),
+                new Vector2(size.x * 0.27f, 1.8f)
+            },
+            new[]
+            {
+                new Vector2(1.2f, HauteurPorteConfortable),
+                new Vector2(1.0f, 0.75f),
+                new Vector2(1.0f, 0.75f)
+            });
+        var bandeHaute = maillageHaut.CopieMursInterieurs(new Vector3(0f, size.y * 0.5f, 0f), 0.004f)
+            .ClipperAuDessus(hauteurMurs);
+        var murHautObjet = ObjetMaillage("Murs_Interieur_Haut", bandeHaute.VersMesh("Murs_Interieur_Haut_" + name), "Wall");
+        murHautObjet.transform.SetParent(root, false);
         // Un sol interieur donne une vraie profondeur visible par les ouvertures
         // au lieu de laisser le mur oppose remplir la vitre.
         // La dalle s'arrete au milieu de l'epaisseur du mur : elle penetre
@@ -4141,7 +4199,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             string nom = enfants[i].name ?? "";
             bool concerne = cible == "mur"
-                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
+                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Interieur_Haut" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "fenetre" ? nom == "Fenetre"
                 : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
@@ -4188,7 +4246,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             string nom = enfants[i].name ?? "";
             bool concerne = cible == "mur"
-                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Bas_Interieur"
+                ? (nom == "Murs" || nom == "Murs_Interieur" || nom == "Murs_Interieur_Haut" || nom == "Murs_Bas_Interieur"
                     || nom == "Soubassement" || nom.StartsWith("Chaine_Angle"))
                 : (cible == "porte" ? (nom == "Porte" || nom == "Porte_Vantail")
                     : nom.StartsWith("Toit_"));
