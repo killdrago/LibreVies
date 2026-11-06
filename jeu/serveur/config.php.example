@@ -13,7 +13,4 @@ return [
     // Laisser false pour l'instant : l'envoi des emails sera ajoute plus tard.
     // Quand il sera en place, true bloquera les comptes dont valider vaut 0.
     'require_email_validation' => false,
-    // Serveur IA des PNJ (jeu/serveur/IA/serveur_ia.py), vu depuis ce serveur.
-    // Il tourne sur la meme machine que l'API : garder cette adresse.
-    'ia_url' => 'http://127.0.0.1:8765/npc_chat',
 ];
