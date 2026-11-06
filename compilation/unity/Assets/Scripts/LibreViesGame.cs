@@ -1221,9 +1221,9 @@ public sealed class LibreViesGame : MonoBehaviour
         if (filtre == null) return;
         float largeur = batiment.LargeurInitiale;
         float profondeur = batiment.ProfondeurInitiale;
-        // Exterieur et papier peint : meme hauteur (toute la hauteur du mur).
+        // Exterieur : hauteur d'origine. Interieur (papier) : moitie de la porte.
         float hauteur = batiment.HauteurInitiale;
-        float hauteurInterieure = hauteur;
+        float hauteurInterieure = HauteurMurs(hauteur, batiment.Root.localScale.y);
         Vector3 positionPorte = batiment.PorteRoot.localPosition;
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
         float hauteurPorte = (batiment.PorteHauteur > 0.001f
@@ -3804,8 +3804,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Hauteur des murs (exterieur, interieur et papier peint) : la moitie
         // de la porte. Le toit, les fenetres, la porte et la pancarte gardent
         // leur hauteur d'origine (size.y).
-        // Papier peint : meme hauteur que le mur exterieur, pour couvrir tout le mur.
-        float hauteurMurs = size.y;
+        float hauteurMurs = HauteurMurs(size.y);
         var maillageInterieurCree = new Maillage();
         var root = new GameObject(name).transform;
         root.position = new Vector3(position.x, TerrainHeight(position.x, position.z), position.z);
