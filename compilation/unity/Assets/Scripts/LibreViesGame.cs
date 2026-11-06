@@ -263,6 +263,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<IAMessageConversation> conversationHistoriqueIA = new List<IAMessageConversation>();
     private bool conversationIAEnAttente;
     private string conversationModeIA = "court";
+    private Vector2 conversationDefilement;
+    private int conversationNbMessagesVus = -1;
 
     [System.Serializable]
     public sealed class IAMessageConversation
@@ -8258,6 +8260,8 @@ public sealed class LibreViesGame : MonoBehaviour
         conversationMessages.Clear();
         conversationHistoriqueIA.Clear();
         conversationIAEnAttente = false;
+        conversationDefilement = Vector2.zero;
+        conversationNbMessagesVus = -1;
         conversationMessages.Add(NomAffichePnj(cible) + " : Bonjour");
         if (cible.Metier == "Esthetique")
             conversationMessages.Add("Je peux vous ouvrir le panel pour creer votre personnage.");
@@ -8365,8 +8369,19 @@ public sealed class LibreViesGame : MonoBehaviour
         string contenu = string.Join("\n\n", conversationMessages.ToArray());
         if (conversationIAEnAttente)
             contenu += "\n\n" + NomAffichePnj(conversationPnj) + " réfléchit...";
-        GUI.Label(new Rect(texte.x + 14f, texte.y + 12f, texte.width - 28f, texte.height - 20f),
-            contenu, conversationTextStyle);
+        // Zone defilante : la barre apparait quand le texte deborde ; le dernier
+        // message est affiche automatiquement a chaque nouvelle replique.
+        Rect zoneTexte = new Rect(texte.x + 14f, texte.y + 12f, texte.width - 28f, texte.height - 24f);
+        float largeurContenu = zoneTexte.width - 18f;
+        float hauteurContenu = conversationTextStyle.CalcHeight(new GUIContent(contenu), largeurContenu) + 12f;
+        bool nouveauMessage = conversationMessages.Count != conversationNbMessagesVus;
+        conversationNbMessagesVus = conversationMessages.Count;
+        if (nouveauMessage)
+            conversationDefilement.y = Mathf.Max(0f, hauteurContenu - zoneTexte.height);
+        conversationDefilement = GUI.BeginScrollView(zoneTexte, conversationDefilement,
+            new Rect(0f, 0f, largeurContenu, Mathf.Max(hauteurContenu, zoneTexte.height)));
+        GUI.Label(new Rect(0f, 0f, largeurContenu, hauteurContenu), contenu, conversationTextStyle);
+        GUI.EndScrollView();
         if (propositionPersonnage
             && GUI.Button(new Rect(cadre.x + 24f, cadre.y + hauteur - 94f,
                 largeur - 48f, 28f), personnageActuel.EstPrimitif
