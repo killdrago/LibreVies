@@ -1867,6 +1867,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private static void AppliquerTexturesFamille(Material materiau, Texture2D a, Texture2D n, Texture2D r)
     {
         if (a != null && materiau.HasProperty("_MainTex")) materiau.SetTexture("_MainTex", a);
+        // Le shader multiplie la texture par la teinte du materiau (bois brun, mur beige) :
+        // une texture choisie doit s'afficher telle qu'elle est dans le menu.
+        if (a != null && materiau.HasProperty("_Color")) materiau.color = Color.white;
         if (n != null && materiau.HasProperty("_BumpMap")) materiau.SetTexture("_BumpMap", n);
         if (r != null && materiau.HasProperty("_RoughMap"))
         {
@@ -2058,6 +2061,11 @@ public sealed class LibreViesGame : MonoBehaviour
         // Porte : texture choisie sur le vantail d'origine (sinon le revetement).
         foreach (Renderer rendu in RendusNommesMaison(batiment, "Porte_Vantail"))
             AppliquerChoixZone(rendu, FamilleBois, batiment.TexturePorte, Mat(batiment.MateriauPorte));
+
+        // La luminosite choisie reste active apres un changement de texture.
+        if (Mathf.Abs(batiment.LuminositeMur - 1f) > 0.001f) AppliquerLuminositeMaison(batiment, "mur", batiment.LuminositeMur);
+        if (Mathf.Abs(batiment.LuminositePorte - 1f) > 0.001f) AppliquerLuminositeMaison(batiment, "porte", batiment.LuminositePorte);
+        if (Mathf.Abs(batiment.LuminositeToit - 1f) > 0.001f) AppliquerLuminositeMaison(batiment, "toit", batiment.LuminositeToit);
 
         // Sol de la maison : seulement Sol_Interieur. ORIGINE = bois d'origine.
         foreach (Renderer rendu in RendusNommesMaison(batiment, "Sol_Interieur"))
@@ -4150,12 +4158,22 @@ public sealed class LibreViesGame : MonoBehaviour
             if (rendu == null || !source.HasProperty("_Color")) continue;
             Material instance = rendu.material;
             if (!instance.HasProperty("_Color")) continue;
-            Color couleur = source.color;
+            Color couleur = CouleurBaseLuminosite(batiment, cible, source);
             couleur.r = Mathf.Clamp01(couleur.r * valeur);
             couleur.g = Mathf.Clamp01(couleur.g * valeur);
             couleur.b = Mathf.Clamp01(couleur.b * valeur);
             instance.color = couleur;
         }
+    }
+
+    // Teinte de depart de la luminosite : blanche si une texture est choisie, sinon teinte d'origine.
+    private Color CouleurBaseLuminosite(Batiment batiment, string cible, Material source)
+    {
+        string perso = cible == "mur" ? batiment.TextureMur
+            : (cible == "porte" ? batiment.TexturePorte : batiment.TextureToit);
+        int famille = cible == "mur" ? FamilleMur : (cible == "porte" ? FamilleBois : 1);
+        bool texturee = !string.IsNullOrEmpty(perso) || !string.IsNullOrEmpty(cheminsFamilles[famille]);
+        return texturee ? Color.white : source.color;
     }
 
     private void DessinerSliderLuminositeMaison(Batiment batiment, string cible, float y)
