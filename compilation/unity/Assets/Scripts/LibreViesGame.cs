@@ -8,6 +8,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 #endif
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -256,6 +257,38 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool conversationFocusRequested;
     private string conversationInput = "";
     private readonly List<string> conversationMessages = new List<string>();
+    // IA locale des PNJ (jeu/serveur/IA/serveur_ia.py) : historique envoye a chaque message.
+    private const string UrlIAConversation = "http://127.0.0.1:8765/npc_chat";
+    private const int IAHistoriqueMax = 10;
+    private readonly List<IAMessageConversation> conversationHistoriqueIA = new List<IAMessageConversation>();
+    private bool conversationIAEnAttente;
+    private string conversationModeIA = "court";
+
+    [System.Serializable]
+    public sealed class IAMessageConversation
+    {
+        public string role;
+        public string content;
+    }
+
+    [System.Serializable]
+    public sealed class IARequeteConversation
+    {
+        public string metier;
+        public string nom;
+        public string ville;
+        public string mode;
+        public string message;
+        public IAMessageConversation[] historique;
+    }
+
+    [System.Serializable]
+    public sealed class IAReponseConversation
+    {
+        public bool ok;
+        public string reponse;
+        public string message;
+    }
     private string infoMessage = "";
     private float infoTimer;
     private float brightness = 0.5f;
@@ -8223,6 +8256,8 @@ public sealed class LibreViesGame : MonoBehaviour
         conversationFocusRequested = true;
         conversationInput = "";
         conversationMessages.Clear();
+        conversationHistoriqueIA.Clear();
+        conversationIAEnAttente = false;
         conversationMessages.Add(NomAffichePnj(cible) + " : Bonjour");
         if (cible.Metier == "Esthetique")
             conversationMessages.Add("Je peux vous ouvrir le panel pour creer votre personnage.");
@@ -8232,11 +8267,65 @@ public sealed class LibreViesGame : MonoBehaviour
     private void EnvoyerMessageConversation()
     {
         string message = (conversationInput ?? "").Trim();
-        if (message.Length == 0) return;
+        if (message.Length == 0 || conversationIAEnAttente || conversationPnj == null) return;
         conversationMessages.Add("Vous : " + message);
-        conversationMessages.Add(NomAffichePnj(conversationPnj)
-            + " : Je vous écoute. Que puis-je faire pour vous ?");
         conversationInput = "";
+
+        // Historique envoye avant le message courant, limite aux derniers echanges.
+        int debut = Mathf.Max(0, conversationHistoriqueIA.Count - IAHistoriqueMax);
+        IAMessageConversation[] historique = new IAMessageConversation[conversationHistoriqueIA.Count - debut];
+        for (int i = debut; i < conversationHistoriqueIA.Count; i++)
+            historique[i - debut] = conversationHistoriqueIA[i];
+        conversationHistoriqueIA.Add(new IAMessageConversation { role = "user", content = message });
+
+        conversationIAEnAttente = true;
+        StartCoroutine(DemanderReponseIA(conversationPnj, message, historique, conversationModeIA));
+    }
+
+    private System.Collections.IEnumerator DemanderReponseIA(PnjState pnj, string message,
+        IAMessageConversation[] historique, string mode)
+    {
+        IARequeteConversation requete = new IARequeteConversation
+        {
+            metier = pnj.Metier ?? "",
+            nom = NomAffichePnj(pnj),
+            ville = pnj.Ville ?? "",
+            mode = mode,
+            message = message,
+            historique = historique
+        };
+        string reponse;
+        using (UnityWebRequest web = new UnityWebRequest(UrlIAConversation, "POST"))
+        {
+            web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonUtility.ToJson(requete)));
+            web.downloadHandler = new DownloadHandlerBuffer();
+            web.SetRequestHeader("Content-Type", "application/json; charset=utf-8");
+            web.timeout = 90;
+            yield return web.SendWebRequest();
+
+            if (web.result != UnityWebRequest.Result.Success)
+            {
+                reponse = "(Le serveur IA ne répond pas. Lancez serveur_ia.py dans serveur/IA.)";
+            }
+            else
+            {
+                IAReponseConversation recu = JsonUtility.FromJson<IAReponseConversation>(web.downloadHandler.text);
+                reponse = recu != null && recu.ok && !string.IsNullOrEmpty(recu.reponse)
+                    ? recu.reponse
+                    : "(Réponse IA indisponible" + (recu != null && !string.IsNullOrEmpty(recu.message) ? " : " + recu.message : "") + ")";
+            }
+        }
+        conversationIAEnAttente = false;
+        // Le dialogue a pu etre ferme ou changer de PNJ pendant l'attente.
+        if (!conversationOpen || conversationPnj != pnj) yield break;
+        conversationMessages.Add(NomAffichePnj(pnj) + " : " + reponse);
+        if (!reponse.StartsWith("("))
+            conversationHistoriqueIA.Add(new IAMessageConversation { role = "assistant", content = reponse });
+    }
+
+    private void BasculerModeConversationIA()
+    {
+        conversationModeIA = conversationModeIA == "libre" ? "court" : "libre";
     }
 
     private void FermerConversation()
@@ -8246,6 +8335,8 @@ public sealed class LibreViesGame : MonoBehaviour
         conversationFocusRequested = false;
         conversationInput = "";
         conversationMessages.Clear();
+        conversationHistoriqueIA.Clear();
+        conversationIAEnAttente = false;
         GUI.FocusControl("");
     }
 
@@ -8256,8 +8347,11 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect cadre = new Rect((Screen.width - largeur) * 0.5f,
             (Screen.height - hauteur) * 0.5f, largeur, hauteur);
         GUI.Box(cadre, "", boxStyle);
-        GUI.Label(new Rect(cadre.x + 22f, cadre.y + 16f, largeur - 80f, 30f),
+        GUI.Label(new Rect(cadre.x + 22f, cadre.y + 16f, largeur - 300f, 30f),
             "CONVERSATION — " + NomAffichePnj(conversationPnj), conversationTitleStyle);
+        if (GUI.Button(new Rect(cadre.x + largeur - 260f, cadre.y + 14f, 200f, 26f),
+            conversationModeIA == "libre" ? "MODE : LIBRE" : "MODE : COURT", buttonStyle))
+            BasculerModeConversationIA();
         if (GUI.Button(new Rect(cadre.x + largeur - 48f, cadre.y + 14f, 28f, 26f), "X", buttonStyle))
         {
             FermerConversation();
@@ -8269,6 +8363,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect texte = new Rect(cadre.x + 24f, cadre.y + 58f, largeur - 48f, hauteurTexte);
         GUI.Box(texte, "", boxStyle);
         string contenu = string.Join("\n\n", conversationMessages.ToArray());
+        if (conversationIAEnAttente)
+            contenu += "\n\n" + NomAffichePnj(conversationPnj) + " réfléchit...";
         GUI.Label(new Rect(texte.x + 14f, texte.y + 12f, texte.width - 28f, texte.height - 20f),
             contenu, conversationTextStyle);
         if (propositionPersonnage

@@ -1,0 +1,5 @@
+# Poids du modele et cache Python : jamais versionnes (plusieurs Go)
+*.safetensors
+*.bin
+*.gguf
+__pycache__/
