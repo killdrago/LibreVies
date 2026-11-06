@@ -1188,7 +1188,7 @@ public sealed class LibreViesGame : MonoBehaviour
         float profondeur = batiment.ProfondeurInitiale;
         // Exterieur : hauteur d'origine. Interieur (papier) : moitie de la porte.
         float hauteur = batiment.HauteurInitiale;
-        float hauteurInterieure = HauteurMurs(hauteur);
+        float hauteurInterieure = HauteurMurs(hauteur, batiment.Root.localScale.y);
         Vector3 positionPorte = batiment.PorteRoot.localPosition;
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
         float hauteurPorte = (batiment.PorteHauteur > 0.001f
@@ -1217,7 +1217,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Maillage murInterieur = maillageInterieur.CopieMursInterieurs(new Vector3(0f, hauteurInterieure * 0.5f, 0f), 0.004f);
         maillage.MurAvecOuvertures(largeur, profondeur, hauteur,
             centres.ToArray(), tailles.ToArray());
-        maillage.DoublerFacesVerticales();
+        maillage.OrienterFacesVerticalesVersExterieur(new Vector3(0f, hauteur * 0.5f, 0f));
         Mesh nouveau = maillage.VersMesh("Murs_" + batiment.Root.name);
         filtre.sharedMesh = nouveau;
         if (collision != null)
@@ -1253,12 +1253,8 @@ public sealed class LibreViesGame : MonoBehaviour
             objet.AddComponent<MeshRenderer>();
         }
         float echelleY = Mathf.Max(Mathf.Abs(batiment.Root.localScale.y), 0.001f);
-        float hauteurPorte = batiment.PorteHauteur > 0.001f
-            ? batiment.PorteHauteur : HauteurPorteConfortable;
-        // La hauteur du mur interieur correspond a la moitie de la porte,
-        // en metres dans le monde meme si la maison a ete redimensionnee.
-        float hauteurBasse = Mathf.Min(batiment.HauteurInitiale,
-            hauteurPorte * 0.5f / echelleY);
+        // Hauteur fixe des murs (independante de la porte).
+        float hauteurBasse = HauteurMurs(batiment.HauteurInitiale, batiment.Root.localScale.y);
         var maillageBas = new Maillage();
         // Le centre de la maison doit rester le sol normal : le dessus est
         // ajoute uniquement sur l'epaisseur des murs perimetriques, jamais
@@ -3467,12 +3463,11 @@ public sealed class LibreViesGame : MonoBehaviour
             return interieur;
         }
 
-        // Ajoute une copie retournee de chaque face verticale : le mur reste visible
-        // de l'exterieur, quel que soit le sens d'enroulement de ses triangles.
-        public void DoublerFacesVerticales()
+        // Oriente chaque face verticale vers l'exterieur (normales coherentes, meme
+        // eclairage des deux cotes). Pas de doublon : le maillage reste propre.
+        public void OrienterFacesVerticalesVersExterieur(Vector3 centre)
         {
-            int total = triangles.Count;
-            for (int i = 0; i + 2 < total; i += 3)
+            for (int i = 0; i + 2 < triangles.Count; i += 3)
             {
                 Vector3 a = sommets[triangles[i]];
                 Vector3 b = sommets[triangles[i + 1]];
@@ -3480,7 +3475,13 @@ public sealed class LibreViesGame : MonoBehaviour
                 Vector3 normale = Vector3.Cross(b - a, c - a);
                 if (normale.sqrMagnitude < 1e-10f) continue;
                 if (Mathf.Abs(normale.normalized.y) > 0.5f) continue;
-                Triangle(a, c, b);
+                Vector3 milieu = (a + b + c) / 3f;
+                if (Vector3.Dot(normale, milieu - centre) < 0f)
+                {
+                    int echange = triangles[i + 1];
+                    triangles[i + 1] = triangles[i + 2];
+                    triangles[i + 2] = echange;
+                }
             }
         }
 
@@ -3755,9 +3756,12 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Murs des maisons : au plus la moitie de la porte (le toit n'en depend pas).
-    private static float HauteurMurs(float hauteurComplete)
+    // Hauteur fixe des murs interieurs et du soubassement, en metres dans le monde
+    // (independante de la porte). Les maisons redimensionnees gardent cette hauteur.
+    private const float HauteurMursMonde = 1.375f;
+    private static float HauteurMurs(float hauteurComplete, float echelleY = 1f)
     {
-        return Mathf.Min(hauteurComplete, HauteurPorteConfortable * 0.5f);
+        return Mathf.Min(hauteurComplete, HauteurMursMonde / Mathf.Max(Mathf.Abs(echelleY), 0.001f));
     }
 
     private void CreateBuilding(Vector3 position, Vector3 size, string name)
@@ -3799,7 +3803,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 new Vector2(1.0f, 0.75f)
             });
         var murInterieur = maillageInterieurCree.CopieMursInterieurs(new Vector3(0f, hauteurMurs * 0.5f, 0f), 0.004f);
-        murMaillage.DoublerFacesVerticales();
+        murMaillage.OrienterFacesVerticalesVersExterieur(new Vector3(0f, size.y * 0.5f, 0f));
         var murs = ObjetMaillage("Murs", murMaillage.VersMesh("Murs_" + name), "Wall");
         var murCollider = murs.AddComponent<MeshCollider>();
         murCollider.sharedMesh = murs.GetComponent<MeshFilter>().sharedMesh;
