@@ -9750,7 +9750,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // Fond semi-transparent du HUD : la couleur de fond est appliquee avant le texte.
     private void FondHudTransparent(Rect rect)
     {
-        GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.25f);
+        GUI.color = new Color(0f, 0f, 0f, 1f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = Color.white;
     }
@@ -9787,7 +9787,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void DessinerBarre(Rect rect, float valeur, string texte)
     {
-        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.35f);
+        GUI.color = new Color(0f, 0f, 0f, 1f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = texte == "PV" ? new Color(0.90f, 0.16f, 0.12f) : (texte == "ENDURANCE" ? new Color(0.20f, 0.78f, 0.28f) : new Color(0.92f, 0.68f, 0.12f));
         GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(valeur), rect.height), Texture2D.whiteTexture);
