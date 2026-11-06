@@ -9658,8 +9658,11 @@ public sealed class LibreViesGame : MonoBehaviour
         // de quete vient juste SOUS ce cadre, avec une croix pour la fermer.
         // Or et cailloux restent dans l'inventaire : le cadre HUD ne garde
         // que PV, endurance et experience, avec une hauteur reduite.
-        GUI.Box(new Rect(20, 18, 270, 108), "", boxStyle);
-        float hudY = 29f;
+        // Cadre HUD transparent : pseudo au-dessus de la barre de vie, puis PV, endurance, XP.
+        Rect cadreHud = new Rect(20, 18, 270, 130);
+        FondHudTransparent(cadreHud);
+        GUI.Label(new Rect(cadreHud.x + 12, cadreHud.y + 6, cadreHud.width - 24, 20), pseudoJoueur, HudTexteStyle());
+        float hudY = 49f;
         DessinerBarre(new Rect(32, hudY, 230, 14), hp / (float)MaxHp, "PV");
         DessinerBarre(new Rect(32, hudY + 28f, 230, 14), endurance / 100f, "ENDURANCE");
         DessinerBarre(new Rect(32, hudY + 56f, 230, 14), (xp % (level * 100)) / (float)(level * 100), "EXPERIENCE");
@@ -9669,7 +9672,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // sa barre et l'endurance reste la barre de course.
         if (questOpen)
         {
-            GUI.Box(new Rect(20, 150, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5", boxStyle);
+            DessinerCadreTransparent(new Rect(20, 150, 270, 118), "QUÊTE\nPROBLÈME DE RATS\n\nRats : " + ratsKilled + " / 10\nAraignées : " + spidersKilled + " / 5");
             if (GUI.Button(new Rect(262, 154, 24, 24), "X", buttonStyle))
                 questOpen = false;
         }
@@ -9744,15 +9747,54 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    // Fond semi-transparent du HUD : la couleur de fond est appliquee avant le texte.
+    private void FondHudTransparent(Rect rect)
+    {
+        GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.25f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+    }
+
+    private void DessinerCadreTransparent(Rect rect, string texte)
+    {
+        FondHudTransparent(rect);
+        GUI.Label(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, rect.height - 12), texte, HudTexteStyle());
+    }
+
+    private GUIStyle hudTexteStyle;
+    private GUIStyle HudTexteStyle()
+    {
+        if (hudTexteStyle == null)
+            hudTexteStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 13, alignment = TextAnchor.UpperLeft, wordWrap = true,
+                normal = { textColor = Color.white }
+            };
+        return hudTexteStyle;
+    }
+
+    private GUIStyle hudBarreStyle;
+    private GUIStyle HudBarreStyle()
+    {
+        if (hudBarreStyle == null)
+            hudBarreStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 12, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold,
+                normal = { textColor = Color.white }
+            };
+        return hudBarreStyle;
+    }
+
     private void DessinerBarre(Rect rect, float valeur, string texte)
     {
-        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.90f);
+        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.35f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = texte == "PV" ? new Color(0.90f, 0.16f, 0.12f) : (texte == "ENDURANCE" ? new Color(0.20f, 0.78f, 0.28f) : new Color(0.92f, 0.68f, 0.12f));
         GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(valeur), rect.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
         string affichage = texte == "PV" ? hp + "/" + MaxHp : texte;
-        GUIStyle style = texte == "PV" ? barreValeurStyle : smallStyle;
+        GUI.color = Color.white;
+        GUIStyle style = HudBarreStyle();
         GUI.Label(new Rect(rect.x + 5, rect.y - 2, rect.width - 10, rect.height + 5), affichage, style);
     }
 
