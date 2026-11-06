@@ -43,6 +43,9 @@ REGLE_COMMUNE = (
 CONSIGNE_COURT = (
     "Reponds en une a trois phrases courtes, comme une replique de jeu video."
 )
+CONSIGNE_TRES_COURT = (
+    "Reponds en une seule phrase tres courte, de moins de quinze mots."
+)
 CONSIGNE_LIBRE = (
     "Tu peux tenir une conversation plus developpee : trois a six phrases, "
     "en posant parfois une question en retour."
@@ -128,7 +131,7 @@ def generer_reponse(metier, nom, ville, mode, message, historique):
     modele = ETAT["modele"]
 
     personnage = PERSONNAGES.get(metier, PERSONNAGE_DEFAUT)
-    consigne = CONSIGNE_LIBRE if mode == "libre" else CONSIGNE_COURT
+    consigne = {"libre": CONSIGNE_LIBRE, "tres_court": CONSIGNE_TRES_COURT}.get(mode, CONSIGNE_COURT)
     identite = "Ton nom est " + nom + ". Tu habites " + (ville or "le village") + "."
     systeme = "\n\n".join([REGLE_COMMUNE, personnage, identite, consigne])
 
@@ -139,7 +142,8 @@ def generer_reponse(metier, nom, ville, mode, message, historique):
     texte = tokenizer.apply_chat_template(messages, tokenize=False,
                                           add_generation_prompt=True)
     entree = tokenizer(texte, return_tensors="pt").to(ETAT["appareil"])
-    max_tokens = 320 if mode == "libre" else 120
+    # Limite en tokens (morceaux de mots), pas en caracteres : 60 tokens ~ 200 caracteres.
+    max_tokens = {"libre": 320, "tres_court": 60}.get(mode, 120)
 
     import torch
     with VERROU, torch.no_grad():
@@ -197,7 +201,7 @@ class GestionnaireIA(BaseHTTPRequestHandler):
         nom = texte_propre(donnees.get("nom"), MAX_NOM) or "Habitant"
         ville = texte_propre(donnees.get("ville"), MAX_NOM) or ""
         message = texte_propre(donnees.get("message"), MAX_MESSAGE)
-        mode = donnees.get("mode") if donnees.get("mode") in ("court", "libre") else "court"
+        mode = donnees.get("mode") if donnees.get("mode") in ("tres_court", "court", "libre") else "court"
         historique = historique_valide(donnees.get("historique"))
         if metier is None or message is None or historique is None:
             self._envoyer(400, {"ok": False, "message": "Message ou contexte invalide."})

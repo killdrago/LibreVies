@@ -5,6 +5,7 @@ using System;
 public sealed class LibreViesNpc
 {
     public string id;
+    public string nom;
     public string sexe;
     public float tete, yeux, nez, bouche, oreilles, seins, volume, hanche, ventre;
     public float largeur_bras, longueur_bras, hauteur_jambe, pieds;

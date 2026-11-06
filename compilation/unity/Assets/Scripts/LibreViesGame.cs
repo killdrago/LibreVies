@@ -8191,9 +8191,13 @@ public sealed class LibreViesGame : MonoBehaviour
         return cible != null;
     }
 
+    // Nom du PNJ depuis la table npc (colonne nom) ; sinon l'ancien libelle de metier.
     private string NomAffichePnj(PnjState pnj)
     {
         if (pnj == null || string.IsNullOrEmpty(pnj.Metier)) return "Habitant";
+        string idNpc = pnj.Metier == "Vendeur" ? "marchand" : pnj.Metier.ToLowerInvariant();
+        LibreViesNpc profil = compteJoueur == null ? null : ProfilNpc(idNpc);
+        if (profil != null && !string.IsNullOrEmpty(profil.nom)) return profil.nom;
         if (pnj.Metier == "Medecin") return "Médecin";
         if (pnj.Metier == "Esthetique") return "Esthétique";
         if (pnj.Metier == "Forgeron") return "Forgeron";
@@ -9474,26 +9478,29 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerAdminIA(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 500f, 30f), "IA DES PNJ", titleStyle);
+        string nomMode = conversationModeIA == "tres_court" ? "TRES COURT"
+            : conversationModeIA == "libre" ? "LIBRE" : "COURT";
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, contenu.width - 36f, 24f),
-            "Mode actuel : " + (conversationModeIA == "libre" ? "LIBRE" : "COURT")
-            + ". Il s'applique aux prochaines répliques des PNJ.", smallStyle);
+            "Mode actuel : " + nomMode + ". Il s'applique aux prochaines répliques des PNJ.", smallStyle);
 
+        GUI.color = conversationModeIA == "tres_court" ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 96f, 200f, 36f), "TRES COURT", buttonStyle))
+            conversationModeIA = "tres_court";
         GUI.color = conversationModeIA == "court" ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
-        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 96f, 200f, 36f), "COURT", buttonStyle))
+        if (GUI.Button(new Rect(contenu.x + 230f, contenu.y + 96f, 200f, 36f), "COURT", buttonStyle))
             conversationModeIA = "court";
         GUI.color = conversationModeIA == "libre" ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
-        if (GUI.Button(new Rect(contenu.x + 230f, contenu.y + 96f, 200f, 36f), "LIBRE", buttonStyle))
+        if (GUI.Button(new Rect(contenu.x + 442f, contenu.y + 96f, 200f, 36f), "LIBRE", buttonStyle))
             conversationModeIA = "libre";
         GUI.color = Color.white;
 
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 152f, contenu.width - 36f, 220f),
-            "COURT (par défaut)\n"
-            + "Réponses d'une à trois phrases courtes, comme une réplique de jeu vidéo.\n"
-            + "Réponse limitée à environ 120 tokens : rapide, idéal pour les échanges rapides.\n\n"
-            + "LIBRE\n"
-            + "Conversation plus développée : trois à six phrases, avec parfois une question en retour.\n"
-            + "Réponse limitée à environ 320 tokens : plus lente à générer sur un PC sans carte NVIDIA.\n\n"
-            + "Dans les deux modes, le PNJ garde son rôle et les dix derniers échanges.",
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 152f, contenu.width - 36f, 300f),
+            "TRES COURT : une seule phrase, 60 tokens maximum (environ 200 caractères).\n"
+            + "COURT (par défaut) : une à trois phrases, 120 tokens maximum (environ 400 caractères).\n"
+            + "LIBRE : trois à six phrases, parfois une question en retour, 320 tokens maximum "
+            + "(environ 1000 caractères), plus lente à générer sur un PC sans carte NVIDIA.\n\n"
+            + "Les tokens sont des morceaux de mots, pas des caractères : la limite coupe la réponse "
+            + "si elle est trop longue. Dans les trois modes, le PNJ garde son rôle et les dix derniers échanges.",
             smallStyle);
     }
 

@@ -18,7 +18,8 @@ function lire_npcs_village($pdo) {
                 . $erreur->getMessage() . ' Completez ce profil dans la table npc.');
         }
         $profils[$id] = array_merge(array('id' => $id), $profil,
-            array('objets' => isset($ligne['objets']) ? (string)$ligne['objets'] : null));
+            array('objets' => isset($ligne['objets']) ? (string)$ligne['objets'] : null,
+                  'nom' => isset($ligne['nom']) ? (string)$ligne['nom'] : null));
     }
     $resultat = array();
     foreach (identifiants_npc_village() as $id) {
