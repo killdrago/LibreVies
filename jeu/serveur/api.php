@@ -13,6 +13,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'securite.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'personnage.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'npc.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'ia.php';
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 
 function journal_api($message) {
@@ -582,6 +583,20 @@ if ($action === 'get_npcs') {
         repondre(false, detail_erreur($erreur, $config), array(), 500);
     }
     repondre(true, 'Profils NPC charges.', array('membre' => membre_public($membre), 'npcs' => $npcs));
+}
+
+if ($action === 'npc_chat') {
+    // Session obligatoire : seul un joueur connecte peut parler aux PNJ.
+    membre_authentifie($pdo, $config, $donnees);
+    $requete = (isset($donnees['requete']) && is_string($donnees['requete'])) ? $donnees['requete'] : '';
+    if ($requete === '' || strlen($requete) > 20000) {
+        repondre(false, 'Requete IA invalide.', array(), 400);
+    }
+    $ia = appeler_ia_locale($config, $requete);
+    if ($ia === null || empty($ia['ok']) || !isset($ia['reponse'])) {
+        repondre(false, 'Le serveur IA ne repond pas pour le moment.', array(), 503);
+    }
+    repondre(true, 'Reponse IA.', array('reponse' => (string)$ia['reponse']));
 }
 
 if ($action === 'save_position') {

@@ -298,3 +298,28 @@ séparées ; marge basse 32 et défilement vertical pour la dernière ligne. Pse
 0.02625 (100 -> 50 -> 75), hauteur/couleur inchangées. Launcher 4.2.4 / jeu 0.5.88.
 Les tests PHP/WASM/SQLite ne remplacent pas la validation Unity/Windows/MySQL réelle.
 Recette : `python -B compilation/outils/test_position.py` + test_api_personnage.mjs.
+
+## Passer sur un hébergeur (IA des PNJ comprise)
+
+Le jeu ne parle qu'à **une seule adresse** : celle de l'API. Elle est lue dans
+`jeu/auth_config.json`, que le launcher transmet au jeu. Les dialogues avec les
+PNJ passent par l'API (action `npc_chat`), avec la session du joueur.
+
+1. Sur l'hébergeur, déposez le dossier `serveur/` (y compris `ia.php`) et le dossier
+   `serveur/IA/` (avec le modèle `model.safetensors`). Lancez `serveur_ia.py` sur la
+   même machine que l'API.
+2. Dans `config.php` (sur le serveur seulement) : gardez `'ia_url' => 'http://127.0.0.1:8765/npc_chat'`.
+3. Dans `jeu/auth_config.json`, mettez l'adresse de l'hébergeur :
+
+```json
+{
+  "api_url": "https://votre-domaine.fr/serveur/api.php",
+  "timeout": 15
+}
+```
+
+C'est le seul réglage côté joueur : le jeu et le launcher ne contiennent pas
+d'autre adresse. En local, gardez `http://localhost/serveur/api.php`.
+
+Remarque : la machine doit avoir assez de mémoire pour le modèle (plusieurs Go),
+ce qui exclut la plupart des hébergements mutualisés.

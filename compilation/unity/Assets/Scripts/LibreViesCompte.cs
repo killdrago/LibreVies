@@ -272,6 +272,49 @@ public sealed class LibreViesCompte
         }
     }
 
+    // Reponse d'un PNJ (action npc_chat) : passe par l'API, comme les autres actions.
+    public string ReponseNpc { get; private set; }
+
+    public IEnumerator DemanderReponseNpc(string requeteJson)
+    {
+        ReponseNpc = null;
+        Erreur = "";
+        if (!SessionPresente)
+        {
+            Erreur = "Reconnectez-vous depuis le launcher pour parler aux PNJ.";
+            yield break;
+        }
+        string formulaire = "action=npc_chat&session_token=" + UnityWebRequest.EscapeURL(jeton)
+            + "&requete=" + UnityWebRequest.EscapeURL(requeteJson);
+        using (UnityWebRequest requete = new UnityWebRequest(url, "POST"))
+        {
+            requete.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(formulaire));
+            requete.downloadHandler = new DownloadHandlerBuffer();
+            requete.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
+            requete.SetRequestHeader("Accept", "application/json");
+            requete.timeout = 90;
+            yield return requete.SendWebRequest();
+            ReponseIaApi reponse = null;
+            try { reponse = JsonUtility.FromJson<ReponseIaApi>(requete.downloadHandler.text); }
+            catch (Exception) { }
+            if (requete.result != UnityWebRequest.Result.Success || reponse == null || !reponse.ok
+                || String.IsNullOrEmpty(reponse.reponse))
+            {
+                Erreur = reponse != null && !String.IsNullOrEmpty(reponse.message)
+                    ? reponse.message : "Le serveur IA ne répond pas.";
+                yield break;
+            }
+            ReponseNpc = reponse.reponse;
+        }
+    }
+
+    private sealed class ReponseIaApi
+    {
+        public bool ok;
+        public string message;
+        public string reponse;
+    }
+
     private static bool UrlValide(string valeur)
     {
         Uri adresse;
