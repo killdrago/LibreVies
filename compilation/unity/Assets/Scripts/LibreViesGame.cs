@@ -9750,6 +9750,8 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int oy = -epaisseur; oy <= epaisseur; oy++)
         for (int ox = -epaisseur; ox <= epaisseur; ox++)
         {
+            // Disque (point rond), pas un carre.
+            if (ox * ox + oy * oy > epaisseur * epaisseur) continue;
             int px = x + ox;
             int py = y + oy;
             if (px < 0 || px >= 128 || py < 0 || py >= 128) continue;
@@ -9820,33 +9822,30 @@ public sealed class LibreViesGame : MonoBehaviour
         qualiteGraphique = GUI.HorizontalSlider(new Rect(135, 51, 220, 18), qualiteGraphique, 0f, 1f);
         GUI.Label(new Rect(360, 42, 55, 24), Mathf.RoundToInt(qualiteGraphique * 100) + "%", smallStyle);
         GUI.Label(new Rect(135, 66, 240, 20), "Niveau : " + NomNiveauQualite(), smallStyle);
-        GUI.Label(new Rect(0, 156, 160, 24), "Resolution", smallStyle);
-        if (GUI.Button(new Rect(135, 154, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle))
+        GUI.Label(new Rect(0, 92, 160, 24), "Resolution", smallStyle);
+        if (GUI.Button(new Rect(135, 90, 220, 28), resolutions[resolutionIndex].x + " x " + resolutions[resolutionIndex].y, buttonStyle))
         {
             menuResolutions = !menuResolutions;
             menuAntialiasing = false;
         }
         if (!menuResolutions)
         {
-            GUI.Label(new Rect(0, 190, 160, 24), "Anti-aliasing", smallStyle);
-            if (GUI.Button(new Rect(135, 188, 220, 28), nomsAntialiasing[antialiasingChoix] + "  \u25BE", buttonStyle))
+            GUI.Label(new Rect(0, 124, 160, 24), "Anti-aliasing", smallStyle);
+            if (GUI.Button(new Rect(135, 122, 220, 28), nomsAntialiasing[antialiasingChoix] + "  \u25BE", buttonStyle))
             {
                 menuAntialiasing = !menuAntialiasing;
             }
             if (!menuAntialiasing)
             {
-                GUI.Label(new Rect(0, 224, 160, 24), "Filtrage anisotrope", smallStyle);
-                if (GUI.Button(new Rect(135, 222, 220, 28), nomsAnisotrope[anisotropeChoix], buttonStyle))
+                GUI.Label(new Rect(0, 158, 160, 24), "Filtrage anisotrope", smallStyle);
+                if (GUI.Button(new Rect(135, 156, 220, 28), nomsAnisotrope[anisotropeChoix], buttonStyle))
                 {
                     anisotropeChoix = (anisotropeChoix + 1) % nomsAnisotrope.Length;
                     AppliquerFiltrage();
                     SauverConfiguration();
                 }
-                GUI.Label(new Rect(0, 256, 130, 24), "Halo des lumieres", smallStyle);
-                intensiteHalo = GUI.HorizontalSlider(new Rect(135, 265, 220, 18), intensiteHalo, 0f, 1f);
-                GUI.Label(new Rect(360, 256, 55, 24), Mathf.RoundToInt(intensiteHalo * 100) + "%", smallStyle);
                 bool herbeAvant = herbeBrins;
-                herbeBrins = GUI.Toggle(new Rect(135, 292, 260, 24), herbeBrins, " Vraie herbe (brins)");
+                herbeBrins = GUI.Toggle(new Rect(135, 190, 260, 24), herbeBrins, " Vraie herbe (brins)");
                 if (herbeBrins != herbeAvant)
                 {
                     ActualiserHerbeBrins();
@@ -9857,7 +9856,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 for (int i = 0; i < nomsAntialiasing.Length; i++)
                 {
-                    if (GUI.Button(new Rect(135, 218f + i * 27f, 220, 25), nomsAntialiasing[i], buttonStyle))
+                    if (GUI.Button(new Rect(135, 152f + i * 27f, 220, 25), nomsAntialiasing[i], buttonStyle))
                     {
                         antialiasingChoix = i;
                         menuAntialiasing = false;
@@ -9876,7 +9875,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 int colonne = i / lignesParColonne;
                 int ligne = i % lignesParColonne;
-                Rect choix = new Rect(colonne * 210f, 184f + ligne * 27f, 200f, 25f);
+                Rect choix = new Rect(colonne * 210f, 122f + ligne * 27f, 200f, 25f);
                 if (GUI.Button(choix, resolutions[i].x + " x " + resolutions[i].y, buttonStyle))
                 {
                     resolutionIndex = i;
@@ -9978,7 +9977,7 @@ public sealed class LibreViesGame : MonoBehaviour
         brightness = 0.5f;
         contrast = 1f;
         qualiteGraphique = config.qualiteGraphique < 0f ? 1f : Mathf.Clamp01(config.qualiteGraphique);
-        intensiteHalo = config.intensiteHalo < 0f ? 0.15f : Mathf.Clamp01(config.intensiteHalo);
+        intensiteHalo = 0.15f; // reglage Halo retire des options : valeur par defaut
         herbeBrins = config.herbeBrins;
         antialiasingChoix = Mathf.Clamp(config.antialiasingChoix, 0, valeursAntialiasing.Length - 1);
         anisotropeChoix = Mathf.Clamp(config.anisotropeChoix, 0, nomsAnisotrope.Length - 1);

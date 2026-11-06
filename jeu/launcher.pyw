@@ -1655,6 +1655,8 @@ class App(tk.Tk):
         self._update_play_state()
 
     def _auth_failed(self, message, automatic=False, banned=False):
+        # Echec : la croix redevient utilisable.
+        self._deverrouiller_fermeture()
         self.auth_busy = False
         self.authenticated = False
         self.compte_bani = bool(banned)
@@ -2011,6 +2013,8 @@ class App(tk.Tk):
         if not self.session_token or self.session_expires_at <= time.time():
             self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
             return
+        # Des le clic, la croix est grisee : le launcher ne doit plus etre ferme pendant le lancement.
+        self._verrouiller_fermeture()
         # Toujours une derniere relecture serveur au clic, meme apres un poll OK.
         self._verifier_compte(ouvrir_jeu=True)
 
@@ -2021,7 +2025,6 @@ class App(tk.Tk):
         if not self.session_token or self.session_expires_at <= time.time():
             self._auth_failed('Session expiree : reconnectez-vous pour jouer.')
             return
-        self._verrouiller_fermeture()
         try:
             launch(self.game, self.logged_pseudo, self.session_token, self.connected_api_url)
         except Exception as e:
@@ -2044,14 +2047,19 @@ class App(tk.Tk):
             return
         try:
             import ctypes
-            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-            menu = ctypes.windll.user32.GetSystemMenu(hwnd, False)
-            # SC_CLOSE = 0xF060 ; MF_GRAYED = 0x1 ; MF_ENABLED = 0x0
-            ctypes.windll.user32.EnableMenuItem(menu, 0xF060, 0x1 if grisee else 0x0)
-            ctypes.windll.user32.DrawMenuBar(hwnd)
+            user32 = ctypes.windll.user32
+            # Poignee de la fenetre Windows (cadre exterieur, celui qui porte la croix).
+            hwnd = int(self.wm_frame(), 16)
+            menu = user32.GetSystemMenu(hwnd, False)
+            # SC_CLOSE = 0xF060 ; MF_BYCOMMAND = 0x0 ; MF_GRAYED = 0x1 ; MF_ENABLED = 0x0
+            user32.EnableMenuItem(menu, 0xF060, 0x1 if grisee else 0x0)
+            # Redessine le cadre pour que la croix change tout de suite.
+            # SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED = 0x0027
+            user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0027)
+            user32.DrawMenuBar(hwnd)
+            self.update_idletasks()
         except Exception:
             pass
-
 
 if __name__ == "__main__":
     App().mainloop()
