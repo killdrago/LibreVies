@@ -99,7 +99,27 @@ CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
 AUTOLOGIN_PATH = os.path.join(GAME_DIR, "autolog.dat")
 AUTOLOGIN_LEGACY_PATH = os.path.join(GAME_DIR, "autolog.json")
-AUTH_API_URL_DEFAULT = "http://localhost/serveur/api.php"
+# Adresse unique du site, lue dans jeu/site.json (fourni avec le jeu).
+# Elle sert a l'API (connexion, personnage, PNJ, IA) et aux mises a jour.
+# Local : http://localhost. Hebergeur : http://librevies.com (ou https).
+SITE_CONFIG_PATH = os.path.join(GAME_DIR, "site.json")
+SITE_URL_DEFAUT = "http://localhost"
+
+
+def lire_site_url():
+    try:
+        with open(SITE_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            valeur = str(json.load(f).get('site_url', '')).strip().rstrip('/')
+    except (OSError, ValueError, AttributeError):
+        valeur = ''
+    if not valeur.lower().startswith(('http://', 'https://')):
+        valeur = SITE_URL_DEFAUT
+    return valeur
+
+
+SITE_URL = lire_site_url()
+AUTH_API_URL_DEFAULT = SITE_URL + "/serveur/api.php"
+SITE_RAW_URL = SITE_URL + "/jeu"
 AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
 # le launcher telecharge la nouvelle version puis redemarre : aucune
@@ -112,7 +132,7 @@ GAME_VERSION = "0.5.79"  # Ancienne version distribuee, jamais un numero invente
 LOCAL_GAME_VERSION = "0.5.88"
 # Travail courant : dossier jeu uniquement. En mode local, aucun fichier
 # compile distant ne peut remplacer l'export de compilation.
-DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"
+DEFAULT_RAW_URL = SITE_RAW_URL
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
@@ -201,7 +221,8 @@ def load_auth_config():
             config.update(local)
     except (OSError, ValueError):
         pass
-    config['api_url'] = str(config.get('api_url') or AUTH_API_URL_DEFAULT).strip()
+    # L'adresse vient toujours du site (jeu/site.json) : auth_config.json ne la remplace plus.
+    config['api_url'] = AUTH_API_URL_DEFAULT
     try:
         config['timeout'] = max(3, min(60, int(config.get('timeout', AUTH_TIMEOUT))))
     except (TypeError, ValueError):
@@ -626,7 +647,7 @@ def check_for_updates(progress_cb):
         return {"error": None, "modified": [], "remote_cfg": load_local_config(), "build": None}
 
     local_cfg = load_local_config()
-    raw_url = normalize_raw_url(local_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
+    raw_url = SITE_RAW_URL
     if not raw_url:
         return {"error": "Pas d'URL configuree", "modified": [], "remote_cfg": None,
                 "build": None}
@@ -661,7 +682,7 @@ def check_for_updates(progress_cb):
 
 
 def apply_updates(modified, remote_cfg, progress_cb):
-    raw_url = normalize_raw_url(remote_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
+    raw_url = SITE_RAW_URL
     errors = []
     downloaded = 0
     pending_launcher = None
