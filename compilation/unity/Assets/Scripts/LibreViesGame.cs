@@ -8351,11 +8351,8 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect cadre = new Rect((Screen.width - largeur) * 0.5f,
             (Screen.height - hauteur) * 0.5f, largeur, hauteur);
         GUI.Box(cadre, "", boxStyle);
-        GUI.Label(new Rect(cadre.x + 22f, cadre.y + 16f, largeur - 300f, 30f),
+        GUI.Label(new Rect(cadre.x + 22f, cadre.y + 16f, largeur - 80f, 30f),
             "CONVERSATION — " + NomAffichePnj(conversationPnj), conversationTitleStyle);
-        if (GUI.Button(new Rect(cadre.x + largeur - 260f, cadre.y + 14f, 200f, 26f),
-            conversationModeIA == "libre" ? "MODE : LIBRE" : "MODE : COURT", buttonStyle))
-            BasculerModeConversationIA();
         if (GUI.Button(new Rect(cadre.x + largeur - 48f, cadre.y + 14f, 28f, 26f), "X", buttonStyle))
         {
             FermerConversation();
@@ -8390,6 +8387,13 @@ public sealed class LibreViesGame : MonoBehaviour
             OuvrirCreationPersonnage();
             return;
         }
+        // Entree (ou Entree du pave numerique) envoie le message, avant le champ de saisie.
+        if (Event.current.type == EventType.KeyDown
+            && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter))
+        {
+            EnvoyerMessageConversation();
+            Event.current.Use();
+        }
         GUI.SetNextControlName("ConversationInput");
         conversationInput = GUI.TextField(new Rect(cadre.x + 24f, cadre.y + hauteur - 58f,
             largeur - 142f, 32f), conversationInput);
@@ -8401,12 +8405,6 @@ public sealed class LibreViesGame : MonoBehaviour
         if (GUI.Button(new Rect(cadre.x + largeur - 108f, cadre.y + hauteur - 58f, 84f, 32f),
             "ENVOYER", buttonStyle))
             EnvoyerMessageConversation();
-        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return
-            && GUI.GetNameOfFocusedControl() == "ConversationInput")
-        {
-            EnvoyerMessageConversation();
-            Event.current.Use();
-        }
     }
 
     private void OuvrirCreationPersonnage()
@@ -9473,6 +9471,32 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // Onglet Textures de l'administration : liens vers le menu TEXTURES pour
     // chaque famille (murs, toits, gazon et sol, route et paves, bois).
+    private void DessinerAdminIA(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 500f, 30f), "IA DES PNJ", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, contenu.width - 36f, 24f),
+            "Mode actuel : " + (conversationModeIA == "libre" ? "LIBRE" : "COURT")
+            + ". Il s'applique aux prochaines répliques des PNJ.", smallStyle);
+
+        GUI.color = conversationModeIA == "court" ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 96f, 200f, 36f), "COURT", buttonStyle))
+            conversationModeIA = "court";
+        GUI.color = conversationModeIA == "libre" ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+        if (GUI.Button(new Rect(contenu.x + 230f, contenu.y + 96f, 200f, 36f), "LIBRE", buttonStyle))
+            conversationModeIA = "libre";
+        GUI.color = Color.white;
+
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 152f, contenu.width - 36f, 220f),
+            "COURT (par défaut)\n"
+            + "Réponses d'une à trois phrases courtes, comme une réplique de jeu vidéo.\n"
+            + "Réponse limitée à environ 120 tokens : rapide, idéal pour les échanges rapides.\n\n"
+            + "LIBRE\n"
+            + "Conversation plus développée : trois à six phrases, avec parfois une question en retour.\n"
+            + "Réponse limitée à environ 320 tokens : plus lente à générer sur un PC sans carte NVIDIA.\n\n"
+            + "Dans les deux modes, le PNJ garde son rôle et les dix derniers échanges.",
+            smallStyle);
+    }
+
     private void DessinerAdminTextures(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f), "TEXTURES", titleStyle);
@@ -9515,7 +9539,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 return;
             }
 
-            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures" };
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA" };
             for (int i = 0; i < onglets.Length; i++)
             {
                 Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -9570,6 +9594,10 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (adminTab == 5)
             {
                 DessinerAdminTextures(contenu);
+            }
+            else if (adminTab == 6)
+            {
+                DessinerAdminIA(contenu);
             }
         }
         finally { GUI.matrix = ancienneMatrice; }
