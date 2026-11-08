@@ -914,6 +914,7 @@ public sealed class LibreViesGame : MonoBehaviour
         StartCoroutine(SurveillerMonde());
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
+        AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
         RafraichirZonesNommees();
         RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
         prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
@@ -1047,6 +1048,7 @@ public sealed class LibreViesGame : MonoBehaviour
             yield return compte.ChargerMonde(revisionMondeConnue);
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null) continue;
             bool change = AppliquerMondeServeur(compte);
+            AppliquerMaisonsServeur(compte.MaisonsMonde);
             revisionMondeConnue = compte.RevisionMonde;
             if (change) ReconstruireMonde();
         }
@@ -2058,97 +2060,175 @@ public sealed class LibreViesGame : MonoBehaviour
             FichierCoordonneesEdition fichier = JsonUtility.FromJson<FichierCoordonneesEdition>(json);
             if (fichier == null || fichier.Objets == null) return;
             bool migrationPivotPorte = fichier.Version < 3;
+            bool maisonsDuServeur = LibreViesCompte.Courant.MaisonsMonde != null
+                && LibreViesCompte.Courant.MaisonsMonde.Length > 0;
             var utilisees = new HashSet<Transform>();
             for (int i = 0; i < fichier.Objets.Count; i++)
             {
                 CoordonneeObjetEdition coordonnee = fichier.Objets[i];
                 if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
-                Transform objet = TrouverRacineCoordonnee(coordonnee.Nom,
-                    coordonnee.Chemin, coordonnee.Position, utilisees);
-                if (objet == null) continue;
-                objet.position = coordonnee.Position;
-                objet.rotation = coordonnee.Rotation;
-                objet.localScale = coordonnee.Echelle;
-                ElementEdition element = TrouverElementEdition(objet);
-                if (element != null && element.Facade != null
-                    && coordonnee.TextePancarte != null)
-                {
-                    element.Facade.Libelle = coordonnee.TextePancarte;
-                    element.Facade.Couleur = coordonnee.CouleurPancarte;
-                    if (coordonnee.StylePancarte < (int)FontStyle.Normal
-                        || coordonnee.StylePancarte > (int)FontStyle.BoldAndItalic)
-                        coordonnee.StylePancarte = (int)FontStyle.Normal;
-                    if (element.Facade.Texte != null)
-                        element.Facade.Texte.fontStyle = (FontStyle)coordonnee.StylePancarte;
-                    // Les anciens fichiers peuvent contenir ce champ, mais
-                    // le soulignement a ete retire de l'editeur et du rendu.
-                    element.Facade.Souligne = false;
-                    if (coordonnee.TaillePancarte > 0f)
-                        element.Facade.Taille = coordonnee.TaillePancarte;
-                    if (coordonnee.LargeurPancarte > 0f)
-                        element.Facade.LargeurPanneau = coordonnee.LargeurPancarte;
-                    if (coordonnee.HauteurPancarte > 0f)
-                        element.Facade.HauteurPanneau = coordonnee.HauteurPancarte;
-                    if (coordonnee.LuminositePancarte > 0f)
-                        element.Facade.Luminosite = Mathf.Clamp(coordonnee.LuminositePancarte, 0.2f, 2f);
-                    AppliquerTaillePancarte(element.Facade);
-                    AppliquerStylePancarte(element.Facade);
-                    AppliquerLuminositePancarte(element.Facade);
-                    element.Facade.TexturePanneau = coordonnee.TexturePanneau ?? "";
-                    if (coordonnee.PancartePositionSauvee && element.Facade.Panneau != null)
-                    {
-                        Vector3 positionPanneau = element.Facade.Panneau.localPosition;
-                        element.Facade.Panneau.localPosition =
-                            new Vector3(coordonnee.PancarteX, coordonnee.PancarteY, positionPanneau.z);
-                    }
-                    if (!string.IsNullOrEmpty(coordonnee.MateriauSupportPancarte))
-                        AppliquerMateriauPancarte(element.Facade, coordonnee.MateriauSupportPancarte);
-                }
-                if (element != null && element.Maison != null)
-                {
-                    if (migrationPivotPorte && element.Maison.PorteRoot != null)
-                    {
-                        Vector3 positionPivot = element.Maison.PorteRoot.localPosition;
-                        positionPivot.x = -element.Maison.PorteLargeur * 0.5f;
-                        element.Maison.PorteRoot.localPosition = positionPivot;
-                    }
-                    if (coordonnee.VersionDimensions >= 2 && coordonnee.HauteurPorte > 0f)
-                        element.Maison.PorteHauteur = coordonnee.HauteurPorte;
-                    else
-                        element.Maison.PorteHauteur = HauteurPorteConfortable;
-                    if (coordonnee.LuminositeMur > 0f)
-                        element.Maison.LuminositeMur = Mathf.Clamp(coordonnee.LuminositeMur, 0.2f, 2f);
-                    if (coordonnee.LuminositePorte > 0f)
-                        element.Maison.LuminositePorte = Mathf.Clamp(coordonnee.LuminositePorte, 0.2f, 2f);
-                    if (coordonnee.LuminositeToit > 0f)
-                        element.Maison.LuminositeToit = Mathf.Clamp(coordonnee.LuminositeToit, 0.2f, 2f);
-                    element.Maison.TextureMur = coordonnee.TextureMur ?? "";
-                    element.Maison.TextureToit = coordonnee.TextureToit ?? "";
-                    element.Maison.TextureSol = coordonnee.TextureSol ?? "";
-                    element.Maison.TexturePapier = coordonnee.TexturePapier ?? "";
-                    element.Maison.TexturePorte = coordonnee.TexturePorte ?? "";
-                    if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
-                        AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
-                    if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
-                        AppliquerMateriauMaison(element.Maison, "fenetre", coordonnee.MateriauFenetre);
-                    if (!string.IsNullOrEmpty(coordonnee.MateriauPorte))
-                        AppliquerMateriauMaison(element.Maison, "porte", coordonnee.MateriauPorte);
-                    if (!string.IsNullOrEmpty(coordonnee.MateriauToit))
-                        AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
-                    AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
-                    AppliquerTexturesLocalesMaison(element.Maison);
-                    AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
-                    AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
-                }
-                utilisees.Add(objet);
+                // Quand la base contient les maisons, le fichier ne les applique plus.
+                if (maisonsDuServeur && EstMaisonEdition(coordonnee, utilisees)) continue;
+                AppliquerCoordonneeEdition(coordonnee, migrationPivotPorte, utilisees);
             }
             SynchroniserTousLesBatiments();
+            AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
             Journal("coordonnees edition chargees : " + fichier.Objets.Count + " objet(s)");
         }
         catch (Exception erreur)
         {
             Debug.LogWarning("LibreVies : fichier edition ignore (illisible ou non reconnu) : "
                 + erreur.Message);
+        }
+    }
+
+    private void AppliquerCoordonneeEdition(CoordonneeObjetEdition coordonnee, bool migrationPivotPorte,
+        HashSet<Transform> utilisees)
+    {
+        Transform objet = TrouverRacineCoordonnee(coordonnee.Nom, coordonnee.Chemin, coordonnee.Position, utilisees);
+        if (objet == null) return;
+        objet.position = coordonnee.Position;
+        objet.rotation = coordonnee.Rotation;
+        objet.localScale = coordonnee.Echelle;
+        ElementEdition element = TrouverElementEdition(objet);
+        if (element != null && element.Facade != null
+            && coordonnee.TextePancarte != null)
+        {
+            element.Facade.Libelle = coordonnee.TextePancarte;
+            element.Facade.Couleur = coordonnee.CouleurPancarte;
+            if (coordonnee.StylePancarte < (int)FontStyle.Normal
+                || coordonnee.StylePancarte > (int)FontStyle.BoldAndItalic)
+                coordonnee.StylePancarte = (int)FontStyle.Normal;
+            if (element.Facade.Texte != null)
+                element.Facade.Texte.fontStyle = (FontStyle)coordonnee.StylePancarte;
+            // Les anciens fichiers peuvent contenir ce champ, mais
+            // le soulignement a ete retire de l'editeur et du rendu.
+            element.Facade.Souligne = false;
+            if (coordonnee.TaillePancarte > 0f)
+                element.Facade.Taille = coordonnee.TaillePancarte;
+            if (coordonnee.LargeurPancarte > 0f)
+                element.Facade.LargeurPanneau = coordonnee.LargeurPancarte;
+            if (coordonnee.HauteurPancarte > 0f)
+                element.Facade.HauteurPanneau = coordonnee.HauteurPancarte;
+            if (coordonnee.LuminositePancarte > 0f)
+                element.Facade.Luminosite = Mathf.Clamp(coordonnee.LuminositePancarte, 0.2f, 2f);
+            AppliquerTaillePancarte(element.Facade);
+            AppliquerStylePancarte(element.Facade);
+            AppliquerLuminositePancarte(element.Facade);
+            element.Facade.TexturePanneau = coordonnee.TexturePanneau ?? "";
+            if (coordonnee.PancartePositionSauvee && element.Facade.Panneau != null)
+            {
+                Vector3 positionPanneau = element.Facade.Panneau.localPosition;
+                element.Facade.Panneau.localPosition =
+                    new Vector3(coordonnee.PancarteX, coordonnee.PancarteY, positionPanneau.z);
+            }
+            if (!string.IsNullOrEmpty(coordonnee.MateriauSupportPancarte))
+                AppliquerMateriauPancarte(element.Facade, coordonnee.MateriauSupportPancarte);
+        }
+        if (element != null && element.Maison != null)
+        {
+            if (migrationPivotPorte && element.Maison.PorteRoot != null)
+            {
+                Vector3 positionPivot = element.Maison.PorteRoot.localPosition;
+                positionPivot.x = -element.Maison.PorteLargeur * 0.5f;
+                element.Maison.PorteRoot.localPosition = positionPivot;
+            }
+            if (coordonnee.VersionDimensions >= 2 && coordonnee.HauteurPorte > 0f)
+                element.Maison.PorteHauteur = coordonnee.HauteurPorte;
+            else
+                element.Maison.PorteHauteur = HauteurPorteConfortable;
+            if (coordonnee.LuminositeMur > 0f)
+                element.Maison.LuminositeMur = Mathf.Clamp(coordonnee.LuminositeMur, 0.2f, 2f);
+            if (coordonnee.LuminositePorte > 0f)
+                element.Maison.LuminositePorte = Mathf.Clamp(coordonnee.LuminositePorte, 0.2f, 2f);
+            if (coordonnee.LuminositeToit > 0f)
+                element.Maison.LuminositeToit = Mathf.Clamp(coordonnee.LuminositeToit, 0.2f, 2f);
+            element.Maison.TextureMur = coordonnee.TextureMur ?? "";
+            element.Maison.TextureToit = coordonnee.TextureToit ?? "";
+            element.Maison.TextureSol = coordonnee.TextureSol ?? "";
+            element.Maison.TexturePapier = coordonnee.TexturePapier ?? "";
+            element.Maison.TexturePorte = coordonnee.TexturePorte ?? "";
+            if (!string.IsNullOrEmpty(coordonnee.MateriauMur))
+                AppliquerMateriauMaison(element.Maison, "mur", coordonnee.MateriauMur);
+            if (!string.IsNullOrEmpty(coordonnee.MateriauFenetre))
+                AppliquerMateriauMaison(element.Maison, "fenetre", coordonnee.MateriauFenetre);
+            if (!string.IsNullOrEmpty(coordonnee.MateriauPorte))
+                AppliquerMateriauMaison(element.Maison, "porte", coordonnee.MateriauPorte);
+            if (!string.IsNullOrEmpty(coordonnee.MateriauToit))
+                AppliquerMateriauMaison(element.Maison, "toit", coordonnee.MateriauToit);
+            AppliquerLuminositeMaison(element.Maison, "mur", element.Maison.LuminositeMur);
+            AppliquerTexturesLocalesMaison(element.Maison);
+            AppliquerLuminositeMaison(element.Maison, "porte", element.Maison.LuminositePorte);
+            AppliquerLuminositeMaison(element.Maison, "toit", element.Maison.LuminositeToit);
+        }
+        utilisees.Add(objet);
+    }
+
+    private bool EstMaisonEdition(CoordonneeObjetEdition coordonnee, HashSet<Transform> utilisees)
+    {
+        Transform objet = TrouverRacineCoordonnee(coordonnee.Nom, coordonnee.Chemin, coordonnee.Position, utilisees);
+        if (objet == null) return false;
+        ElementEdition element = TrouverElementEdition(objet);
+        return element != null && element.Maison != null;
+    }
+
+    // ---- Maisons partagees (base mondeLV) ----
+    private readonly Dictionary<string, string> maisonsAppliquees = new Dictionary<string, string>();
+
+    private sealed class MaisonAEnvoyer
+    {
+        public string Cle;
+        public string Nom;
+        public float X;
+        public float Z;
+        public float Rotation;
+        public string Json;
+    }
+
+    // Applique les maisons recues de la base, seulement quand leur contenu change.
+    private void AppliquerMaisonsServeur(LibreViesCompte.LibreViesMaisonMonde[] maisons)
+    {
+        if (maisons == null) return;
+        var utilisees = new HashSet<Transform>();
+        bool change = false;
+        for (int i = 0; i < maisons.Length; i++)
+        {
+            LibreViesCompte.LibreViesMaisonMonde maison = maisons[i];
+            string donnees = maison.donnees ?? "";
+            string precedent;
+            if (maisonsAppliquees.TryGetValue(maison.id, out precedent) && precedent == donnees) continue;
+            maisonsAppliquees[maison.id] = donnees;
+            CoordonneeObjetEdition coordonnee = null;
+            try { coordonnee = JsonUtility.FromJson<CoordonneeObjetEdition>(donnees); }
+            catch (Exception) { coordonnee = null; }
+            if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
+            AppliquerCoordonneeEdition(coordonnee, false, utilisees);
+            change = true;
+        }
+        if (change) SynchroniserTousLesBatiments();
+    }
+
+    // Cle stable d'une maison : identifiant lisible derive du nom et du chemin dans la scene.
+    private static string CleMaisonEdition(string brut)
+    {
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+        {
+            byte[] hash = md5.ComputeHash(Encoding.UTF8.GetBytes(brut));
+            return "m" + BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        }
+    }
+
+    private System.Collections.IEnumerator EnvoyerMaisonsEdition(List<MaisonAEnvoyer> maisons)
+    {
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        for (int i = 0; i < maisons.Count; i++)
+        {
+            MaisonAEnvoyer m = maisons[i];
+            string precedent;
+            if (maisonsAppliquees.TryGetValue(m.Cle, out precedent) && precedent == m.Json) continue;
+            yield return compte.EnregistrerMaisonMonde(m.Cle, m.Nom, m.X, m.Z, m.Rotation, m.Json);
+            if (String.IsNullOrEmpty(compte.Erreur)) maisonsAppliquees[m.Cle] = m.Json;
+            else Journal("maison " + m.Nom + " non enregistree : " + compte.Erreur);
         }
     }
 
@@ -2159,6 +2239,8 @@ public sealed class LibreViesGame : MonoBehaviour
             string dossier = Path.GetDirectoryName(CheminCoordonneesEdition);
             if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
             var fichier = new FichierCoordonneesEdition();
+            var maisonsAEnvoyer = new List<MaisonAEnvoyer>();
+            var compteurCles = new Dictionary<string, int>();
             List<Transform> objets = ObjetsCoordonneesEdition();
             for (int i = 0; i < objets.Count; i++)
             {
@@ -2223,8 +2305,26 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
                 }
+                if (element != null && element.Maison != null)
+                {
+                    string brut = coordonnee.Nom + "|" + coordonnee.Chemin;
+                    int rang;
+                    compteurCles.TryGetValue(brut, out rang);
+                    compteurCles[brut] = rang + 1;
+                    maisonsAEnvoyer.Add(new MaisonAEnvoyer
+                    {
+                        Cle = CleMaisonEdition(brut) + (rang > 0 ? "_" + (rang + 1) : ""),
+                        Nom = coordonnee.Nom,
+                        X = coordonnee.Position.x,
+                        Z = coordonnee.Position.z,
+                        Rotation = coordonnee.Rotation.eulerAngles.y,
+                        Json = JsonUtility.ToJson(coordonnee, false)
+                    });
+                    continue;
+                }
                 fichier.Objets.Add(coordonnee);
             }
+            if (maisonsAEnvoyer.Count > 0) StartCoroutine(EnvoyerMaisonsEdition(maisonsAEnvoyer));
             string json = JsonUtility.ToJson(fichier, false);
             byte[] chiffre = ChiffrerCoordonneesEdition(Encoding.UTF8.GetBytes(json));
             string temporaire = CheminCoordonneesEdition + ".tmp";
