@@ -59,6 +59,8 @@ function repondre($ok, $message = '', $extra = array(), $code = 200) {
 
 function detail_erreur($erreur, $config) {
     error_log('[LibreVies API] ' . $erreur->getMessage());
+    // Le vrai message reste dans journal_api.log (sans mot de passe ni jeton).
+    journal_api('ERREUR SERVEUR ' . get_class($erreur) . ' : ' . $erreur->getMessage());
     return !empty($config['debug'])
         ? 'Erreur serveur : ' . $erreur->getMessage()
         : 'Connexion a la base impossible.';
