@@ -34,6 +34,32 @@ public sealed class LibreViesCompte
         public Membre[] players;
         public LibreViesJoueurAdmin player;
         public LibreViesPosition position;
+        public int id;
+        public LibreViesElementMonde[] elements;
+        public LibreViesMaisonMonde[] maisons;
+    }
+
+    // Monde partage (tables monde_element et monde_maison, voir monde.sql).
+    [Serializable]
+    public sealed class LibreViesElementMonde
+    {
+        public int id;
+        public string type;
+        public float x;
+        public float z;
+        public float rotation;
+        public float taille;
+    }
+
+    [Serializable]
+    public sealed class LibreViesMaisonMonde
+    {
+        public string id;
+        public string nom;
+        public float x;
+        public float z;
+        public float rotation;
+        public string donnees;
     }
 
     [Serializable]
@@ -56,6 +82,9 @@ public sealed class LibreViesCompte
     public LibreViesNpc[] Npcs { get; private set; }
     public Membre[] JoueursTrouves { get; private set; }
     public LibreViesJoueurAdmin JoueurAdministratif { get; private set; }
+    public LibreViesElementMonde[] ElementsMonde { get; private set; }
+    public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
+    public int DernierIdMonde { get; private set; }
 
     public bool EstAdministrateur
     {
@@ -92,6 +121,41 @@ public sealed class LibreViesCompte
         if (!EstAdministrateur) { Erreur = "Edition NPC reservee aux administrateurs."; yield break; }
         yield return Envoyer("save_npc", profil, id);
     }
+    public IEnumerator ChargerMonde() { yield return Envoyer("get_monde", null); }
+
+    public IEnumerator AjouterElementMonde(LibreViesElementMonde element)
+    {
+        yield return Envoyer("ajouter_element_monde", null, null, ChampsElementMonde(element));
+    }
+
+    public IEnumerator ModifierElementMonde(LibreViesElementMonde element)
+    {
+        var champs = ChampsElementMonde(element);
+        champs["id"] = element.id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        yield return Envoyer("modifier_element_monde", null, null, champs);
+    }
+
+    public IEnumerator SupprimerElementMonde(int id)
+    {
+        yield return Envoyer("supprimer_element_monde", null, null,
+            new Dictionary<string, string> { { "id", id.ToString(System.Globalization.CultureInfo.InvariantCulture) } });
+    }
+
+    public IEnumerator ViderMonde() { yield return Envoyer("vider_monde", null); }
+
+    private static Dictionary<string, string> ChampsElementMonde(LibreViesElementMonde element)
+    {
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        return new Dictionary<string, string>
+        {
+            { "type", element.type ?? "" },
+            { "x", element.x.ToString("0.###", culture) },
+            { "z", element.z.ToString("0.###", culture) },
+            { "rotation", element.rotation.ToString("0.###", culture) },
+            { "taille", element.taille.ToString("0.###", culture) }
+        };
+    }
+
     public IEnumerator RechercherJoueurs(string recherche)
     {
         JoueursTrouves = new Membre[0];
@@ -202,6 +266,12 @@ public sealed class LibreViesCompte
                 Erreur = "Reponse du compte invalide : statut bani requis, mettez l'API a jour.";
                 yield break;
             }
+            if (action == "get_monde")
+            {
+                ElementsMonde = reponse.elements ?? new LibreViesElementMonde[0];
+                MaisonsMonde = reponse.maisons ?? new LibreViesMaisonMonde[0];
+            }
+            if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
             if (action == "search_players" || action == "get_player" || action == "save_player_ban")
             {
                 if (Joueur == null || reponse.membre.id != Joueur.id)

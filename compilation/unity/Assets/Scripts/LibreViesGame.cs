@@ -130,12 +130,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public float X;
         public float Z;
         public float Taille;
-    }
-
-    [Serializable]
-    private sealed class FichierMonde
-    {
-        public List<ElementMonde> Elements = new List<ElementMonde>();
+        public int Id;
+        public float Rotation;
     }
 
     private readonly List<ElementMonde> elementsMonde = new List<ElementMonde>();
@@ -145,6 +141,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int pinceauModeIndex;
     private bool razMondeConfirmation;
     private Mesh meshTerrainMonde;
+    private string signatureMonde = "";
     private Transform racineMonde;
     private Rect fenetreAdminMonde;
     // Profondeur du fond d'une zone d'eau creusee au pinceau, sous le relief.
@@ -871,7 +868,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 yield break;
             }
         }
-        ChargerMondeDonnees();
+        yield return ChargerMondeServeur();
         string[] noms =
         {
             "materiaux", "environnement", "terrain", "route", "village",
@@ -906,6 +903,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ReconstruireObjetsMonde();
+        StartCoroutine(SurveillerMonde());
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
         RafraichirZonesNommees();
@@ -953,41 +951,61 @@ public sealed class LibreViesGame : MonoBehaviour
                 + " (textes 3D exclus)");
     }
 
-    private string CheminMonde
+    private IEnumerator ChargerMondeServeur()
     {
-        get { return Path.Combine(Path.GetDirectoryName(CheminCoordonneesEdition), "monde"); }
+        yield return LibreViesCompte.Courant.ChargerMonde();
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        if (compte.ElementsMonde == null)
+        {
+            Journal("monde : chargement impossible : " + compte.Erreur);
+            yield break;
+        }
+        AppliquerMondeServeur(compte.ElementsMonde);
+        Journal("monde : " + elementsMonde.Count + " element(s) charge(s)");
     }
 
-    private void ChargerMondeDonnees()
+    // Renvoie true si le monde recu de la BDD est different de celui affiche.
+    private bool AppliquerMondeServeur(LibreViesCompte.LibreViesElementMonde[] elements)
     {
-        try
+        string avant = signatureMonde;
+        elementsMonde.Clear();
+        for (int i = 0; i < elements.Length; i++)
         {
-            if (!File.Exists(CheminMonde)) return;
-            byte[] clair = DechiffrerCoordonneesEdition(File.ReadAllBytes(CheminMonde));
-            var fichier = JsonUtility.FromJson<FichierMonde>(System.Text.Encoding.UTF8.GetString(clair));
-            if (fichier != null && fichier.Elements != null) elementsMonde.AddRange(fichier.Elements);
-            Journal("monde : " + elementsMonde.Count + " element(s) charge(s)");
+            var element = new ElementMonde();
+            element.Id = elements[i].id;
+            element.Type = elements[i].type;
+            element.X = elements[i].x;
+            element.Z = elements[i].z;
+            element.Rotation = elements[i].rotation;
+            element.Taille = elements[i].taille;
+            elementsMonde.Add(element);
         }
-        catch (Exception erreur)
-        {
-            Journal("monde : lecture impossible : " + erreur.Message);
-        }
+        signatureMonde = SignatureMonde();
+        return avant != signatureMonde;
     }
 
-    private void SauverMonde()
+    private string SignatureMonde()
     {
-        try
+        var texte = new System.Text.StringBuilder();
+        for (int i = 0; i < elementsMonde.Count; i++)
         {
-            string dossier = Path.GetDirectoryName(CheminMonde);
-            if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
-            var fichier = new FichierMonde();
-            fichier.Elements = elementsMonde;
-            byte[] clair = System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(fichier));
-            File.WriteAllBytes(CheminMonde, ChiffrerCoordonneesEdition(clair));
+            ElementMonde e = elementsMonde[i];
+            texte.Append(e.Id).Append('|').Append(e.Type).Append('|').Append(e.X).Append('|')
+                .Append(e.Z).Append('|').Append(e.Rotation).Append('|').Append(e.Taille).Append(';');
         }
-        catch (Exception erreur)
+        return texte.ToString();
+    }
+
+    // Synchronisation temps reel : relecture de la BDD toutes les 5 secondes.
+    private IEnumerator SurveillerMonde()
+    {
+        while (true)
         {
-            Journal("monde : sauvegarde impossible : " + erreur.Message);
+            yield return new WaitForSeconds(5f);
+            LibreViesCompte compte = LibreViesCompte.Courant;
+            yield return compte.ChargerMonde();
+            if (compte.ElementsMonde == null) continue;
+            if (AppliquerMondeServeur(compte.ElementsMonde)) ReconstruireMonde();
         }
     }
 
@@ -995,7 +1013,31 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         RafraichirTerrainMonde();
         ReconstruireObjetsMonde();
-        SauverMonde();
+    }
+
+    private IEnumerator AjouterElementServeur(ElementMonde element)
+    {
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        var envoi = new LibreViesCompte.LibreViesElementMonde();
+        envoi.type = element.Type; envoi.x = element.X; envoi.z = element.Z;
+        envoi.rotation = element.Rotation; envoi.taille = element.Taille;
+        yield return compte.AjouterElementMonde(envoi);
+        if (compte.DernierIdMonde > 0) element.Id = compte.DernierIdMonde;
+        signatureMonde = SignatureMonde();
+    }
+
+    private IEnumerator SupprimerElementsServeur(List<int> ids)
+    {
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        for (int i = 0; i < ids.Count; i++) yield return compte.SupprimerElementMonde(ids[i]);
+        signatureMonde = SignatureMonde();
+    }
+
+    private IEnumerator ViderMondeServeur()
+    {
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        yield return compte.ViderMonde();
+        signatureMonde = SignatureMonde();
     }
 
     private void RafraichirTerrainMonde()
@@ -1092,7 +1134,12 @@ public sealed class LibreViesGame : MonoBehaviour
         if (mode == "EFFACER")
         {
             Vector2 centre = new Vector2(point.x, point.z);
-            elementsMonde.RemoveAll(e => Vector2.Distance(new Vector2(e.X, e.Z), centre) <= taille * 0.5f + 0.6f);
+            var retires = elementsMonde.FindAll(e => Vector2.Distance(new Vector2(e.X, e.Z), centre) <= taille * 0.5f + 0.6f);
+            var ids = new List<int>();
+            for (int i = 0; i < retires.Count; i++)
+                if (retires[i].Id > 0) ids.Add(retires[i].Id);
+            elementsMonde.RemoveAll(e => retires.Contains(e));
+            if (ids.Count > 0) StartCoroutine(SupprimerElementsServeur(ids));
         }
         else
         {
@@ -1102,6 +1149,7 @@ public sealed class LibreViesGame : MonoBehaviour
             element.Z = point.z;
             element.Taille = taille;
             elementsMonde.Add(element);
+            StartCoroutine(AjouterElementServeur(element));
         }
         ReconstruireMonde();
     }
@@ -1163,6 +1211,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 elementsMonde.Clear();
                 razMondeConfirmation = false;
+                StartCoroutine(ViderMondeServeur());
                 ReconstruireMonde();
             }
             if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 316f, 120f, 32f), "ANNULER", buttonStyle))
