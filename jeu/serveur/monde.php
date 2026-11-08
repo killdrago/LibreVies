@@ -4,7 +4,8 @@
 // fait dans api.php (droit=1, relu en base a chaque requete).
 
 function types_monde_valides() {
-    return array('EAU', 'HERBE', 'CAILLOU', 'ARBRE', 'PONT');
+    return array('EAU', 'HERBE', 'CAILLOU', 'ARBRE', 'PONT',
+        'CAILLOU_SPHERE', 'CAILLOU_ROCHER', 'ARBRE_FEUILLU', 'ARBRE_PIN');
 }
 
 function nombre_monde($valeur, $min, $max) {

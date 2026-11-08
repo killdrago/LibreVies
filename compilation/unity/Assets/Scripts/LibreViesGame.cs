@@ -145,7 +145,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private Transform racineMonde;
     private Rect fenetreAdminMonde;
     // Pont sélectionné dans l'onglet Monde : il se déplace case par case.
-    private ElementMonde pontSelectionne;
+    private ElementMonde elementMondeSelectionne;
+    // Fenetre de choix du type (arbres et cailloux), ouverte pour l'element selectionne.
+    private bool choixTypeMondeOuvert;
+    private Rect fenetreChoixTypeMonde = new Rect(330f, 160f, 300f, 320f);
+    private const int IdFenetreChoixTypeMonde = 4127;
     private const float PasDeplacementPont = 1f;
     private const float EpaisseurTablierPont = 0.25f;
     // Profondeur du fond d'une zone d'eau creusee au pinceau, sous le relief.
@@ -986,7 +990,7 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         signatureMonde = SignatureMonde();
         // Les objets ont ete recrees depuis le serveur : l'ancienne selection n'est plus valable.
-        if (avant != signatureMonde) pontSelectionne = null;
+        if (avant != signatureMonde) SelectionnerElementMonde(null);
         return avant != signatureMonde;
     }
 
@@ -1104,7 +1108,14 @@ public sealed class LibreViesGame : MonoBehaviour
                     new Vector3(taille * 0.5f, 0.02f, taille * 0.5f), "Terrain", racineMonde, "Monde_Herbe");
                 break;
             }
+            case "CAILLOU_ROCHER":
+            {
+                if (CreerNatureMonde("Rock_Medium_1", x, z, Mathf.Clamp(taille * 0.5f, 0.5f, 3f)))
+                    break;
+                goto case "CAILLOU";
+            }
             case "CAILLOU":
+            case "CAILLOU_SPHERE":
             {
                 float diametre = taille * 0.5f;
                 Primitive(PrimitiveType.Sphere, new Vector3(x, sol + diametre * 0.3f, z),
@@ -1112,7 +1123,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 break;
             }
             case "ARBRE":
+            case "ARBRE_FEUILLU":
+            case "ARBRE_PIN":
             {
+                if (CreerNatureMonde(element.Type == "ARBRE_PIN" ? "Pine_1" : "CommonTree_1", x, z, Mathf.Clamp(taille, 0.5f, 2f)))
+                    break;
                 float facteur = Mathf.Clamp(taille, 0.5f, 2f);
                 Primitive(PrimitiveType.Cylinder, new Vector3(x, sol + 1.5f * facteur, z),
                     new Vector3(0.3f * facteur, 1.5f * facteur, 0.3f * facteur), "Wood", racineMonde, "Monde_Tronc", true);
@@ -1151,6 +1166,83 @@ public sealed class LibreViesGame : MonoBehaviour
         return Mathf.Abs(across) <= largeur * 0.5f + marge && Mathf.Abs(along) <= 1.25f + marge;
     }
 
+    // Types enregistres : la palette pose une variante par defaut ; la fenetre TYPE la change.
+    private string TypeMondePourMode(string mode)
+    {
+        if (mode == "ARBRE") return "ARBRE_FEUILLU";
+        if (mode == "CAILLOU") return "CAILLOU_SPHERE";
+        return mode;
+    }
+
+    private bool EstFamilleArbreCaillou(string type)
+    {
+        return type != null && (type.StartsWith("ARBRE") || type.StartsWith("CAILLOU"));
+    }
+
+    private string LibelleTypeMonde(string type)
+    {
+        switch (type)
+        {
+            case "ARBRE": case "ARBRE_FEUILLU": return "Arbre feuillu";
+            case "ARBRE_PIN": return "Sapin";
+            case "CAILLOU": case "CAILLOU_SPHERE": return "Caillou rond";
+            case "CAILLOU_ROCHER": return "Gros rocher";
+            case "PONT": return "Pont";
+            default: return type;
+        }
+    }
+
+    private void SelectionnerElementMonde(ElementMonde element)
+    {
+        elementMondeSelectionne = element;
+        choixTypeMondeOuvert = element != null && EstFamilleArbreCaillou(element.Type);
+    }
+
+    // Element selectionnable : tout sauf l'eau et l'herbe (qui restent au pinceau).
+    private bool DansElementMonde(ElementMonde e, float x, float z, float marge)
+    {
+        if (e.Type == "EAU" || e.Type == "HERBE") return false;
+        if (e.Type == "PONT") return DansPont(e, x, z, marge);
+        return Vector2.Distance(new Vector2(e.X, e.Z), new Vector2(x, z)) <= Mathf.Max(e.Taille * 0.5f, 1.2f) + marge;
+    }
+
+    private ElementMonde TrouverElementMondeSelectionnable(Vector3 point)
+    {
+        for (int j = elementsMonde.Count - 1; j >= 0; j--)
+            if (DansElementMonde(elementsMonde[j], point.x, point.z, 0.5f)) return elementsMonde[j];
+        return null;
+    }
+
+    private void RetirerElementMondeSelectionne()
+    {
+        ElementMonde e = elementMondeSelectionne;
+        if (e == null) return;
+        elementsMonde.Remove(e);
+        SelectionnerElementMonde(null);
+        ReconstruireMonde();
+        if (e.Id > 0) StartCoroutine(SupprimerElementsServeur(new List<int> { e.Id }));
+    }
+
+    private void ChangerTypeMonde(ElementMonde e, string nouveauType)
+    {
+        e.Type = nouveauType;
+        ReconstruireMonde();
+        StartCoroutine(ModifierElementServeur(e));
+    }
+
+    // Modele CC0 du jeu (arbres, rochers) place dans le Monde ; false si le modele manque.
+    private bool CreerNatureMonde(string asset, float x, float z, float echelle)
+    {
+        GameObject prefab = NaturePrefab(asset);
+        if (prefab == null) return false;
+        float baseY = TerrainHeight(x, z) + (asset.StartsWith("Rock") ? 0.08f : 0.24f);
+        GameObject instance = Instantiate(prefab, new Vector3(x, baseY, z), Quaternion.identity);
+        instance.name = "Monde_" + asset;
+        instance.transform.SetParent(racineMonde, true);
+        instance.transform.localScale = Vector3.one * echelle;
+        return true;
+    }
+
     private void AppliquerPinceauMonde(Vector3 point)
     {
         string mode = modesMonde[pinceauModeIndex];
@@ -1161,7 +1253,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 axe = PointRiviereProche(new Vector2(point.x, point.z), out Vector2 tangentePont);
             var pont = new ElementMonde { Type = "PONT", X = axe.x, Z = axe.y, Taille = 1f };
             elementsMonde.Add(pont);
-            pontSelectionne = pont;
+            SelectionnerElementMonde(pont);
             StartCoroutine(AjouterElementServeur(pont));
             ReconstruireMonde();
             return;
@@ -1170,7 +1262,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Vector2 centre = new Vector2(point.x, point.z);
             var retires = elementsMonde.FindAll(e => Vector2.Distance(new Vector2(e.X, e.Z), centre) <= taille * 0.5f + 0.6f);
-            if (pontSelectionne != null && retires.Contains(pontSelectionne)) pontSelectionne = null;
+            if (elementMondeSelectionne != null && retires.Contains(elementMondeSelectionne)) SelectionnerElementMonde(null);
             var ids = new List<int>();
             for (int i = 0; i < retires.Count; i++)
                 if (retires[i].Id > 0) ids.Add(retires[i].Id);
@@ -1180,7 +1272,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else
         {
             var element = new ElementMonde();
-            element.Type = mode;
+            element.Type = TypeMondePourMode(mode);
             element.X = point.x;
             element.Z = point.z;
             element.Taille = taille;
@@ -1197,6 +1289,7 @@ public sealed class LibreViesGame : MonoBehaviour
         float echelle = Mathf.Min(1f, Screen.width / 1200f, Screen.height / 750f);
         Vector2 souris = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y) / echelle;
         if (fenetreAdminMonde.Contains(souris)) return;
+        if (choixTypeMondeOuvert && fenetreChoixTypeMonde.Contains(new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y))) return;
         Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit[] touches = Physics.RaycastAll(rayon, 1000f);
         for (int i = 0; i < touches.Length; i++)
@@ -1204,19 +1297,13 @@ public sealed class LibreViesGame : MonoBehaviour
             if (touches[i].collider != null && touches[i].collider.gameObject.name == "Terrain_Unity")
             {
                 Vector3 point = touches[i].point;
-                // En mode PONT, un clic sur un pont existant le selectionne.
-                if (modesMonde[pinceauModeIndex] == "PONT")
+                if (modesMonde[pinceauModeIndex] != "EFFACER")
                 {
-                    ElementMonde trouve = null;
-                    for (int j = elementsMonde.Count - 1; j >= 0; j--)
-                    {
-                        if (elementsMonde[j].Type == "PONT" && DansPont(elementsMonde[j], point.x, point.z, 0.5f))
-                        {
-                            trouve = elementsMonde[j];
-                            break;
-                        }
-                    }
-                    if (trouve != null) { pontSelectionne = trouve; return; }
+                    // Comme pour les maisons : un clic sur un objet le selectionne,
+                    // un clic dans le vide deselectionne sans rien poser.
+                    ElementMonde trouve = TrouverElementMondeSelectionnable(point);
+                    if (trouve != null) { SelectionnerElementMonde(trouve); return; }
+                    if (elementMondeSelectionne != null) { SelectionnerElementMonde(null); return; }
                 }
                 AppliquerPinceauMonde(point);
                 return;
@@ -1224,13 +1311,13 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private void DeplacerPontSelectionne(float dx, float dz)
+    private void DeplacerElementMondeSelectionne(float dx, float dz)
     {
-        if (pontSelectionne == null) return;
-        pontSelectionne.X = Mathf.Clamp(pontSelectionne.X + dx, -130f, 130f);
-        pontSelectionne.Z = Mathf.Clamp(pontSelectionne.Z + dz, -130f, 130f);
+        if (elementMondeSelectionne == null) return;
+        elementMondeSelectionne.X = Mathf.Clamp(elementMondeSelectionne.X + dx, -130f, 130f);
+        elementMondeSelectionne.Z = Mathf.Clamp(elementMondeSelectionne.Z + dz, -130f, 130f);
         ReconstruireMonde();
-        StartCoroutine(ModifierElementServeur(pontSelectionne));
+        StartCoroutine(ModifierElementServeur(elementMondeSelectionne));
     }
 
     private System.Collections.IEnumerator ModifierElementServeur(ElementMonde element)
@@ -1242,6 +1329,28 @@ public sealed class LibreViesGame : MonoBehaviour
         envoi.rotation = element.Rotation; envoi.taille = element.Taille;
         yield return compte.ModifierElementMonde(envoi);
         signatureMonde = SignatureMonde();
+    }
+
+    // Fenetre TYPE : choix de la variante d'un arbre ou d'un caillou selectionne.
+    private void DessinerChoixTypeMonde(int id)
+    {
+        ElementMonde e = elementMondeSelectionne;
+        if (e == null || !EstFamilleArbreCaillou(e.Type)) { choixTypeMondeOuvert = false; return; }
+        bool arbre = e.Type.StartsWith("ARBRE");
+        string[] codes = arbre ? new[] { "ARBRE_FEUILLU", "ARBRE_PIN" } : new[] { "CAILLOU_SPHERE", "CAILLOU_ROCHER" };
+        GUI.Label(new Rect(14f, 30f, 270f, 24f), arbre ? "Choisissez le type d'arbre :" : "Choisissez le type de caillou :", smallStyle);
+        for (int i = 0; i < codes.Length; i++)
+        {
+            bool actuel = (e.Type == codes[i]) || (i == 0 && e.Type == (arbre ? "ARBRE" : "CAILLOU"));
+            GUI.color = actuel ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+            if (GUI.Button(new Rect(14f, 64f + i * 44f, 270f, 36f), LibelleTypeMonde(codes[i]), buttonStyle)
+                && !actuel)
+                ChangerTypeMonde(e, codes[i]);
+            GUI.color = Color.white;
+        }
+        if (GUI.Button(new Rect(14f, 64f + codes.Length * 44f + 16f, 270f, 34f), "FERMER", buttonStyle))
+            choixTypeMondeOuvert = false;
+        GUI.DragWindow(new Rect(0f, 0f, 300f, 24f));
     }
 
     private void DessinerAdminMonde(Rect contenu)
@@ -1269,16 +1378,20 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 250f, 620f, 24f),
             "Pinceau : " + modesMonde[pinceauModeIndex] + "  " + taillesPinceauMonde[pinceauTailleIndex] + " m     Elements : " + elementsMonde.Count,
             smallStyle);
-        if (pontSelectionne != null)
+        if (elementMondeSelectionne != null)
         {
+            ElementMonde sel = elementMondeSelectionne;
+            GUI.Label(new Rect(contenu.x + 420f, contenu.y + 290f, 220f, 24f),
+                "Selection : " + LibelleTypeMonde(sel.Type) + "   X " + sel.X.ToString("0.0") + "  Z " + sel.Z.ToString("0.0"), smallStyle);
             // Haut = vers le nord (+Z), bas = vers le sud (-Z).
-            GUI.Label(new Rect(contenu.x + 420f, contenu.y + 290f, 300f, 24f),
-                "Pont selectionne : X " + pontSelectionne.X.ToString("0.0") + "  Z " + pontSelectionne.Z.ToString("0.0"), smallStyle);
-            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 316f, 100f, 32f), "HAUT", buttonStyle)) DeplacerPontSelectionne(0f, PasDeplacementPont);
-            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 390f, 100f, 32f), "BAS", buttonStyle)) DeplacerPontSelectionne(0f, -PasDeplacementPont);
-            if (GUI.Button(new Rect(contenu.x + 410f, contenu.y + 353f, 100f, 32f), "GAUCHE", buttonStyle)) DeplacerPontSelectionne(-PasDeplacementPont, 0f);
-            if (GUI.Button(new Rect(contenu.x + 530f, contenu.y + 353f, 100f, 32f), "DROITE", buttonStyle)) DeplacerPontSelectionne(PasDeplacementPont, 0f);
-            if (GUI.Button(new Rect(contenu.x + 650f, contenu.y + 316f, 150f, 32f), "DESELECTIONNER", buttonStyle)) pontSelectionne = null;
+            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 316f, 100f, 32f), "HAUT", buttonStyle)) DeplacerElementMondeSelectionne(0f, PasDeplacementPont);
+            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 390f, 100f, 32f), "BAS", buttonStyle)) DeplacerElementMondeSelectionne(0f, -PasDeplacementPont);
+            if (GUI.Button(new Rect(contenu.x + 410f, contenu.y + 353f, 100f, 32f), "GAUCHE", buttonStyle)) DeplacerElementMondeSelectionne(-PasDeplacementPont, 0f);
+            if (GUI.Button(new Rect(contenu.x + 530f, contenu.y + 353f, 100f, 32f), "DROITE", buttonStyle)) DeplacerElementMondeSelectionne(PasDeplacementPont, 0f);
+            if (EstFamilleArbreCaillou(sel.Type) && GUI.Button(new Rect(contenu.x + 650f, contenu.y + 286f, 150f, 32f), "CHANGER LE TYPE", buttonStyle))
+                choixTypeMondeOuvert = true;
+            if (GUI.Button(new Rect(contenu.x + 650f, contenu.y + 324f, 150f, 32f), "SUPPRIMER", buttonStyle)) RetirerElementMondeSelectionne();
+            if (GUI.Button(new Rect(contenu.x + 650f, contenu.y + 362f, 150f, 32f), "DESELECTIONNER", buttonStyle)) SelectionnerElementMonde(null);
         }
         if (!razMondeConfirmation)
         {
@@ -1292,7 +1405,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 316f, 120f, 32f), "CONFIRMER", buttonStyle))
             {
                 elementsMonde.Clear();
-                pontSelectionne = null;
+                SelectionnerElementMonde(null);
                 razMondeConfirmation = false;
                 StartCoroutine(ViderMondeServeur());
                 ReconstruireMonde();
@@ -8022,7 +8135,11 @@ public sealed class LibreViesGame : MonoBehaviour
             playerGrounded = false;
             bool monter = Touche(toucheSaut) || Input.GetKey(KeyCode.UpArrow);
             bool descendre = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.DownArrow);
-            float vitesseVerticale = monter ? SwimSpeed : (descendre ? -SwimSpeed : 0f);
+            // Sans demande de plonger, le heros coule jusqu'a la surface : il ne reste
+            // pas en l'air a la hauteur de la berge.
+            float surfaceCourante = HauteurSurfaceEau(player.position.x, player.position.z);
+            float vitesseVerticale = monter ? SwimSpeed
+                : (descendre ? -SwimSpeed : (player.position.y > surfaceCourante + 0.02f ? -SwimSpeed : 0f));
             playerVelocity.y = Mathf.MoveTowards(playerVelocity.y, vitesseVerticale, dt * 12f);
             player.position += Vector3.up * playerVelocity.y * dt;
             float lit = TerrainHeight(player.position.x, player.position.z) + 0.08f;
@@ -10271,6 +10388,8 @@ public sealed class LibreViesGame : MonoBehaviour
         DessinerEditionPancarte();
         if (!CompteAdministrateur) adminOpen = false;
         if (CompteAdministrateur && adminOpen && !creationPersonnageOpen) DessinerAdmin();
+        if (CompteAdministrateur && adminOpen && adminTab == 3 && choixTypeMondeOuvert && elementMondeSelectionne != null)
+            fenetreChoixTypeMonde = GUI.Window(IdFenetreChoixTypeMonde, fenetreChoixTypeMonde, DessinerChoixTypeMonde, "TYPE");
         if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
             "ADMIN", buttonStyle))
         {
