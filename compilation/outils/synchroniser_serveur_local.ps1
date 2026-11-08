@@ -91,12 +91,35 @@ if ([IO.Path]::GetFullPath($Sources).TrimEnd('\') -eq [IO.Path]::GetFullPath($de
 }
 if (!(Test-Path -LiteralPath $destination)) { New-Item -ItemType Directory -Path $destination | Out-Null }
 $nombre = 0
+$erreurs = 0
+# Si un fichier manque dans le dossier local (depot pas a jour), il est telecharge
+# depuis la branche GitHub du jeu au lieu de faire echouer le build.
+$baseDistante = 'https://raw.githubusercontent.com/killdrago/LibreVies/arena/c40ef64e-librevies/jeu/serveur/'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 # Le helper doit arriver avant l'API qui l'inclut.
 foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'monde.php', 'personnage.sql', 'npc.sql', 'classement.sql', 'mondeLV.sql', 'mondeLV_migration.sql',
     'membre.sql', 'config.php.example', 'README.md', 'api.php')) {
     $source = Join-Path $Sources $nom
     $cible = Join-Path $destination $nom
-    if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw ('Source serveur absente : ' + $nom) }
+    if (!(Test-Path -LiteralPath $source -PathType Leaf)) {
+        Write-Host ('        Source absente, telechargement depuis GitHub : ' + $nom)
+        $temp = Join-Path ([IO.Path]::GetTempPath()) ('librevies-' + $nom)
+        try {
+            Invoke-WebRequest -Uri ($baseDistante + $nom) -OutFile $temp -UseBasicParsing -TimeoutSec 60
+            if ((Test-Path -LiteralPath $cible -PathType Leaf) -and
+                (Get-FileHash -LiteralPath $temp).Hash -eq (Get-FileHash -LiteralPath $cible).Hash) { continue }
+            Copy-Item -LiteralPath $temp -Destination $cible -Force
+            $nombre++
+        }
+        catch {
+            Write-Host ('        Telechargement impossible : ' + $nom + ' (verifiez la connexion internet)')
+            $erreurs++
+        }
+        finally {
+            if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force }
+        }
+        continue
+    }
     if ((Test-Path -LiteralPath $cible -PathType Leaf) -and
         (Get-FileHash -LiteralPath $source).Hash -eq (Get-FileHash -LiteralPath $cible).Hash) { continue }
     Copy-Item -LiteralPath $source -Destination $cible -Force
@@ -111,7 +134,8 @@ foreach ($ancien in @('ajouter_droit.sql', 'remplir_npc.sql', 'mettre_a_jour_per
         Write-Host ('        Ancien script SQL retire : ' + $ancien)
     }
 }
-Write-Host ('        API locale : ' + $nombre + ' fichier(s) mis a jour depuis jeu\serveur.')
+Write-Host ('        API locale : ' + $nombre + ' fichier(s) mis a jour.')
+if ($erreurs -gt 0) { Write-Host ('        ATTENTION : ' + $erreurs + ' fichier(s) non mis a jour.') }
 Write-Host '        Configuration MySQL conservee : config.php n est jamais remplace.'
 Write-Host '        Schemas actuels conserves dans jeu\serveur, sans import automatique.'
 exit 0
