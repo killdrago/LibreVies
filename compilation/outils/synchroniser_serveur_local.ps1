@@ -92,7 +92,7 @@ if ([IO.Path]::GetFullPath($Sources).TrimEnd('\') -eq [IO.Path]::GetFullPath($de
 if (!(Test-Path -LiteralPath $destination)) { New-Item -ItemType Directory -Path $destination | Out-Null }
 $nombre = 0
 # Le helper doit arriver avant l'API qui l'inclut.
-foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'personnage.sql', 'npc.sql', 'classement.sql',
+foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'monde.php', 'personnage.sql', 'npc.sql', 'classement.sql', 'monde.sql',
     'membre.sql', 'config.php.example', 'README.md', 'api.php')) {
     $source = Join-Path $Sources $nom
     $cible = Join-Path $destination $nom
