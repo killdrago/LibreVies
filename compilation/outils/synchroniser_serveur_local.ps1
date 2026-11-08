@@ -97,7 +97,7 @@ $erreurs = 0
 $baseDistante = 'https://raw.githubusercontent.com/killdrago/LibreVies/arena/c40ef64e-librevies/jeu/serveur/'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 # Le helper doit arriver avant l'API qui l'inclut.
-foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'monde.php', 'personnage.sql', 'npc.sql', 'classement.sql', 'mondeLV.sql', 'mondeLV_migration.sql',
+foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'monde.php', 'personnage.sql', 'npc.sql', 'classement.sql', 'mondeLV.sql', 'mondeLV_presence.sql',
     'membre.sql', 'config.php.example', 'README.md', 'api.php')) {
     $source = Join-Path $Sources $nom
     $cible = Join-Path $destination $nom
@@ -127,7 +127,7 @@ foreach ($nom in @('securite.php', 'personnage.php', 'npc.php', 'ia.php', 'monde
 }
 # Retirer uniquement les anciennes migrations publiques connues : ni BDD,
 # ni config.php, ni fichiers locaux inconnus ne sont touches.
-foreach ($ancien in @('ajouter_droit.sql', 'remplir_npc.sql', 'mettre_a_jour_personnage.sql', 'corriger_membre.sql')) {
+foreach ($ancien in @('ajouter_droit.sql', 'remplir_npc.sql', 'mettre_a_jour_personnage.sql', 'corriger_membre.sql', 'monde.sql', 'mondeLV_migration.sql')) {
     $cibleAncienne = Join-Path $destination $ancien
     if (Test-Path -LiteralPath $cibleAncienne -PathType Leaf) {
         Remove-Item -LiteralPath $cibleAncienne -Force

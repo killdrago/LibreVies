@@ -600,6 +600,21 @@ if ($action === 'npc_chat') {
     repondre(true, 'Reponse IA.', array('reponse' => (string)$ia['reponse']));
 }
 
+if ($action === 'presence') {
+    // Position des joueurs connectes : tout joueur connecte peut l'envoyer pour lui-meme.
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    try {
+        $pdoMonde = connexion_monde($config);
+        $resultat = mettre_a_jour_presence($pdoMonde, $membre, $donnees);
+        $resultat['membre'] = membre_public($membre);
+        repondre(true, 'Presence enregistree.', $resultat);
+    } catch (InvalidArgumentException $erreur) {
+        repondre(false, $erreur->getMessage(), array(), 400);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+}
+
 if (in_array($action, array('get_monde', 'ajouter_element_monde', 'modifier_element_monde', 'supprimer_element_monde',
     'vider_monde', 'enregistrer_maison'), true)) {
     // Lecture pour tous les joueurs connectes ; ecriture reservee aux administrateurs.

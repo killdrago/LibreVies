@@ -37,6 +37,7 @@ public sealed class LibreViesCompte
         public int id;
         public LibreViesElementMonde[] elements;
         public LibreViesMaisonMonde[] maisons;
+        public LibreViesJoueurPresent[] joueurs;
         public int revision;
         public bool complet;
         public int[] supprimes;
@@ -66,6 +67,18 @@ public sealed class LibreViesCompte
         public string donnees;
     }
 
+    // Joueur connecte vu par le serveur (position envoyee toutes les secondes).
+    [Serializable]
+    public sealed class LibreViesJoueurPresent
+    {
+        public int membre_id;
+        public string pseudo;
+        public float position_x;
+        public float position_z;
+        public float rotation_y;
+        public string animation;
+    }
+
     [Serializable]
     private sealed class ConfigurationApi { public string api_url; }
 
@@ -90,6 +103,7 @@ public sealed class LibreViesCompte
     public LibreViesElementMonde[] ElementsMonde { get; private set; }
     public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
     public int[] IdsElementsSupprimes { get; private set; }
+    public LibreViesJoueurPresent[] JoueursPresents { get; private set; }
     public int RevisionMonde { get; private set; }
     public bool MondeComplet { get; private set; }
     public int DernierIdMonde { get; private set; }
@@ -158,6 +172,20 @@ public sealed class LibreViesCompte
     }
 
     public IEnumerator ViderMonde() { yield return Envoyer("vider_monde", null); }
+
+    // Envoie la position du joueur local et recoit celles des autres joueurs.
+    public IEnumerator EnvoyerPresence(float x, float z, float rotation, string animation)
+    {
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var champs = new Dictionary<string, string>
+        {
+            { "x", x.ToString("0.###", culture) },
+            { "z", z.ToString("0.###", culture) },
+            { "rotation", rotation.ToString("0.###", culture) },
+            { "animation", animation ?? "Idle" }
+        };
+        yield return Envoyer("presence", null, null, champs);
+    }
 
     private static Dictionary<string, string> ChampsElementMonde(LibreViesElementMonde element)
     {
@@ -291,6 +319,7 @@ public sealed class LibreViesCompte
                 MondeComplet = reponse.complet;
             }
             if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
+            if (action == "presence") JoueursPresents = reponse.joueurs ?? new LibreViesJoueurPresent[0];
             if (action == "search_players" || action == "get_player" || action == "save_player_ban")
             {
                 if (Joueur == null || reponse.membre.id != Joueur.id)

@@ -166,3 +166,34 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
     }
     throw new InvalidArgumentException('Action monde inconnue.');
 }
+
+// Presence des joueurs : enregistre la position du joueur connecte et renvoie
+// les autres joueurs vus il y a moins de 10 secondes.
+function mettre_a_jour_presence($pdo, $membre, $donnees) {
+    $x = nombre_monde(isset($donnees['x']) ? $donnees['x'] : 0, -130, 130);
+    $z = nombre_monde(isset($donnees['z']) ? $donnees['z'] : 0, -130, 130);
+    $rotation = nombre_monde(isset($donnees['rotation']) ? $donnees['rotation'] : 0, -360, 360);
+    $animation = isset($donnees['animation']) ? substr(preg_replace('/[^A-Za-z_]/', '', (string)$donnees['animation']), 0, 20) : 'Idle';
+    if ($animation === '') $animation = 'Idle';
+    $id = (int)$membre['id'];
+    $pseudo = mb_substr((string)$membre['pseudo'], 0, 40);
+    $requete = $pdo->prepare('INSERT INTO monde_presence (membre_id, pseudo, position_x, position_z, rotation_y, animation, mis_a_jour)'
+        . ' VALUES (:id, :pseudo, :x, :z, :rotation, :animation, NOW())'
+        . ' ON DUPLICATE KEY UPDATE pseudo = VALUES(pseudo), position_x = VALUES(position_x),'
+        . ' position_z = VALUES(position_z), rotation_y = VALUES(rotation_y), animation = VALUES(animation), mis_a_jour = NOW()');
+    $requete->execute(array(':id' => $id, ':pseudo' => $pseudo, ':x' => $x, ':z' => $z,
+        ':rotation' => $rotation, ':animation' => $animation));
+    $requete = $pdo->prepare('SELECT membre_id, pseudo, position_x, position_z, rotation_y, animation FROM monde_presence'
+        . ' WHERE membre_id <> :id AND mis_a_jour > NOW() - INTERVAL 10 SECOND');
+    $requete->execute(array(':id' => $id));
+    $joueurs = array();
+    foreach ($requete->fetchAll() as $ligne) {
+        $joueurs[] = array(
+            'membre_id' => (int)$ligne['membre_id'], 'pseudo' => (string)$ligne['pseudo'],
+            'position_x' => (float)$ligne['position_x'], 'position_z' => (float)$ligne['position_z'],
+            'rotation_y' => (float)$ligne['rotation_y'], 'animation' => (string)$ligne['animation'],
+        );
+    }
+    return array('joueurs' => $joueurs);
+}
+

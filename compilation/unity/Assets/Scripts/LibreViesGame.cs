@@ -1478,9 +1478,111 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // ---- Joueurs connectes : position partagee toutes les secondes ----
+    private sealed class JoueurDistant
+    {
+        public GameObject Racine;
+        public TextMesh Pseudo;
+        public Vector3 Cible;
+        public float Rotation;
+    }
+
+    private readonly Dictionary<int, JoueurDistant> joueursDistants = new Dictionary<int, JoueurDistant>();
+    private float prochainePresence;
+    private bool presenceEnCours;
+    private Vector3 dernierePositionPresence;
+
+    private void GererPresenceJoueur()
+    {
+        if (player == null || compteJoueur == null || !compteJoueur.LanceParLauncher || !compteJoueur.Authentifie) return;
+        if (presenceEnCours || Time.time < prochainePresence) return;
+        prochainePresence = Time.time + 1f;
+        StartCoroutine(EnvoyerPresenceJoueur());
+    }
+
+    private System.Collections.IEnumerator EnvoyerPresenceJoueur()
+    {
+        presenceEnCours = true;
+        LibreViesCompte compte = compteJoueur;
+        Vector3 position = player.position;
+        float rotation = player.eulerAngles.y;
+        string animation = (position - dernierePositionPresence).sqrMagnitude > 0.0004f ? "Walking" : "Idle";
+        dernierePositionPresence = position;
+        yield return compte.EnvoyerPresence(position.x, position.z, rotation, animation);
+        presenceEnCours = false;
+        if (String.IsNullOrEmpty(compte.Erreur) && compte.JoueursPresents != null)
+            MettreAJourJoueursDistants(compte.JoueursPresents);
+    }
+
+    private void MettreAJourJoueursDistants(LibreViesCompte.LibreViesJoueurPresent[] liste)
+    {
+        int moi = compteJoueur.Joueur != null ? compteJoueur.Joueur.id : -1;
+        var vus = new HashSet<int>();
+        for (int i = 0; i < liste.Length; i++)
+        {
+            LibreViesCompte.LibreViesJoueurPresent j = liste[i];
+            if (j.membre_id == moi) continue;
+            vus.Add(j.membre_id);
+            Vector3 cible = new Vector3(j.position_x, TerrainHeight(j.position_x, j.position_z), j.position_z);
+            JoueurDistant d;
+            if (!joueursDistants.TryGetValue(j.membre_id, out d))
+            {
+                d = CreerJoueurDistant(j.pseudo, cible);
+                joueursDistants[j.membre_id] = d;
+            }
+            d.Cible = cible;
+            d.Rotation = j.rotation_y;
+        }
+        var partis = new List<int>();
+        foreach (int id in joueursDistants.Keys)
+            if (!vus.Contains(id)) partis.Add(id);
+        for (int i = 0; i < partis.Count; i++)
+        {
+            Destroy(joueursDistants[partis[i]].Racine);
+            joueursDistants.Remove(partis[i]);
+        }
+    }
+
+    // Avatar simple (capsule bleue + pseudo) : le modele complet des autres joueurs viendra ensuite.
+    private JoueurDistant CreerJoueurDistant(string pseudo, Vector3 position)
+    {
+        var racine = new GameObject("Joueur_" + pseudo);
+        racine.transform.position = position;
+        GameObject corps = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        corps.transform.SetParent(racine.transform, false);
+        corps.transform.localPosition = new Vector3(0f, 1f, 0f);
+        corps.transform.localScale = new Vector3(0.5f, 0.9f, 0.5f);
+        Destroy(corps.GetComponent<Collider>());
+        corps.GetComponent<Renderer>().material.color = new Color(0.2f, 0.6f, 0.9f);
+        var etiquette = new GameObject("Pseudo");
+        etiquette.transform.SetParent(racine.transform, false);
+        etiquette.transform.localPosition = new Vector3(0f, 2.6f, 0f);
+        TextMesh texte = etiquette.AddComponent<TextMesh>();
+        texte.text = pseudo ?? "";
+        texte.characterSize = 0.12f;
+        texte.fontSize = 40;
+        texte.anchor = TextAnchor.MiddleCenter;
+        texte.alignment = TextAlignment.Center;
+        texte.color = Color.white;
+        return new JoueurDistant { Racine = racine, Pseudo = texte, Cible = position };
+    }
+
+    private void AnimerJoueursDistants()
+    {
+        foreach (JoueurDistant d in joueursDistants.Values)
+        {
+            Transform t = d.Racine.transform;
+            t.position = Vector3.Lerp(t.position, d.Cible, Time.deltaTime * 5f);
+            t.rotation = Quaternion.Slerp(t.rotation, Quaternion.Euler(0f, d.Rotation, 0f), Time.deltaTime * 8f);
+            if (gameCamera != null) d.Pseudo.transform.rotation = gameCamera.transform.rotation;
+        }
+    }
+
     private void Update()
     {
         GererPinceauMonde();
+        GererPresenceJoueur();
+        AnimerJoueursDistants();
         if (herbeBrins && Time.time >= prochaineMajBrins)
         {
             prochaineMajBrins = Time.time + 0.5f;
