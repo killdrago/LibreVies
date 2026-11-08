@@ -37,8 +37,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float MargeEauMonstres = 0.85f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
-    private const float WaterDepth = 3.20f;
-    private const float WaterSurfaceOffset = 0.03f;
+    // Profil de la riviere : les berges sont a DemiLargeurRiviere de l'axe
+    // (5 m entre rives). Le fond est plat sur DemiZonePlateRiviere autour de
+    // l'axe, puis remonte jusqu'a la berge. Il est BergeHauteurRiviere plus bas
+    // que le niveau naturel du centre. L'eau est ProfondeurEauCentre au-dessus
+    // de ce fond plat, sur toute la section.
+    private const float DemiLargeurRiviere = 2.5f;
+    private const float DemiZonePlateRiviere = 1.0f;
+    private const float BergeHauteurRiviere = 1.0f;
+    private const float ProfondeurEauCentre = 0.20f;
+    // Demi-largeur de l'eau visible, mesuree a partir de l'axe : l'eau s'arrete
+    // la ou le terrain remonte au-dessus de sa surface (environ 1,4 m).
+    private const float DemiLargeurEau = 1.6f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
@@ -2672,28 +2682,29 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private float HauteurSurfaceEau(float x, float z)
     {
-        // La surface est calculee sur le relief naturel, jamais sur le terrain
-        // deja creuse. Elle suit donc chaque montee et chaque descente.
-        return TerrainSurfaceHeight(x, z) + WaterSurfaceOffset;
+        // La surface est plate en travers du lit : elle est calculee sur le
+        // point de l'axe le plus proche, sur le relief naturel. Elle suit donc
+        // les montees et descentes de la riviere, mais jamais une pente laterale.
+        Vector2 axe = PointRiviereProche(new Vector2(x, z), out Vector2 tangente);
+        return TerrainSurfaceHeight(axe.x, axe.y) - BergeHauteurRiviere + ProfondeurEauCentre;
     }
 
     private float TerrainHeight(float x, float z)
     {
         float hauteur = TerrainSurfaceHeight(x, z);
-        float profondeur = 0f;
+        if (DansVillage(x, z)) return hauteur;
 
-        // Le lit est creuse sous le relief naturel, au lieu d'etre force a une
-        // altitude mondiale fixe. La nappe d'eau pourra ainsi suivre ce relief.
-        if (!DansVillage(x, z))
-        {
-            float distanceEau = DistancePolyligne(new Vector2(x, z), RivierePrincipale);
-            // Le creux revient a zero exactement sur la berge : le terrain
-            // rejoint ainsi la surface de l'eau sans marche ni espace.
-            float creuxRiviere = 1f - Mathf.SmoothStep(4.5f, 7.0f, distanceEau);
-            profondeur = Mathf.Max(profondeur, WaterDepth * creuxRiviere);
-        }
+        // Le lit est plat au centre (BergeHauteurRiviere sous le relief du
+        // centre), puis rejoint le relief naturel exactement a la berge.
+        Vector2 point = new Vector2(x, z);
+        Vector2 axe = PointRiviereProche(point, out Vector2 tangente);
+        float distance = Vector2.Distance(point, axe);
+        if (distance >= DemiLargeurRiviere) return hauteur;
 
-        return hauteur - profondeur;
+        float fond = TerrainSurfaceHeight(axe.x, axe.y) - BergeHauteurRiviere;
+        float t = Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(DemiZonePlateRiviere, DemiLargeurRiviere, distance));
+        return Mathf.Lerp(fond, hauteur, t);
     }
 
     private float DistancePolyligne(Vector2 point, Vector2[] ligne)
@@ -2715,7 +2726,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Le fleuve reste hors du village ; il n'y a plus de douves ni de
         // pont-levis a traiter.
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= 5.3f;
+        return DistancePolyligne(point, RivierePrincipale) <= DemiLargeurEau;
     }
 
     // Les monstres terrestres n'ont pas de nage : l'eau est une zone interdite
@@ -2724,7 +2735,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool ZoneEauInterditeMonstre(Vector2 point)
     {
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= 5.3f + MargeEauMonstres;
+        return DistancePolyligne(point, RivierePrincipale) <= DemiLargeurEau + MargeEauMonstres;
     }
 
     private Vector2 PointRiviereProche(Vector2 point, out Vector2 tangente)
@@ -2759,7 +2770,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector2 normale = point - bord;
         if (normale.sqrMagnitude < 0.0001f)
             normale = new Vector2(-tangente.y, tangente.x);
-        return bord + normale.normalized * (5.3f + MargeEauMonstres + 0.20f);
+        return bord + normale.normalized * (DemiLargeurEau + MargeEauMonstres + 0.20f);
     }
 
     private Vector3 DirectionSansEau(Vector2 position, Vector3 direction)
@@ -3099,9 +3110,12 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         // Une grille plus fine evite qu'une cellule complete de terrain
         // traverse le fleuve et laisse du gazon au milieu de l'eau.
-        const int cells = 96;
+        // Une maille d'environ 1 m : le fond plat (2 m) et les berges (1 m de
+        // denivele sur 1,5 m) doivent etre visibles. 250 mailles = 63 001
+        // sommets, donc index 32 bits obligatoires.
+        const int cells = 250;
         const float step = WorldSize * 2f / cells;
-        var mesh = new Mesh { name = "LibreViesTerrain" };
+        var mesh = new Mesh { name = "LibreViesTerrain", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
         var vertices = new Vector3[(cells + 1) * (cells + 1)];
         var trianglesSol = new List<int>();
         var trianglesEau = new List<int>();
@@ -3124,8 +3138,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 int d = c + 1;
                 float centreX = -WorldSize + (x + 0.5f) * step;
                 float centreZ = -WorldSize + (z + 0.5f) * step;
+                // Triangle en eau seulement s'il est sous la surface de l'eau.
+                Vector2 centre = new Vector2(centreX, centreZ);
                 bool zoneEau = !DansVillage(centreX, centreZ)
-                    && DistancePolyligne(new Vector2(centreX, centreZ), RivierePrincipale) <= 5.8f;
+                    && DistancePolyligne(centre, RivierePrincipale) <= DemiLargeurRiviere + 0.5f
+                    && TerrainHeight(centreX, centreZ) < HauteurSurfaceEau(centreX, centreZ);
                 List<int> destination = zoneEau ? trianglesEau : trianglesSol;
                 destination.Add(a); destination.Add(c); destination.Add(b);
                 destination.Add(b); destination.Add(c); destination.Add(d);
@@ -5527,7 +5544,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Il ne reste qu'un seul fleuve qui traverse la carte ; aucune
         // derivation ni autre surface d'eau n'est creee.
         ObjetMaillage("Riviere_Principale",
-            CreerRubanEau(RivierePrincipale, 5.20f, "Riviere_Principale"), "Eau_Riviere");
+            CreerRubanEau(RivierePrincipale, DemiLargeurRiviere, "Riviere_Principale"), "Eau_Riviere");
     }
 
     private Vector2[] EchantillonnerLigne(Vector2[] points)
