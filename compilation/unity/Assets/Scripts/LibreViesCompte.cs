@@ -375,6 +375,12 @@ public sealed class LibreViesCompte
             }
             if (reponse.membre.bani != "non")
             { Erreur = "Joueur bani veuillez contacter l'administrateur"; jeton = null; Joueur = null; yield break; }
+            // Actions du monde et de la presence : leur reponse ne contient pas de personnage.
+            // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
+            if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
+                || action == "modifier_element_monde" || action == "supprimer_element_monde"
+                || action == "vider_monde" || action == "enregistrer_maison")
+                yield break;
             if (action == "get_npcs" || action == "save_npc")
             {
                 if (Joueur == null || reponse.membre.id != Joueur.id
