@@ -144,6 +144,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private string signatureMonde = "";
     private Transform racineMonde;
     private Rect fenetreAdminMonde;
+    // Pont sélectionné dans l'onglet Monde : il se déplace case par case.
+    private ElementMonde pontSelectionne;
+    private const float PasDeplacementPont = 1f;
+    private const float EpaisseurTablierPont = 0.25f;
     // Profondeur du fond d'une zone d'eau creusee au pinceau, sous le relief.
     private const float ProfondeurFondMonde = 1.0f;
     private bool positionSauvegardeEnCours;
@@ -981,6 +985,8 @@ public sealed class LibreViesGame : MonoBehaviour
             elementsMonde.Add(element);
         }
         signatureMonde = SignatureMonde();
+        // Les objets ont ete recrees depuis le serveur : l'ancienne selection n'est plus valable.
+        if (avant != signatureMonde) pontSelectionne = null;
         return avant != signatureMonde;
     }
 
@@ -1117,24 +1123,54 @@ public sealed class LibreViesGame : MonoBehaviour
             case "PONT":
             {
                 // Le pont enjambe la riviere, perpendiculairement a son cours.
-                Vector2 axe = PointRiviereProche(new Vector2(x, z), out Vector2 tangente);
-                float largeur = LargeurRiviere(axe) + 2f;
-                float niveau = TerrainSurfaceHeight(axe.x, axe.y) + ProfondeurEauCentre + 0.9f;
-                Box(new Vector3(axe.x, niveau, axe.y), new Vector3(largeur, 0.25f, 2.5f), "Wood",
+                GeometriePont(element, out Vector2 tangente, out float largeur, out float niveauTablier);
+                Box(new Vector3(x, niveauTablier, z), new Vector3(largeur, EpaisseurTablierPont, 2.5f), "Wood",
                     racineMonde, "Monde_Pont", true, Quaternion.LookRotation(new Vector3(tangente.x, 0f, tangente.y)));
                 break;
             }
         }
     }
 
+    // Geometrie d'un pont : centre enregistre (X, Z), direction du cours de la
+    // riviere, largeur entre rives + 2 m et hauteur du tablier au-dessus de l'eau.
+    private void GeometriePont(ElementMonde pont, out Vector2 tangente, out float largeur, out float niveauTablier)
+    {
+        Vector2 axe = PointRiviereProche(new Vector2(pont.X, pont.Z), out tangente);
+        largeur = LargeurRiviere(axe) + 2f;
+        // Centre du tablier ; le dessus est a niveauTablier + moitie de l'epaisseur.
+        niveauTablier = TerrainSurfaceHeight(axe.x, axe.y) + ProfondeurEauCentre + 0.9f;
+    }
+
+    // Vrai si le point (x, z) est dans l'emprise du pont. marge = tolerance en metres.
+    private bool DansPont(ElementMonde pont, float x, float z, float marge)
+    {
+        GeometriePont(pont, out Vector2 tangente, out float largeur, out float niveau);
+        Vector2 d = new Vector2(x - pont.X, z - pont.Z);
+        float along = Vector2.Dot(d, tangente);
+        float across = Vector2.Dot(d, new Vector2(-tangente.y, tangente.x));
+        return Mathf.Abs(across) <= largeur * 0.5f + marge && Mathf.Abs(along) <= 1.25f + marge;
+    }
+
     private void AppliquerPinceauMonde(Vector3 point)
     {
         string mode = modesMonde[pinceauModeIndex];
         float taille = taillesPinceauMonde[pinceauTailleIndex];
+        if (mode == "PONT")
+        {
+            // Un pont pose se cale sur l'axe de la riviere, puis se deplace a la main.
+            Vector2 axe = PointRiviereProche(new Vector2(point.x, point.z), out Vector2 tangentePont);
+            var pont = new ElementMonde { Type = "PONT", X = axe.x, Z = axe.y, Taille = 1f };
+            elementsMonde.Add(pont);
+            pontSelectionne = pont;
+            StartCoroutine(AjouterElementServeur(pont));
+            ReconstruireMonde();
+            return;
+        }
         if (mode == "EFFACER")
         {
             Vector2 centre = new Vector2(point.x, point.z);
             var retires = elementsMonde.FindAll(e => Vector2.Distance(new Vector2(e.X, e.Z), centre) <= taille * 0.5f + 0.6f);
+            if (pontSelectionne != null && retires.Contains(pontSelectionne)) pontSelectionne = null;
             var ids = new List<int>();
             for (int i = 0; i < retires.Count; i++)
                 if (retires[i].Id > 0) ids.Add(retires[i].Id);
@@ -1167,10 +1203,45 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (touches[i].collider != null && touches[i].collider.gameObject.name == "Terrain_Unity")
             {
-                AppliquerPinceauMonde(touches[i].point);
+                Vector3 point = touches[i].point;
+                // En mode PONT, un clic sur un pont existant le selectionne.
+                if (modesMonde[pinceauModeIndex] == "PONT")
+                {
+                    ElementMonde trouve = null;
+                    for (int j = elementsMonde.Count - 1; j >= 0; j--)
+                    {
+                        if (elementsMonde[j].Type == "PONT" && DansPont(elementsMonde[j], point.x, point.z, 0.5f))
+                        {
+                            trouve = elementsMonde[j];
+                            break;
+                        }
+                    }
+                    if (trouve != null) { pontSelectionne = trouve; return; }
+                }
+                AppliquerPinceauMonde(point);
                 return;
             }
         }
+    }
+
+    private void DeplacerPontSelectionne(float dx, float dz)
+    {
+        if (pontSelectionne == null) return;
+        pontSelectionne.X = Mathf.Clamp(pontSelectionne.X + dx, -130f, 130f);
+        pontSelectionne.Z = Mathf.Clamp(pontSelectionne.Z + dz, -130f, 130f);
+        ReconstruireMonde();
+        StartCoroutine(ModifierElementServeur(pontSelectionne));
+    }
+
+    private System.Collections.IEnumerator ModifierElementServeur(ElementMonde element)
+    {
+        if (element.Id <= 0) yield break;
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        var envoi = new LibreViesCompte.LibreViesElementMonde();
+        envoi.id = element.Id; envoi.type = element.Type; envoi.x = element.X; envoi.z = element.Z;
+        envoi.rotation = element.Rotation; envoi.taille = element.Taille;
+        yield return compte.ModifierElementMonde(envoi);
+        signatureMonde = SignatureMonde();
     }
 
     private void DessinerAdminMonde(Rect contenu)
@@ -1198,6 +1269,17 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 250f, 620f, 24f),
             "Pinceau : " + modesMonde[pinceauModeIndex] + "  " + taillesPinceauMonde[pinceauTailleIndex] + " m     Elements : " + elementsMonde.Count,
             smallStyle);
+        if (pontSelectionne != null)
+        {
+            // Haut = vers le nord (+Z), bas = vers le sud (-Z).
+            GUI.Label(new Rect(contenu.x + 420f, contenu.y + 290f, 300f, 24f),
+                "Pont selectionne : X " + pontSelectionne.X.ToString("0.0") + "  Z " + pontSelectionne.Z.ToString("0.0"), smallStyle);
+            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 316f, 100f, 32f), "HAUT", buttonStyle)) DeplacerPontSelectionne(0f, PasDeplacementPont);
+            if (GUI.Button(new Rect(contenu.x + 470f, contenu.y + 390f, 100f, 32f), "BAS", buttonStyle)) DeplacerPontSelectionne(0f, -PasDeplacementPont);
+            if (GUI.Button(new Rect(contenu.x + 410f, contenu.y + 353f, 100f, 32f), "GAUCHE", buttonStyle)) DeplacerPontSelectionne(-PasDeplacementPont, 0f);
+            if (GUI.Button(new Rect(contenu.x + 530f, contenu.y + 353f, 100f, 32f), "DROITE", buttonStyle)) DeplacerPontSelectionne(PasDeplacementPont, 0f);
+            if (GUI.Button(new Rect(contenu.x + 650f, contenu.y + 316f, 150f, 32f), "DESELECTIONNER", buttonStyle)) pontSelectionne = null;
+        }
         if (!razMondeConfirmation)
         {
             if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 290f, 240f, 32f), "RAZ MONDE", buttonStyle))
@@ -1210,6 +1292,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 316f, 120f, 32f), "CONFIRMER", buttonStyle))
             {
                 elementsMonde.Clear();
+                pontSelectionne = null;
                 razMondeConfirmation = false;
                 StartCoroutine(ViderMondeServeur());
                 ReconstruireMonde();
@@ -3429,6 +3512,17 @@ public sealed class LibreViesGame : MonoBehaviour
             float hauteurSolInterieur = batiment.SolY
                 + 0.35f * Mathf.Max(Mathf.Abs(batiment.Root.lossyScale.y), 0.001f);
             if (hauteurSolInterieur > sol) sol = hauteurSolInterieur;
+        }
+        // Les ponts poses dans le Monde sont praticables.
+        for (int i = 0; i < elementsMonde.Count; i++)
+        {
+            ElementMonde pont = elementsMonde[i];
+            if (pont.Type != "PONT") continue;
+            if (Mathf.Abs(x - pont.X) > 14f && Mathf.Abs(z - pont.Z) > 14f) continue;
+            if (!DansPont(pont, x, z, 0f)) continue;
+            GeometriePont(pont, out Vector2 tangente, out float largeur, out float niveau);
+            float dessus = niveau + EpaisseurTablierPont * 0.5f;
+            if (dessus > sol && pieds >= dessus - 1f) sol = dessus;
         }
         for (int i = 0; i < obstacles.Count; i++)
         {
@@ -7840,10 +7934,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (playerUnderwater && !playerWasUnderwater)
             ShowInfo("Sous l'eau : remontez avec ESPACE");
         playerWasUnderwater = playerUnderwater;
-        if (playerInWater)
+        if (playerUnderwater)
         {
-            // L'endurance se vide dans l'eau. Une fois vide et sous la surface,
-            // chaque seconde retire exactement 1 PV jusqu'a la sortie.
+            // L'endurance se vide seulement quand la tete est sous la surface.
+            // Le heros qui marche sur l'eau respire normalement.
             regenClock = 0f;
             endurance = Mathf.MoveTowards(endurance, 0f, dt * 11f);
             // La perte de PV depend de la presence dans l'eau, pas d'une
@@ -7863,6 +7957,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else
         {
             underwaterDamageClock = 0f;
+            if (playerInWater) endurance = Mathf.MoveTowards(endurance, 100f, dt * 16f);
             regenClock += dt;
             if (regenClock > 3f)
             {
@@ -7931,11 +8026,12 @@ public sealed class LibreViesGame : MonoBehaviour
             playerVelocity.y = Mathf.MoveTowards(playerVelocity.y, vitesseVerticale, dt * 12f);
             player.position += Vector3.up * playerVelocity.y * dt;
             float lit = TerrainHeight(player.position.x, player.position.z) + 0.08f;
-            // L'eau n'enfonce plus automatiquement le personnage : dans une
-            // zone peu profonde il peut rester debout, avec la tete au-dessus
-            // de la surface. Il ne descend que s'il demande a plonger.
-            float plafond = HauteurSurfaceEau(player.position.x, player.position.z) + 0.35f;
-            if (player.position.y < lit) player.position = new Vector3(player.position.x, lit, player.position.z);
+            float surface = HauteurSurfaceEau(player.position.x, player.position.z);
+            // Le heros marche sur l'eau : sans plonger, ses pieds restent
+            // a la surface. Il ne descend jusqu'au lit que s'il demande a plonger.
+            float plancher = descendre ? lit : Mathf.Max(lit, surface);
+            float plafond = surface + 0.35f;
+            if (player.position.y < plancher) player.position = new Vector3(player.position.x, plancher, player.position.z);
             if (player.position.y > plafond) player.position = new Vector3(player.position.x, plafond, player.position.z);
         }
         else
@@ -9930,6 +10026,16 @@ public sealed class LibreViesGame : MonoBehaviour
             OuvrirMenuTextures(-1);
     }
 
+    // Fenetre admin : position et taille gardees d'une ouverture a l'autre.
+    // x < 0 signifie : pas encore placee, elle sera centree.
+    private Rect fenetreAdminRect = new Rect(-1f, -1f, 1180f, 720f);
+    private bool fenetreAdminReduite;
+    private bool fenetreAdminDeplacement;
+    private bool fenetreAdminRedimension;
+    private const float FenetreAdminLargeurMin = 900f;
+    private const float FenetreAdminHauteurMin = 600f;
+    private const float FenetreAdminHauteurBarre = 52f;
+
     private void DessinerAdmin()
     {
         if (!CompteAdministrateur) { adminOpen = false; return; }
@@ -9938,8 +10044,49 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(echelleAdmin, echelleAdmin, 1f));
         try
         {
-            Rect fenetre = new Rect(Screen.width / echelleAdmin * 0.5f - 590f,
-                Screen.height / echelleAdmin * 0.5f - 360f, 1180f, 720f);
+            float largeurEcran = Screen.width / echelleAdmin;
+            float hauteurEcran = Screen.height / echelleAdmin;
+            if (fenetreAdminRect.x < 0f)
+            {
+                fenetreAdminRect.x = largeurEcran * 0.5f - fenetreAdminRect.width * 0.5f;
+                fenetreAdminRect.y = hauteurEcran * 0.5f - fenetreAdminRect.height * 0.5f;
+            }
+
+            // Deplacement : on saisit la barre de titre. Redimensionnement : poignee en bas a droite.
+            Event evenement = Event.current;
+            Rect barre = new Rect(fenetreAdminRect.x, fenetreAdminRect.y, fenetreAdminRect.width - 120f, FenetreAdminHauteurBarre);
+            Rect poignee = new Rect(fenetreAdminRect.xMax - 22f, fenetreAdminRect.yMax - 22f, 22f, 22f);
+            if (evenement.type == EventType.MouseDown && evenement.button == 0)
+            {
+                if (!fenetreAdminReduite && poignee.Contains(evenement.mousePosition)) fenetreAdminRedimension = true;
+                else if (barre.Contains(evenement.mousePosition)) fenetreAdminDeplacement = true;
+            }
+            else if (evenement.type == EventType.MouseUp)
+            {
+                fenetreAdminDeplacement = false;
+                fenetreAdminRedimension = false;
+            }
+            else if (evenement.type == EventType.MouseDrag)
+            {
+                if (fenetreAdminDeplacement)
+                {
+                    fenetreAdminRect.x += evenement.delta.x;
+                    fenetreAdminRect.y += evenement.delta.y;
+                    evenement.Use();
+                }
+                else if (fenetreAdminRedimension)
+                {
+                    fenetreAdminRect.width = Mathf.Clamp(fenetreAdminRect.width + evenement.delta.x, FenetreAdminLargeurMin, largeurEcran);
+                    fenetreAdminRect.height = Mathf.Clamp(fenetreAdminRect.height + evenement.delta.y, FenetreAdminHauteurMin, hauteurEcran);
+                    evenement.Use();
+                }
+            }
+            // Reste toujours visible a l'ecran.
+            fenetreAdminRect.x = Mathf.Clamp(fenetreAdminRect.x, -fenetreAdminRect.width + 120f, largeurEcran - 120f);
+            fenetreAdminRect.y = Mathf.Clamp(fenetreAdminRect.y, 0f, Mathf.Max(0f, hauteurEcran - FenetreAdminHauteurBarre));
+
+            Rect fenetre = fenetreAdminRect;
+            if (fenetreAdminReduite) fenetre.height = FenetreAdminHauteurBarre;
             fenetreAdminMonde = fenetre;
             GUI.Box(fenetre, "", boxStyle);
             GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
@@ -9950,6 +10097,12 @@ public sealed class LibreViesGame : MonoBehaviour
                 adminOpen = false;
                 return;
             }
+            if (GUI.Button(new Rect(fenetre.x + fenetre.width - 78f, fenetre.y + 14f, 28f, 28f),
+                fenetreAdminReduite ? "+" : "-", buttonStyle))
+                fenetreAdminReduite = !fenetreAdminReduite;
+            if (fenetreAdminReduite) return;
+            // Poignee de redimensionnement (affichee seulement quand la fenetre est deployee).
+            GUI.Box(new Rect(fenetre.xMax - 22f, fenetre.yMax - 22f, 22f, 22f), "//", smallStyle);
 
             string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA" };
             for (int i = 0; i < onglets.Length; i++)
