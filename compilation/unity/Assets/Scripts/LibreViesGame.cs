@@ -1156,6 +1156,29 @@ public sealed class LibreViesGame : MonoBehaviour
         niveauTablier = TerrainSurfaceHeight(axe.x, axe.y) + ProfondeurEauCentre + 0.9f;
     }
 
+    // Le tablier est 2 a 3 m au-dessus de l'eau : on le prend a pied des qu'on
+    // arrive dessus depuis la berge ou depuis l'eau, sinon le heros traverse le pont.
+    private const float MonteePontMonde = 3.2f;
+
+    private bool SurPontMonde(float x, float z, float pieds, out float dessus)
+    {
+        dessus = 0f;
+        bool trouve = false;
+        for (int i = 0; i < elementsMonde.Count; i++)
+        {
+            ElementMonde pont = elementsMonde[i];
+            if (pont.Type != "PONT") continue;
+            if (Mathf.Abs(x - pont.X) > 14f && Mathf.Abs(z - pont.Z) > 14f) continue;
+            if (!DansPont(pont, x, z, 0f)) continue;
+            GeometriePont(pont, out Vector2 tangente, out float largeur, out float niveau);
+            float dessusCandidat = niveau + EpaisseurTablierPont * 0.5f;
+            if (pieds < dessusCandidat - MonteePontMonde) continue;
+            if (!trouve || dessusCandidat > dessus) dessus = dessusCandidat;
+            trouve = true;
+        }
+        return trouve;
+    }
+
     // Vrai si le point (x, z) est dans l'emprise du pont. marge = tolerance en metres.
     private bool DansPont(ElementMonde pont, float x, float z, float marge)
     {
@@ -1292,23 +1315,30 @@ public sealed class LibreViesGame : MonoBehaviour
         if (choixTypeMondeOuvert && fenetreChoixTypeMonde.Contains(new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y))) return;
         Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit[] touches = Physics.RaycastAll(rayon, 1000f);
+        System.Array.Sort(touches, (a, b) => a.distance.CompareTo(b.distance));
+        bool solTrouve = false;
+        Vector3 pointSol = Vector3.zero;
         for (int i = 0; i < touches.Length; i++)
         {
             if (touches[i].collider != null && touches[i].collider.gameObject.name == "Terrain_Unity")
             {
-                Vector3 point = touches[i].point;
-                if (modesMonde[pinceauModeIndex] != "EFFACER")
-                {
-                    // Comme pour les maisons : un clic sur un objet le selectionne,
-                    // un clic dans le vide deselectionne sans rien poser.
-                    ElementMonde trouve = TrouverElementMondeSelectionnable(point);
-                    if (trouve != null) { SelectionnerElementMonde(trouve); return; }
-                    if (elementMondeSelectionne != null) { SelectionnerElementMonde(null); return; }
-                }
-                AppliquerPinceauMonde(point);
-                return;
+                pointSol = touches[i].point;
+                solTrouve = true;
+                break;
             }
         }
+        if (!solTrouve) return;
+        if (modesMonde[pinceauModeIndex] != "EFFACER")
+        {
+            // Comme pour les maisons : un clic sur un objet le selectionne (cime d'arbre,
+            // tablier de pont compris), un clic dans le vide deselectionne sans rien poser.
+            ElementMonde trouve = null;
+            for (int i = 0; i < touches.Length && trouve == null; i++)
+                trouve = TrouverElementMondeSelectionnable(touches[i].point);
+            if (trouve != null) { SelectionnerElementMonde(trouve); return; }
+            if (elementMondeSelectionne != null) { SelectionnerElementMonde(null); return; }
+        }
+        AppliquerPinceauMonde(pointSol);
     }
 
     private void DeplacerElementMondeSelectionne(float dx, float dz)
@@ -3627,16 +3657,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (hauteurSolInterieur > sol) sol = hauteurSolInterieur;
         }
         // Les ponts poses dans le Monde sont praticables.
-        for (int i = 0; i < elementsMonde.Count; i++)
-        {
-            ElementMonde pont = elementsMonde[i];
-            if (pont.Type != "PONT") continue;
-            if (Mathf.Abs(x - pont.X) > 14f && Mathf.Abs(z - pont.Z) > 14f) continue;
-            if (!DansPont(pont, x, z, 0f)) continue;
-            GeometriePont(pont, out Vector2 tangente, out float largeur, out float niveau);
-            float dessus = niveau + EpaisseurTablierPont * 0.5f;
-            if (dessus > sol && pieds >= dessus - 1f) sol = dessus;
-        }
+        if (SurPontMonde(x, z, pieds, out float dessusPont) && dessusPont > sol) sol = dessusPont;
         for (int i = 0; i < obstacles.Count; i++)
         {
             Obstacle c = obstacles[i];
@@ -8030,7 +8051,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (playerProtection > 0) playerProtection -= dt;
         if (invincibility > 0) invincibility -= dt;
         if (speedBoost > 0) speedBoost -= dt;
-        playerInWater = player != null && EstDansEau(new Vector2(player.position.x, player.position.z));
+        // Sur un pont, le heros marche sur le tablier meme au-dessus de la riviere.
+        bool surPontJoueur = player != null
+            && SurPontMonde(player.position.x, player.position.z, player.position.y, out float dessusPontJoueur);
+        playerInWater = player != null && EstDansEau(new Vector2(player.position.x, player.position.z)) && !surPontJoueur;
         // L'immersion est mesurée sur la hauteur de la tete. L'endurance, elle,
         // descend dès que les pieds sont dans l'eau, afin de ne pas dépendre
         // d'un seul point de détection lorsque le joueur entre par la berge.
