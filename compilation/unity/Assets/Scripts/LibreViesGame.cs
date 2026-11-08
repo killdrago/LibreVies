@@ -2205,6 +2205,14 @@ public sealed class LibreViesGame : MonoBehaviour
             string canon = coordonnee != null ? JsonUtility.ToJson(coordonnee, false) : donnees;
             string precedent;
             if (maisonsAppliquees.TryGetValue(maison.id, out precedent) && precedent == canon) continue;
+            // Maison en cours de deplacement par ce joueur : on ne la saute pas sur place.
+            // Non memorisee, elle sera appliquee au sondage suivant apres le depot.
+            if (editionMaisonEnDeplacement && elementEditionSelectionne != null && coordonnee != null)
+            {
+                Transform enCours = TrouverRacineCoordonnee(coordonnee.Nom, coordonnee.Chemin,
+                    coordonnee.Position, new HashSet<Transform>());
+                if (enCours != null && TrouverElementEdition(enCours) == elementEditionSelectionne) continue;
+            }
             maisonsAppliquees[maison.id] = canon;
             if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
             AppliquerCoordonneeEdition(coordonnee, false, utilisees);
