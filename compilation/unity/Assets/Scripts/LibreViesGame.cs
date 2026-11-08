@@ -1056,10 +1056,19 @@ public sealed class LibreViesGame : MonoBehaviour
                 continue;
             }
             erreurSynchroMonde = "";
-            bool change = AppliquerMondeServeur(compte);
-            AppliquerMaisonsServeur(compte.MaisonsMonde);
-            revisionMondeConnue = compte.RevisionMonde;
-            if (change) ReconstruireMonde();
+            // Une erreur dans l'application ne doit jamais arreter la boucle de synchro.
+            try
+            {
+                bool change = AppliquerMondeServeur(compte);
+                AppliquerMaisonsServeur(compte.MaisonsMonde);
+                revisionMondeConnue = compte.RevisionMonde;
+                if (change) ReconstruireMonde();
+            }
+            catch (Exception erreur)
+            {
+                Journal("monde : application impossible : " + erreur.GetType().Name + " " + erreur.Message);
+                Debug.LogException(erreur);
+            }
         }
     }
 
@@ -2231,7 +2240,12 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             maisonsAppliquees[maison.id] = canon;
             if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
-            AppliquerCoordonneeEdition(coordonnee, false, utilisees);
+            try { AppliquerCoordonneeEdition(coordonnee, false, utilisees); }
+            catch (Exception erreur)
+            {
+                Journal("maison " + coordonnee.Nom + " non appliquee : " + erreur.GetType().Name + " " + erreur.Message);
+                continue;
+            }
             change = true;
         }
         if (change) SynchroniserTousLesBatiments();
