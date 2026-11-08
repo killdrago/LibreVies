@@ -1046,13 +1046,24 @@ public sealed class LibreViesGame : MonoBehaviour
             yield return new WaitForSeconds(1.5f);
             LibreViesCompte compte = LibreViesCompte.Courant;
             yield return compte.ChargerMonde(revisionMondeConnue);
-            if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null) continue;
+            if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
+            {
+                if (compte.Erreur != erreurSynchroMonde)
+                {
+                    erreurSynchroMonde = compte.Erreur;
+                    Journal("monde : synchronisation impossible : " + compte.Erreur);
+                }
+                continue;
+            }
+            erreurSynchroMonde = "";
             bool change = AppliquerMondeServeur(compte);
             AppliquerMaisonsServeur(compte.MaisonsMonde);
             revisionMondeConnue = compte.RevisionMonde;
             if (change) ReconstruireMonde();
         }
     }
+
+    private string erreurSynchroMonde = "";
 
     private void ReconstruireMonde()
     {
@@ -1067,6 +1078,11 @@ public sealed class LibreViesGame : MonoBehaviour
         envoi.type = element.Type; envoi.x = element.X; envoi.z = element.Z;
         envoi.rotation = element.Rotation; envoi.taille = element.Taille;
         yield return compte.AjouterElementMonde(envoi);
+        if (!String.IsNullOrEmpty(compte.Erreur))
+        {
+            ShowInfo("Monde : objet non enregistre : " + compte.Erreur);
+            Journal("monde : ajout refuse : " + compte.Erreur);
+        }
         if (compte.DernierIdMonde > 0) element.Id = compte.DernierIdMonde;
         signatureMonde = SignatureMonde();
     }
@@ -5605,7 +5621,10 @@ public sealed class LibreViesGame : MonoBehaviour
         ElementEdition cible;
         if (!TryTrouverElementEdition(out cible)) return;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
+        {
             PoserElementEdition(elementEditionSelectionne);
+            if (mondePret) EnregistrerCoordonneesEdition();
+        }
         if (editionOutilMaison == 1 || editionOutilMaison == 4
             || editionOutilMaison == 6 || editionOutilMaison == 7)
         {
@@ -5735,6 +5754,8 @@ public sealed class LibreViesGame : MonoBehaviour
             elementEditionDernierSelectionne = editionOutilMaison == 5
                 ? element : TrouverElementEdition(element.MaisonParent.Root);
         elementEditionSelectionne = null;
+        // Sans cet appel, le deplacement n'etait envoye qu'en quittant le mode edition.
+        if (mondePret) EnregistrerCoordonneesEdition();
         ShowInfo("Objet pose a sa nouvelle position");
     }
 
