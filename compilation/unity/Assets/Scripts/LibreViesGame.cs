@@ -1043,7 +1043,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForSeconds(0.5f);
             LibreViesCompte compte = LibreViesCompte.Courant;
             yield return compte.ChargerMonde(revisionMondeConnue);
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
@@ -1523,7 +1523,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (player == null || compteJoueur == null || !compteJoueur.LanceParLauncher || !compteJoueur.Authentifie) return;
         if (presenceEnCours || Time.time < prochainePresence) return;
-        prochainePresence = Time.time + 1f;
+        prochainePresence = Time.time + 0.5f;
         StartCoroutine(EnvoyerPresenceJoueur());
     }
 
@@ -1554,7 +1554,7 @@ public sealed class LibreViesGame : MonoBehaviour
             JoueurDistant d;
             if (!joueursDistants.TryGetValue(j.membre_id, out d))
             {
-                d = CreerJoueurDistant(j.pseudo, cible);
+                d = CreerJoueurDistant(j.pseudo, cible, j.personnage);
                 joueursDistants[j.membre_id] = d;
             }
             d.Cible = cible;
@@ -1571,16 +1571,20 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Avatar simple (capsule bleue + pseudo) : le modele complet des autres joueurs viendra ensuite.
-    private JoueurDistant CreerJoueurDistant(string pseudo, Vector3 position)
+    private JoueurDistant CreerJoueurDistant(string pseudo, Vector3 position, LibreViesPersonnage profil)
     {
         var racine = new GameObject("Joueur_" + pseudo);
         racine.transform.position = position;
-        GameObject corps = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        corps.transform.SetParent(racine.transform, false);
-        corps.transform.localPosition = new Vector3(0f, 1f, 0f);
-        corps.transform.localScale = new Vector3(0.5f, 0.9f, 0.5f);
-        Destroy(corps.GetComponent<Collider>());
-        corps.GetComponent<Renderer>().material.color = new Color(0.2f, 0.6f, 0.9f);
+        // Apparence reelle (meme constructeur que le personnage local) ; sinon capsule.
+        if (profil == null || CreerModeleJoueurDistant(racine.transform, profil) == null)
+        {
+            GameObject corps = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            corps.transform.SetParent(racine.transform, false);
+            corps.transform.localPosition = new Vector3(0f, 1f, 0f);
+            corps.transform.localScale = new Vector3(0.5f, 0.9f, 0.5f);
+            Destroy(corps.GetComponent<Collider>());
+            corps.GetComponent<Renderer>().material.color = new Color(0.2f, 0.6f, 0.9f);
+        }
         var etiquette = new GameObject("Pseudo");
         etiquette.transform.SetParent(racine.transform, false);
         etiquette.transform.localPosition = new Vector3(0f, 2.6f, 0f);
@@ -1592,6 +1596,28 @@ public sealed class LibreViesGame : MonoBehaviour
         texte.alignment = TextAlignment.Center;
         texte.color = Color.white;
         return new JoueurDistant { Racine = racine, Pseudo = texte, Cible = position };
+    }
+
+    private GameObject CreerModeleJoueurDistant(Transform parent, LibreViesPersonnage profil)
+    {
+        try
+        {
+            var modele = new GameObject("Apparence");
+            modele.transform.SetParent(parent, false);
+            var createur = modele.AddComponent<AdminHumanCreator>();
+            profil.ChargerDans(createur);
+            if (!createur.ApplyTo(modele.transform))
+            {
+                Destroy(modele);
+                return null;
+            }
+            return modele;
+        }
+        catch (Exception erreur)
+        {
+            Debug.LogWarning("LibreVies : apparence d'un joueur distant impossible : " + erreur.Message);
+            return null;
+        }
     }
 
     private void AnimerJoueursDistants()

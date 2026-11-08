@@ -77,6 +77,8 @@ public sealed class LibreViesCompte
         public float position_z;
         public float rotation_y;
         public string animation;
+        // Apparence du joueur (meme profil que son personnage). Absent : avatar simple.
+        public LibreViesPersonnage personnage;
     }
 
     [Serializable]

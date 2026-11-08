@@ -608,6 +608,14 @@ if ($action === 'presence') {
     try {
         $pdoMonde = connexion_monde($config);
         $resultat = mettre_a_jour_presence($pdoMonde, $membre, $donnees);
+        // Apparence des autres joueurs : profil de leur personnage (base principale).
+        foreach ($resultat['joueurs'] as $indice => $autre) {
+            try {
+                $resultat['joueurs'][$indice]['personnage'] = lire_personnage($pdo, (int)$autre['membre_id']);
+            } catch (Exception $erreur) {
+                // Sans apparence : le client affiche un avatar simple.
+            }
+        }
         $resultat['membre'] = membre_public($membre);
         repondre(true, 'Presence enregistree.', $resultat);
     } catch (InvalidArgumentException $erreur) {
