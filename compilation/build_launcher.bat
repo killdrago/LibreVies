@@ -67,6 +67,11 @@ echo.
 
 call :etape_projet
 if errorlevel 1 goto :echec
+
+rem --- Adresses du jeu (cheminurl) : choix 1 = pour moi, 2 = joueurs ---
+rem Fait APRES la synchronisation GitHub, qui remplacerait jeu\cheminurl.
+call :choisir_adresses
+if errorlevel 1 goto :echec
 call :etape_python
 if errorlevel 1 goto :echec
 call :etape_pyinstaller
@@ -474,6 +479,30 @@ rem  Les fichiers sont mis a jour a chaque lancement (le depot est la
 rem  reference). Avant tout remplacement, l'ancienne version est copiee dans
 rem  build\sauvegarde_locale\ : rien n'est jamais perdu.
 rem ==========================================================================
+:choisir_adresses
+set "LV_ADRESSES_CHOIX="
+set "LV_ADRESSES_SRC="
+echo.
+echo   Adresses du jeu (jeu\cheminurl\adresses.txt) :
+echo     1 = version POUR MOI   ^(api localhost, mises a jour GitHub^)
+echo     2 = version JOUEURS    ^(api et mises a jour sur www.librevies.com^)
+set /p "LV_ADRESSES_CHOIX=Votre choix (1 ou 2) : "
+if "%LV_ADRESSES_CHOIX%"=="1" set "LV_ADRESSES_SRC=%ROOT%cheminurl\adresses_moi.txt"
+if "%LV_ADRESSES_CHOIX%"=="2" set "LV_ADRESSES_SRC=%ROOT%cheminurl\adresses_joueurs.txt"
+if not defined LV_ADRESSES_SRC (
+    echo ERREUR : choix invalide, tapez 1 ou 2.
+    exit /b 1
+)
+if not exist "%JEU%\cheminurl" mkdir "%JEU%\cheminurl"
+copy /y "%LV_ADRESSES_SRC%" "%JEU%\cheminurl\adresses.txt" >nul
+if errorlevel 1 (
+    echo ERREUR : impossible d'ecrire jeu\cheminurl\adresses.txt.
+    exit /b 1
+)
+echo   Fichier ecrit : jeu\cheminurl\adresses.txt ^(choix %LV_ADRESSES_CHOIX%^)
+echo.
+exit /b 0
+
 :etape_projet
 echo [1/7] Projet : mise a jour depuis GitHub...
 echo        https://github.com/%DEPOT% ^(branche %BRANCHE%^)

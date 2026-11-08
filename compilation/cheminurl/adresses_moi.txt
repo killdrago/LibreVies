@@ -1,7 +1,3 @@
-# LibreVies - adresses utilisees par le jeu, le launcher et les mises a jour.
-# Format : cle=valeur. Les lignes qui commencent par # sont ignorees.
-# Ne laissez ACTIVE qu'une seule ligne par cle (api= et maj=).
-#
 # ---- PARTIE DU JEU (connexion, personnage, PNJ, IA) ----
 # Hebergeur :
 # api=http://www.librevies.com

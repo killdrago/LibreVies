@@ -1,0 +1,11 @@
+# ---- PARTIE DU JEU (connexion, personnage, PNJ, IA) ----
+# Hebergeur :
+api=http://www.librevies.com
+# Local (test) :
+# api=http://localhost
+#
+# ---- PARTIE MAJ (fichiers du jeu telecharges au lancement) ----
+# Hebergeur :
+maj=http://www.librevies.com/jeu
+# Git (actuel) :
+# maj=https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu
