@@ -37,18 +37,18 @@ public sealed class LibreViesGame : MonoBehaviour
     private const float MargeEauMonstres = 0.85f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
-    // Profil de la riviere : les berges sont a DemiLargeurRiviere de l'axe
-    // (5 m entre rives). Le fond est plat sur DemiZonePlateRiviere autour de
-    // l'axe, puis remonte jusqu'a la berge. Il est BergeHauteurRiviere plus bas
-    // que le niveau naturel du centre. L'eau est ProfondeurEauCentre au-dessus
-    // de ce fond plat, sur toute la section.
-    private const float DemiLargeurRiviere = 2.5f;
-    private const float DemiZonePlateRiviere = 1.0f;
-    private const float BergeHauteurRiviere = 1.0f;
+    // Ruisseau : la largeur entre rives varie de LargeurMinRiviere a
+    // LargeurMaxRiviere le long du cours, de facon lisse (jamais de saut).
+    private const float LargeurMinRiviere = 1.0f;
+    private const float LargeurMaxRiviere = 5.0f;
+    // Creux du lit sous le niveau naturel : plus le lit est large, plus il est profond.
+    private const float ProfondeurMinRiviere = 0.20f;
+    private const float ProfondeurMaxRiviere = 1.00f;
+    // Rayon du fond plat autour de l'axe, lui aussi fonction de la largeur.
+    private const float FondPlatMinRiviere = 0.20f;
+    private const float FondPlatMaxRiviere = 1.00f;
+    // Niveau de l'eau au-dessus du fond du lit.
     private const float ProfondeurEauCentre = 0.20f;
-    // Demi-largeur de l'eau visible, mesuree a partir de l'axe : l'eau s'arrete
-    // la ou le terrain remonte au-dessus de sa surface (environ 1,4 m).
-    private const float DemiLargeurEau = 1.6f;
     private const int MaxHp = 100;
     private const int HammerDamage = 25;
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
@@ -2680,13 +2680,34 @@ public sealed class LibreViesGame : MonoBehaviour
         return hauteur;
     }
 
+    // Largeur entre rives au point de l'axe : somme de deux ondes lentes, donc
+    // une variation progressive d'un bout a l'autre de la riviere.
+    private float LargeurRiviere(Vector2 axe)
+    {
+        float onde = Mathf.Sin(axe.x * 0.037f + 0.6f) * Mathf.Cos(axe.y * 0.029f + 1.3f);
+        float onde2 = Mathf.Sin(axe.x * 0.093f + axe.y * 0.061f) * 0.35f;
+        return Mathf.Clamp(3.0f + 1.8f * onde + onde2, LargeurMinRiviere, LargeurMaxRiviere);
+    }
+
+    private float ProfondeurRiviere(float largeur)
+    {
+        return Mathf.Lerp(ProfondeurMinRiviere, ProfondeurMaxRiviere,
+            Mathf.InverseLerp(LargeurMinRiviere, LargeurMaxRiviere, largeur));
+    }
+
+    private float FondPlatRiviere(float largeur)
+    {
+        return Mathf.Lerp(FondPlatMinRiviere, FondPlatMaxRiviere,
+            Mathf.InverseLerp(LargeurMinRiviere, LargeurMaxRiviere, largeur));
+    }
+
     private float HauteurSurfaceEau(float x, float z)
     {
-        // La surface est plate en travers du lit : elle est calculee sur le
-        // point de l'axe le plus proche, sur le relief naturel. Elle suit donc
-        // les montees et descentes de la riviere, mais jamais une pente laterale.
+        // Surface plate en travers du lit, calculee sur le point de l'axe le
+        // plus proche : elle suit le relief de la riviere, pas une pente laterale.
         Vector2 axe = PointRiviereProche(new Vector2(x, z), out Vector2 tangente);
-        return TerrainSurfaceHeight(axe.x, axe.y) - BergeHauteurRiviere + ProfondeurEauCentre;
+        float profondeur = ProfondeurRiviere(LargeurRiviere(axe));
+        return TerrainSurfaceHeight(axe.x, axe.y) - profondeur + ProfondeurEauCentre;
     }
 
     private float TerrainHeight(float x, float z)
@@ -2694,16 +2715,17 @@ public sealed class LibreViesGame : MonoBehaviour
         float hauteur = TerrainSurfaceHeight(x, z);
         if (DansVillage(x, z)) return hauteur;
 
-        // Le lit est plat au centre (BergeHauteurRiviere sous le relief du
-        // centre), puis rejoint le relief naturel exactement a la berge.
+        // Le lit est plat au centre, puis rejoint le relief naturel exactement
+        // au bord de la largeur locale. Largeur et profondeur varient ensemble.
         Vector2 point = new Vector2(x, z);
         Vector2 axe = PointRiviereProche(point, out Vector2 tangente);
+        float largeur = LargeurRiviere(axe);
         float distance = Vector2.Distance(point, axe);
-        if (distance >= DemiLargeurRiviere) return hauteur;
+        if (distance >= largeur * 0.5f) return hauteur;
 
-        float fond = TerrainSurfaceHeight(axe.x, axe.y) - BergeHauteurRiviere;
+        float fond = TerrainSurfaceHeight(axe.x, axe.y) - ProfondeurRiviere(largeur);
         float t = Mathf.SmoothStep(0f, 1f,
-            Mathf.InverseLerp(DemiZonePlateRiviere, DemiLargeurRiviere, distance));
+            Mathf.InverseLerp(FondPlatRiviere(largeur), largeur * 0.5f, distance));
         return Mathf.Lerp(fond, hauteur, t);
     }
 
@@ -2726,7 +2748,9 @@ public sealed class LibreViesGame : MonoBehaviour
         // Le fleuve reste hors du village ; il n'y a plus de douves ni de
         // pont-levis a traiter.
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= DemiLargeurEau;
+        Vector2 axe = PointRiviereProche(point, out Vector2 tangente);
+        if (Vector2.Distance(point, axe) > LargeurRiviere(axe) * 0.5f + 0.5f) return false;
+        return TerrainHeight(point.x, point.y) < HauteurSurfaceEau(point.x, point.y) - 0.02f;
     }
 
     // Les monstres terrestres n'ont pas de nage : l'eau est une zone interdite
@@ -2735,7 +2759,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool ZoneEauInterditeMonstre(Vector2 point)
     {
         if (DansVillage(point.x, point.y)) return false;
-        return DistancePolyligne(point, RivierePrincipale) <= DemiLargeurEau + MargeEauMonstres;
+        Vector2 axe = PointRiviereProche(point, out Vector2 tangente);
+        return Vector2.Distance(point, axe) <= LargeurRiviere(axe) * 0.5f + MargeEauMonstres;
     }
 
     private Vector2 PointRiviereProche(Vector2 point, out Vector2 tangente)
@@ -2770,7 +2795,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Vector2 normale = point - bord;
         if (normale.sqrMagnitude < 0.0001f)
             normale = new Vector2(-tangente.y, tangente.x);
-        return bord + normale.normalized * (DemiLargeurEau + MargeEauMonstres + 0.20f);
+        return bord + normale.normalized * (LargeurMaxRiviere * 0.5f + MargeEauMonstres + 0.20f);
     }
 
     private Vector3 DirectionSansEau(Vector2 position, Vector3 direction)
@@ -3118,7 +3143,6 @@ public sealed class LibreViesGame : MonoBehaviour
         var mesh = new Mesh { name = "LibreViesTerrain", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
         var vertices = new Vector3[(cells + 1) * (cells + 1)];
         var trianglesSol = new List<int>();
-        var trianglesEau = new List<int>();
         for (int z = 0; z <= cells; z++)
         {
             for (int x = 0; x <= cells; x++)
@@ -3136,27 +3160,19 @@ public sealed class LibreViesGame : MonoBehaviour
                 int b = a + 1;
                 int c = a + cells + 1;
                 int d = c + 1;
-                float centreX = -WorldSize + (x + 0.5f) * step;
-                float centreZ = -WorldSize + (z + 0.5f) * step;
-                // Triangle en eau seulement s'il est sous la surface de l'eau.
-                Vector2 centre = new Vector2(centreX, centreZ);
-                bool zoneEau = !DansVillage(centreX, centreZ)
-                    && DistancePolyligne(centre, RivierePrincipale) <= DemiLargeurRiviere + 0.5f
-                    && TerrainHeight(centreX, centreZ) < HauteurSurfaceEau(centreX, centreZ);
-                List<int> destination = zoneEau ? trianglesEau : trianglesSol;
+                List<int> destination = trianglesSol;
                 destination.Add(a); destination.Add(c); destination.Add(b);
                 destination.Add(b); destination.Add(c); destination.Add(d);
             }
         }
         mesh.vertices = vertices;
-        mesh.subMeshCount = 2;
+        mesh.subMeshCount = 1;
         mesh.SetTriangles(trianglesSol, 0);
-        mesh.SetTriangles(trianglesEau, 1);
         mesh.RecalculateNormals();
         var terrain = new GameObject("Terrain_Unity");
         terrain.AddComponent<MeshFilter>().sharedMesh = mesh;
         var terrainRenderer = terrain.AddComponent<MeshRenderer>();
-        terrainRenderer.sharedMaterials = new[] { Mat("Terrain"), Mat("Eau_Riviere") };
+        terrainRenderer.sharedMaterials = new[] { Mat("Terrain") };
         terrain.AddComponent<MeshCollider>().sharedMesh = mesh;
     }
 
@@ -5544,7 +5560,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Il ne reste qu'un seul fleuve qui traverse la carte ; aucune
         // derivation ni autre surface d'eau n'est creee.
         ObjetMaillage("Riviere_Principale",
-            CreerRubanEau(RivierePrincipale, DemiLargeurRiviere, "Riviere_Principale"), "Eau_Riviere");
+            CreerRubanEau(RivierePrincipale, "Riviere_Principale"), "Eau_Riviere");
     }
 
     private Vector2[] EchantillonnerLigne(Vector2[] points)
@@ -5560,34 +5576,48 @@ public sealed class LibreViesGame : MonoBehaviour
         return resultats.ToArray();
     }
 
-    private Mesh CreerRubanEau(Vector2[] points, float demiLargeur, string nom)
+    // Distance de l'axe ou le terrain remonte au-dessus de la surface, cote
+    // 'normale'. Le ruban ne couvre ainsi que la partie reellement submergee.
+    private float EtendueEau(Vector2 axe, Vector2 normale, float surface, float maxi)
+    {
+        const float pas = 0.05f;
+        for (float o = 0f; o <= maxi; o += pas)
+        {
+            Vector2 p = axe + normale * o;
+            if (TerrainHeight(p.x, p.y) >= surface) return o;
+        }
+        return maxi;
+    }
+
+    private Mesh CreerRubanEau(Vector2[] points, string nom)
     {
         points = EchantillonnerLigne(points);
         var ruban = new Maillage();
         Vector2[] normales = new Vector2[points.Length];
+        float[] gauches = new float[points.Length];
+        float[] droites = new float[points.Length];
+        float[] hauteurs = new float[points.Length];
         for (int i = 0; i < points.Length; i++)
         {
             Vector2 avant = points[Mathf.Max(0, i - 1)];
             Vector2 apres = points[Mathf.Min(points.Length - 1, i + 1)];
             Vector2 direction = (apres - avant).normalized;
             normales[i] = new Vector2(-direction.y, direction.x);
+            float maxi = LargeurRiviere(points[i]) * 0.5f + 0.5f;
+            hauteurs[i] = HauteurSurfaceEau(points[i].x, points[i].y);
+            gauches[i] = EtendueEau(points[i], normales[i], hauteurs[i], maxi);
+            droites[i] = EtendueEau(points[i], -normales[i], hauteurs[i], maxi);
         }
         for (int i = 0; i < points.Length - 1; i++)
         {
-            Vector2 gauche = points[i] + normales[i] * demiLargeur;
-            Vector2 droite = points[i] - normales[i] * demiLargeur;
-            Vector2 gauche2 = points[i + 1] + normales[i + 1] * demiLargeur;
-            Vector2 droite2 = points[i + 1] - normales[i + 1] * demiLargeur;
-            // Une hauteur unique par section evite que les deux bords du
-            // ruban se croisent quand le terrain monte d'un cote. Elle est
-            // prise sur l'axe du chenal : l'eau reste posee au niveau du sol
-            // naturel, sans etre remontee artificiellement sur une berge.
-            float hauteur1 = HauteurSurfaceEau(points[i].x, points[i].y);
-            float hauteur2 = HauteurSurfaceEau(points[i + 1].x, points[i + 1].y);
-            ruban.Quad(new Vector3(gauche.x, hauteur1, gauche.y),
-                new Vector3(gauche2.x, hauteur2, gauche2.y),
-                new Vector3(droite2.x, hauteur2, droite2.y),
-                new Vector3(droite.x, hauteur1, droite.y));
+            Vector2 gauche = points[i] + normales[i] * gauches[i];
+            Vector2 droite = points[i] - normales[i] * droites[i];
+            Vector2 gauche2 = points[i + 1] + normales[i + 1] * gauches[i + 1];
+            Vector2 droite2 = points[i + 1] - normales[i + 1] * droites[i + 1];
+            ruban.Quad(new Vector3(gauche.x, hauteurs[i], gauche.y),
+                new Vector3(gauche2.x, hauteurs[i + 1], gauche2.y),
+                new Vector3(droite2.x, hauteurs[i + 1], droite2.y),
+                new Vector3(droite.x, hauteurs[i], droite.y));
         }
         return ruban.VersMesh(nom);
     }
