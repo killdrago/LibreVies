@@ -961,37 +961,68 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private System.Collections.IEnumerator ChargerMondeServeur()
     {
-        yield return LibreViesCompte.Courant.ChargerMonde();
+        yield return LibreViesCompte.Courant.ChargerMonde(0);
         LibreViesCompte compte = LibreViesCompte.Courant;
-        if (compte.ElementsMonde == null)
+        if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
         {
             Journal("monde : chargement impossible : " + compte.Erreur);
             yield break;
         }
-        AppliquerMondeServeur(compte.ElementsMonde);
-        Journal("monde : " + elementsMonde.Count + " element(s) charge(s)");
+        AppliquerMondeServeur(compte);
+        revisionMondeConnue = compte.RevisionMonde;
+        Journal("monde : " + elementsMonde.Count + " element(s) charge(s), revision " + revisionMondeConnue);
     }
 
-    // Renvoie true si le monde recu de la BDD est different de celui affiche.
-    private bool AppliquerMondeServeur(LibreViesCompte.LibreViesElementMonde[] elements)
+    // Revision du monde deja recue ; on ne demande ensuite que les changements.
+    private int revisionMondeConnue;
+
+    // Applique le monde recu : complet (premier chargement) ou seulement les changements.
+    // Renvoie true si quelque chose a change dans la scene.
+    private bool AppliquerMondeServeur(LibreViesCompte compte)
     {
-        string avant = signatureMonde;
-        elementsMonde.Clear();
-        for (int i = 0; i < elements.Length; i++)
+        bool change = false;
+        if (compte.MondeComplet)
         {
-            var element = new ElementMonde();
-            element.Id = elements[i].id;
-            element.Type = elements[i].type;
-            element.X = elements[i].x;
-            element.Z = elements[i].z;
-            element.Rotation = elements[i].rotation;
-            element.Taille = elements[i].taille;
-            elementsMonde.Add(element);
+            change = elementsMonde.Count > 0 || compte.ElementsMonde.Length > 0;
+            elementsMonde.Clear();
+        }
+        int[] supprimes = compte.IdsElementsSupprimes ?? new int[0];
+        if (supprimes.Length > 0 && elementsMonde.RemoveAll(e => System.Array.IndexOf(supprimes, e.Id) >= 0) > 0)
+            change = true;
+        LibreViesCompte.LibreViesElementMonde[] recus = compte.ElementsMonde;
+        for (int i = 0; i < recus.Length; i++)
+        {
+            LibreViesCompte.LibreViesElementMonde r = recus[i];
+            int idx = elementsMonde.FindIndex(e => e.Id == r.id);
+            // Un element pose a l'instant (pas encore d'identifiant) est reconnu par sa place.
+            if (idx < 0)
+                idx = elementsMonde.FindIndex(e => e.Id <= 0 && e.Type == r.type
+                    && Mathf.Abs(e.X - r.x) < 0.01f && Mathf.Abs(e.Z - r.z) < 0.01f);
+            ElementMonde element;
+            if (idx < 0)
+            {
+                element = new ElementMonde();
+                elementsMonde.Add(element);
+                change = true;
+            }
+            else
+            {
+                element = elementsMonde[idx];
+            }
+            if (element.Id != r.id || element.Type != r.type || element.X != r.x || element.Z != r.z
+                || element.Rotation != r.rotation || element.Taille != r.taille) change = true;
+            element.Id = r.id;
+            element.Type = r.type;
+            element.X = r.x;
+            element.Z = r.z;
+            element.Rotation = r.rotation;
+            element.Taille = r.taille;
         }
         signatureMonde = SignatureMonde();
-        // Les objets ont ete recrees depuis le serveur : l'ancienne selection n'est plus valable.
-        if (avant != signatureMonde) SelectionnerElementMonde(null);
-        return avant != signatureMonde;
+        // Un objet selectionne a disparu ou a bouge : la selection n'est plus fiable.
+        if (elementMondeSelectionne != null && !elementsMonde.Contains(elementMondeSelectionne))
+            SelectionnerElementMonde(null);
+        return change;
     }
 
     private string SignatureMonde()
@@ -1006,16 +1037,18 @@ public sealed class LibreViesGame : MonoBehaviour
         return texte.ToString();
     }
 
-    // Synchronisation temps reel : relecture de la BDD toutes les 5 secondes.
+    // Synchronisation : demande toutes les 1,5 seconde les seuls changements depuis la revision connue.
     private System.Collections.IEnumerator SurveillerMonde()
     {
         while (true)
         {
-            yield return new WaitForSeconds(5f);
+            yield return new WaitForSeconds(1.5f);
             LibreViesCompte compte = LibreViesCompte.Courant;
-            yield return compte.ChargerMonde();
-            if (compte.ElementsMonde == null) continue;
-            if (AppliquerMondeServeur(compte.ElementsMonde)) ReconstruireMonde();
+            yield return compte.ChargerMonde(revisionMondeConnue);
+            if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null) continue;
+            bool change = AppliquerMondeServeur(compte);
+            revisionMondeConnue = compte.RevisionMonde;
+            if (change) ReconstruireMonde();
         }
     }
 

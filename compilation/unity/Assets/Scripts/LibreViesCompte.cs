@@ -37,6 +37,10 @@ public sealed class LibreViesCompte
         public int id;
         public LibreViesElementMonde[] elements;
         public LibreViesMaisonMonde[] maisons;
+        public int revision;
+        public bool complet;
+        public int[] supprimes;
+        public string[] maisons_supprimees;
     }
 
     // Monde partage (tables monde_element et monde_maison, voir monde.sql).
@@ -82,8 +86,12 @@ public sealed class LibreViesCompte
     public LibreViesNpc[] Npcs { get; private set; }
     public Membre[] JoueursTrouves { get; private set; }
     public LibreViesJoueurAdmin JoueurAdministratif { get; private set; }
+    // Depuis le dernier chargement : ElementsMonde = seulement ce qui a change.
     public LibreViesElementMonde[] ElementsMonde { get; private set; }
     public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
+    public int[] IdsElementsSupprimes { get; private set; }
+    public int RevisionMonde { get; private set; }
+    public bool MondeComplet { get; private set; }
     public int DernierIdMonde { get; private set; }
 
     public bool EstAdministrateur
@@ -121,7 +129,15 @@ public sealed class LibreViesCompte
         if (!EstAdministrateur) { Erreur = "Edition NPC reservee aux administrateurs."; yield break; }
         yield return Envoyer("save_npc", profil, id);
     }
-    public IEnumerator ChargerMonde() { yield return Envoyer("get_monde", null); }
+    // depuis = 0 : tout le monde. Sinon : seulement les changements depuis cette revision.
+    public IEnumerator ChargerMonde(int depuis = 0)
+    {
+        var champs = new Dictionary<string, string>
+        {
+            { "depuis", depuis.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+        };
+        yield return Envoyer("get_monde", null, null, champs);
+    }
 
     public IEnumerator AjouterElementMonde(LibreViesElementMonde element)
     {
@@ -270,6 +286,9 @@ public sealed class LibreViesCompte
             {
                 ElementsMonde = reponse.elements ?? new LibreViesElementMonde[0];
                 MaisonsMonde = reponse.maisons ?? new LibreViesMaisonMonde[0];
+                IdsElementsSupprimes = reponse.supprimes ?? new int[0];
+                RevisionMonde = reponse.revision;
+                MondeComplet = reponse.complet;
             }
             if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
             if (action == "search_players" || action == "get_player" || action == "save_player_ban")

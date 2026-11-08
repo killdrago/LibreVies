@@ -7,6 +7,8 @@ return [
     'db_name' => 'librevies',
     'db_user' => 'root',
     'db_password' => '',
+    // Base du monde partagé (créée par mondeLV.sql). Même utilisateur MySQL que ci-dessus.
+    'monde_db_name' => 'mondeLV',
     // Passez temporairement à true pour voir l'erreur SQL dans la réponse.
     // Remettez false ensuite si l'API est accessible depuis Internet.
     'debug' => false,
