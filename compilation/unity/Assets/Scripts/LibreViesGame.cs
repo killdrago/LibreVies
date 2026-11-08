@@ -951,7 +951,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 + " (textes 3D exclus)");
     }
 
-    private IEnumerator ChargerMondeServeur()
+    private System.Collections.IEnumerator ChargerMondeServeur()
     {
         yield return LibreViesCompte.Courant.ChargerMonde();
         LibreViesCompte compte = LibreViesCompte.Courant;
@@ -997,7 +997,7 @@ public sealed class LibreViesGame : MonoBehaviour
     }
 
     // Synchronisation temps reel : relecture de la BDD toutes les 5 secondes.
-    private IEnumerator SurveillerMonde()
+    private System.Collections.IEnumerator SurveillerMonde()
     {
         while (true)
         {
@@ -1015,7 +1015,7 @@ public sealed class LibreViesGame : MonoBehaviour
         ReconstruireObjetsMonde();
     }
 
-    private IEnumerator AjouterElementServeur(ElementMonde element)
+    private System.Collections.IEnumerator AjouterElementServeur(ElementMonde element)
     {
         LibreViesCompte compte = LibreViesCompte.Courant;
         var envoi = new LibreViesCompte.LibreViesElementMonde();
@@ -1026,14 +1026,14 @@ public sealed class LibreViesGame : MonoBehaviour
         signatureMonde = SignatureMonde();
     }
 
-    private IEnumerator SupprimerElementsServeur(List<int> ids)
+    private System.Collections.IEnumerator SupprimerElementsServeur(List<int> ids)
     {
         LibreViesCompte compte = LibreViesCompte.Courant;
         for (int i = 0; i < ids.Count; i++) yield return compte.SupprimerElementMonde(ids[i]);
         signatureMonde = SignatureMonde();
     }
 
-    private IEnumerator ViderMondeServeur()
+    private System.Collections.IEnumerator ViderMondeServeur()
     {
         LibreViesCompte compte = LibreViesCompte.Courant;
         yield return compte.ViderMonde();
