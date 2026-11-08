@@ -39,14 +39,14 @@ public sealed class LibreViesGame : MonoBehaviour
     // niveau du sol naturel et son lit est creuse de cette profondeur.
     // Ruisseau : la largeur entre rives varie de LargeurMinRiviere a
     // LargeurMaxRiviere le long du cours, de facon lisse (jamais de saut).
-    private const float LargeurMinRiviere = 1.0f;
-    private const float LargeurMaxRiviere = 5.0f;
+    private const float LargeurMinRiviere = 5.0f;
+    private const float LargeurMaxRiviere = 10.0f;
     // Creux du lit sous le niveau naturel : plus le lit est large, plus il est profond.
-    private const float ProfondeurMinRiviere = 0.20f;
-    private const float ProfondeurMaxRiviere = 1.00f;
+    private const float ProfondeurMinRiviere = 1.00f;
+    private const float ProfondeurMaxRiviere = 2.00f;
     // Rayon du fond plat autour de l'axe, lui aussi fonction de la largeur.
-    private const float FondPlatMinRiviere = 0.20f;
-    private const float FondPlatMaxRiviere = 1.00f;
+    private const float FondPlatMinRiviere = 1.00f;
+    private const float FondPlatMaxRiviere = 2.00f;
     // Niveau de l'eau au-dessus du fond du lit.
     private const float ProfondeurEauCentre = 0.20f;
     private const int MaxHp = 100;
@@ -2686,7 +2686,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         float onde = Mathf.Sin(axe.x * 0.037f + 0.6f) * Mathf.Cos(axe.y * 0.029f + 1.3f);
         float onde2 = Mathf.Sin(axe.x * 0.093f + axe.y * 0.061f) * 0.35f;
-        return Mathf.Clamp(3.0f + 1.8f * onde + onde2, LargeurMinRiviere, LargeurMaxRiviere);
+        return Mathf.Clamp(7.5f + 2.5f * onde + onde2, LargeurMinRiviere, LargeurMaxRiviere);
     }
 
     private float ProfondeurRiviere(float largeur)

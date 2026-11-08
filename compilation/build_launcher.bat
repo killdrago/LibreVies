@@ -486,7 +486,8 @@ echo.
 echo   Adresses du jeu (jeu\cheminurl\adresses.txt) :
 echo     1 = version POUR MOI   ^(api localhost, mises a jour GitHub^)
 echo     2 = version JOUEURS    ^(api et mises a jour sur www.librevies.com^)
-set /p "LV_ADRESSES_CHOIX=Votre choix (1 ou 2) : "
+choice /c 12 /n /m "Votre choix (1 ou 2) : "
+if errorlevel 2 (set "LV_ADRESSES_CHOIX=2") else (set "LV_ADRESSES_CHOIX=1")
 if "%LV_ADRESSES_CHOIX%"=="1" set "LV_ADRESSES_SRC=%ROOT%cheminurl\adresses_moi.txt"
 if "%LV_ADRESSES_CHOIX%"=="2" set "LV_ADRESSES_SRC=%ROOT%cheminurl\adresses_joueurs.txt"
 if not defined LV_ADRESSES_SRC (
