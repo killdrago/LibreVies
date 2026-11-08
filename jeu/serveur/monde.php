@@ -47,8 +47,8 @@ function valider_maison_monde($donnees) {
     return array(
         'id' => $id,
         'nom' => $nom,
-        'x' => nombre_monde(isset($donnees['x']) ? $donnees['x'] : 0, -130, 130),
-        'z' => nombre_monde(isset($donnees['z']) ? $donnees['z'] : 0, -130, 130),
+        'x' => nombre_monde(isset($donnees['x']) ? $donnees['x'] : 0, -200, 200),
+        'z' => nombre_monde(isset($donnees['z']) ? $donnees['z'] : 0, -200, 200),
         'rotation' => nombre_monde(isset($donnees['rotation']) ? $donnees['rotation'] : 0, -360, 360),
         'donnees' => $reglages,
     );
@@ -89,7 +89,7 @@ function lire_monde($pdo, $depuis) {
     $elements = array(); $supprimes = array(); $maisons = array(); $maisonsSupprimees = array();
     foreach ($requete->fetchAll() as $ligne) {
         $supprime = (int)$ligne['supprime'] === 1;
-        if ($ligne['genre'] === 'maison') {
+        if ($ligne['genre'] === 'maison' || $ligne['genre'] === 'edition') {
             if ($supprime) $maisonsSupprimees[] = (string)$ligne['cle'];
             else $maisons[] = array(
                 'id' => (string)$ligne['cle'], 'nom' => '', 'x' => (float)$ligne['position_x'],
@@ -155,12 +155,14 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
     if ($action === 'enregistrer_maison') {
         $maison = valider_maison_monde($donnees);
         $rev = prochaine_revision($pdo);
+        // 'edition' : objets de l'editeur (fichier edition/coordonee) ; 'maison' par defaut.
+        $genre = (isset($donnees['genre']) && (string)$donnees['genre'] === 'edition') ? 'edition' : 'maison';
         $requete = $pdo->prepare("INSERT INTO monde_objet (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
-            . " VALUES ('maison', :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
+            . " VALUES (:genre, :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
             . " ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),"
             . " rotation_y = VALUES(rotation_y), donnees = VALUES(donnees), auteur_id = VALUES(auteur_id),"
             . " supprime = 0, revision = VALUES(revision)");
-        $requete->execute(array(':cle' => $maison['id'], ':x' => $maison['x'], ':z' => $maison['z'],
+        $requete->execute(array(':genre' => $genre, ':cle' => $maison['id'], ':x' => $maison['x'], ':z' => $maison['z'],
             ':rotation' => $maison['rotation'], ':donnees' => $maison['donnees'], ':auteur' => $auteur, ':rev' => $rev));
         return array('message' => 'Maison enregistree.', 'extra' => array('revision' => $rev));
     }

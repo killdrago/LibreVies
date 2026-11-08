@@ -174,11 +174,13 @@ public sealed class LibreViesCompte
     public IEnumerator ViderMonde() { yield return Envoyer("vider_monde", null); }
 
     // Enregistre une maison (identifiant lisible, position, reglages en JSON) dans la base partagee.
-    public IEnumerator EnregistrerMaisonMonde(string cle, string nom, float x, float z, float rotation, string donnees)
+    public IEnumerator EnregistrerMaisonMonde(string cle, string nom, float x, float z, float rotation, string donnees,
+        string genre = "maison")
     {
         var culture = System.Globalization.CultureInfo.InvariantCulture;
         var champs = new Dictionary<string, string>
         {
+            { "genre", genre ?? "maison" },
             { "id", cle ?? "" },
             { "nom", nom ?? "" },
             { "x", x.ToString("0.###", culture) },

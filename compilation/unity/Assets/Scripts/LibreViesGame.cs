@@ -2051,6 +2051,9 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void ChargerCoordonneesEdition()
     {
+        // Les objets de l'editeur viennent de la base (mondeLV). Le fichier ne sert
+        // plus que de secours quand la base est vide.
+        if (LibreViesCompte.Courant.MaisonsMonde != null && LibreViesCompte.Courant.MaisonsMonde.Length > 0) return;
         string chemin = CheminCoordonneesEdition;
         if (!File.Exists(chemin)) return;
         try
@@ -2195,12 +2198,14 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             LibreViesCompte.LibreViesMaisonMonde maison = maisons[i];
             string donnees = maison.donnees ?? "";
-            string precedent;
-            if (maisonsAppliquees.TryGetValue(maison.id, out precedent) && precedent == donnees) continue;
-            maisonsAppliquees[maison.id] = donnees;
             CoordonneeObjetEdition coordonnee = null;
             try { coordonnee = JsonUtility.FromJson<CoordonneeObjetEdition>(donnees); }
             catch (Exception) { coordonnee = null; }
+            // Forme canonique : meme texte que celui produit par l'editeur a l'envoi.
+            string canon = coordonnee != null ? JsonUtility.ToJson(coordonnee, false) : donnees;
+            string precedent;
+            if (maisonsAppliquees.TryGetValue(maison.id, out precedent) && precedent == canon) continue;
+            maisonsAppliquees[maison.id] = canon;
             if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
             AppliquerCoordonneeEdition(coordonnee, false, utilisees);
             change = true;
@@ -2226,7 +2231,7 @@ public sealed class LibreViesGame : MonoBehaviour
             MaisonAEnvoyer m = maisons[i];
             string precedent;
             if (maisonsAppliquees.TryGetValue(m.Cle, out precedent) && precedent == m.Json) continue;
-            yield return compte.EnregistrerMaisonMonde(m.Cle, m.Nom, m.X, m.Z, m.Rotation, m.Json);
+            yield return compte.EnregistrerMaisonMonde(m.Cle, m.Nom, m.X, m.Z, m.Rotation, m.Json, "edition");
             if (String.IsNullOrEmpty(compte.Erreur)) maisonsAppliquees[m.Cle] = m.Json;
             else Journal("maison " + m.Nom + " non enregistree : " + compte.Erreur);
         }
@@ -2305,7 +2310,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
                 }
-                if (element != null && element.Maison != null)
+                // Tous les objets de l'editeur vont dans la base (genre 'edition').
                 {
                     string brut = coordonnee.Nom + "|" + coordonnee.Chemin;
                     int rang;
@@ -2320,19 +2325,11 @@ public sealed class LibreViesGame : MonoBehaviour
                         Rotation = coordonnee.Rotation.eulerAngles.y,
                         Json = JsonUtility.ToJson(coordonnee, false)
                     });
-                    continue;
                 }
-                fichier.Objets.Add(coordonnee);
             }
+            // Envoi seulement des objets modifies (comparaison avec la base).
             if (maisonsAEnvoyer.Count > 0) StartCoroutine(EnvoyerMaisonsEdition(maisonsAEnvoyer));
-            string json = JsonUtility.ToJson(fichier, false);
-            byte[] chiffre = ChiffrerCoordonneesEdition(Encoding.UTF8.GetBytes(json));
-            string temporaire = CheminCoordonneesEdition + ".tmp";
-            File.WriteAllBytes(temporaire, chiffre);
-            if (File.Exists(CheminCoordonneesEdition)) File.Delete(CheminCoordonneesEdition);
-            File.Move(temporaire, CheminCoordonneesEdition);
-            Journal("coordonnees edition enregistrees : " + fichier.Objets.Count
-                + " objet(s) dans edition/coordonee");
+            Journal("coordonnees edition envoyees a la base : " + maisonsAEnvoyer.Count + " objet(s) testes");
         }
         catch (Exception erreur)
         {
