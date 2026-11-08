@@ -121,6 +121,34 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool modeEdition;
     private bool adminOpen;
     private int adminTab;
+
+    // ---- Monde : pinceaux de l'onglet Monde (fichier edition/monde) ----
+    [Serializable]
+    private sealed class ElementMonde
+    {
+        public string Type;
+        public float X;
+        public float Z;
+        public float Taille;
+    }
+
+    [Serializable]
+    private sealed class FichierMonde
+    {
+        public List<ElementMonde> Elements = new List<ElementMonde>();
+    }
+
+    private readonly List<ElementMonde> elementsMonde = new List<ElementMonde>();
+    private readonly float[] taillesPinceauMonde = { 0.5f, 1f, 5f, 10f };
+    private readonly string[] modesMonde = { "EAU", "HERBE", "CAILLOU", "ARBRE", "PONT", "EFFACER" };
+    private int pinceauTailleIndex = 1;
+    private int pinceauModeIndex;
+    private bool razMondeConfirmation;
+    private Mesh meshTerrainMonde;
+    private Transform racineMonde;
+    private Rect fenetreAdminMonde;
+    // Profondeur du fond d'une zone d'eau creusee au pinceau, sous le relief.
+    private const float ProfondeurFondMonde = 1.0f;
     private bool positionSauvegardeEnCours;
     private float prochainEnregistrementPosition;
     private bool fermetureEnCours;
@@ -843,6 +871,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 yield break;
             }
         }
+        ChargerMondeDonnees();
         string[] noms =
         {
             "materiaux", "environnement", "terrain", "route", "village",
@@ -876,6 +905,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (!String.IsNullOrEmpty(erreurChargementCompte)) yield break;
         }
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
+        ReconstruireObjetsMonde();
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
         RafraichirZonesNommees();
@@ -923,8 +953,226 @@ public sealed class LibreViesGame : MonoBehaviour
                 + " (textes 3D exclus)");
     }
 
+    private string CheminMonde
+    {
+        get { return Path.Combine(Path.GetDirectoryName(CheminCoordonneesEdition), "monde"); }
+    }
+
+    private void ChargerMondeDonnees()
+    {
+        try
+        {
+            if (!File.Exists(CheminMonde)) return;
+            byte[] clair = DechiffrerCoordonneesEdition(File.ReadAllBytes(CheminMonde));
+            var fichier = JsonUtility.FromJson<FichierMonde>(System.Text.Encoding.UTF8.GetString(clair));
+            if (fichier != null && fichier.Elements != null) elementsMonde.AddRange(fichier.Elements);
+            Journal("monde : " + elementsMonde.Count + " element(s) charge(s)");
+        }
+        catch (Exception erreur)
+        {
+            Journal("monde : lecture impossible : " + erreur.Message);
+        }
+    }
+
+    private void SauverMonde()
+    {
+        try
+        {
+            string dossier = Path.GetDirectoryName(CheminMonde);
+            if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
+            var fichier = new FichierMonde();
+            fichier.Elements = elementsMonde;
+            byte[] clair = System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(fichier));
+            File.WriteAllBytes(CheminMonde, ChiffrerCoordonneesEdition(clair));
+        }
+        catch (Exception erreur)
+        {
+            Journal("monde : sauvegarde impossible : " + erreur.Message);
+        }
+    }
+
+    private void ReconstruireMonde()
+    {
+        RafraichirTerrainMonde();
+        ReconstruireObjetsMonde();
+        SauverMonde();
+    }
+
+    private void RafraichirTerrainMonde()
+    {
+        if (meshTerrainMonde == null) return;
+        const int cells = 250;
+        const float step = WorldSize * 2f / cells;
+        Vector3[] vertices = meshTerrainMonde.vertices;
+        for (int z = 0; z <= cells; z++)
+        {
+            for (int x = 0; x <= cells; x++)
+            {
+                float wx = -WorldSize + x * step;
+                float wz = -WorldSize + z * step;
+                vertices[z * (cells + 1) + x] = new Vector3(wx, TerrainHeight(wx, wz), wz);
+            }
+        }
+        meshTerrainMonde.vertices = vertices;
+        meshTerrainMonde.RecalculateNormals();
+        GameObject terrain = GameObject.Find("Terrain_Unity");
+        if (terrain != null)
+        {
+            MeshCollider collider = terrain.GetComponent<MeshCollider>();
+            if (collider != null)
+            {
+                collider.sharedMesh = null;
+                collider.sharedMesh = meshTerrainMonde;
+            }
+        }
+    }
+
+    private void ReconstruireObjetsMonde()
+    {
+        if (racineMonde == null) racineMonde = new GameObject("Monde_Objets").transform;
+        for (int i = racineMonde.childCount - 1; i >= 0; i--) Destroy(racineMonde.GetChild(i).gameObject);
+        for (int i = 0; i < elementsMonde.Count; i++) CreerObjetMonde(elementsMonde[i]);
+    }
+
+    private void CreerObjetMonde(ElementMonde element)
+    {
+        float x = element.X;
+        float z = element.Z;
+        float taille = element.Taille;
+        float sol = TerrainHeight(x, z);
+        switch (element.Type)
+        {
+            case "EAU":
+            {
+                // Plan d'eau au niveau du fond creuse + la profondeur d'eau.
+                float niveau = TerrainSurfaceHeight(x, z) - ProfondeurFondMonde + ProfondeurEauCentre;
+                Primitive(PrimitiveType.Cube, new Vector3(x, niveau - 0.01f, z),
+                    new Vector3(taille, 0.02f, taille), "Eau_Riviere", racineMonde, "Monde_Eau");
+                break;
+            }
+            case "HERBE":
+            {
+                Primitive(PrimitiveType.Cylinder, new Vector3(x, sol + 0.03f, z),
+                    new Vector3(taille * 0.5f, 0.02f, taille * 0.5f), "Terrain", racineMonde, "Monde_Herbe");
+                break;
+            }
+            case "CAILLOU":
+            {
+                float diametre = taille * 0.5f;
+                Primitive(PrimitiveType.Sphere, new Vector3(x, sol + diametre * 0.3f, z),
+                    Vector3.one * diametre, "Stone", racineMonde, "Monde_Caillou", true);
+                break;
+            }
+            case "ARBRE":
+            {
+                float facteur = Mathf.Clamp(taille, 0.5f, 2f);
+                Primitive(PrimitiveType.Cylinder, new Vector3(x, sol + 1.5f * facteur, z),
+                    new Vector3(0.3f * facteur, 1.5f * facteur, 0.3f * facteur), "Wood", racineMonde, "Monde_Tronc", true);
+                Primitive(PrimitiveType.Sphere, new Vector3(x, sol + 3.6f * facteur, z),
+                    Vector3.one * 2.4f * facteur, "Leaf", racineMonde, "Monde_Feuillage");
+                break;
+            }
+            case "PONT":
+            {
+                // Le pont enjambe la riviere, perpendiculairement a son cours.
+                Vector2 axe = PointRiviereProche(new Vector2(x, z), out Vector2 tangente);
+                float largeur = LargeurRiviere(axe) + 2f;
+                float niveau = TerrainSurfaceHeight(axe.x, axe.y) + ProfondeurEauCentre + 0.9f;
+                Box(new Vector3(axe.x, niveau, axe.y), new Vector3(largeur, 0.25f, 2.5f), "Wood",
+                    racineMonde, "Monde_Pont", true, Quaternion.LookRotation(new Vector3(tangente.x, 0f, tangente.y)));
+                break;
+            }
+        }
+    }
+
+    private void AppliquerPinceauMonde(Vector3 point)
+    {
+        string mode = modesMonde[pinceauModeIndex];
+        float taille = taillesPinceauMonde[pinceauTailleIndex];
+        if (mode == "EFFACER")
+        {
+            Vector2 centre = new Vector2(point.x, point.z);
+            elementsMonde.RemoveAll(e => Vector2.Distance(new Vector2(e.X, e.Z), centre) <= taille * 0.5f + 0.6f);
+        }
+        else
+        {
+            var element = new ElementMonde();
+            element.Type = mode;
+            element.X = point.x;
+            element.Z = point.z;
+            element.Taille = taille;
+            elementsMonde.Add(element);
+        }
+        ReconstruireMonde();
+    }
+
+    private void GererPinceauMonde()
+    {
+        if (!adminOpen || adminTab != 3 || gameCamera == null) return;
+        if (!Input.GetMouseButtonDown(0)) return;
+        float echelle = Mathf.Min(1f, Screen.width / 1200f, Screen.height / 750f);
+        Vector2 souris = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y) / echelle;
+        if (fenetreAdminMonde.Contains(souris)) return;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        RaycastHit[] touches = Physics.RaycastAll(rayon, 1000f);
+        for (int i = 0; i < touches.Length; i++)
+        {
+            if (touches[i].collider != null && touches[i].collider.gameObject.name == "Terrain_Unity")
+            {
+                AppliquerPinceauMonde(touches[i].point);
+                return;
+            }
+        }
+    }
+
+    private void DessinerAdminMonde(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f), "MONDE", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 50f, 620f, 40f),
+            "Choisissez la taille et le type, puis cliquez sur la carte. Chaque clic est enregistre.",
+            smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 96f, 120f, 24f), "Taille :", smallStyle);
+        for (int i = 0; i < taillesPinceauMonde.Length; i++)
+        {
+            GUI.color = pinceauTailleIndex == i ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+            if (GUI.Button(new Rect(contenu.x + 110f + i * 110f, contenu.y + 92f, 100f, 32f),
+                taillesPinceauMonde[i] + " m", buttonStyle)) pinceauTailleIndex = i;
+            GUI.color = Color.white;
+        }
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 150f, 120f, 24f), "Type :", smallStyle);
+        for (int j = 0; j < modesMonde.Length; j++)
+        {
+            GUI.color = pinceauModeIndex == j ? new Color(0.18f, 0.62f, 0.86f) : Color.white;
+            if (GUI.Button(new Rect(contenu.x + 110f + (j % 3) * 170f, contenu.y + 146f + (j / 3) * 44f, 160f, 36f),
+                modesMonde[j], buttonStyle)) pinceauModeIndex = j;
+            GUI.color = Color.white;
+        }
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 250f, 620f, 24f),
+            "Pinceau : " + modesMonde[pinceauModeIndex] + "  " + taillesPinceauMonde[pinceauTailleIndex] + " m     Elements : " + elementsMonde.Count,
+            smallStyle);
+        if (!razMondeConfirmation)
+        {
+            if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 290f, 240f, 32f), "RAZ MONDE", buttonStyle))
+                razMondeConfirmation = true;
+        }
+        else
+        {
+            GUI.Label(new Rect(contenu.x + 18f, contenu.y + 286f, 450f, 24f),
+                "Confirmer : supprimer toutes les modifications du monde ?", smallStyle);
+            if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 316f, 120f, 32f), "CONFIRMER", buttonStyle))
+            {
+                elementsMonde.Clear();
+                razMondeConfirmation = false;
+                ReconstruireMonde();
+            }
+            if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 316f, 120f, 32f), "ANNULER", buttonStyle))
+                razMondeConfirmation = false;
+        }
+    }
+
     private void Update()
     {
+        GererPinceauMonde();
         if (herbeBrins && Time.time >= prochaineMajBrins)
         {
             prochaineMajBrins = Time.time + 0.5f;
@@ -2712,6 +2960,24 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private float TerrainHeight(float x, float z)
     {
+        return AppliquerEauMonde(x, z, TerrainHeightRiviere(x, z));
+    }
+
+    private float AppliquerEauMonde(float x, float z, float hauteur)
+    {
+        for (int i = 0; i < elementsMonde.Count; i++)
+        {
+            ElementMonde element = elementsMonde[i];
+            if (element.Type != "EAU") continue;
+            float demi = element.Taille * 0.5f;
+            if (Mathf.Abs(x - element.X) > demi || Mathf.Abs(z - element.Z) > demi) continue;
+            hauteur = Mathf.Min(hauteur, TerrainSurfaceHeight(element.X, element.Z) - ProfondeurFondMonde);
+        }
+        return hauteur;
+    }
+
+    private float TerrainHeightRiviere(float x, float z)
+    {
         float hauteur = TerrainSurfaceHeight(x, z);
         if (DansVillage(x, z)) return hauteur;
 
@@ -3141,6 +3407,7 @@ public sealed class LibreViesGame : MonoBehaviour
         const int cells = 250;
         const float step = WorldSize * 2f / cells;
         var mesh = new Mesh { name = "LibreViesTerrain", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+        meshTerrainMonde = mesh;
         var vertices = new Vector3[(cells + 1) * (cells + 1)];
         var trianglesSol = new List<int>();
         for (int z = 0; z <= cells; z++)
@@ -9624,6 +9891,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Rect fenetre = new Rect(Screen.width / echelleAdmin * 0.5f - 590f,
                 Screen.height / echelleAdmin * 0.5f - 360f, 1180f, 720f);
+            fenetreAdminMonde = fenetre;
             GUI.Box(fenetre, "", boxStyle);
             GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
                 "ADMINISTRATION", titleStyle);
@@ -9681,6 +9949,10 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (adminTab == 2)
             {
                 DessinerAdminNpc(contenu);
+            }
+            else if (adminTab == 3)
+            {
+                DessinerAdminMonde(contenu);
             }
             else if (adminTab == 4)
             {
