@@ -602,12 +602,13 @@ if ($action === 'npc_chat') {
 
 if ($action === 'get_monde') {
     // Lecture pour tous les joueurs connectes : le monde est partage.
-    membre_authentifie($pdo, $config, $donnees);
+    $membre = membre_authentifie($pdo, $config, $donnees);
     try {
         $monde = lire_monde($pdo);
     } catch (Exception $erreur) {
         repondre(false, detail_erreur($erreur, $config), array(), 500);
     }
+    $monde['membre'] = membre_public($membre);
     repondre(true, 'Monde charge.', $monde);
 }
 
@@ -624,7 +625,7 @@ if (in_array($action, array('ajouter_element_monde', 'modifier_element_monde', '
                 . ' VALUES (:type, :x, :z, :rotation, :taille, :auteur)');
             $requete->execute(array(':type' => $element['type'], ':x' => $element['x'], ':z' => $element['z'],
                 ':rotation' => $element['rotation'], ':taille' => $element['taille'], ':auteur' => (int)$membre['id']));
-            repondre(true, 'Element ajoute.', array('id' => (int)$pdo->lastInsertId()));
+            repondre(true, 'Element ajoute.', array('id' => (int)$pdo->lastInsertId(), 'membre' => membre_public($membre)));
         }
         if ($action === 'modifier_element_monde') {
             $id = isset($donnees['id']) ? (int)$donnees['id'] : 0;
@@ -634,18 +635,18 @@ if (in_array($action, array('ajouter_element_monde', 'modifier_element_monde', '
                 . ' rotation_y = :rotation, taille = :taille, auteur_id = :auteur WHERE id = :id');
             $requete->execute(array(':x' => $element['x'], ':z' => $element['z'], ':rotation' => $element['rotation'],
                 ':taille' => $element['taille'], ':auteur' => (int)$membre['id'], ':id' => $id));
-            repondre(true, 'Element modifie.');
+            repondre(true, 'Element modifie.', array('membre' => membre_public($membre)));
         }
         if ($action === 'supprimer_element_monde') {
             $id = isset($donnees['id']) ? (int)$donnees['id'] : 0;
             if ($id <= 0) repondre(false, 'Identifiant d element invalide.', array(), 400);
             $requete = $pdo->prepare('DELETE FROM monde_element WHERE id = :id');
             $requete->execute(array(':id' => $id));
-            repondre(true, 'Element supprime.');
+            repondre(true, 'Element supprime.', array('membre' => membre_public($membre)));
         }
         if ($action === 'vider_monde') {
             $pdo->exec('DELETE FROM monde_element');
-            repondre(true, 'Elements du monde supprimes.');
+            repondre(true, 'Elements du monde supprimes.', array('membre' => membre_public($membre)));
         }
         if ($action === 'enregistrer_maison') {
             $maison = valider_maison_monde($donnees);
@@ -657,7 +658,7 @@ if (in_array($action, array('ajouter_element_monde', 'modifier_element_monde', '
             $requete->execute(array(':id' => $maison['id'], ':nom' => $maison['nom'], ':x' => $maison['x'],
                 ':z' => $maison['z'], ':rotation' => $maison['rotation'], ':donnees' => $maison['donnees'],
                 ':auteur' => (int)$membre['id']));
-            repondre(true, 'Maison enregistree.');
+            repondre(true, 'Maison enregistree.', array('membre' => membre_public($membre)));
         }
     } catch (InvalidArgumentException $erreur) {
         repondre(false, $erreur->getMessage(), array(), 400);
