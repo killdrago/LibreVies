@@ -8,4 +8,4 @@ api=http://www.librevies.com
 # Hebergeur :
 maj=http://www.librevies.com/jeu
 # Git (actuel) :
-# maj=https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu
+# maj=https://raw.githubusercontent.com/killdrago/LibreVies/arena/c40ef64e-librevies/jeu
