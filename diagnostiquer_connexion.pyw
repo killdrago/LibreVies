@@ -22,7 +22,7 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_LOCAL_URL = "http://localhost/serveur/api.php?action=health"
-DEFAULT_REMOTE_URL = "http://92.133.115.121/serveur/api.php?action=health"
+DEFAULT_REMOTE_URL = "http://www.librevies.com/serveur/api.php?action=health"
 DEFAULT_PORTS = "80,443,3306"
 TIMEOUT = 8
 USER_AGENT = "LibreVies-Connection-Diagnostic/1.0"

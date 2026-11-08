@@ -99,7 +99,36 @@ CONFIG_PATH = os.path.join(GAME_DIR, "version_url.json")
 AUTH_CONFIG_PATH = os.path.join(GAME_DIR, "auth_config.json")
 AUTOLOGIN_PATH = os.path.join(GAME_DIR, "autolog.dat")
 AUTOLOGIN_LEGACY_PATH = os.path.join(GAME_DIR, "autolog.json")
-AUTH_API_URL_DEFAULT = "http://localhost/serveur/api.php"
+# Adresses lues dans cheminurl/adresses.txt (une ligne active par cle).
+ADRESSES_PATH = os.path.join(GAME_DIR, "cheminurl", "adresses.txt")
+ADRESSE_SECOURS = "http://localhost"
+
+
+def lire_adresses():
+    """Lit cheminurl/adresses.txt : 'cle=valeur' par ligne ; '#' = commentaire."""
+    valeurs = {}
+    try:
+        with open(ADRESSES_PATH, 'r', encoding='utf-8') as f:
+            for ligne in f:
+                ligne = ligne.strip()
+                if not ligne or ligne.startswith('#') or '=' not in ligne:
+                    continue
+                cle, valeur = ligne.split('=', 1)
+                valeurs[cle.strip().lower()] = valeur.strip().rstrip('/')
+    except (OSError, UnicodeDecodeError):
+        pass
+    return valeurs
+
+
+def _adresse_http(valeur):
+    return bool(valeur) and valeur.lower().startswith(('http://', 'https://'))
+
+
+_ADRESSES = lire_adresses()
+SITE_API = _ADRESSES.get('api', '')
+if not _adresse_http(SITE_API):
+    SITE_API = ADRESSE_SECOURS
+AUTH_API_URL_DEFAULT = SITE_API + "/serveur/api.php"
 AUTH_TIMEOUT = 15
 # Le fichier en cours d'execution. Quand son hash change dans version_url.json,
 # le launcher telecharge la nouvelle version puis redemarre : aucune
@@ -113,6 +142,10 @@ LOCAL_GAME_VERSION = "0.5.88"
 # Travail courant : dossier jeu uniquement. En mode local, aucun fichier
 # compile distant ne peut remplacer l'export de compilation.
 DEFAULT_RAW_URL = "https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu"
+# Adresse des mises a jour : cle maj de cheminurl/adresses.txt, sinon GitHub.
+MAJ_RAW_URL = _ADRESSES.get('maj', '')
+if not _adresse_http(MAJ_RAW_URL):
+    MAJ_RAW_URL = DEFAULT_RAW_URL
 
 DOSSIER_JEU_DEFAUT = "game"
 NOM_ARCHIVE = "jeu.download"
@@ -201,7 +234,8 @@ def load_auth_config():
             config.update(local)
     except (OSError, ValueError):
         pass
-    config['api_url'] = str(config.get('api_url') or AUTH_API_URL_DEFAULT).strip()
+    # L'adresse vient de cheminurl/adresses.txt, jamais de auth_config.json.
+    config['api_url'] = AUTH_API_URL_DEFAULT
     try:
         config['timeout'] = max(3, min(60, int(config.get('timeout', AUTH_TIMEOUT))))
     except (TypeError, ValueError):
@@ -626,7 +660,7 @@ def check_for_updates(progress_cb):
         return {"error": None, "modified": [], "remote_cfg": load_local_config(), "build": None}
 
     local_cfg = load_local_config()
-    raw_url = normalize_raw_url(local_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
+    raw_url = MAJ_RAW_URL
     if not raw_url:
         return {"error": "Pas d'URL configuree", "modified": [], "remote_cfg": None,
                 "build": None}
@@ -661,7 +695,7 @@ def check_for_updates(progress_cb):
 
 
 def apply_updates(modified, remote_cfg, progress_cb):
-    raw_url = normalize_raw_url(remote_cfg.get('raw_url', '') or DEFAULT_RAW_URL)
+    raw_url = MAJ_RAW_URL
     errors = []
     downloaded = 0
     pending_launcher = None

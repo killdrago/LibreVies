@@ -301,25 +301,27 @@ Recette : `python -B compilation/outils/test_position.py` + test_api_personnage.
 
 ## Passer sur un hébergeur (IA des PNJ comprise)
 
-Le jeu ne parle qu'à **une seule adresse** : celle de l'API. Elle est lue dans
-`jeu/auth_config.json`, que le launcher transmet au jeu. Les dialogues avec les
-PNJ passent par l'API (action `npc_chat`), avec la session du joueur.
+Les adresses sont dans **`cheminurl/adresses.txt`** :
+- `compilation/cheminurl/adresses.txt` : le fichier maître, celui que vous éditez ;
+- `jeu/cheminurl/adresses.txt` : la copie lue par le launcher (à recopier depuis le maître).
 
-1. Sur l'hébergeur, déposez le dossier `serveur/` (y compris `ia.php`) et le dossier
-   `serveur/IA/` (avec le modèle `model.safetensors`). Lancez `serveur_ia.py` sur la
-   même machine que l'API.
-2. Dans `config.php` (sur le serveur seulement) : gardez `'ia_url' => 'http://127.0.0.1:8765/npc_chat'`.
-3. Dans `jeu/auth_config.json`, mettez l'adresse de l'hébergeur :
+Chaque ligne a la forme `cle=valeur`. Une ligne commencée par `#` est ignorée.
+Ne laissez active qu'une seule ligne par cle :
 
-```json
-{
-  "api_url": "https://votre-domaine.fr/serveur/api.php",
-  "timeout": 15
-}
-```
+| Cle | Rôle | Local (test) | Hébergeur |
+|---|---|---|---|
+| `api` | connexion, personnage, PNJ, IA | `api=http://localhost` | `api=http://www.librevies.com` |
+| `maj` | fichiers du jeu téléchargés au lancement | `maj=https://raw.githubusercontent.com/...` (Git) | `maj=http://www.librevies.com/jeu` |
 
-C'est le seul réglage côté joueur : le jeu et le launcher ne contiennent pas
-d'autre adresse. En local, gardez `http://localhost/serveur/api.php`.
+Sur l'hébergeur :
+1. Déposez `serveur/` (avec `ia.php`) dans `/serveur/` à la racine du site, et `serveur/IA/` dans `/serveur/IA/`.
+2. Dans `/serveur/config.php` (serveur seulement) : identifiants MySQL, `debug` à `false`, et `'ia_url' => 'http://127.0.0.1:8765/npc_chat'`.
+3. Lancez `serveur_ia.py` en continu sur la même machine que l'API.
+4. Mettez le contenu de `jeucompiler/` (MAJ) dans `/jeu/`.
+5. Le dossier `/serveur/IA/` doit rester inaccessible depuis Internet (`.htaccess` fourni).
+
+En local, la copie `jeu/cheminurl/adresses.txt` reste sur `localhost` et la MAJ sur GitHub.
+Le launcher ne lit pas d'autre adresse.
 
 Remarque : la machine doit avoir assez de mémoire pour le modèle (plusieurs Go),
 ce qui exclut la plupart des hébergements mutualisés.

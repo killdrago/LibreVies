@@ -1,0 +1,15 @@
+# LibreVies - adresses utilisees par le jeu, le launcher et les mises a jour.
+# Format : cle=valeur. Les lignes qui commencent par # sont ignorees.
+# Ne laissez ACTIVE qu'une seule ligne par cle (api= et maj=).
+#
+# ---- PARTIE DU JEU (connexion, personnage, PNJ, IA) ----
+# Hebergeur :
+# api=http://www.librevies.com
+# Local (test) :
+api=http://localhost
+#
+# ---- PARTIE MAJ (fichiers du jeu telecharges au lancement) ----
+# Hebergeur :
+# maj=http://www.librevies.com/jeu
+# Git (actuel) :
+maj=https://raw.githubusercontent.com/killdrago/LibreVies/arena/01a0b32c-librevies/jeu
