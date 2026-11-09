@@ -450,8 +450,9 @@ public sealed class LibreViesGame : MonoBehaviour
     [Serializable]
     private sealed class FenetreSauvee
     {
-        public float X;
+        public float X;   // position le long du mur (X en face avant/arriere, Z sur les cotes)
         public float Y;
+        public int Face;  // 0 avant, 1 arriere, 2 droite, 3 gauche
     }
 
     [Serializable]
@@ -604,6 +605,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private sealed class ElementEdition
     {
         public Transform Root;
+        public int Face;
         public Batiment Maison;
         public Batiment MaisonParent;
         public FacadeTextState Facade;
@@ -1925,15 +1927,13 @@ public sealed class LibreViesGame : MonoBehaviour
         // Une fenetre reste entierement dans le mur : sa position X enregistree peut
         // avoir ete decalee par un deplacement de la maison ; sans borne, le mur
         // s'etirait pour couvrir l'ouverture.
-        float demiLargeurMur = Mathf.Max(batiment.LargeurInitiale, 0f) * 0.5f;
         foreach (Transform fenetre in FenetresMaison(batiment, false))
         {
-            Vector3 position = fenetre.localPosition;
-            position.z = face + 0.051f; // vitre : profondeur 0,10 m
-            float demiFenetre = Mathf.Abs(fenetre.localScale.x) * 0.5f;
-            float limite = Mathf.Max(demiLargeurMur - demiFenetre - 0.05f, 0f);
-            position.x = Mathf.Clamp(position.x, -limite, limite);
-            fenetre.localPosition = position;
+            ElementEdition element = ElementFenetre(batiment, fenetre);
+            float u = element.Face >= 2 ? fenetre.localPosition.z : fenetre.localPosition.x;
+            float limite = LimiteU(batiment, element.Face);
+            u = Mathf.Clamp(u, -limite, limite);
+            PlacerFenetre(element, batiment, element.Face, u, fenetre.localPosition.y);
         }
         Transform panneau = batiment.Root.Find("Affiche_Maison");
         if (panneau != null)
@@ -1973,12 +1973,15 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < enfants.Length; i++)
         {
             if (enfants[i].name != "Fenetre" || !enfants[i].gameObject.activeSelf) continue;
+            if (ElementFenetre(batiment, enfants[i]).Face != 0) continue;
             centres.Add(new Vector2(enfants[i].localPosition.x, enfants[i].localPosition.y));
             tailles.Add(new Vector2(Mathf.Abs(enfants[i].localScale.x),
                 Mathf.Abs(enfants[i].localScale.y)));
         }
         var maillage = new Maillage();
         var maillageInterieur = new Maillage();
+        AppliquerOuverturesLaterales(batiment, maillage);
+        AppliquerOuverturesLaterales(batiment, maillageInterieur);
         maillageInterieur.MurAvecOuvertures(largeur, profondeur, hauteurInterieure,
             centres.ToArray(), tailles.ToArray());
         Maillage murInterieur = maillageInterieur.CopieMursInterieurs(new Vector3(0f, hauteurInterieure * 0.5f, 0f), 0.004f);
@@ -2008,6 +2011,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (hautRoot != null)
         {
             Maillage bandeHaute = new Maillage();
+            AppliquerOuverturesLaterales(batiment, bandeHaute);
             bandeHaute.MurAvecOuvertures(largeur, profondeur, hauteur, centres.ToArray(), tailles.ToArray());
             Maillage haut = bandeHaute.CopieMursInterieurs(new Vector3(0f, hauteur * 0.5f, 0f), 0.004f)
                 .ClipperAuDessus(hauteurInterieure);
@@ -2032,6 +2036,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // Hauteur fixe des murs (independante de la porte).
         float hauteurBasse = HauteurMurs(batiment.HauteurInitiale, batiment.Root.localScale.y);
         var maillageBas = new Maillage();
+        AppliquerOuverturesLaterales(batiment, maillageBas);
         // Le centre de la maison doit rester le sol normal : le dessus est
         // ajoute uniquement sur l'epaisseur des murs perimetriques, jamais
         // comme une plaque qui couvrirait toute la maison.
@@ -2538,6 +2543,7 @@ public sealed class LibreViesGame : MonoBehaviour
         MakeMaterial("Water", new Color(0.08f, 0.45f, 0.85f), true);
         MakeMaterial("Glass", new Color(0.12f, 0.48f, 0.88f, 1f), true);
         MakeMaterial("GlassBleu", new Color(0.12f, 0.48f, 0.88f, 1f), true);
+        MakeMaterial("VerreClair", new Color(0.93f, 0.97f, 1f, 1f), true);
         MakeMaterial("Red", new Color(0.80f, 0.06f, 0.04f), true);
         MakeMaterial("White", Color.white);
         MakeMaterial("Nuage", new Color(0.96f, 0.98f, 1f));
@@ -2594,7 +2600,7 @@ public sealed class LibreViesGame : MonoBehaviour
         else if (nom == "Metal" || nom == "MetalAluminium" || nom == "Lanterne") chemin = "LVTextures/divers/LV_Metal";
         else if (nom == "Leaf" || nom.StartsWith("Sapin") || nom == "Feuillage") chemin = "LVTextures/divers/LV_Leaf";
         else if (nom == "Banniere_Bleue" || nom == "Banniere_Rouge" || nom == "Drapeau" || nom == "Player") chemin = "LVTextures/divers/LV_Cloth";
-        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu") chemin = "LVTextures/divers/LV_Water";
+        else if (nom == "Water" || nom == "Eau_Riviere" || nom == "Glass" || nom == "GlassBleu" || nom == "VerreClair") chemin = "LVTextures/divers/LV_Water";
         return chemin == null ? null : Resources.Load<Texture2D>(chemin);
     }
 
@@ -3247,7 +3253,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 metalAluminiumShader = ChargerShader("LVShaders/LVMetalAluminium");
             shader = metalAluminiumShader;
         }
-        else if (name == "Glass" || name == "GlassBleu")
+        else if (name == "Glass" || name == "GlassBleu" || name == "VerreClair")
         {
             if (glassBleuShader == null)
                 glassBleuShader = ChargerShader("LVShaders/LVGlassBleu");
@@ -3308,7 +3314,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 : (name == "Water" || name == "Eau_Riviere" ? 0.16f
                 : (name == "Leaf" || name.StartsWith("Sapin") || name == "Feuillage" ? 0.22f
                 : (name == "Metal" || name == "MetalAluminium" || name == "Lanterne" ? 0.30f
-                : (name == "Glass" || name == "GlassBleu" ? 1.0f
+                : (name == "Glass" || name == "GlassBleu" || name == "VerreClair" ? 1.0f
                 : (name.Contains("Banniere") || name == "Drapeau" ? 0.42f : 0.28f)))))));
             material.SetFloat("_Tiling", echelle);
         }
@@ -3324,10 +3330,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (material.HasProperty("_Smoothness"))
             material.SetFloat("_Smoothness", name == "MetalAluminium" ? 0.90f
                 : (name == "Metal" || name == "Gold" ? 0.76f
-                : (name == "Water" || name == "Eau_Riviere" || name == "Glass" || name == "GlassBleu"
+                : (name == "Water" || name == "Eau_Riviere" || name == "Glass" || name == "GlassBleu" || name == "VerreClair"
                     ? 0.90f : 0.32f)));
-        if (material.HasProperty("_Alpha") && (name == "Glass" || name == "GlassBleu"))
-            material.SetFloat("_Alpha", 0.24f);
+        if (material.HasProperty("_Alpha") && (name == "Glass" || name == "GlassBleu" || name == "VerreClair"))
+            material.SetFloat("_Alpha", name == "VerreClair" ? 0.12f : 0.24f);
         if (material.HasProperty("_DetailScale"))
             material.SetFloat("_DetailScale", name == "Terrain" ? 0.16f : (name.Contains("Roof") ? 1.8f : 0.75f));
         if (material.HasProperty("_DetailStrength"))
@@ -4301,6 +4307,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // Mur ferme sur ses cotes, avec ouvertures uniquement sur la facade
         // avant. Le verre ne masque donc plus un cube de mur derriere lui,
         // tandis que la face arriere reste une paroi pleine.
+        // Ouvertures des autres faces (null = mur plein). Coordonnees : X pour
+        // l'arriere, Z pour les cotes ; Y = hauteur.
+        public Vector2[] OuverturesArriere, TaillesArriere;
+        public Vector2[] OuverturesDroite, TaillesDroite;
+        public Vector2[] OuverturesGauche, TaillesGauche;
+
         public void MurAvecOuvertures(float largeur, float profondeur, float hauteur,
             Vector2[] centres, Vector2[] tailles, bool avecDessus = true,
             bool dessusPerimetre = false)
@@ -4315,15 +4327,17 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector3 basDroitAvant = new Vector3(x, 0f, z);
             Vector3 hautGaucheAvant = new Vector3(-x, hauteur, z);
             Vector3 hautDroitAvant = new Vector3(x, hauteur, z);
-            Quad(basGauche, basDroit, hautDroit, hautGauche);
-            Quad(basGauche, basGaucheAvant, hautGaucheAvant, hautGauche);
-            Quad(basDroitAvant, basDroit, hautDroit, hautDroitAvant);
+            if (OuverturesArriere == null) Quad(basGauche, basDroit, hautDroit, hautGauche);
+            else FaceAvecOuvertures(largeur, -z, hauteur, OuverturesArriere, TaillesArriere, true);
+            if (OuverturesGauche == null) Quad(basGauche, basGaucheAvant, hautGaucheAvant, hautGauche);
+            else FaceLateraleAvecOuvertures(profondeur, -x, hauteur, OuverturesGauche, TaillesGauche, false);
+            if (OuverturesDroite == null) Quad(basDroitAvant, basDroit, hautDroit, hautDroitAvant);
+            else FaceLateraleAvecOuvertures(profondeur, x, hauteur, OuverturesDroite, TaillesDroite, true);
             Quad(basGauche, basGaucheAvant, basDroitAvant, basDroit);
             if (avecDessus)
                 Quad(hautGauche, hautDroit, hautDroitAvant, hautGaucheAvant);
-            // La facade avant porte les vraies ouvertures. Le mur arriere
-            // reste plein : aucune fausse porte/fenetre ni ombre projetee ne
-            // peut apparaitre au fond de la maison.
+            // La facade avant porte la porte et les fenetres de la face avant ;
+            // les faces arriere et cotes ont leurs propres ouvertures (ci-dessus).
             FaceAvecOuvertures(largeur, z, hauteur, centres, tailles, true);
             if (dessusPerimetre)
                 AjouterDessusPerimetre(largeur, profondeur, hauteur, centres, tailles);
@@ -4372,6 +4386,49 @@ public sealed class LibreViesGame : MonoBehaviour
                     new Vector3(bornesX[i + 1], hauteur, z),
                     new Vector3(bornesX[i + 1], hauteur, z - e),
                     new Vector3(bornesX[i], hauteur, z - e));
+            }
+        }
+
+        // Mur lateral en x = const, horizontal sur Z. faceDroite : normale +X.
+        private void FaceLateraleAvecOuvertures(float profondeur, float x, float hauteur,
+            Vector2[] centres, Vector2[] tailles, bool faceDroite)
+        {
+            float demi = profondeur * 0.5f;
+            var bornesZ = new List<float> { -demi, demi };
+            var bornesY = new List<float> { 0f, hauteur };
+            for (int i = 0; i < centres.Length && i < tailles.Length; i++)
+            {
+                AjouterBorne(bornesZ, centres[i].x - tailles[i].x * 0.5f);
+                AjouterBorne(bornesZ, centres[i].x + tailles[i].x * 0.5f);
+                AjouterBorne(bornesY, Mathf.Clamp(centres[i].y - tailles[i].y * 0.5f, 0f, hauteur));
+                AjouterBorne(bornesY, Mathf.Clamp(centres[i].y + tailles[i].y * 0.5f, 0f, hauteur));
+            }
+            bornesZ.Sort();
+            bornesY.Sort();
+            for (int iz = 0; iz < bornesZ.Count - 1; iz++)
+            for (int iy = 0; iy < bornesY.Count - 1; iy++)
+            {
+                float centreZ = (bornesZ[iz] + bornesZ[iz + 1]) * 0.5f;
+                float centreY = (bornesY[iy] + bornesY[iy + 1]) * 0.5f;
+                bool ouverture = false;
+                for (int i = 0; i < centres.Length && i < tailles.Length; i++)
+                {
+                    if (Mathf.Abs(centreZ - centres[i].x) < tailles[i].x * 0.5f
+                        && Mathf.Abs(centreY - centres[i].y) < tailles[i].y * 0.5f)
+                    {
+                        ouverture = true;
+                        break;
+                    }
+                }
+                if (ouverture) continue;
+                float z0 = bornesZ[iz], z1 = bornesZ[iz + 1];
+                float y0 = bornesY[iy], y1 = bornesY[iy + 1];
+                if (faceDroite)
+                    Quad(new Vector3(x, y0, z1), new Vector3(x, y0, z0),
+                        new Vector3(x, y1, z0), new Vector3(x, y1, z1));
+                else
+                    Quad(new Vector3(x, y0, z0), new Vector3(x, y0, z1),
+                        new Vector3(x, y1, z1), new Vector3(x, y1, z0));
             }
         }
 
@@ -5269,15 +5326,57 @@ public sealed class LibreViesGame : MonoBehaviour
         return CadreEditionMaison().Contains(souris);
     }
 
-    // ---- Fenetres de maison : pose, deplacement, ajout et suppression ----
+    // ---- Fenetres de maison : pose sur les 4 faces, deplacement, suppression ----
+    // Faces : 0 = avant (+Z), 1 = arriere (-Z), 2 = droite (+X), 3 = gauche (-X).
     private const float HauteurCentreFenetre = 1.8f;
     private const float DemiLargeurFenetre = 0.5f;
     private const float DemiHauteurFenetre = 0.375f;
     private const float EspaceFenetre = 0.1f;
+    private const float RetraitFenetre = 0.051f;
+    private bool suppressionFenetreActive;
 
-    private float PositionFacadeFenetre(Batiment b)
+    private float DemiTailleFace(Batiment b, int face)
     {
-        return b.ProfondeurInitiale * 0.5f + 0.051f;
+        return (face >= 2 ? b.ProfondeurInitiale : b.LargeurInitiale) * 0.5f;
+    }
+
+    private float LimiteU(Batiment b, int face)
+    {
+        return Mathf.Max(DemiTailleFace(b, face) - DemiLargeurFenetre - 0.05f, 0f);
+    }
+
+    private float BorneY(Batiment b, float y)
+    {
+        return Mathf.Clamp(y, 1.0f, Mathf.Max(b.Hauteur - 0.5f, 1.0f));
+    }
+
+    private Vector3 PositionFenetreLocale(Batiment b, int face, float u, float y)
+    {
+        float demiL = b.LargeurInitiale * 0.5f;
+        float demiP = b.ProfondeurInitiale * 0.5f;
+        switch (face)
+        {
+            case 1: return new Vector3(u, y, -(demiP + RetraitFenetre));
+            case 2: return new Vector3(demiL + RetraitFenetre, y, u);
+            case 3: return new Vector3(-(demiL + RetraitFenetre), y, u);
+            default: return new Vector3(u, y, demiP + RetraitFenetre);
+        }
+    }
+
+    private static Quaternion RotationFenetre(int face)
+    {
+        return face >= 2 ? Quaternion.Euler(0f, 90f, 0f) : Quaternion.identity;
+    }
+
+    private static string NomFace(int face)
+    {
+        switch (face)
+        {
+            case 1: return "arriere";
+            case 2: return "droite";
+            case 3: return "gauche";
+            default: return "avant";
+        }
     }
 
     // Fenetres enfants directs de la maison (les supprimees sont inactives).
@@ -5295,19 +5394,51 @@ public sealed class LibreViesGame : MonoBehaviour
         return liste;
     }
 
-    // Vrai si une fenetre placee en (x, y) toucherait la porte ou une autre fenetre.
-    private bool FenetreChevauche(Batiment b, Transform moi, float x, float y)
+    // Vrai si le panneau de facade avant touche la zone (u, y) d'une fenetre.
+    private bool FenetreTouchePanneau(Batiment b, float u, float y)
     {
-        float hauteurPorte = b.PorteHauteur > 0.001f ? b.PorteHauteur : HauteurPorteConfortable;
-        // La porte est centree sur x = 0 et large de 1,2 m.
-        if (Mathf.Abs(x) < 0.6f + DemiLargeurFenetre + EspaceFenetre
-            && y - DemiHauteurFenetre - EspaceFenetre < hauteurPorte) return true;
+        Transform panneau = b.Root.Find("Affiche_Maison");
+        if (panneau == null) return false;
+        Renderer[] rendus = panneau.GetComponentsInChildren<Renderer>();
+        if (rendus.Length == 0) return false;
+        float minU = float.MaxValue, maxU = float.MinValue;
+        float minY = float.MaxValue, maxY = float.MinValue;
+        for (int i = 0; i < rendus.Length; i++)
+        {
+            Bounds bornes = rendus[i].bounds;
+            for (int c = 0; c < 8; c++)
+            {
+                Vector3 coin = bornes.center + Vector3.Scale(bornes.extents,
+                    new Vector3((c & 1) == 0 ? -1f : 1f, (c & 2) == 0 ? -1f : 1f, (c & 4) == 0 ? -1f : 1f));
+                Vector3 local = b.Root.InverseTransformPoint(coin);
+                minU = Mathf.Min(minU, local.x); maxU = Mathf.Max(maxU, local.x);
+                minY = Mathf.Min(minY, local.y); maxY = Mathf.Max(maxY, local.y);
+            }
+        }
+        return u + DemiLargeurFenetre + EspaceFenetre > minU && u - DemiLargeurFenetre - EspaceFenetre < maxU
+            && y + DemiHauteurFenetre + EspaceFenetre > minY && y - DemiHauteurFenetre - EspaceFenetre < maxY;
+    }
+
+    // Vrai si une fenetre placee sur cette face en (u, y) toucherait la porte, le
+    // panneau ou une autre fenetre de la meme face.
+    private bool FenetreChevauche(Batiment b, Transform moi, int face, float u, float y)
+    {
+        if (face == 0)
+        {
+            float hauteurPorte = b.PorteHauteur > 0.001f ? b.PorteHauteur : HauteurPorteConfortable;
+            // La porte est centree sur u = 0 et large de 1,2 m.
+            if (Mathf.Abs(u) < 0.6f + DemiLargeurFenetre + EspaceFenetre
+                && y - DemiHauteurFenetre - EspaceFenetre < hauteurPorte) return true;
+            if (FenetreTouchePanneau(b, u, y)) return true;
+        }
         List<Transform> autres = FenetresMaison(b, true);
         for (int i = 0; i < autres.Count; i++)
         {
             Transform t = autres[i];
             if (t == moi) continue;
-            if (Mathf.Abs(x - t.localPosition.x) < 2f * DemiLargeurFenetre + EspaceFenetre
+            if (ElementFenetre(b, t).Face != face) continue;
+            float position = face >= 2 ? t.localPosition.z : t.localPosition.x;
+            if (Mathf.Abs(u - position) < 2f * DemiLargeurFenetre + EspaceFenetre
                 && Mathf.Abs(y - t.localPosition.y) < 2f * DemiHauteurFenetre + EspaceFenetre)
                 return true;
         }
@@ -5324,17 +5455,26 @@ public sealed class LibreViesGame : MonoBehaviour
             Root = fenetre,
             MaisonParent = b,
             Type = "Fenetre",
+            Face = 0,
             SolY = fenetre.position.y,
             HauteurLocale = fenetre.localPosition.y,
-            ProfondeurLocale = PositionFacadeFenetre(b)
+            ProfondeurLocale = PositionFenetreLocale(b, 0, 0f, 0f).z
         };
         objetsEdition.Add(element);
         return element;
     }
 
+    private void PlacerFenetre(ElementEdition element, Batiment b, int face, float u, float y)
+    {
+        element.Face = face;
+        element.HauteurLocale = y;
+        element.Root.localPosition = PositionFenetreLocale(b, face, u, y);
+        element.Root.localRotation = RotationFenetre(face);
+    }
+
     private ElementEdition CreerFenetreMaison(Batiment b)
     {
-        GameObject fenetre = Box(new Vector3(0f, HauteurCentreFenetre, PositionFacadeFenetre(b)),
+        GameObject fenetre = Box(PositionFenetreLocale(b, 0, 0f, HauteurCentreFenetre),
             new Vector3(1.0f, 0.75f, 0.10f), "GlassBleu", b.Root, "Fenetre");
         Renderer rendu = fenetre.GetComponent<Renderer>();
         if (rendu != null) rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -5346,11 +5486,15 @@ public sealed class LibreViesGame : MonoBehaviour
         List<Transform> actives = FenetresMaison(b, true);
         var resultat = new FenetreSauvee[actives.Count];
         for (int i = 0; i < actives.Count; i++)
+        {
+            ElementEdition element = ElementFenetre(b, actives[i]);
             resultat[i] = new FenetreSauvee
             {
-                X = actives[i].localPosition.x,
-                Y = actives[i].localPosition.y
+                X = element.Face >= 2 ? actives[i].localPosition.z : actives[i].localPosition.x,
+                Y = actives[i].localPosition.y,
+                Face = element.Face
             };
+        }
         return resultat;
     }
 
@@ -5359,8 +5503,8 @@ public sealed class LibreViesGame : MonoBehaviour
         float r = b.LargeurInitiale * 0.27f;
         return new[]
         {
-            new FenetreSauvee { X = -r, Y = HauteurCentreFenetre },
-            new FenetreSauvee { X = r, Y = HauteurCentreFenetre }
+            new FenetreSauvee { X = -r, Y = HauteurCentreFenetre, Face = 0 },
+            new FenetreSauvee { X = r, Y = HauteurCentreFenetre, Face = 0 }
         };
     }
 
@@ -5370,7 +5514,6 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (b == null || b.Root == null || sauvees == null) return;
         List<Transform> existantes = FenetresMaison(b, false);
-        float face = PositionFacadeFenetre(b);
         for (int i = 0; i < sauvees.Length; i++)
         {
             Transform fenetre = i < existantes.Count ? existantes[i] : null;
@@ -5380,32 +5523,40 @@ public sealed class LibreViesGame : MonoBehaviour
                 existantes.Add(fenetre);
             }
             fenetre.gameObject.SetActive(true);
-            fenetre.localPosition = new Vector3(sauvees[i].X, sauvees[i].Y, face);
-            ElementEdition element = ElementFenetre(b, fenetre);
-            element.HauteurLocale = sauvees[i].Y;
-            element.ProfondeurLocale = face;
+            PlacerFenetre(ElementFenetre(b, fenetre), b, sauvees[i].Face, sauvees[i].X, sauvees[i].Y);
         }
         for (int i = sauvees.Length; i < existantes.Count; i++)
             existantes[i].gameObject.SetActive(false);
     }
 
-    private void AjouterFenetreMaison(Batiment b)
+    // Place une nouvelle fenetre a la premiere place libre de la face demandee.
+    // Pas de limite de nombre : tant qu'il reste de la place, elle est posee.
+    private void AjouterFenetreMaison(Batiment b, int face)
     {
         if (b == null || b.Root == null) return;
-        float limite = b.LargeurInitiale * 0.5f - DemiLargeurFenetre - 0.05f;
-        float[] candidats = { 0f, -1.5f, 1.5f, -2.5f, 2.5f, -3.5f, 3.5f };
+        float limite = LimiteU(b, face);
+        float[] hauteurs = { HauteurCentreFenetre, 2.2f, 1.4f };
         bool trouve = false;
-        float x = 0f;
-        for (int i = 0; i < candidats.Length && !trouve; i++)
+        float u = 0f, y = HauteurCentreFenetre;
+        for (int h = 0; h < hauteurs.Length && !trouve; h++)
         {
-            if (Mathf.Abs(candidats[i]) > limite) continue;
-            if (FenetreChevauche(b, null, candidats[i], HauteurCentreFenetre)) continue;
-            x = candidats[i];
-            trouve = true;
+            for (float pas = 0f; pas <= limite + 0.001f && !trouve; pas += 0.25f)
+            {
+                for (int signe = -1; signe <= 1 && !trouve; signe += 2)
+                {
+                    if (pas == 0f && signe > 0) continue;
+                    float candidat = pas * signe;
+                    if (FenetreChevauche(b, null, face, candidat, hauteurs[h])) continue;
+                    u = candidat;
+                    y = hauteurs[h];
+                    trouve = true;
+                }
+            }
         }
         if (!trouve)
         {
-            ShowInfo("Pas de place pour une nouvelle fenetre : deplacez ou supprimez une fenetre");
+            ShowInfo("Pas de place sur la face " + NomFace(face)
+                + " : deplacez ou supprimez une fenetre");
             return;
         }
         // Une fenetre supprimee est reutilisee en premier.
@@ -5415,16 +5566,14 @@ public sealed class LibreViesGame : MonoBehaviour
             if (!toutes[i].gameObject.activeSelf) reutilisable = toutes[i];
         ElementEdition element = reutilisable != null
             ? ElementFenetre(b, reutilisable) : CreerFenetreMaison(b);
-        float face = PositionFacadeFenetre(b);
         element.Root.gameObject.SetActive(true);
-        element.Root.localPosition = new Vector3(x, HauteurCentreFenetre, face);
-        element.HauteurLocale = HauteurCentreFenetre;
-        element.ProfondeurLocale = face;
+        PlacerFenetre(element, b, face, u, y);
         ActualiserOuverturePorteVisuelle(b);
         SynchroniserBatiment(b);
         elementEditionDernierSelectionne = element;
         if (mondePret) EnregistrerCoordonneesEdition();
-        ShowInfo("Fenetre ajoutee : maintenez le clic dessus pour la placer");
+        ShowInfo("Fenetre ajoutee sur la face " + NomFace(face)
+            + " : maintenez le clic dessus pour la placer");
     }
 
     private void SupprimerFenetreMaison(ElementEdition element)
@@ -5440,6 +5589,80 @@ public sealed class LibreViesGame : MonoBehaviour
         ShowInfo("Fenetre supprimee");
     }
 
+    // Fenetre visee par la souris (pour le mode suppression).
+    private ElementEdition FenetreSousSouris()
+    {
+        if (gameCamera == null) return null;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        RaycastHit[] touches = Physics.RaycastAll(rayon, 1000f, ~0, QueryTriggerInteraction.Ignore);
+        float meilleure = float.MaxValue;
+        ElementEdition meilleur = null;
+        for (int i = 0; i < touches.Length; i++)
+        {
+            Transform t = touches[i].transform;
+            if (t == null || t.name != "Fenetre" || t.parent == null) continue;
+            ElementEdition e = TrouverElementEdition(t);
+            if (e == null || e.MaisonParent == null) continue;
+            if (touches[i].distance < meilleure)
+            {
+                meilleure = touches[i].distance;
+                meilleur = e;
+            }
+        }
+        return meilleur;
+    }
+
+    // Deplacement d'une fenetre sur le plan de sa face : elle reste sur le mur.
+    private void DeplacerFenetreEdition(ElementEdition element)
+    {
+        Batiment b = element.MaisonParent;
+        if (gameCamera == null || b == null || b.Root == null) return;
+        int face = element.Face;
+        Vector3 normaleLocale = face == 1 ? -Vector3.forward : face == 2 ? Vector3.right
+            : face == 3 ? -Vector3.right : Vector3.forward;
+        Vector3 pointPlan = b.Root.TransformPoint(PositionFenetreLocale(b, face, 0f, 0f));
+        Vector3 normale = b.Root.TransformDirection(normaleLocale).normalized;
+        Ray rayon = gameCamera.ScreenPointToRay(Input.mousePosition);
+        float denominateur = Vector3.Dot(normale, rayon.direction);
+        if (Mathf.Abs(denominateur) < 0.0001f) return;
+        float distance = Vector3.Dot(pointPlan - rayon.origin, normale) / denominateur;
+        if (distance < 0f) return;
+        Vector3 local = b.Root.InverseTransformPoint(rayon.GetPoint(distance));
+        float limite = LimiteU(b, face);
+        float u = Mathf.Clamp(face >= 2 ? local.z : local.x, -limite, limite);
+        float y = BorneY(b, local.y);
+        // Position refusee (porte, panneau, autre fenetre) : on reste a la derniere place.
+        if (FenetreChevauche(b, element.Root, face, u, y)) return;
+        PlacerFenetre(element, b, face, u, y);
+        SynchroniserElementEdition(element);
+    }
+
+    // Ouvertures des faces arriere et cotes, pour les murs de la maison.
+    private void AppliquerOuverturesLaterales(Batiment b, Maillage m)
+    {
+        var arriere = new List<Vector2>(); var tailleArriere = new List<Vector2>();
+        var droite = new List<Vector2>(); var tailleDroite = new List<Vector2>();
+        var gauche = new List<Vector2>(); var tailleGauche = new List<Vector2>();
+        List<Transform> fenetres = FenetresMaison(b, true);
+        for (int i = 0; i < fenetres.Count; i++)
+        {
+            Transform t = fenetres[i];
+            int face = ElementFenetre(b, t).Face;
+            if (face == 0) continue;
+            Vector2 taille = new Vector2(Mathf.Abs(t.localScale.x), Mathf.Abs(t.localScale.y));
+            Vector3 p = t.localPosition;
+            if (face == 1) { arriere.Add(new Vector2(p.x, p.y)); tailleArriere.Add(taille); }
+            else if (face == 2) { droite.Add(new Vector2(p.z, p.y)); tailleDroite.Add(taille); }
+            else { gauche.Add(new Vector2(p.z, p.y)); tailleGauche.Add(taille); }
+        }
+        m.OuverturesArriere = arriere.Count > 0 ? arriere.ToArray() : null;
+        m.TaillesArriere = arriere.Count > 0 ? tailleArriere.ToArray() : null;
+        m.OuverturesDroite = droite.Count > 0 ? droite.ToArray() : null;
+        m.TaillesDroite = droite.Count > 0 ? tailleDroite.ToArray() : null;
+        m.OuverturesGauche = gauche.Count > 0 ? gauche.ToArray() : null;
+        m.TaillesGauche = gauche.Count > 0 ? tailleGauche.ToArray() : null;
+    }
+
     private bool PanneauFenetreAffiche()
     {
         ElementEdition e = elementEditionDernierSelectionne;
@@ -5453,10 +5676,10 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect cadre = CadreEditionMaison();
         GUI.Box(cadre, "", boxStyle);
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
-            "Fenetre selectionnee", smallStyle);
+            "Fenetre selectionnee (face " + NomFace(fenetre.Face) + ")", smallStyle);
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 56f, 448f, 42f),
             "Maintenez le clic sur la fenetre pour la deplacer le long du mur.\n"
-                + "Elle ne peut pas chevaucher la porte ni une autre fenetre.", smallStyle);
+                + "Elle ne peut pas chevaucher la porte, le panneau ni une autre fenetre.", smallStyle);
         if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 110f, 214f, 30f),
             "SUPPRIMER CETTE FENETRE", buttonStyle))
             SupprimerFenetreMaison(fenetre);
@@ -5542,14 +5765,25 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         else if (editionOutilMaison == 2)
         {
-            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 390f, 22f),
-                "Cliquez une fenetre pour la modifier ou la deplacer.", smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 16f, yc + 194f, 448f, 30f),
-                "AJOUTER UNE FENETRE", buttonStyle))
-                AjouterFenetreMaison(batiment);
-            DessinerChoixMateriaux(batiment, "fenetre",
-                new[] { "VERRE BLEU" },
-                new[] { "GlassBleu" }, yc + 250f);
+            GUI.Label(new Rect(cadre.x + 16f, yc + 168f, 448f, 22f),
+                "Ajouter une fenetre sur la face voulue :", smallStyle);
+            string[] nomsFaces = { "+ AVANT", "+ ARRIERE", "+ DROITE", "+ GAUCHE" };
+            for (int f = 0; f < 4; f++)
+            {
+                if (GUI.Button(new Rect(cadre.x + 16f + f * 112f, yc + 194f, 106f, 30f),
+                    nomsFaces[f], buttonStyle))
+                    AjouterFenetreMaison(batiment, f);
+            }
+            if (GUI.Button(new Rect(cadre.x + 16f, yc + 230f, 448f, 30f),
+                suppressionFenetreActive ? "ANNULER LA SUPPRESSION"
+                    : "SUPPRIMER UNE FENETRE (puis cliquer la fenetre)", buttonStyle))
+            {
+                suppressionFenetreActive = !suppressionFenetreActive;
+                if (suppressionFenetreActive) ShowInfo("Cliquez la fenetre a supprimer");
+            }
+            GUI.Label(new Rect(34f, yc + 272f, 150f, 24f), "Couleur / revetement :", smallStyle);
+            if (GUI.Button(new Rect(174f, yc + 270f, 120f, 28f), "TRANSPARENT", buttonStyle))
+                AppliquerMateriauMaison(batiment, "fenetre", "VerreClair");
         }
         else if (editionOutilMaison == 3)
         {
@@ -6008,6 +6242,11 @@ public sealed class LibreViesGame : MonoBehaviour
             return;
         }
         ElementEdition element = elementEditionSelectionne;
+        if (element.Type == "Fenetre" && element.MaisonParent != null)
+        {
+            DeplacerFenetreEdition(element);
+            return;
+        }
         float sol = SolElementEdition(element);
         float hauteurPlan = element.MaisonParent != null
             ? element.PositionAvant.y : sol + HauteurSoulevementMaisonEdition;
@@ -6027,15 +6266,6 @@ public sealed class LibreViesGame : MonoBehaviour
             local.y = element.BloqueHauteur ? element.HauteurLocale
                 : Mathf.Clamp(local.y, minY, maxY);
             local.z = element.ProfondeurLocale;
-            if (element.Type == "Fenetre")
-            {
-                float limiteX = Mathf.Max(element.MaisonParent.LargeurInitiale * 0.5f
-                    - DemiLargeurFenetre - 0.05f, 0f);
-                local.x = Mathf.Clamp(local.x, -limiteX, limiteX);
-                local.y = Mathf.Clamp(local.y, 1.0f, Mathf.Max(element.MaisonParent.Hauteur - 0.5f, 1.0f));
-                // Position refusee : la fenetre reste a sa derniere place valide.
-                if (FenetreChevauche(element.MaisonParent, element.Root, local.x, local.y)) return;
-            }
             element.Root.localPosition = local;
         }
         else
@@ -6208,6 +6438,20 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void GererSourisEdition()
     {
+        if (suppressionFenetreActive)
+        {
+            if (editionOutilMaison != 2) suppressionFenetreActive = false;
+            else if (Input.GetMouseButtonDown(0) && !SourisSurInterfaceEdition())
+            {
+                ElementEdition fenetre = FenetreSousSouris();
+                if (fenetre != null)
+                {
+                    suppressionFenetreActive = false;
+                    SupprimerFenetreMaison(fenetre);
+                }
+                return;
+            }
+        }
         if (deplacementPancarteActive && elementEditionDernierSelectionne != null
             && elementEditionDernierSelectionne.Facade != null)
         {
