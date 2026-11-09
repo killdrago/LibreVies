@@ -5735,22 +5735,123 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 116f, 448f, 22f),
             "Taille : " + Mathf.Abs(fenetre.Root.localScale.x).ToString("0.00") + " m x "
                 + Mathf.Abs(fenetre.Root.localScale.y).ToString("0.00") + " m (pas de 0,25 m)", smallStyle);
-        string[] bords = { "Cote gauche", "Cote droit", "Haut", "Bas" };
-        for (int k = 0; k < 4; k++)
-        {
-            float ligne = cadre.y + 146f + k * 36f;
-            GUI.Label(new Rect(cadre.x + 16f, ligne + 4f, 130f, 24f), bords[k], smallStyle);
-            if (GUI.Button(new Rect(cadre.x + 150f, ligne, 150f, 30f), "+ ELARGIR", buttonStyle))
-                RedimensionnerBordFenetre(fenetre, k, 0.25f);
-            if (GUI.Button(new Rect(cadre.x + 314f, ligne, 150f, 30f), "- REDUIRE", buttonStyle))
-                RedimensionnerBordFenetre(fenetre, k, -0.25f);
-        }
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 320f, 214f, 30f),
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 146f, 448f, 60f),
+            "Fleches sur la fenetre : la fleche exterieure agrandit ce bord,\n"
+                + "la fleche interieure le reduit (pas de 0,25 m).", smallStyle);
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 230f, 214f, 30f),
             "SUPPRIMER CETTE FENETRE", buttonStyle))
             SupprimerFenetreMaison(fenetre);
-        else if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 320f, 214f, 30f),
+        else if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 230f, 214f, 30f),
             "RETOUR A LA MAISON", buttonStyle))
             elementEditionDernierSelectionne = TrouverElementEdition(fenetre.MaisonParent.Root);
+    }
+
+    // ---- Fleches cliquables sur l'objet : exterieure = agrandir, interieure = reduire ----
+    private readonly List<Rect> flechesEdition = new List<Rect>();
+    private const float TailleFlecheEdition = 26f;
+    private const float DecalageFlecheEdition = 0.14f;
+
+    private bool PointEcranEdition(Vector3 monde, out Vector2 ecran)
+    {
+        ecran = Vector2.zero;
+        if (gameCamera == null) return false;
+        Vector3 p = gameCamera.WorldToScreenPoint(monde);
+        if (p.z <= 0f) return false;
+        ecran = new Vector2(p.x, Screen.height - p.y);
+        return true;
+    }
+
+    // Fleche pointant vers la direction donnee en coordonnees ecran (y vers le bas).
+    private static string GlypheDirectionEcran(Vector2 dir)
+    {
+        if (Mathf.Abs(dir.x) >= Mathf.Abs(dir.y)) return dir.x >= 0f ? "→" : "←";
+        return dir.y >= 0f ? "↓" : "↑";
+    }
+
+    // Deux fleches sur un bord : la exterieure agrandit (grandir), l'interieure reduit.
+    private void AjouterFlechesBord(Vector3 bord, Vector3 directionMonde,
+        System.Action grandir, System.Action reduire)
+    {
+        Vector3 dir = directionMonde.normalized;
+        Vector2 ecranBord, ecranExt, ecranInt;
+        if (!PointEcranEdition(bord, out ecranBord)
+            || !PointEcranEdition(bord + dir * DecalageFlecheEdition, out ecranExt)
+            || !PointEcranEdition(bord - dir * DecalageFlecheEdition, out ecranInt)) return;
+        Vector2 sens = ecranExt - ecranBord;
+        if (sens.sqrMagnitude < 0.01f) return;
+        sens.Normalize();
+        BoutonFlecheEdition(ecranExt, GlypheDirectionEcran(sens), grandir);
+        BoutonFlecheEdition(ecranInt, GlypheDirectionEcran(-sens), reduire);
+    }
+
+    private void BoutonFlecheEdition(Vector2 centre, string glyphe, System.Action action)
+    {
+        Rect r = new Rect(centre.x - TailleFlecheEdition * 0.5f, centre.y - TailleFlecheEdition * 0.5f,
+            TailleFlecheEdition, TailleFlecheEdition);
+        if (r.xMax < 0f || r.yMax < 0f || r.x > Screen.width || r.y > Screen.height) return;
+        if (CadreEditionMaison().Overlaps(r)) return;
+        flechesEdition.Add(r);
+        if (GUI.Button(r, glyphe, buttonStyle)) action();
+    }
+
+    private void DessinerFlechesFenetre(ElementEdition f)
+    {
+        Transform t = f.Root;
+        Batiment b = f.MaisonParent;
+        float demiL = DemiLargeurDe(t), demiH = DemiHauteurDe(t);
+        // Le cadre local de la fenetre a son +X vers le bord droit de la fenetre ;
+        // sur les faces laterales il est retourne par la rotation de 90 degres.
+        bool retourne = f.Face >= 2;
+        int bordDroit = retourne ? 0 : 1, bordGauche = retourne ? 1 : 0;
+        AjouterFlechesBord(t.TransformPoint(new Vector3(demiL, 0f, 0f)), t.TransformDirection(Vector3.right),
+            () => RedimensionnerBordFenetre(f, bordDroit, 0.25f),
+            () => RedimensionnerBordFenetre(f, bordDroit, -0.25f));
+        AjouterFlechesBord(t.TransformPoint(new Vector3(-demiL, 0f, 0f)), -t.TransformDirection(Vector3.right),
+            () => RedimensionnerBordFenetre(f, bordGauche, 0.25f),
+            () => RedimensionnerBordFenetre(f, bordGauche, -0.25f));
+        AjouterFlechesBord(t.TransformPoint(new Vector3(0f, demiH, 0f)), t.TransformDirection(Vector3.up),
+            () => RedimensionnerBordFenetre(f, 2, 0.25f),
+            () => RedimensionnerBordFenetre(f, 2, -0.25f));
+        AjouterFlechesBord(t.TransformPoint(new Vector3(0f, -demiH, 0f)), -t.TransformDirection(Vector3.up),
+            () => RedimensionnerBordFenetre(f, 3, 0.25f),
+            () => RedimensionnerBordFenetre(f, 3, -0.25f));
+    }
+
+    private void DessinerFlechesMurs(ElementEdition maison)
+    {
+        Batiment b = maison.Maison;
+        Transform r = b.Root;
+        Vector3 ax = (r.rotation * Vector3.right).normalized;
+        Vector3 az = (r.rotation * Vector3.forward).normalized;
+        Vector3 haut = Vector3.up;
+        Vector3 centre = r.position + Vector3.up * (b.Hauteur * 0.5f);
+        float demiL = b.Largeur * 0.5f, demiP = b.Profondeur * 0.5f;
+        AjouterFlechesBord(centre + ax * demiL, ax,
+            () => ModifierTailleMur(maison, 1, true), () => ModifierTailleMur(maison, 1, false));
+        AjouterFlechesBord(centre - ax * demiL, -ax,
+            () => ModifierTailleMur(maison, -1, true), () => ModifierTailleMur(maison, -1, false));
+        AjouterFlechesBord(centre + az * demiP, az,
+            () => ModifierTailleMur(maison, 2, true), () => ModifierTailleMur(maison, 2, false));
+        AjouterFlechesBord(centre - az * demiP, -az,
+            () => ModifierTailleMur(maison, -2, true), () => ModifierTailleMur(maison, -2, false));
+        AjouterFlechesBord(r.position + haut * b.Hauteur, haut,
+            () => ModifierHauteurMur(maison, true), () => ModifierHauteurMur(maison, false));
+    }
+
+    // Fleches sur l'objet en cours d'edition (fenetre, ou murs de la maison).
+    private void DessinerFlechesEdition()
+    {
+        flechesEdition.Clear();
+        if (!modeEdition || editionMaisonEnDeplacement || elementEditionDernierSelectionne == null) return;
+        ElementEdition sel = elementEditionDernierSelectionne;
+        if (PanneauFenetreAffiche())
+        {
+            if (sel.Root != null && sel.MaisonParent != null) DessinerFlechesFenetre(sel);
+        }
+        else if (editionOutilMaison == 1 && sel.Maison != null && sel.Maison.Root != null)
+        {
+            DessinerFlechesMurs(sel);
+        }
     }
 
     private void DessinerEditionMaison()
@@ -6503,6 +6604,8 @@ public sealed class LibreViesGame : MonoBehaviour
             && new Rect(18f, Screen.height - 405f, 470f, 385f).Contains(souris))
             return true;
         if (SourisSurPanneauMaison()) return true;
+        for (int i = 0; i < flechesEdition.Count; i++)
+            if (flechesEdition[i].Contains(souris)) return true;
         if (texturesOpen && fenetreTextures.Contains(souris)) return true;
         return new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f).Contains(souris);
     }
@@ -11319,6 +11422,7 @@ public sealed class LibreViesGame : MonoBehaviour
             GUI.color = Color.white;
         }
         DessinerEditionMaison();
+        DessinerFlechesEdition();
         DessinerEditionPancarte();
         if (!CompteAdministrateur) adminOpen = false;
         if (CompteAdministrateur && adminOpen && !creationPersonnageOpen) DessinerAdmin();
