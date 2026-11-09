@@ -438,7 +438,9 @@ public sealed class LibreViesCompte
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
             if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
                 || action == "modifier_element_monde" || action == "supprimer_element_monde"
-                || action == "vider_monde" || action == "enregistrer_maison")
+                || action == "vider_monde" || action == "enregistrer_maison"
+                || action == "declarer_monstres" || action == "piloter_monstres"
+                || action == "ressusciter_monstres" || action == "frapper_monstre")
                 yield break;
             if (action == "get_npcs" || action == "save_npc")
             {
