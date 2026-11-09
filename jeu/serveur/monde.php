@@ -10,6 +10,16 @@ function types_monde_valides() {
         'CAILLOU_SPHERE', 'CAILLOU_ROCHER', 'ARBRE_FEUILLU', 'ARBRE_PIN');
 }
 
+// Monstres : une ligne par monstre tue (cle = monstre_<rang>). supprime = 1 :
+// le monstre est mort ; le client le fait reapparaitre 10 s apres la mort.
+function valider_monstre_monde($donnees) {
+    $cle = isset($donnees['cle']) ? trim((string)$donnees['cle']) : '';
+    if (!preg_match('/^monstre_[0-9]{1,4}$/', $cle)) {
+        throw new InvalidArgumentException('Identifiant de monstre invalide.');
+    }
+    return $cle;
+}
+
 function nombre_monde($valeur, $min, $max) {
     if (is_string($valeur)) $valeur = str_replace(',', '.', trim($valeur));
     if (!is_numeric($valeur)) throw new InvalidArgumentException('Valeur numerique attendue.');
@@ -78,17 +88,25 @@ function lire_monde($pdo, $depuis) {
     $revision = (int)$pdo->query('SELECT revision FROM monde_compteur WHERE id = 1')->fetchColumn();
     $complet = ($depuis === 0);
     if ($complet) {
-        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime'
+        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
+            . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
             . ' FROM monde_objet WHERE supprime = 0 ORDER BY id');
         $requete->execute();
     } else {
-        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime'
+        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
+            . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
             . ' FROM monde_objet WHERE revision > :depuis ORDER BY id');
         $requete->execute(array(':depuis' => $depuis));
     }
     $elements = array(); $supprimes = array(); $maisons = array(); $maisonsSupprimees = array();
+    $monstresMorts = array();
     foreach ($requete->fetchAll() as $ligne) {
         $supprime = (int)$ligne['supprime'] === 1;
+        if ($ligne['genre'] === 'monstre') {
+            // age : secondes depuis la mort ; le client calcule la reapparition.
+            if ($supprime) $monstresMorts[] = array('cle' => (string)$ligne['cle'], 'age' => (int)$ligne['age']);
+            continue;
+        }
         if ($ligne['genre'] === 'maison' || $ligne['genre'] === 'edition') {
             if ($supprime) $maisonsSupprimees[] = (string)$ligne['cle'];
             else $maisons[] = array(
@@ -109,6 +127,7 @@ function lire_monde($pdo, $depuis) {
         'revision' => $revision, 'complet' => $complet,
         'elements' => $elements, 'supprimes' => $supprimes,
         'maisons' => $maisons, 'maisons_supprimees' => $maisonsSupprimees,
+        'monstres' => $monstresMorts,
     );
 }
 
@@ -151,6 +170,16 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         $requete = $pdo->prepare("UPDATE monde_objet SET supprime = 1, revision = :rev WHERE genre = 'element' AND supprime = 0");
         $requete->execute(array(':rev' => $rev));
         return array('message' => 'Elements du monde supprimes.', 'extra' => array('revision' => $rev));
+    }
+    if ($action === 'tuer_monstre') {
+        // Ouvert a tout joueur connecte (api.php) : la mort est partagee avec tous.
+        $cle = valider_monstre_monde($donnees);
+        $rev = prochaine_revision($pdo);
+        $requete = $pdo->prepare("INSERT INTO monde_objet (genre, cle, type, position_x, position_z, rotation_y, taille, supprime, auteur_id, revision)"
+            . " VALUES ('monstre', :cle, 'MONSTRE', 0, 0, 0, 1, 1, :auteur, :rev)"
+            . " ON DUPLICATE KEY UPDATE supprime = 1, auteur_id = VALUES(auteur_id), revision = VALUES(revision)");
+        $requete->execute(array(':cle' => $cle, ':auteur' => $auteur, ':rev' => $rev));
+        return array('message' => 'Monstre tue.', 'extra' => array('revision' => $rev));
     }
     if ($action === 'enregistrer_maison') {
         $maison = valider_maison_monde($donnees);

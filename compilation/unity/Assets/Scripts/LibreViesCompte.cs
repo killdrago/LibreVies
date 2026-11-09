@@ -42,6 +42,15 @@ public sealed class LibreViesCompte
         public bool complet;
         public int[] supprimes;
         public string[] maisons_supprimees;
+        public LibreViesMonstreMort[] monstres;
+    }
+
+    // Monstre tue (partage) : age = secondes depuis la mort.
+    [Serializable]
+    public sealed class LibreViesMonstreMort
+    {
+        public string cle;
+        public int age;
     }
 
     // Monde partage (tables monde_element et monde_maison, voir monde.sql).
@@ -105,6 +114,7 @@ public sealed class LibreViesCompte
     public LibreViesElementMonde[] ElementsMonde { get; private set; }
     public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
     public int[] IdsElementsSupprimes { get; private set; }
+    public LibreViesMonstreMort[] MonstresMorts { get; private set; }
     public LibreViesJoueurPresent[] JoueursPresents { get; private set; }
     public int RevisionMonde { get; private set; }
     public bool MondeComplet { get; private set; }
@@ -153,6 +163,13 @@ public sealed class LibreViesCompte
             { "depuis", depuis.ToString(System.Globalization.CultureInfo.InvariantCulture) }
         };
         yield return Envoyer("get_monde", null, null, champs);
+    }
+
+    // Signale la mort d'un monstre a tous les joueurs (cle = monstre_<rang>).
+    public IEnumerator SignalerMonstreMort(string cle)
+    {
+        yield return Envoyer("tuer_monstre", null, null,
+            new Dictionary<string, string> { { "cle", cle ?? "" } });
     }
 
     public IEnumerator AjouterElementMonde(LibreViesElementMonde element)
@@ -335,6 +352,7 @@ public sealed class LibreViesCompte
                 ElementsMonde = reponse.elements ?? new LibreViesElementMonde[0];
                 MaisonsMonde = reponse.maisons ?? new LibreViesMaisonMonde[0];
                 IdsElementsSupprimes = reponse.supprimes ?? new int[0];
+                MonstresMorts = reponse.monstres ?? new LibreViesMonstreMort[0];
                 RevisionMonde = reponse.revision;
                 MondeComplet = reponse.complet;
             }

@@ -711,6 +711,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public bool Spider;
         public int Hp = MaxHp;
         public bool Alive = true;
+        public string Cle;          // identifiant partage (monstre_<rang>), voir CreateEnemies
         public float AttackCooldown;
         public float RespawnAt;
         public Vector3 Home;
@@ -1075,6 +1076,7 @@ public sealed class LibreViesGame : MonoBehaviour
             try
             {
                 bool change = AppliquerMondeServeur(compte);
+                AppliquerMonstresMorts(compte.MonstresMorts);
                 AppliquerMaisonsServeur(compte.MaisonsMonde);
                 revisionMondeConnue = compte.RevisionMonde;
                 if (change) ReconstruireMonde();
@@ -7558,11 +7560,52 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // ---- Monstres partages : la mort est envoyee au serveur, reapparition 10 s apres ----
+    private const int GraineMonstres = 20261010;
+
+    private static float AleaMonstre(System.Random rng, float min, float max)
+    {
+        return min + (float)rng.NextDouble() * (max - min);
+    }
+
+    private void EnvoyerMortMonstre(EnemyState ennemi)
+    {
+        if (ennemi == null || String.IsNullOrEmpty(ennemi.Cle)) return;
+        if (LibreViesCompte.Courant == null || !LibreViesCompte.Courant.Authentifie) return;
+        StartCoroutine(LibreViesCompte.Courant.SignalerMonstreMort(ennemi.Cle));
+    }
+
+    private EnemyState TrouverEnnemiParCle(string cle)
+    {
+        for (int i = 0; i < enemies.Count; i++)
+            if (enemies[i] != null && enemies[i].Cle == cle) return enemies[i];
+        return null;
+    }
+
+    // Monstres tues par un autre joueur : ils disparaissent ici et reapparaissent
+    // en meme temps que chez lui (10 s apres la mort).
+    private void AppliquerMonstresMorts(LibreViesCompte.LibreViesMonstreMort[] morts)
+    {
+        if (morts == null) return;
+        for (int i = 0; i < morts.Length; i++)
+        {
+            LibreViesCompte.LibreViesMonstreMort mort = morts[i];
+            if (mort == null || mort.age >= 10) continue;
+            EnemyState ennemi = TrouverEnnemiParCle(mort.cle);
+            if (ennemi == null || !ennemi.Alive || ennemi.Root == null) continue;
+            ennemi.Alive = false;
+            ennemi.Hp = 0;
+            ennemi.RespawnAt = Time.time + Mathf.Max(0f, 10f - mort.age);
+            ennemi.Root.SetActive(false);
+        }
+    }
+
     private void TuerEnnemiParGarde(EnemyState ennemi)
     {
         ennemi.Alive = false;
         ennemi.RespawnAt = Time.time + 10f;
         ennemi.Root.SetActive(false);
+        EnvoyerMortMonstre(ennemi);
         // Remarque : la reference ne compte pas ce monstre pour la quete et ne
         // donne pas d'experience au heros (c'est le garde qui l'a tue).
     }
@@ -8858,14 +8901,17 @@ public sealed class LibreViesGame : MonoBehaviour
         // tirees sur toute la carte, jamais dans le village ni dans la riviere.
         // Un ecart minimal evite de former des tas lorsque la quantite augmente.
         string[] types = { "souris", "rat", "araignee" };
+        // Graine fixe : chaque joueur obtient les memes monstres au meme endroit,
+        // ce qui permet de partager leurs morts (monstre_<rang>).
+        var rngMonstres = new System.Random(GraineMonstres);
         for (int index = 0; index < nombreMonstresAdmin; index++)
         {
             Vector3 position = Vector3.zero;
             bool positionValide = false;
             for (int essai = 0; essai < 160 && !positionValide; essai++)
             {
-                float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
-                float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+                float x = AleaMonstre(rngMonstres, -WorldSize + 6f, WorldSize - 6f);
+                float z = AleaMonstre(rngMonstres, -WorldSize + 6f, WorldSize - 6f);
                 Vector2 candidate = new Vector2(x, z);
                 positionValide = !DansVillage(x, z)
                     && !ZoneEauInterditeMonstre(candidate);
@@ -8889,6 +8935,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             if (!positionValide) continue;
             CreateEnemy(position, types[index % types.Length]);
+            if (enemies.Count > 0) enemies[enemies.Count - 1].Cle = "monstre_" + index;
         }
         Debug.Log("[LV] monstres créés : " + enemies.Count
             + " (quantite ADMIN = " + nombreMonstresAdmin + ", positions aleatoires)");
@@ -9677,6 +9724,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (enemy.Hp <= 0)
             {
                 enemy.Alive = false; enemy.RespawnAt = Time.time + 10f; enemy.Root.SetActive(false);
+                EnvoyerMortMonstre(enemy);
                 if (enemy.Spider) spidersKilled++; else ratsKilled++;
                 GainXp(enemy.Spider ? 35 : 20);
                 coins += enemy.Spider ? 4 : 2;

@@ -626,10 +626,11 @@ if ($action === 'presence') {
 }
 
 if (in_array($action, array('get_monde', 'ajouter_element_monde', 'modifier_element_monde', 'supprimer_element_monde',
-    'vider_monde', 'enregistrer_maison'), true)) {
-    // Lecture pour tous les joueurs connectes ; ecriture reservee aux administrateurs.
+    'vider_monde', 'enregistrer_maison', 'tuer_monstre'), true)) {
+    // Lecture pour tous les joueurs connectes ; ecriture reservee aux administrateurs,
+    // sauf la mort d'un monstre (tout joueur connecte peut la signaler).
     $membre = membre_authentifie($pdo, $config, $donnees);
-    if ($action !== 'get_monde' && (int)$membre['droit'] !== 1) {
+    if ($action !== 'get_monde' && $action !== 'tuer_monstre' && (int)$membre['droit'] !== 1) {
         repondre(false, 'Modification du monde reservee aux administrateurs.', array(), 403);
     }
     try {
