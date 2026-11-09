@@ -1038,12 +1038,12 @@ public sealed class LibreViesGame : MonoBehaviour
         return texte.ToString();
     }
 
-    // Synchronisation : demande toutes les 1,5 seconde les seuls changements depuis la revision connue.
+    // Synchronisation : demande toutes les 0,05 seconde les seuls changements depuis la revision connue.
     private System.Collections.IEnumerator SurveillerMonde()
     {
         while (true)
         {
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.05f);
             LibreViesCompte compte = LibreViesCompte.Courant;
             yield return compte.ChargerMonde(revisionMondeConnue);
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
@@ -1913,6 +1913,10 @@ public sealed class LibreViesGame : MonoBehaviour
             batiment.PorteRoot.localPosition = position;
         }
         Transform[] enfants = batiment.Root.GetComponentsInChildren<Transform>(true);
+        // Une fenetre reste entierement dans le mur : sa position X enregistree peut
+        // avoir ete decalee par un deplacement de la maison ; sans borne, le mur
+        // s'etirait pour couvrir l'ouverture.
+        float demiLargeurMur = Mathf.Max(batiment.LargeurInitiale, 0f) * 0.5f;
         for (int i = 0; i < enfants.Length; i++)
         {
             Transform enfant = enfants[i];
@@ -1920,6 +1924,9 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 Vector3 position = enfant.localPosition;
                 position.z = face + 0.051f; // vitre : profondeur 0,10 m
+                float demiFenetre = Mathf.Abs(enfant.localScale.x) * 0.5f;
+                float limite = Mathf.Max(demiLargeurMur - demiFenetre - 0.05f, 0f);
+                position.x = Mathf.Clamp(position.x, -limite, limite);
                 enfant.localPosition = position;
             }
         }
