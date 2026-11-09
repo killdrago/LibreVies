@@ -7597,6 +7597,9 @@ public sealed class LibreViesGame : MonoBehaviour
             nombre++;
         }
         json.Append(']');
+        // Diagnostic : position envoyee au serveur pour les premiers monstres.
+        Journal("monstres : declaration de " + nombre + " ; debut envoye : "
+                + json.ToString(0, Math.Min(json.Length, 160)));
         LibreViesCompte compte = LibreViesCompte.Courant;
         yield return compte.DeclarerMonstres(json.ToString());
         if (!String.IsNullOrEmpty(compte.Erreur))
