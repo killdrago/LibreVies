@@ -10,9 +10,9 @@ function types_monde_valides() {
         'CAILLOU_SPHERE', 'CAILLOU_ROCHER', 'ARBRE_FEUILLU', 'ARBRE_PIN');
 }
 
-// Monstres : une ligne par monstre tue (cle = monstre_<rang>). supprime = 1 :
-// le monstre est mort ; le client le fait reapparaitre 10 s apres la mort.
-function valider_monstre_monde($donnees) {
+// Monstres : table monde_monstre (une ligne par monstre). Position fixee a la
+// premiere declaration ; pv / mort partages entre tous les joueurs.
+function valider_cle_monstre($donnees) {
     $cle = isset($donnees['cle']) ? trim((string)$donnees['cle']) : '';
     if (!preg_match('/^monstre_[0-9]{1,4}$/', $cle)) {
         throw new InvalidArgumentException('Identifiant de monstre invalide.');
@@ -99,14 +99,8 @@ function lire_monde($pdo, $depuis) {
         $requete->execute(array(':depuis' => $depuis));
     }
     $elements = array(); $supprimes = array(); $maisons = array(); $maisonsSupprimees = array();
-    $monstresMorts = array();
     foreach ($requete->fetchAll() as $ligne) {
         $supprime = (int)$ligne['supprime'] === 1;
-        if ($ligne['genre'] === 'monstre') {
-            // age : secondes depuis la mort ; le client calcule la reapparition.
-            if ($supprime) $monstresMorts[] = array('cle' => (string)$ligne['cle'], 'age' => (int)$ligne['age']);
-            continue;
-        }
         if ($ligne['genre'] === 'maison' || $ligne['genre'] === 'edition') {
             if ($supprime) $maisonsSupprimees[] = (string)$ligne['cle'];
             else $maisons[] = array(
@@ -127,8 +121,111 @@ function lire_monde($pdo, $depuis) {
         'revision' => $revision, 'complet' => $complet,
         'elements' => $elements, 'supprimes' => $supprimes,
         'maisons' => $maisons, 'maisons_supprimees' => $maisonsSupprimees,
-        'monstres' => $monstresMorts,
+        'monstres' => lire_monstres($pdo, $complet ? 0 : $depuis),
     );
+}
+
+// ---- Monstres partages ----
+function formater_monstre($ligne) {
+    return array(
+        'cle' => (string)$ligne['cle'], 'x' => (float)$ligne['position_x'], 'z' => (float)$ligne['position_z'],
+        'pv' => (int)$ligne['pv'], 'pv_max' => (int)$ligne['pv_max'], 'mort' => (int)$ligne['mort'],
+        'age' => (int)$ligne['age'],
+    );
+}
+
+// depuis = 0 : tous les monstres ; sinon seulement ceux qui ont change.
+function lire_monstres($pdo, $depuis) {
+    $sql = 'SELECT cle, position_x, position_z, pv, pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+        . ' FROM monde_monstre';
+    if ((int)$depuis > 0) {
+        $requete = $pdo->prepare($sql . ' WHERE revision > :depuis ORDER BY cle');
+        $requete->execute(array(':depuis' => (int)$depuis));
+    } else {
+        $requete = $pdo->prepare($sql . ' ORDER BY cle');
+        $requete->execute();
+    }
+    $liste = array();
+    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne);
+    return $liste;
+}
+
+function lire_monstres_par_cle($pdo, $cles) {
+    if (count($cles) === 0) return array();
+    $marques = implode(',', array_fill(0, count($cles), '?'));
+    $requete = $pdo->prepare('SELECT cle, position_x, position_z, pv, pv_max, mort,'
+        . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age FROM monde_monstre WHERE cle IN (' . $marques . ')');
+    $requete->execute(array_values($cles));
+    $liste = array();
+    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne);
+    return $liste;
+}
+
+// Declare les monstres du client. La premiere declaration fixe la position ;
+// ensuite tous les joueurs recoivent la meme position (INSERT IGNORE).
+function traiter_declaration_monstres($pdo, $donnees) {
+    $brut = isset($donnees['monstres']) ? $donnees['monstres'] : '[]';
+    $liste = is_string($brut) ? json_decode($brut, true) : $brut;
+    if (!is_array($liste) || count($liste) > 200) throw new InvalidArgumentException('Liste de monstres invalide.');
+    $rev = prochaine_revision($pdo);
+    $insertion = $pdo->prepare('INSERT IGNORE INTO monde_monstre'
+        . ' (cle, type, position_x, position_z, pv, pv_max, mort, revision)'
+        . ' VALUES (:cle, :type, :x, :z, :pv, :pvmax, 0, :rev)');
+    $cles = array();
+    foreach ($liste as $monstre) {
+        if (!is_array($monstre)) throw new InvalidArgumentException('Monstre invalide.');
+        $cle = valider_cle_monstre($monstre);
+        $type = isset($monstre['type']) ? (string)$monstre['type'] : '';
+        if (!in_array($type, array('souris', 'rat', 'araignee'), true)) {
+            throw new InvalidArgumentException('Type de monstre inconnu.');
+        }
+        $x = nombre_monde(isset($monstre['x']) ? $monstre['x'] : 0, -130, 130);
+        $z = nombre_monde(isset($monstre['z']) ? $monstre['z'] : 0, -130, 130);
+        $pvMax = isset($monstre['pv_max']) ? (int)$monstre['pv_max'] : 0;
+        if ($pvMax < 1 || $pvMax > 200) throw new InvalidArgumentException('Points de vie invalides.');
+        $insertion->execute(array(':cle' => $cle, ':type' => $type, ':x' => $x, ':z' => $z,
+            ':pv' => $pvMax, ':pvmax' => $pvMax, ':rev' => $rev));
+        $cles[] = $cle;
+    }
+    return array('message' => 'Monstres declares.', 'extra' => array(
+        'revision' => $rev, 'monstres' => lire_monstres_par_cle($pdo, $cles)));
+}
+
+// Un coup porte sur un monstre : les pv baissent pour tout le monde. Un monstre
+// mort se releve 10 s apres sa mort (remise a pleine vie au premier coup apres ce delai).
+function traiter_coup_monstre($pdo, $donnees, $auteur) {
+    $cle = valider_cle_monstre($donnees);
+    $degats = isset($donnees['degats']) ? (int)$donnees['degats'] : 0;
+    if ($degats < 1 || $degats > 999) throw new InvalidArgumentException('Degats invalides.');
+    $pdo->beginTransaction();
+    try {
+        $requete = $pdo->prepare('SELECT pv, pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+            . ' FROM monde_monstre WHERE cle = :cle FOR UPDATE');
+        $requete->execute(array(':cle' => $cle));
+        $ligne = $requete->fetch();
+        if (!$ligne) throw new InvalidArgumentException('Monstre inconnu : declaration manquante.');
+        $pv = (int)$ligne['pv'];
+        $pvMax = (int)$ligne['pv_max'];
+        $mort = (int)$ligne['mort'] === 1;
+        if ($mort && (int)$ligne['age'] >= 10) { $mort = false; $pv = $pvMax; }
+        if ($mort) {
+            $pdo->commit();
+            return array('message' => 'Monstre deja mort.', 'extra' => array());
+        }
+        $pv = max(0, $pv - $degats);
+        $mort = ($pv === 0);
+        $rev = prochaine_revision($pdo);
+        $miseAJour = $pdo->prepare('UPDATE monde_monstre SET pv = :pv, mort = :mort, revision = :rev, auteur_id = :auteur'
+            . ' WHERE cle = :cle');
+        $miseAJour->execute(array(':pv' => $pv, ':mort' => $mort ? 1 : 0, ':rev' => $rev,
+            ':auteur' => $auteur, ':cle' => $cle));
+        $pdo->commit();
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $erreur;
+    }
+    return array('message' => 'Coup enregistre.', 'extra' => array('revision' => $rev,
+        'monstre' => array('cle' => $cle, 'pv' => $pv, 'pv_max' => $pvMax, 'mort' => $mort ? 1 : 0)));
 }
 
 // Ecritures du monde (admin seulement, controle fait dans api.php).
@@ -171,16 +268,8 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         $requete->execute(array(':rev' => $rev));
         return array('message' => 'Elements du monde supprimes.', 'extra' => array('revision' => $rev));
     }
-    if ($action === 'tuer_monstre') {
-        // Ouvert a tout joueur connecte (api.php) : la mort est partagee avec tous.
-        $cle = valider_monstre_monde($donnees);
-        $rev = prochaine_revision($pdo);
-        $requete = $pdo->prepare("INSERT INTO monde_objet (genre, cle, type, position_x, position_z, rotation_y, taille, supprime, auteur_id, revision)"
-            . " VALUES ('monstre', :cle, 'MONSTRE', 0, 0, 0, 1, 1, :auteur, :rev)"
-            . " ON DUPLICATE KEY UPDATE supprime = 1, auteur_id = VALUES(auteur_id), revision = VALUES(revision)");
-        $requete->execute(array(':cle' => $cle, ':auteur' => $auteur, ':rev' => $rev));
-        return array('message' => 'Monstre tue.', 'extra' => array('revision' => $rev));
-    }
+    if ($action === 'declarer_monstres') return traiter_declaration_monstres($pdo, $donnees);
+    if ($action === 'frapper_monstre') return traiter_coup_monstre($pdo, $donnees, $auteur);
     if ($action === 'enregistrer_maison') {
         $maison = valider_maison_monde($donnees);
         $rev = prochaine_revision($pdo);

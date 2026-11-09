@@ -42,14 +42,19 @@ public sealed class LibreViesCompte
         public bool complet;
         public int[] supprimes;
         public string[] maisons_supprimees;
-        public LibreViesMonstreMort[] monstres;
+        public LibreViesMonstre[] monstres;
     }
 
-    // Monstre tue (partage) : age = secondes depuis la mort.
+    // Monstre partage (table monde_monstre). mort = 1 ou 0 ; age = secondes depuis la mort.
     [Serializable]
-    public sealed class LibreViesMonstreMort
+    public sealed class LibreViesMonstre
     {
         public string cle;
+        public float x;
+        public float z;
+        public int pv;
+        public int pv_max;
+        public int mort;
         public int age;
     }
 
@@ -114,7 +119,7 @@ public sealed class LibreViesCompte
     public LibreViesElementMonde[] ElementsMonde { get; private set; }
     public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
     public int[] IdsElementsSupprimes { get; private set; }
-    public LibreViesMonstreMort[] MonstresMorts { get; private set; }
+    public LibreViesMonstre[] Monstres { get; private set; }
     public LibreViesJoueurPresent[] JoueursPresents { get; private set; }
     public int RevisionMonde { get; private set; }
     public bool MondeComplet { get; private set; }
@@ -165,11 +170,22 @@ public sealed class LibreViesCompte
         yield return Envoyer("get_monde", null, null, champs);
     }
 
-    // Signale la mort d'un monstre a tous les joueurs (cle = monstre_<rang>).
-    public IEnumerator SignalerMonstreMort(string cle)
+    // Declare les monstres du client (JSON : cle, type, x, z, pv_max). Le serveur
+    // garde la premiere position connue et renvoie l'etat de chaque monstre.
+    public IEnumerator DeclarerMonstres(string monstresJson)
     {
-        yield return Envoyer("tuer_monstre", null, null,
-            new Dictionary<string, string> { { "cle", cle ?? "" } });
+        yield return Envoyer("declarer_monstres", null, null,
+            new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" } });
+    }
+
+    // Un coup porte sur un monstre : les pv baissent pour tous les joueurs.
+    public IEnumerator FrapperMonstre(string cle, int degats)
+    {
+        yield return Envoyer("frapper_monstre", null, null, new Dictionary<string, string>
+        {
+            { "cle", cle ?? "" },
+            { "degats", degats.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+        });
     }
 
     public IEnumerator AjouterElementMonde(LibreViesElementMonde element)
@@ -352,10 +368,11 @@ public sealed class LibreViesCompte
                 ElementsMonde = reponse.elements ?? new LibreViesElementMonde[0];
                 MaisonsMonde = reponse.maisons ?? new LibreViesMaisonMonde[0];
                 IdsElementsSupprimes = reponse.supprimes ?? new int[0];
-                MonstresMorts = reponse.monstres ?? new LibreViesMonstreMort[0];
                 RevisionMonde = reponse.revision;
                 MondeComplet = reponse.complet;
             }
+            if (action == "get_monde" || action == "declarer_monstres")
+                Monstres = reponse.monstres ?? new LibreViesMonstre[0];
             if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
             if (action == "presence") JoueursPresents = reponse.joueurs ?? new LibreViesJoueurPresent[0];
             if (action == "search_players" || action == "get_player" || action == "save_player_ban")
