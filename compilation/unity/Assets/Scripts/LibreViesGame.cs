@@ -714,9 +714,9 @@ public sealed class LibreViesGame : MonoBehaviour
         public string Cle;          // identifiant partage (monstre_<rang>), voir CreateEnemies
         public bool Pilote;            // ce joueur calcule ce monstre ; les autres le suivent
         public int Proprietaire;       // membre qui le pilote (serveur)
-        public float AgeServeur;       // secondes depuis la derniere mise a jour serveur
+        public float ModifieLe;        // instant local (Time.time) de la derniere mise a jour recue du serveur
         public bool MortServeur;       // mort selon le serveur
-        public float AgeMort;          // secondes depuis la mort (serveur)
+        public float MortLe;           // instant local (Time.time) de la mort recue du serveur
         public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
         public float DernierEssaiRessurection;
         public float AttackCooldown;
@@ -7653,9 +7653,12 @@ public sealed class LibreViesGame : MonoBehaviour
             EnemyState ennemi = TrouverEnnemiParCle(etat.cle);
             if (ennemi == null || ennemi.Root == null) continue;
             ennemi.Proprietaire = etat.proprietaire;
-            ennemi.AgeServeur = etat.age;
-            ennemi.MortServeur = etat.mort == 1;
-            ennemi.AgeMort = etat.age;
+            // Le serveur n'envoie un monstre que s'il a change : on note l'instant local
+            // (et non l'age recu une seule fois), sinon le delai de 10 s ne progresse jamais.
+            ennemi.ModifieLe = Time.time - etat.age;
+            bool estMort = etat.mort == 1;
+            if (estMort && !ennemi.MortServeur) ennemi.MortLe = Time.time - etat.age;
+            ennemi.MortServeur = estMort;
             Vector3 position = new Vector3(etat.x, 0f, etat.z);
             position.y = TerrainHeight(etat.x, etat.z);
             if (etat.mort == 1)
@@ -7771,7 +7774,7 @@ public sealed class LibreViesGame : MonoBehaviour
             for (int i = 0; i < enemies.Count; i++)
             {
                 EnemyState e = enemies[i];
-                if (e == null || e.Root == null || e.Alive || !e.MortServeur || e.AgeMort < 10f) continue;
+                if (e == null || e.Root == null || e.Alive || !e.MortServeur || Time.time - e.MortLe < 10f) continue;
                 if (Time.time < e.DernierEssaiRessurection) continue;
                 Vector2 point;
                 if (!PositionReapparitionMonstre(out point)) continue;
@@ -7796,7 +7799,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 EnemyState e = enemies[i];
                 if (e == null || e.Root == null || !e.Alive || String.IsNullOrEmpty(e.Cle)) continue;
-                bool candidat = e.Proprietaire == 0 || e.Proprietaire == moi || e.AgeServeur >= 2f;
+                bool candidat = e.Proprietaire == 0 || e.Proprietaire == moi || Time.time - e.ModifieLe >= 2f;
                 if (!candidat) continue;
                 Vector3 p = e.Root.transform.position;
                 if (nombrePilotes > 0) pilotage.Append(',');
