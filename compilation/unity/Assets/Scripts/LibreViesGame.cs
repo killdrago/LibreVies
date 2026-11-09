@@ -2306,7 +2306,32 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             change = true;
         }
-        if (change) SynchroniserTousLesBatiments();
+        if (change)
+        {
+            SynchroniserTousLesBatiments();
+            JournalDetailMaisons("apres synchro");
+        }
+    }
+
+    // Diagnostic : dimensions de chaque batiment et boite de chacune de ses parties.
+    private void JournalDetailMaisons(string quand)
+    {
+        for (int i = 0; i < batiments.Count; i++)
+        {
+            Batiment b = batiments[i];
+            if (b == null || b.Root == null) continue;
+            Journal("maison detail " + quand + " " + b.Root.name + " largeur=" + b.Largeur
+                + " profondeur=" + b.Profondeur + " hauteur=" + b.Hauteur
+                + " initiales=" + b.LargeurInitiale + "/" + b.ProfondeurInitiale + "/" + b.HauteurInitiale
+                + " echelle=" + b.Root.localScale);
+            Renderer[] rendus = b.Root.GetComponentsInChildren<Renderer>(false);
+            for (int j = 0; j < rendus.Length; j++)
+            {
+                if (rendus[j] == null || !rendus[j].enabled) continue;
+                Bounds r = rendus[j].bounds;
+                Journal("   partie " + rendus[j].transform.name + " centre=" + r.center + " taille=" + r.size);
+            }
+        }
     }
 
     // Cle stable d'une maison : identifiant lisible derive du nom et du chemin dans la scene.
