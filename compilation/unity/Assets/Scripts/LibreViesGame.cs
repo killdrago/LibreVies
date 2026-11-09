@@ -2329,7 +2329,12 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 if (rendus[j] == null || !rendus[j].enabled) continue;
                 Bounds r = rendus[j].bounds;
-                Journal("   partie " + rendus[j].transform.name + " centre=" + r.center + " taille=" + r.size);
+                Transform t = rendus[j].transform;
+                string chaine = "";
+                for (Transform c = t; c != null && c != b.Root; c = c.parent)
+                    chaine = c.name + "[" + c.localPosition.ToString("F2") + "]/" + chaine;
+                Journal("   partie " + t.name + " centre=" + r.center + " taille=" + r.size
+                    + " chaine=" + chaine + " monde=" + t.position);
             }
         }
     }
