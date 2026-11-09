@@ -1043,7 +1043,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(0.01f);
+            yield return new WaitForSeconds(0.1f);
             LibreViesCompte compte = LibreViesCompte.Courant;
             yield return compte.ChargerMonde(revisionMondeConnue);
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
@@ -2100,6 +2100,29 @@ public sealed class LibreViesGame : MonoBehaviour
         return meilleur;
     }
 
+    // Diagnostic : position, echelle et boite englobante des rendus d'une maison.
+    private void JournalDebugMaison(string quand, Transform racine)
+    {
+        if (racine == null) return;
+        Renderer[] rendus = racine.GetComponentsInChildren<Renderer>(false);
+        bool premier = true;
+        Bounds boite = new Bounds(racine.position, Vector3.zero);
+        int nombre = 0;
+        for (int i = 0; i < rendus.Length; i++)
+        {
+            if (rendus[i] == null || !rendus[i].enabled) continue;
+            if (premier) { boite = rendus[i].bounds; premier = false; }
+            else boite.Encapsulate(rendus[i].bounds);
+            nombre++;
+        }
+        Journal("maison debug " + quand + " " + racine.name
+            + " pos=" + racine.position + " rot=" + racine.eulerAngles
+            + " echelle=" + racine.localScale + " parent=" + (racine.parent != null ? racine.parent.name : "aucun")
+            + " echelleMonde=" + racine.lossyScale
+            + " rendus=" + nombre
+            + " boite centre=" + boite.center + " taille=" + boite.size);
+    }
+
     private void ChargerCoordonneesEdition()
     {
         // Les objets de l'editeur viennent de la base (mondeLV). Le fichier ne sert
@@ -2141,10 +2164,19 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         Transform objet = TrouverRacineCoordonnee(coordonnee.Nom, coordonnee.Chemin, coordonnee.Position, utilisees);
         if (objet == null) return;
+        ElementEdition element = TrouverElementEdition(objet);
+        bool debugMaison = element != null && element.Maison != null;
+        if (debugMaison)
+        {
+            Journal("maison debug APPLIQUER " + coordonnee.Nom + " donnees: pos=" + coordonnee.Position
+                + " rot=" + coordonnee.Rotation.eulerAngles + " echelle=" + coordonnee.Echelle
+                + " version=" + coordonnee.VersionDimensions + " hauteurPorte=" + coordonnee.HauteurPorte);
+            JournalDebugMaison("avant", objet);
+        }
         objet.position = coordonnee.Position;
         objet.rotation = coordonnee.Rotation;
         objet.localScale = coordonnee.Echelle;
-        ElementEdition element = TrouverElementEdition(objet);
+        if (debugMaison) JournalDebugMaison("apres", objet);
         if (element != null && element.Facade != null
             && coordonnee.TextePancarte != null)
         {
@@ -2374,6 +2406,10 @@ public sealed class LibreViesGame : MonoBehaviour
                     coordonnee.LuminositePorte = element.Maison.LuminositePorte;
                     coordonnee.LuminositeToit = element.Maison.LuminositeToit;
                 }
+                if (element != null && element.Maison != null)
+                    Journal("maison debug ENREGISTRER " + coordonnee.Nom + " pos=" + coordonnee.Position
+                        + " rot=" + coordonnee.Rotation.eulerAngles + " echelle=" + coordonnee.Echelle
+                        + " version=" + coordonnee.VersionDimensions + " hauteurPorte=" + coordonnee.HauteurPorte);
                 // Tous les objets de l'editeur vont dans la base (genre 'edition').
                 {
                     string brut = coordonnee.Nom + "|" + coordonnee.Chemin;
