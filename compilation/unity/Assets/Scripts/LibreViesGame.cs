@@ -5481,7 +5481,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private ElementEdition CreerFenetreMaison(Batiment b)
     {
         GameObject fenetre = Box(PositionFenetreLocale(b, 0, 0f, HauteurCentreFenetre),
-            new Vector3(1.0f, 0.75f, 0.10f), "GlassBleu", b.Root, "Fenetre");
+            new Vector3(1.0f, 0.75f, 0.10f), MateriauFenetreCourant(b), b.Root, "Fenetre");
         Renderer rendu = fenetre.GetComponent<Renderer>();
         if (rendu != null) rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         return ElementFenetre(b, fenetre.transform);
@@ -5538,6 +5538,20 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         for (int i = sauvees.Length; i < existantes.Count; i++)
             existantes[i].gameObject.SetActive(false);
+        Material materiel = Mat(MateriauFenetreCourant(b));
+        if (materiel != null)
+            foreach (Transform fenetre in FenetresMaison(b, false))
+            {
+                Renderer rendu = fenetre.GetComponent<Renderer>();
+                if (rendu != null) rendu.sharedMaterial = materiel;
+            }
+    }
+
+    // Couleur choisie pour les fenetres de la maison (TRANSPARENT par defaut).
+    private string MateriauFenetreCourant(Batiment b)
+    {
+        string m = b != null ? b.MateriauFenetre : null;
+        return m == "VerreClair" || m == "GlassBleu" ? m : "VerreClair";
     }
 
     // Place une nouvelle fenetre a la premiere place libre de la face demandee.
@@ -5610,35 +5624,41 @@ public sealed class LibreViesGame : MonoBehaviour
         return cible;
     }
 
-    // Agrandit ou retrecit une fenetre en gardant son centre, sans toucher
-    // la porte, le panneau ni une autre fenetre.
-    private void RedimensionnerFenetre(ElementEdition element, float dL, float dH)
+    // Agrandit ou retrecit une fenetre par un de ses bords. bord : 0 gauche,
+    // 1 droit, 2 haut, 3 bas. d > 0 agrandit (le bord avance), d < 0 retrecit.
+    private void RedimensionnerBordFenetre(ElementEdition element, int bord, float d)
     {
         if (element == null || element.Type != "Fenetre" || element.MaisonParent == null) return;
         Batiment b = element.MaisonParent;
         Transform t = element.Root;
-        float oldL = Mathf.Abs(t.localScale.x), oldH = Mathf.Abs(t.localScale.y);
-        float maxL = Mathf.Max(DemiTailleFace(b, element.Face) * 2f - 0.3f, 0.4f);
-        float maxH = Mathf.Max(b.Hauteur - 0.6f, 0.4f);
-        float newL = Mathf.Clamp(oldL + dL, 0.4f, maxL);
-        float newH = Mathf.Clamp(oldH + dH, 0.4f, maxH);
-        if (Mathf.Abs(newL - oldL) < 0.001f && Mathf.Abs(newH - oldH) < 0.001f)
-        {
-            ShowInfo("Taille limite atteinte");
-            return;
-        }
-        float demiL = newL * 0.5f, demiH = newH * 0.5f;
         int face = element.Face;
-        float limite = LimiteU(b, face, demiL);
-        float u = Mathf.Clamp(face >= 2 ? t.localPosition.z : t.localPosition.x, -limite, limite);
-        float y = Mathf.Clamp(t.localPosition.y, demiH + 0.2f, Mathf.Max(b.Hauteur - demiH - 0.2f, demiH + 0.2f));
-        if (FenetreChevauche(b, t, face, u, y, demiL, demiH))
+        float oldL = Mathf.Abs(t.localScale.x), oldH = Mathf.Abs(t.localScale.y);
+        float u = face >= 2 ? t.localPosition.z : t.localPosition.x;
+        float y = t.localPosition.y;
+        float newL = oldL, newH = oldH, newU = u, newY = y;
+        if (bord <= 1)
         {
-            ShowInfo("Taille impossible : la fenetre toucherait la porte, le panneau ou une autre fenetre");
-            return;
+            newL = oldL + d;
+            newU = u + (bord == 1 ? d * 0.5f : -d * 0.5f);
         }
+        else
+        {
+            newH = oldH + d;
+            newY = y + (bord == 2 ? d * 0.5f : -d * 0.5f);
+        }
+        float maxL = Mathf.Max(DemiTailleFace(b, face) * 2f - 0.3f, 0.4f);
+        float maxH = Mathf.Max(b.Hauteur - 0.6f, 0.4f);
+        if (newL < 0.399f || newH < 0.399f) { ShowInfo("Taille minimale atteinte (0,40 m)"); return; }
+        if (newL > maxL + 0.001f || newH > maxH + 0.001f) { ShowInfo("Taille maximale atteinte sur ce mur"); return; }
+        float demiL = newL * 0.5f, demiH = newH * 0.5f;
+        if (Mathf.Abs(newU) > LimiteU(b, face, demiL) + 0.001f)
+        { ShowInfo("Le bord toucherait le coin du mur"); return; }
+        if (newY - demiH < 0.2f || newY + demiH > b.Hauteur - 0.2f)
+        { ShowInfo("La fenetre toucherait le haut ou le bas du mur"); return; }
+        if (FenetreChevauche(b, t, face, newU, newY, demiL, demiH))
+        { ShowInfo("Impossible : la fenetre toucherait la porte, le panneau ou une autre fenetre"); return; }
         t.localScale = new Vector3(newL, newH, Mathf.Abs(t.localScale.z));
-        PlacerFenetre(element, b, face, u, y);
+        PlacerFenetre(element, b, face, newU, newY);
         SynchroniserElementEdition(element);
         if (mondePret) EnregistrerCoordonneesEdition();
     }
@@ -5715,18 +5735,20 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 116f, 448f, 22f),
             "Taille : " + Mathf.Abs(fenetre.Root.localScale.x).ToString("0.00") + " m x "
                 + Mathf.Abs(fenetre.Root.localScale.y).ToString("0.00") + " m (pas de 0,25 m)", smallStyle);
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 142f, 214f, 30f), "RETRECIR LARGEUR", buttonStyle))
-            RedimensionnerFenetre(fenetre, -0.25f, 0f);
-        if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 142f, 214f, 30f), "AGRANDIR LARGEUR", buttonStyle))
-            RedimensionnerFenetre(fenetre, 0.25f, 0f);
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 178f, 214f, 30f), "RETRECIR HAUTEUR", buttonStyle))
-            RedimensionnerFenetre(fenetre, 0f, -0.25f);
-        if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 178f, 214f, 30f), "AGRANDIR HAUTEUR", buttonStyle))
-            RedimensionnerFenetre(fenetre, 0f, 0.25f);
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 230f, 214f, 30f),
+        string[] bords = { "Cote gauche", "Cote droit", "Haut", "Bas" };
+        for (int k = 0; k < 4; k++)
+        {
+            float ligne = cadre.y + 146f + k * 36f;
+            GUI.Label(new Rect(cadre.x + 16f, ligne + 4f, 130f, 24f), bords[k], smallStyle);
+            if (GUI.Button(new Rect(cadre.x + 150f, ligne, 150f, 30f), "+ ELARGIR", buttonStyle))
+                RedimensionnerBordFenetre(fenetre, k, 0.25f);
+            if (GUI.Button(new Rect(cadre.x + 314f, ligne, 150f, 30f), "- REDUIRE", buttonStyle))
+                RedimensionnerBordFenetre(fenetre, k, -0.25f);
+        }
+        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 320f, 214f, 30f),
             "SUPPRIMER CETTE FENETRE", buttonStyle))
             SupprimerFenetreMaison(fenetre);
-        else if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 230f, 214f, 30f),
+        else if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 320f, 214f, 30f),
             "RETOUR A LA MAISON", buttonStyle))
             elementEditionDernierSelectionne = TrouverElementEdition(fenetre.MaisonParent.Root);
     }
@@ -5824,9 +5846,11 @@ public sealed class LibreViesGame : MonoBehaviour
                 suppressionFenetreActive = !suppressionFenetreActive;
                 if (suppressionFenetreActive) ShowInfo("Cliquez la fenetre a supprimer");
             }
-            GUI.Label(new Rect(34f, yc + 272f, 150f, 24f), "Couleur / revetement :", smallStyle);
+            GUI.Label(new Rect(34f, yc + 272f, 150f, 24f), "Couleur :", smallStyle);
             if (GUI.Button(new Rect(174f, yc + 270f, 120f, 28f), "TRANSPARENT", buttonStyle))
                 AppliquerMateriauMaison(batiment, "fenetre", "VerreClair");
+            if (GUI.Button(new Rect(304f, yc + 270f, 120f, 28f), "VERRE BLEU", buttonStyle))
+                AppliquerMateriauMaison(batiment, "fenetre", "GlassBleu");
         }
         else if (editionOutilMaison == 3)
         {
@@ -6346,6 +6370,7 @@ public sealed class LibreViesGame : MonoBehaviour
         editionMaisonEnDeplacement = false;
         if (element.MaisonParent != null)
             elementEditionDernierSelectionne = editionOutilMaison == 5
+                || (editionOutilMaison == 2 && element.Type == "Fenetre")
                 ? element : TrouverElementEdition(element.MaisonParent.Root);
         elementEditionSelectionne = null;
         ShowInfo("Mouvement annule : position precedente restauree");
@@ -6361,6 +6386,7 @@ public sealed class LibreViesGame : MonoBehaviour
         editionMaisonEnDeplacement = false;
         if (element != null && element.MaisonParent != null)
             elementEditionDernierSelectionne = editionOutilMaison == 5
+                || (editionOutilMaison == 2 && element.Type == "Fenetre")
                 ? element : TrouverElementEdition(element.MaisonParent.Root);
         elementEditionSelectionne = null;
         // Sans cet appel, le deplacement n'etait envoye qu'en quittant le mode edition.
