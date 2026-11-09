@@ -5862,9 +5862,15 @@ public sealed class LibreViesGame : MonoBehaviour
             nomMaisonSaisi = nomsMaisons.TryGetValue(cle, out actuel) ? actuel : "sans nom";
         }
         GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 60f, 24f), "Nom :", smallStyle);
-        nomMaisonSaisi = GUI.TextField(new Rect(cadre.x + 70f, cadre.y + 30f, 220f, 24f), nomMaisonSaisi, 60);
+        nomMaisonSaisi = FiltrerNomMaison(GUI.TextField(new Rect(cadre.x + 70f, cadre.y + 30f, 220f, 24f), nomMaisonSaisi, 60));
         if (GUI.Button(new Rect(cadre.x + 300f, cadre.y + 30f, 164f, 24f), "ENREGISTRER LE NOM", buttonStyle))
             StartCoroutine(RenommerMaisonServeur(cle, nomMaisonSaisi.Trim()));
+    }
+
+    // Lettres sans accent, chiffres et espaces seulement (le serveur refuse le reste).
+    private static string FiltrerNomMaison(string saisie)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(saisie ?? "", "[^A-Za-z0-9 ]", "");
     }
 
     private System.Collections.IEnumerator RenommerMaisonServeur(string cle, string nom)

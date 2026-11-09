@@ -70,7 +70,11 @@ function valider_nom_maison($donnees) {
     if (!preg_match('/^[a-z0-9_]{3,100}$/', $id)) {
         throw new InvalidArgumentException('Identifiant de maison invalide (lettres, chiffres, _).');
     }
-    $nom = isset($donnees['nom']) ? mb_substr(trim((string)$donnees['nom']), 0, 60) : '';
+    $nom = isset($donnees['nom']) ? trim((string)$donnees['nom']) : '';
+    // Lettres sans accent, chiffres et espaces seulement.
+    if (!preg_match('/^[A-Za-z0-9 ]{0,60}$/', $nom)) {
+        throw new InvalidArgumentException('Nom invalide : lettres, chiffres et espaces seulement (60 caracteres max).');
+    }
     if ($nom === '') $nom = 'sans nom';
     return array('id' => $id, 'nom' => $nom);
 }
