@@ -1916,19 +1916,41 @@ public sealed class LibreViesGame : MonoBehaviour
         // Une fenetre reste entierement dans le mur : sa position X enregistree peut
         // avoir ete decalee par un deplacement de la maison ; sans borne, le mur
         // s'etirait pour couvrir l'ouverture.
-        float demiLargeurMur = Mathf.Max(batiment.LargeurInitiale, 0f) * 0.5f;
+        float largeurMur = Mathf.Max(batiment.LargeurInitiale, 0f);
+        float demiLargeurMur = largeurMur * 0.5f;
+        // Position de reference d'une fenetre : +/-0,27 de la largeur, de chaque cote.
+        float positionReference = largeurMur * 0.27f;
+        var fenetres = new List<Transform>();
         for (int i = 0; i < enfants.Length; i++)
         {
             Transform enfant = enfants[i];
-            if (enfant.name == "Fenetre")
+            if (enfant.name == "Fenetre") fenetres.Add(enfant);
+        }
+        var xPlacees = new List<float>();
+        for (int i = 0; i < fenetres.Count; i++)
+        {
+            Transform enfant = fenetres[i];
+            Vector3 position = enfant.localPosition;
+            position.z = face + 0.051f; // vitre : profondeur 0,10 m
+            float demiFenetre = Mathf.Abs(enfant.localScale.x) * 0.5f;
+            float limite = Mathf.Max(demiLargeurMur - demiFenetre - 0.05f, 0f);
+            if (Mathf.Abs(position.x) > limite)
             {
-                Vector3 position = enfant.localPosition;
-                position.z = face + 0.051f; // vitre : profondeur 0,10 m
-                float demiFenetre = Mathf.Abs(enfant.localScale.x) * 0.5f;
-                float limite = Mathf.Max(demiLargeurMur - demiFenetre - 0.05f, 0f);
-                position.x = Mathf.Clamp(position.x, -limite, limite);
-                enfant.localPosition = position;
+                // Position hors du mur : retour a la place de reference du meme cote.
+                float cote = position.x < 0f ? -1f : 1f;
+                position.x = Mathf.Clamp(cote * positionReference, -limite, limite);
             }
+            // Deux fenetres ne doivent pas se superposer : la seconde passe de l'autre cote.
+            for (int j = 0; j < xPlacees.Count; j++)
+            {
+                if (Mathf.Abs(xPlacees[j] - position.x) < 0.1f)
+                {
+                    position.x = Mathf.Clamp(-position.x, -limite, limite);
+                    break;
+                }
+            }
+            xPlacees.Add(position.x);
+            enfant.localPosition = position;
         }
         Transform panneau = batiment.Root.Find("Affiche_Maison");
         if (panneau != null)
