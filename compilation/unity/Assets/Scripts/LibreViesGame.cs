@@ -1926,30 +1926,17 @@ public sealed class LibreViesGame : MonoBehaviour
             Transform enfant = enfants[i];
             if (enfant.name == "Fenetre") fenetres.Add(enfant);
         }
-        var xPlacees = new List<float>();
+        // Les fenetres reviennent toujours a leur place d'origine : une gauche, une droite.
+        // Leur position enregistree peut etre decalee par un deplacement de la maison.
         for (int i = 0; i < fenetres.Count; i++)
         {
             Transform enfant = fenetres[i];
             Vector3 position = enfant.localPosition;
             position.z = face + 0.051f; // vitre : profondeur 0,10 m
+            float cote = i % 2 == 0 ? -1f : 1f;
             float demiFenetre = Mathf.Abs(enfant.localScale.x) * 0.5f;
             float limite = Mathf.Max(demiLargeurMur - demiFenetre - 0.05f, 0f);
-            if (Mathf.Abs(position.x) > limite)
-            {
-                // Position hors du mur : retour a la place de reference du meme cote.
-                float cote = position.x < 0f ? -1f : 1f;
-                position.x = Mathf.Clamp(cote * positionReference, -limite, limite);
-            }
-            // Deux fenetres ne doivent pas se superposer : la seconde passe de l'autre cote.
-            for (int j = 0; j < xPlacees.Count; j++)
-            {
-                if (Mathf.Abs(xPlacees[j] - position.x) < 0.1f)
-                {
-                    position.x = Mathf.Clamp(-position.x, -limite, limite);
-                    break;
-                }
-            }
-            xPlacees.Add(position.x);
+            position.x = Mathf.Clamp(cote * positionReference, -limite, limite);
             enfant.localPosition = position;
         }
         Transform panneau = batiment.Root.Find("Affiche_Maison");
