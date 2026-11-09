@@ -43,6 +43,7 @@ public sealed class LibreViesCompte
         public int[] supprimes;
         public string[] maisons_supprimees;
         public LibreViesMonstre[] monstres;
+        public string[] pilotes;
     }
 
     // Monstre partage (table monde_monstre). mort = 1 ou 0 ; age = secondes depuis la mort.
@@ -56,6 +57,8 @@ public sealed class LibreViesCompte
         public int pv_max;
         public int mort;
         public int age;
+        public int proprietaire;
+        public float rot;
     }
 
     // Monde partage (tables monde_element et monde_maison, voir monde.sql).
@@ -120,6 +123,8 @@ public sealed class LibreViesCompte
     public LibreViesMaisonMonde[] MaisonsMonde { get; private set; }
     public int[] IdsElementsSupprimes { get; private set; }
     public LibreViesMonstre[] Monstres { get; private set; }
+    // Monstres que ce joueur pilote (accepte par le serveur) lors du dernier envoi.
+    public string[] PilotesAcceptes { get; private set; }
     public LibreViesJoueurPresent[] JoueursPresents { get; private set; }
     public int RevisionMonde { get; private set; }
     public bool MondeComplet { get; private set; }
@@ -175,6 +180,21 @@ public sealed class LibreViesCompte
     public IEnumerator DeclarerMonstres(string monstresJson)
     {
         yield return Envoyer("declarer_monstres", null, null,
+            new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" } });
+    }
+
+    // Envoie les positions des monstres pilotes ; le serveur renvoie ceux qu'il accepte.
+    public IEnumerator PiloterMonstres(string monstresJson)
+    {
+        PilotesAcceptes = null;
+        yield return Envoyer("piloter_monstres", null, null,
+            new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" } });
+    }
+
+    // Fait revivre des monstres morts depuis 10 s, a des points donnes.
+    public IEnumerator RessusciterMonstres(string monstresJson)
+    {
+        yield return Envoyer("ressusciter_monstres", null, null,
             new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" } });
     }
 
@@ -371,8 +391,10 @@ public sealed class LibreViesCompte
                 RevisionMonde = reponse.revision;
                 MondeComplet = reponse.complet;
             }
-            if (action == "get_monde" || action == "declarer_monstres")
+            if (action == "get_monde" || action == "declarer_monstres" || action == "ressusciter_monstres")
                 Monstres = reponse.monstres ?? new LibreViesMonstre[0];
+            if (action == "piloter_monstres")
+                PilotesAcceptes = reponse.pilotes ?? new string[0];
             if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
             if (action == "presence") JoueursPresents = reponse.joueurs ?? new LibreViesJoueurPresent[0];
             if (action == "search_players" || action == "get_player" || action == "save_player_ban")

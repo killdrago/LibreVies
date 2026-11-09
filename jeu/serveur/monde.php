@@ -130,14 +130,15 @@ function formater_monstre($ligne) {
     return array(
         'cle' => (string)$ligne['cle'], 'x' => (float)$ligne['position_x'], 'z' => (float)$ligne['position_z'],
         'pv' => (int)$ligne['pv'], 'pv_max' => (int)$ligne['pv_max'], 'mort' => (int)$ligne['mort'],
-        'age' => (int)$ligne['age'],
+        'age' => (int)$ligne['age'], 'rot' => (float)$ligne['rotation_y'],
+        'proprietaire' => (int)$ligne['proprietaire_id'],
     );
 }
 
 // depuis = 0 : tous les monstres ; sinon seulement ceux qui ont change.
 function lire_monstres($pdo, $depuis) {
-    $sql = 'SELECT cle, position_x, position_z, pv, pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
-        . ' FROM monde_monstre';
+    $sql = 'SELECT cle, position_x, position_z, rotation_y, proprietaire_id, pv, pv_max, mort,'
+        . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age FROM monde_monstre';
     if ((int)$depuis > 0) {
         $requete = $pdo->prepare($sql . ' WHERE revision > :depuis ORDER BY cle');
         $requete->execute(array(':depuis' => (int)$depuis));
@@ -153,7 +154,7 @@ function lire_monstres($pdo, $depuis) {
 function lire_monstres_par_cle($pdo, $cles) {
     if (count($cles) === 0) return array();
     $marques = implode(',', array_fill(0, count($cles), '?'));
-    $requete = $pdo->prepare('SELECT cle, position_x, position_z, pv, pv_max, mort,'
+    $requete = $pdo->prepare('SELECT cle, position_x, position_z, rotation_y, proprietaire_id, pv, pv_max, mort,'
         . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age FROM monde_monstre WHERE cle IN (' . $marques . ')');
     $requete->execute(array_values($cles));
     $liste = array();
@@ -207,7 +208,6 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
         $pv = (int)$ligne['pv'];
         $pvMax = (int)$ligne['pv_max'];
         $mort = (int)$ligne['mort'] === 1;
-        if ($mort && (int)$ligne['age'] >= 10) { $mort = false; $pv = $pvMax; }
         if ($mort) {
             $pdo->commit();
             return array('message' => 'Monstre deja mort.', 'extra' => array());
@@ -226,6 +226,82 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
     }
     return array('message' => 'Coup enregistre.', 'extra' => array('revision' => $rev,
         'monstre' => array('cle' => $cle, 'pv' => $pv, 'pv_max' => $pvMax, 'mort' => $mort ? 1 : 0)));
+}
+
+// Liste envoyee par le client : tableau JSON (ou deja decode).
+function liste_monstres_recue($donnees) {
+    $brut = isset($donnees['monstres']) ? $donnees['monstres'] : '[]';
+    $liste = is_string($brut) ? json_decode($brut, true) : $brut;
+    if (!is_array($liste) || count($liste) > 200) throw new InvalidArgumentException('Liste de monstres invalide.');
+    return $liste;
+}
+
+// Pilotage : un client pilote les monstres dont il a la charge (position calculee chez lui).
+// Un monstre est pris si personne ne le pilote, si c'est deja nous, ou si le pilote
+// precedent n'a pas envoye de mise a jour depuis 2 s. Renvoie les monstres pris.
+function traiter_pilotage_monstres($pdo, $donnees, $auteur) {
+    $liste = liste_monstres_recue($donnees);
+    $rev = prochaine_revision($pdo);
+    $pilotes = array();
+    $pdo->beginTransaction();
+    try {
+        $lecture = $pdo->prepare('SELECT proprietaire_id, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+            . ' FROM monde_monstre WHERE cle = :cle FOR UPDATE');
+        $miseAJour = $pdo->prepare('UPDATE monde_monstre SET proprietaire_id = :auteur, position_x = :x,'
+            . ' position_z = :z, rotation_y = :rot, revision = :rev WHERE cle = :cle');
+        foreach ($liste as $monstre) {
+            if (!is_array($monstre)) continue;
+            $cle = valider_cle_monstre($monstre);
+            $x = nombre_monde(isset($monstre['x']) ? $monstre['x'] : 0, -130, 130);
+            $z = nombre_monde(isset($monstre['z']) ? $monstre['z'] : 0, -130, 130);
+            $rot = nombre_monde(isset($monstre['rot']) ? $monstre['rot'] : 0, -360, 360);
+            $lecture->execute(array(':cle' => $cle));
+            $ligne = $lecture->fetch();
+            if (!$ligne || (int)$ligne['mort'] === 1) continue;
+            $proprietaire = $ligne['proprietaire_id'] === null ? 0 : (int)$ligne['proprietaire_id'];
+            if (!($proprietaire === 0 || $proprietaire === (int)$auteur || (int)$ligne['age'] >= 2)) continue;
+            $miseAJour->execute(array(':auteur' => $auteur, ':x' => $x, ':z' => $z, ':rot' => $rot,
+                ':rev' => $rev, ':cle' => $cle));
+            $pilotes[] = $cle;
+        }
+        $pdo->commit();
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $erreur;
+    }
+    return array('message' => 'Pilotage enregistre.', 'extra' => array('revision' => $rev, 'pilotes' => $pilotes));
+}
+
+// Ressurection : un monstre mort depuis 10 s revient a pleine vie, au point donne
+// par le client (une seule fois : le premier qui le demande).
+function traiter_ressurection_monstres($pdo, $donnees) {
+    $liste = liste_monstres_recue($donnees);
+    $rev = prochaine_revision($pdo);
+    $ressuscites = array();
+    $pdo->beginTransaction();
+    try {
+        $lecture = $pdo->prepare('SELECT pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+            . ' FROM monde_monstre WHERE cle = :cle FOR UPDATE');
+        $miseAJour = $pdo->prepare('UPDATE monde_monstre SET mort = 0, pv = pv_max, position_x = :x,'
+            . ' position_z = :z, proprietaire_id = NULL, revision = :rev WHERE cle = :cle');
+        foreach ($liste as $monstre) {
+            if (!is_array($monstre)) continue;
+            $cle = valider_cle_monstre($monstre);
+            $x = nombre_monde(isset($monstre['x']) ? $monstre['x'] : 0, -130, 130);
+            $z = nombre_monde(isset($monstre['z']) ? $monstre['z'] : 0, -130, 130);
+            $lecture->execute(array(':cle' => $cle));
+            $ligne = $lecture->fetch();
+            if (!$ligne || (int)$ligne['mort'] !== 1 || (int)$ligne['age'] < 10) continue;
+            $miseAJour->execute(array(':x' => $x, ':z' => $z, ':rev' => $rev, ':cle' => $cle));
+            $ressuscites[] = $cle;
+        }
+        $pdo->commit();
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $erreur;
+    }
+    return array('message' => 'Ressurection traitee.', 'extra' => array(
+        'revision' => $rev, 'monstres' => lire_monstres_par_cle($pdo, $ressuscites)));
 }
 
 // Ecritures du monde (admin seulement, controle fait dans api.php).
@@ -270,6 +346,8 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
     }
     if ($action === 'declarer_monstres') return traiter_declaration_monstres($pdo, $donnees);
     if ($action === 'frapper_monstre') return traiter_coup_monstre($pdo, $donnees, $auteur);
+    if ($action === 'piloter_monstres') return traiter_pilotage_monstres($pdo, $donnees, $auteur);
+    if ($action === 'ressusciter_monstres') return traiter_ressurection_monstres($pdo, $donnees);
     if ($action === 'enregistrer_maison') {
         $maison = valider_maison_monde($donnees);
         $rev = prochaine_revision($pdo);

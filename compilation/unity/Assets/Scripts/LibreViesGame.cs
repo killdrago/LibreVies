@@ -712,6 +712,13 @@ public sealed class LibreViesGame : MonoBehaviour
         public int Hp = MaxHp;
         public bool Alive = true;
         public string Cle;          // identifiant partage (monstre_<rang>), voir CreateEnemies
+        public bool Pilote;            // ce joueur calcule ce monstre ; les autres le suivent
+        public int Proprietaire;       // membre qui le pilote (serveur)
+        public float AgeServeur;       // secondes depuis la derniere mise a jour serveur
+        public bool MortServeur;       // mort selon le serveur
+        public float AgeMort;          // secondes depuis la mort (serveur)
+        public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
+        public float DernierEssaiRessurection;
         public float AttackCooldown;
         public float RespawnAt;
         public Vector3 Home;
@@ -929,6 +936,7 @@ public sealed class LibreViesGame : MonoBehaviour
         intervalleSyncMonde = Mathf.Clamp(
             PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());
+        StartCoroutine(SynchroniserPilotageMonstres());
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
         AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
@@ -1530,6 +1538,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public TextMesh Pseudo;
         public Vector3 Cible;
         public float Rotation;
+        public bool Mort;
     }
 
     private readonly Dictionary<int, JoueurDistant> joueursDistants = new Dictionary<int, JoueurDistant>();
@@ -1551,7 +1560,7 @@ public sealed class LibreViesGame : MonoBehaviour
         LibreViesCompte compte = compteJoueur;
         Vector3 position = player.position;
         float rotation = player.eulerAngles.y;
-        string animation = (position - dernierePositionPresence).sqrMagnitude > 0.0004f ? "Walking" : "Idle";
+        string animation = dead ? "Mort" : ((position - dernierePositionPresence).sqrMagnitude > 0.0004f ? "Walking" : "Idle");
         dernierePositionPresence = position;
         yield return compte.EnvoyerPresence(position.x, position.z, rotation, animation);
         presenceEnCours = false;
@@ -1577,6 +1586,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
             d.Cible = cible;
             d.Rotation = j.rotation_y;
+            d.Mort = j.animation == "Mort";
         }
         var partis = new List<int>();
         foreach (int id in joueursDistants.Keys)
@@ -1644,7 +1654,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Transform t = d.Racine.transform;
             t.position = Vector3.Lerp(t.position, d.Cible, Time.deltaTime * 5f);
-            t.rotation = Quaternion.Slerp(t.rotation, Quaternion.Euler(0f, d.Rotation, 0f), Time.deltaTime * 8f);
+            t.rotation = Quaternion.Slerp(t.rotation, Quaternion.Euler(0f, d.Rotation, d.Mort ? 90f : 0f), Time.deltaTime * 8f);
             if (gameCamera != null) d.Pseudo.transform.rotation = gameCamera.transform.rotation;
         }
     }
@@ -7629,8 +7639,7 @@ public sealed class LibreViesGame : MonoBehaviour
         return null;
     }
 
-    // Etat partage : un monstre mort (moins de 10 s) disparait ici ; un monstre vivant
-    // prend les pv du serveur s'ils sont plus bas (les coups des autres joueurs).
+    // Etat partage : vivant / mort, pv, pilote et position recus du serveur.
     private void AppliquerEtatMonstres(LibreViesCompte.LibreViesMonstre[] etats)
     {
         if (etats == null) return;
@@ -7640,25 +7649,182 @@ public sealed class LibreViesGame : MonoBehaviour
             if (etat == null) continue;
             EnemyState ennemi = TrouverEnnemiParCle(etat.cle);
             if (ennemi == null || ennemi.Root == null) continue;
+            ennemi.Proprietaire = etat.proprietaire;
+            ennemi.AgeServeur = etat.age;
+            ennemi.MortServeur = etat.mort == 1;
+            ennemi.AgeMort = etat.age;
+            Vector3 position = new Vector3(etat.x, 0f, etat.z);
+            position.y = TerrainHeight(etat.x, etat.z);
             if (etat.mort == 1)
             {
-                if (etat.age < 10 && ennemi.Alive)
+                if (ennemi.Alive)
                 {
                     ennemi.Alive = false;
+                    ennemi.Pilote = false;
                     ennemi.Hp = 0;
-                    ennemi.RespawnAt = Time.time + Mathf.Max(0f, 10f - etat.age);
+                    ennemi.RespawnAt = Time.time + 1.5f;
                     ennemi.Root.SetActive(false);
+                    if (ennemi.Corps != null) ennemi.Corps.Actif = false;
                 }
                 continue;
             }
-            if (ennemi.Alive) ennemi.Hp = Mathf.Min(ennemi.Hp, etat.pv);
+            if (!ennemi.Alive)
+            {
+                // Mort localement il y a moins de 1,5 s : on attend la reponse du serveur.
+                if (Time.time < ennemi.RespawnAt) continue;
+                ennemi.Alive = true;
+                ennemi.Hp = etat.pv;
+                ennemi.Root.SetActive(true);
+                ennemi.Root.transform.position = position;
+                if (ennemi.Corps != null)
+                {
+                    ennemi.Corps.Actif = true;
+                    ennemi.Corps.X = position.x;
+                    ennemi.Corps.Z = position.z;
+                }
+            }
+            else if (etat.pv < ennemi.Hp)
+            {
+                ennemi.Hp = etat.pv;
+            }
+            ennemi.CibleDistante = position;
+        }
+    }
+
+    private int MonIdentifiant()
+    {
+        return compteJoueur != null && compteJoueur.Joueur != null ? compteJoueur.Joueur.id : 0;
+    }
+
+    // Distance a la cible de poursuite la plus proche (joueur local vivant ou joueur distant vivant).
+    private float ProchaineCibleMonstre(Vector3 position, out Vector3 cible)
+    {
+        float meilleure = float.MaxValue;
+        cible = position;
+        if (!dead && player != null)
+        {
+            float d = Vector3.Distance(position, player.position);
+            if (d < meilleure) { meilleure = d; cible = player.position; }
+        }
+        foreach (JoueurDistant j in joueursDistants.Values)
+        {
+            if (j.Mort || j.Racine == null) continue;
+            Vector3 p = j.Racine.transform.position;
+            float d = Vector3.Distance(position, p);
+            if (d < meilleure) { meilleure = d; cible = p; }
+        }
+        return meilleure;
+    }
+
+    // Monstre non pilote : il glisse vers la position recue du serveur.
+    private void SuivreMonstreDistant(EnemyState ennemi, float dt)
+    {
+        Vector3 position = ennemi.Root.transform.position;
+        Vector3 cible = ennemi.CibleDistante;
+        Vector3 vers = cible - position;
+        vers.y = 0f;
+        float distance = vers.magnitude;
+        if (distance > 12f) position = cible;
+        else if (distance > 0.02f) position = Vector3.MoveTowards(position, cible, Mathf.Max(2f, distance * 5f) * dt);
+        position.y = TerrainHeight(position.x, position.z);
+        ennemi.Root.transform.position = position;
+        if (distance > 0.05f)
+            ennemi.Root.transform.rotation = Quaternion.Slerp(ennemi.Root.transform.rotation,
+                Quaternion.LookRotation(vers), Mathf.Clamp01(dt * 8f));
+        if (ennemi.Corps != null) { ennemi.Corps.X = position.x; ennemi.Corps.Z = position.z; }
+    }
+
+    // Point de reapparition au hasard, ni dans le village, ni dans l'eau, ni pres du joueur.
+    private bool PositionReapparitionMonstre(out Vector2 point)
+    {
+        Vector3 moi = player != null ? player.position : Vector3.zero;
+        for (int essai = 0; essai < 60; essai++)
+        {
+            float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+            float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+            if (DansVillage(x, z) || ZoneEauInterditeMonstre(new Vector2(x, z))) continue;
+            if (new Vector2(x - moi.x, z - moi.z).magnitude < 12f) continue;
+            point = new Vector2(x, z);
+            return true;
+        }
+        point = Vector2.zero;
+        return false;
+    }
+
+    // Toutes les 0,2 s : ressuscite les monstres morts depuis 10 s, puis envoie les
+    // positions des monstres que ce joueur pilote (ou peut prendre).
+    private System.Collections.IEnumerator SynchroniserPilotageMonstres()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(0.2f);
+            LibreViesCompte compte = compteJoueur;
+            if (compte == null || !compte.LanceParLauncher || !compte.Authentifie || enemies.Count == 0) continue;
+            var culture = CultureInfo.InvariantCulture;
+
+            var ressurections = new StringBuilder("[");
+            int nombreRessurections = 0;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyState e = enemies[i];
+                if (e == null || e.Root == null || e.Alive || !e.MortServeur || e.AgeMort < 10f) continue;
+                if (Time.time < e.DernierEssaiRessurection) continue;
+                Vector2 point;
+                if (!PositionReapparitionMonstre(out point)) continue;
+                e.DernierEssaiRessurection = Time.time + 2f;
+                if (nombreRessurections > 0) ressurections.Append(',');
+                ressurections.Append("{\"cle\":\"").Append(e.Cle)
+                    .Append("\",\"x\":").Append(point.x.ToString("0.###", culture))
+                    .Append(",\"z\":").Append(point.y.ToString("0.###", culture)).Append('}');
+                nombreRessurections++;
+            }
+            if (nombreRessurections > 0)
+            {
+                ressurections.Append(']');
+                yield return compte.RessusciterMonstres(ressurections.ToString());
+                if (String.IsNullOrEmpty(compte.Erreur)) AppliquerEtatMonstres(compte.Monstres);
+            }
+
+            int moi = MonIdentifiant();
+            var pilotage = new StringBuilder("[");
+            int nombrePilotes = 0;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyState e = enemies[i];
+                if (e == null || e.Root == null || !e.Alive || String.IsNullOrEmpty(e.Cle)) continue;
+                bool candidat = e.Proprietaire == 0 || e.Proprietaire == moi || e.AgeServeur >= 2f;
+                if (!candidat) continue;
+                Vector3 p = e.Root.transform.position;
+                if (nombrePilotes > 0) pilotage.Append(',');
+                pilotage.Append("{\"cle\":\"").Append(e.Cle)
+                    .Append("\",\"x\":").Append(p.x.ToString("0.###", culture))
+                    .Append(",\"z\":").Append(p.z.ToString("0.###", culture))
+                    .Append(",\"rot\":").Append(e.Root.transform.eulerAngles.y.ToString("0.###", culture))
+                    .Append('}');
+                nombrePilotes++;
+            }
+            List<string> acceptes = new List<string>();
+            if (nombrePilotes > 0)
+            {
+                pilotage.Append(']');
+                yield return compte.PiloterMonstres(pilotage.ToString());
+                if (String.IsNullOrEmpty(compte.Erreur) && compte.PilotesAcceptes != null)
+                    acceptes.AddRange(compte.PilotesAcceptes);
+            }
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyState e = enemies[i];
+                if (e == null) continue;
+                e.Pilote = e.Alive && acceptes.Contains(e.Cle);
+            }
         }
     }
 
     private void TuerEnnemiParGarde(EnemyState ennemi)
     {
         ennemi.Alive = false;
-        ennemi.RespawnAt = Time.time + 10f;
+        ennemi.RespawnAt = Time.time + 1.5f;
+        ennemi.Pilote = false;
         ennemi.Root.SetActive(false);
         EnvoyerCoupMonstre(ennemi, 999);
         // Remarque : la reference ne compte pas ce monstre pour la quete et ne
@@ -9579,118 +9745,106 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 // Une bete morte ne bloque plus le passage.
                 if (enemy.Corps != null) enemy.Corps.Actif = false;
-                if (Time.time >= enemy.RespawnAt)
-                {
-                    enemy.Alive = true;
-                    enemy.Hp = enemy.PvMax;
-                    enemy.Root.SetActive(true);
-                    // Reapparition decalee de 3 m au hasard autour du point de
-                    // depart, et jamais dans le village (reference).
-                    Vector2 retour = new Vector2(enemy.Home.x, enemy.Home.z)
-                        + new Vector2(UnityEngine.Random.Range(-3f, 3f), UnityEngine.Random.Range(-3f, 3f));
-                    if (retour.magnitude < VillageRadius + 1f)
-                    {
-                        if (retour.magnitude < 0.001f) retour = new Vector2(1f, 0f);
-                        retour = retour.normalized * (VillageRadius + 1f);
-                    }
-                    if (ZoneEauInterditeMonstre(retour)) retour = SortirZoneEauMonstre(retour);
-                    Vector3 reapparition = new Vector3(retour.x, TerrainHeight(retour.x, retour.y), retour.y);
-                    enemy.Root.transform.position = reapparition;
-                    enemy.Home = reapparition;
-                    if (enemy.Corps != null)
-                    {
-                        enemy.Corps.Actif = true;
-                        enemy.Corps.X = enemy.Home.x; enemy.Corps.Z = enemy.Home.z;
-                    }
-                }
+                // La reapparition vient du serveur (voir SynchroniserPilotageMonstres).
                 continue;
             }
             if (enemy.AttackCooldown > 0) enemy.AttackCooldown -= dt;
             Vector3 position = enemy.Root.transform.position;
             float distance = Vector3.Distance(position, player.position);
-            enemy.WanderTimer -= dt;
+            if (enemy.Pilote)
+            {
+                Vector3 cibleChasse;
+                float distanceChasse = ProchaineCibleMonstre(position, out cibleChasse);
+                enemy.WanderTimer -= dt;
 
-            // Poursuite quand le heros est proche, errance sinon : les betes ne
-            // restent plus plantees a ne rien faire (comme la reference).
-            if (distance < 10f && !dead)
-            {
-                Vector3 vers = player.position - position; vers.y = 0f;
-                if (vers.sqrMagnitude > 0.01f) enemy.Direction = vers.normalized;
-            }
-            else if (enemy.WanderTimer <= 0f)
-            {
-                enemy.WanderTimer = UnityEngine.Random.Range(1.5f, 4f);
-                if (UnityEngine.Random.value < 0.35f) enemy.Direction = Vector3.zero;
-                else
+                // Poursuite quand le heros est proche, errance sinon : les betes ne
+                // restent plus plantees a ne rien faire (comme la reference).
+                if (distanceChasse < 10f)
                 {
-                    float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-                    enemy.Direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    Vector3 vers = cibleChasse - position; vers.y = 0f;
+                    if (vers.sqrMagnitude > 0.01f) enemy.Direction = vers.normalized;
                 }
-            }
-
-            float speed = enemy.Speed * (distance < 10f ? 1.4f : 0.6f);
-            Vector3 deplacement = enemy.Direction;
-            // A portee de coup, la bete s'arrete : elle n'entre plus dans les
-            // jambes du heros.
-            if (distance < 1.5f) deplacement = Vector3.zero;
-
-            // Securite : une bete sortie de sa zone autorisee est remise sur
-            // la berge, puis repart dans une direction terrestre.
-            if (ZoneEauInterditeMonstre(new Vector2(position.x, position.z)))
-            {
-                Vector2 dehors = SortirZoneEauMonstre(new Vector2(position.x, position.z));
-                position.x = dehors.x;
-                position.z = dehors.y;
-                deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
-                enemy.Direction = deplacement;
-            }
-            // Securite : une bete egaree dans le village est remise dehors.
-            if (DansVillage(position.x, position.z))
-            {
-                Vector2 dehors = new Vector2(position.x, position.z);
-                if (dehors.magnitude < 0.001f) dehors = new Vector2(1f, 0f);
-                dehors = dehors.normalized * (VillageRadius + 0.5f);
-                position.x = dehors.x; position.z = dehors.y;
-            }
-
-            if (deplacement.sqrMagnitude > 0.01f)
-            {
-                // Si la prochaine foulée entre dans l'eau, le monstre tourne
-                // immédiatement vers la berge. Il ne reste donc pas planté
-                // face au fleuve à répéter la même collision.
-                deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
-                enemy.Direction = deplacement;
-                Vector3 suivant = position + deplacement * speed * dt;
-                if (DansVillage(suivant.x, suivant.z))
+                else if (enemy.WanderTimer <= 0f)
                 {
-                    // Village protege : la bete longe la cloture sans entrer.
-                    enemy.WanderTimer = 0f;
-                    enemy.Direction = Quaternion.Euler(0f, 90f, 0f) * deplacement;
-                }
-                else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
-                {
-                    // Les monstres ne traversent rien non plus (murs, arbres).
-                    Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps);
-                    if (ZoneEauInterditeMonstre(resolu))
-                    {
-                        // Une collision avec un obstacle ne doit jamais pousser
-                        // une bete dans l'eau : elle garde sa position et
-                        // choisira un autre virage à l'image suivante.
-                        enemy.Direction = DirectionSansEau(new Vector2(position.x, position.z), -deplacement);
-                    }
+                    enemy.WanderTimer = UnityEngine.Random.Range(1.5f, 4f);
+                    if (UnityEngine.Random.value < 0.35f) enemy.Direction = Vector3.zero;
                     else
                     {
-                        position.x = resolu.x; position.z = resolu.y;
-                        Vector3 regard = new Vector3(deplacement.x, 0f, deplacement.z);
-                        if (regard.sqrMagnitude > 0.01f)
-                            enemy.Root.transform.rotation = Quaternion.LookRotation(regard);
+                        float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+                        enemy.Direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
                     }
                 }
-            }
 
-            position.y = TerrainHeight(position.x, position.z);
-            enemy.Root.transform.position = position;
-            if (enemy.Corps != null) { enemy.Corps.X = position.x; enemy.Corps.Z = position.z; }
+                float speed = enemy.Speed * (distanceChasse < 10f ? 1.4f : 0.6f);
+                Vector3 deplacement = enemy.Direction;
+                // A portee de coup, la bete s'arrete : elle n'entre plus dans les
+                // jambes du heros.
+                if (distanceChasse < 1.5f) deplacement = Vector3.zero;
+
+                // Securite : une bete sortie de sa zone autorisee est remise sur
+                // la berge, puis repart dans une direction terrestre.
+                if (ZoneEauInterditeMonstre(new Vector2(position.x, position.z)))
+                {
+                    Vector2 dehors = SortirZoneEauMonstre(new Vector2(position.x, position.z));
+                    position.x = dehors.x;
+                    position.z = dehors.y;
+                    deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
+                    enemy.Direction = deplacement;
+                }
+                // Securite : une bete egaree dans le village est remise dehors.
+                if (DansVillage(position.x, position.z))
+                {
+                    Vector2 dehors = new Vector2(position.x, position.z);
+                    if (dehors.magnitude < 0.001f) dehors = new Vector2(1f, 0f);
+                    dehors = dehors.normalized * (VillageRadius + 0.5f);
+                    position.x = dehors.x; position.z = dehors.y;
+                }
+
+                if (deplacement.sqrMagnitude > 0.01f)
+                {
+                    // Si la prochaine foulée entre dans l'eau, le monstre tourne
+                    // immédiatement vers la berge. Il ne reste donc pas planté
+                    // face au fleuve à répéter la même collision.
+                    deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
+                    enemy.Direction = deplacement;
+                    Vector3 suivant = position + deplacement * speed * dt;
+                    if (DansVillage(suivant.x, suivant.z))
+                    {
+                        // Village protege : la bete longe la cloture sans entrer.
+                        enemy.WanderTimer = 0f;
+                        enemy.Direction = Quaternion.Euler(0f, 90f, 0f) * deplacement;
+                    }
+                    else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
+                    {
+                        // Les monstres ne traversent rien non plus (murs, arbres).
+                        Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps);
+                        if (ZoneEauInterditeMonstre(resolu))
+                        {
+                            // Une collision avec un obstacle ne doit jamais pousser
+                            // une bete dans l'eau : elle garde sa position et
+                            // choisira un autre virage à l'image suivante.
+                            enemy.Direction = DirectionSansEau(new Vector2(position.x, position.z), -deplacement);
+                        }
+                        else
+                        {
+                            position.x = resolu.x; position.z = resolu.y;
+                            Vector3 regard = new Vector3(deplacement.x, 0f, deplacement.z);
+                            if (regard.sqrMagnitude > 0.01f)
+                                enemy.Root.transform.rotation = Quaternion.LookRotation(regard);
+                        }
+                    }
+                }
+
+                position.y = TerrainHeight(position.x, position.z);
+                enemy.Root.transform.position = position;
+                if (enemy.Corps != null) { enemy.Corps.X = position.x; enemy.Corps.Z = position.z; }
+            }
+            else
+            {
+                SuivreMonstreDistant(enemy, dt);
+                position = enemy.Root.transform.position;
+                distance = Vector3.Distance(position, player.position);
+            }
 
             // Attaque : a portee et pas a travers la cloture du village.
             // Cadence 1,2 s / portee 1,6 m / 6 degats : les valeurs de la
@@ -9777,7 +9931,7 @@ public sealed class LibreViesGame : MonoBehaviour
             SpawnSpark(enemy.Root.transform.position + Vector3.up * 0.6f);
             if (enemy.Hp <= 0)
             {
-                enemy.Alive = false; enemy.RespawnAt = Time.time + 10f; enemy.Root.SetActive(false);
+                enemy.Alive = false; enemy.Pilote = false; enemy.RespawnAt = Time.time + 1.5f; enemy.Root.SetActive(false);
                 if (enemy.Spider) spidersKilled++; else ratsKilled++;
                 GainXp(enemy.Spider ? 35 : 20);
                 coins += enemy.Spider ? 4 : 2;
