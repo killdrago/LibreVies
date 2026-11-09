@@ -41,6 +41,49 @@ CREATE TABLE IF NOT EXISTS monde_objet (
   KEY idx_monde_objet_genre (genre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Maisons (genre maison) et elements du monde (arbres, cailloux, eau, ponts, herbe, edition).
+CREATE TABLE IF NOT EXISTS monde_maison (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  genre VARCHAR(20) NOT NULL,
+  cle VARCHAR(100) NULL DEFAULT NULL,
+  type VARCHAR(30) NOT NULL DEFAULT '',
+  position_x DECIMAL(10,3) NOT NULL DEFAULT 0,
+  position_z DECIMAL(10,3) NOT NULL DEFAULT 0,
+  rotation_y DECIMAL(10,3) NOT NULL DEFAULT 0,
+  taille DECIMAL(10,3) NOT NULL DEFAULT 1,
+  donnees TEXT NULL,
+  supprime TINYINT(1) NOT NULL DEFAULT 0,
+  revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  auteur_id INT NULL DEFAULT NULL,
+  cree_le TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  modifie_le TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY idx_monde_maison_cle (cle),
+  KEY idx_monde_maison_revision (revision),
+  KEY idx_monde_maison_genre (genre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS monde_element (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  genre VARCHAR(20) NOT NULL,
+  cle VARCHAR(100) NULL DEFAULT NULL,
+  type VARCHAR(30) NOT NULL DEFAULT '',
+  position_x DECIMAL(10,3) NOT NULL DEFAULT 0,
+  position_z DECIMAL(10,3) NOT NULL DEFAULT 0,
+  rotation_y DECIMAL(10,3) NOT NULL DEFAULT 0,
+  taille DECIMAL(10,3) NOT NULL DEFAULT 1,
+  donnees TEXT NULL,
+  supprime TINYINT(1) NOT NULL DEFAULT 0,
+  revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  auteur_id INT NULL DEFAULT NULL,
+  cree_le TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  modifie_le TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY idx_monde_element_cle (cle),
+  KEY idx_monde_element_revision (revision),
+  KEY idx_monde_element_genre (genre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Monstres : une ligne par monstre (position fixee a la premiere declaration,
 -- pv et mort partages entre les joueurs). Les loots viendront dans une table a part.
 CREATE TABLE IF NOT EXISTS monde_monstre (

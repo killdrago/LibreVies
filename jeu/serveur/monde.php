@@ -87,19 +87,24 @@ function lire_monde($pdo, $depuis) {
     $depuis = max(0, (int)$depuis);
     $revision = (int)$pdo->query('SELECT revision FROM monde_compteur WHERE id = 1')->fetchColumn();
     $complet = ($depuis === 0);
-    if ($complet) {
-        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
-            . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
-            . ' FROM monde_objet WHERE supprime = 0 ORDER BY id');
-        $requete->execute();
-    } else {
-        $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
-            . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
-            . ' FROM monde_objet WHERE revision > :depuis ORDER BY id');
-        $requete->execute(array(':depuis' => $depuis));
+    // monde_element : elements (arbres, cailloux, eau...) et 'edition'. monde_maison : maisons.
+    $lignes = array();
+    foreach (array('monde_element', 'monde_maison') as $table) {
+        if ($complet) {
+            $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
+                . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+                . ' FROM ' . $table . ' WHERE supprime = 0 ORDER BY id');
+            $requete->execute();
+        } else {
+            $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
+                . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+                . ' FROM ' . $table . ' WHERE revision > :depuis ORDER BY id');
+            $requete->execute(array(':depuis' => $depuis));
+        }
+        $lignes = array_merge($lignes, $requete->fetchAll());
     }
     $elements = array(); $supprimes = array(); $maisons = array(); $maisonsSupprimees = array();
-    foreach ($requete->fetchAll() as $ligne) {
+    foreach ($lignes as $ligne) {
         $supprime = (int)$ligne['supprime'] === 1;
         if ($ligne['genre'] === 'maison' || $ligne['genre'] === 'edition') {
             if ($supprime) $maisonsSupprimees[] = (string)$ligne['cle'];
@@ -311,7 +316,7 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
     if ($action === 'ajouter_element_monde') {
         $element = valider_element_monde($donnees);
         $rev = prochaine_revision($pdo);
-        $requete = $pdo->prepare('INSERT INTO monde_objet (genre, type, position_x, position_z, rotation_y, taille, auteur_id, revision)'
+        $requete = $pdo->prepare('INSERT INTO monde_element (genre, type, position_x, position_z, rotation_y, taille, auteur_id, revision)'
             . " VALUES ('element', :type, :x, :z, :rotation, :taille, :auteur, :rev)");
         $requete->execute(array(':type' => $element['type'], ':x' => $element['x'], ':z' => $element['z'],
             ':rotation' => $element['rotation'], ':taille' => $element['taille'], ':auteur' => $auteur, ':rev' => $rev));
@@ -322,7 +327,7 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         if ($id <= 0) throw new InvalidArgumentException('Identifiant d element invalide.');
         $element = valider_element_monde($donnees);
         $rev = prochaine_revision($pdo);
-        $requete = $pdo->prepare("UPDATE monde_objet SET type = :type, position_x = :x, position_z = :z,"
+        $requete = $pdo->prepare("UPDATE monde_element SET type = :type, position_x = :x, position_z = :z,"
             . " rotation_y = :rotation, taille = :taille, auteur_id = :auteur, revision = :rev"
             . " WHERE id = :id AND genre = 'element' AND supprime = 0");
         $requete->execute(array(':type' => $element['type'], ':x' => $element['x'], ':z' => $element['z'],
@@ -334,13 +339,13 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         $id = isset($donnees['id']) ? (int)$donnees['id'] : 0;
         if ($id <= 0) throw new InvalidArgumentException('Identifiant d element invalide.');
         $rev = prochaine_revision($pdo);
-        $requete = $pdo->prepare("UPDATE monde_objet SET supprime = 1, revision = :rev WHERE id = :id AND genre = 'element'");
+        $requete = $pdo->prepare("UPDATE monde_element SET supprime = 1, revision = :rev WHERE id = :id AND genre = 'element'");
         $requete->execute(array(':rev' => $rev, ':id' => $id));
         return array('message' => 'Element supprime.', 'extra' => array('revision' => $rev));
     }
     if ($action === 'vider_monde') {
         $rev = prochaine_revision($pdo);
-        $requete = $pdo->prepare("UPDATE monde_objet SET supprime = 1, revision = :rev WHERE genre = 'element' AND supprime = 0");
+        $requete = $pdo->prepare("UPDATE monde_element SET supprime = 1, revision = :rev WHERE genre = 'element' AND supprime = 0");
         $requete->execute(array(':rev' => $rev));
         return array('message' => 'Elements du monde supprimes.', 'extra' => array('revision' => $rev));
     }
@@ -353,7 +358,9 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         $rev = prochaine_revision($pdo);
         // 'edition' : objets de l'editeur (fichier edition/coordonee) ; 'maison' par defaut.
         $genre = (isset($donnees['genre']) && (string)$donnees['genre'] === 'edition') ? 'edition' : 'maison';
-        $requete = $pdo->prepare("INSERT INTO monde_objet (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
+        // Les maisons vont dans monde_maison ; les objets 'edition' dans monde_element.
+        $table = $genre === 'edition' ? 'monde_element' : 'monde_maison';
+        $requete = $pdo->prepare("INSERT INTO $table (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
             . " VALUES (:genre, :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
             . " ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),"
             . " rotation_y = VALUES(rotation_y), donnees = VALUES(donnees), auteur_id = VALUES(auteur_id),"
