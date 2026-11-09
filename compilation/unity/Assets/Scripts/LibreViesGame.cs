@@ -924,6 +924,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ReconstruireObjetsMonde();
+        intervalleSyncMonde = Mathf.Clamp(
+            PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());
         ConstruireObjetsEdition();
         ChargerCoordonneesEdition();
@@ -1051,12 +1053,12 @@ public sealed class LibreViesGame : MonoBehaviour
         return texte.ToString();
     }
 
-    // Synchronisation : demande toutes les 0,05 seconde les seuls changements depuis la revision connue.
+    // Synchronisation : demande les seuls changements depuis la revision connue, a l'intervalle de l'onglet SQL.
     private System.Collections.IEnumerator SurveillerMonde()
     {
         while (true)
         {
-            yield return new WaitForSeconds(0.05f);
+            yield return new WaitForSeconds(intervalleSyncMonde);
             LibreViesCompte compte = LibreViesCompte.Courant;
             yield return compte.ChargerMonde(revisionMondeConnue);
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ElementsMonde == null)
@@ -5322,7 +5324,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool SourisSurPanneauMaison()
     {
         if (!modeEdition || elementEditionDernierSelectionne == null) return false;
-        if (elementEditionDernierSelectionne.Maison == null && !PanneauFenetreAffiche()) return false;
+        if (elementEditionDernierSelectionne.Maison == null) return false;
         Vector2 souris = new Vector2(Input.mousePosition.x,
             Screen.height - Input.mousePosition.y);
         return CadreEditionMaison().Contains(souris);
@@ -5606,6 +5608,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (element == null || element.MaisonParent == null || element.Type != "Fenetre") return;
         Batiment b = element.MaisonParent;
         element.Root.gameObject.SetActive(false);
+        if (fenetreSelectionnee == element) fenetreSelectionnee = null;
         if (elementEditionSelectionne == element) elementEditionSelectionne = null;
         elementEditionDernierSelectionne = TrouverElementEdition(b.Root);
         ActualiserOuverturePorteVisuelle(b);
@@ -5715,36 +5718,7 @@ public sealed class LibreViesGame : MonoBehaviour
         m.TaillesGauche = gauche.Count > 0 ? tailleGauche.ToArray() : null;
     }
 
-    private bool PanneauFenetreAffiche()
-    {
-        ElementEdition e = elementEditionDernierSelectionne;
-        return modeEdition && editionOutilMaison == 2 && e != null
-            && e.Type == "Fenetre" && e.MaisonParent != null;
-    }
-
-    private void DessinerPanneauFenetre()
-    {
-        ElementEdition fenetre = elementEditionDernierSelectionne;
-        Rect cadre = CadreEditionMaison();
-        GUI.Box(cadre, "", boxStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
-            "Fenetre selectionnee (face " + NomFace(fenetre.Face) + ")", smallStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 56f, 448f, 42f),
-            "Maintenez le clic sur la fenetre pour la deplacer le long du mur.\n"
-                + "Elle ne peut pas chevaucher la porte, le panneau ni une autre fenetre.", smallStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 116f, 448f, 22f),
-            "Taille : " + Mathf.Abs(fenetre.Root.localScale.x).ToString("0.00") + " m x "
-                + Mathf.Abs(fenetre.Root.localScale.y).ToString("0.00") + " m (pas de 0,25 m)", smallStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 146f, 448f, 60f),
-            "Fleches sur la fenetre : la fleche exterieure agrandit ce bord,\n"
-                + "la fleche interieure le reduit (pas de 0,25 m).", smallStyle);
-        if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 230f, 214f, 30f),
-            "SUPPRIMER CETTE FENETRE", buttonStyle))
-            SupprimerFenetreMaison(fenetre);
-        else if (GUI.Button(new Rect(cadre.x + 250f, cadre.y + 230f, 214f, 30f),
-            "RETOUR A LA MAISON", buttonStyle))
-            elementEditionDernierSelectionne = TrouverElementEdition(fenetre.MaisonParent.Root);
-    }
+    private ElementEdition fenetreSelectionnee;
 
     // ---- Fleches cliquables sur l'objet : exterieure = agrandir, interieure = reduire ----
     private readonly List<Rect> flechesEdition = new List<Rect>();
@@ -5844,9 +5818,10 @@ public sealed class LibreViesGame : MonoBehaviour
         flechesEdition.Clear();
         if (!modeEdition || editionMaisonEnDeplacement || elementEditionDernierSelectionne == null) return;
         ElementEdition sel = elementEditionDernierSelectionne;
-        if (PanneauFenetreAffiche())
+        if (editionOutilMaison == 2 && fenetreSelectionnee != null && fenetreSelectionnee.Root != null
+            && fenetreSelectionnee.Root.gameObject.activeSelf && fenetreSelectionnee.MaisonParent != null)
         {
-            if (sel.Root != null && sel.MaisonParent != null) DessinerFlechesFenetre(sel);
+            DessinerFlechesFenetre(fenetreSelectionnee);
         }
         else if (editionOutilMaison == 1 && sel.Maison != null && sel.Maison.Root != null)
         {
@@ -5858,10 +5833,13 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (!modeEdition || editionMaisonEnDeplacement
             || elementEditionDernierSelectionne == null) return;
-        if (PanneauFenetreAffiche())
+        // Une fenetre selectionnee garde le panneau de la maison : la souris agit
+        // sur la fenetre (fleches, glisser-deposer), sans popup supplementaire.
+        if (elementEditionDernierSelectionne.Type == "Fenetre" && elementEditionDernierSelectionne.MaisonParent != null)
         {
-            DessinerPanneauFenetre();
-            return;
+            fenetreSelectionnee = elementEditionDernierSelectionne;
+            elementEditionDernierSelectionne = TrouverElementEdition(fenetreSelectionnee.MaisonParent.Root);
+            if (elementEditionDernierSelectionne == null) return;
         }
         if (elementEditionDernierSelectionne.Maison == null
             || elementEditionDernierSelectionne.Facade != null) return;
@@ -6349,6 +6327,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         ElementEdition cible;
         if (!TryTrouverElementEdition(out cible)) return;
+        if (editionOutilMaison == 2 && cible.Type == "Fenetre") fenetreSelectionnee = cible;
         if (elementEditionSelectionne != null && elementEditionSelectionne != cible)
         {
             PoserElementEdition(elementEditionSelectionne);
@@ -6634,7 +6613,15 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (!editionMaisonEnDeplacement && Input.GetMouseButtonDown(0)
             && !SourisSurInterfaceEdition())
+        {
+            if (editionOutilMaison == 2)
+            {
+                ElementEdition touche;
+                if (!TryTrouverElementEdition(out touche) || touche.Type != "Fenetre")
+                    fenetreSelectionnee = null;
+            }
             CommencerDeplacementMaisonEdition();
+        }
         if (editionMaisonEnDeplacement && Input.GetMouseButton(0))
             DeplacerMaisonEdition();
         if (editionMaisonEnDeplacement && Input.GetMouseButtonUp(0))
@@ -11129,6 +11116,47 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // Onglet Textures de l'administration : liens vers le menu TEXTURES pour
     // chaque famille (murs, toits, gazon et sol, route et paves, bois).
+    // Intervalle entre deux demandes de synchronisation du monde (secondes).
+    private float intervalleSyncMonde = 0.05f;
+    private string champIntervalleSync;
+
+    private void DessinerAdminSQL(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 500f, 30f), "SQL : SYNCHRO DU MONDE", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, contenu.width - 36f, 44f),
+            "Temps entre deux demandes de synchro (secondes). Accepte des valeurs\n"
+                + "tres petites, par exemple 0,000001. La vitesse reelle reste limitee\n"
+                + "par le temps d'un aller-retour avec le serveur.", smallStyle);
+        if (champIntervalleSync == null)
+            champIntervalleSync = intervalleSyncMonde.ToString("0.######", CultureInfo.InvariantCulture);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 124f, 260f, 24f),
+            "Intervalle actuel : " + intervalleSyncMonde.ToString("0.######", CultureInfo.InvariantCulture) + " s", smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 160f, 200f, 24f), "Nouvel intervalle (s) :", smallStyle);
+        champIntervalleSync = GUI.TextField(new Rect(contenu.x + 220f, contenu.y + 156f, 150f, 28f), champIntervalleSync ?? "");
+        if (GUI.Button(new Rect(contenu.x + 386f, contenu.y + 156f, 120f, 28f), "APPLIQUER", buttonStyle))
+        {
+            float valeur;
+            string texte = (champIntervalleSync ?? "").Trim().Replace(',', '.');
+            if (!float.TryParse(texte, NumberStyles.Float, CultureInfo.InvariantCulture, out valeur) || valeur <= 0f)
+                ShowInfo("Intervalle invalide : entrez un nombre positif (ex. 0.05 ou 0.000001)");
+            else
+            {
+                intervalleSyncMonde = Mathf.Clamp(valeur, 0.000001f, 10f);
+                PlayerPrefs.SetFloat("LibreVies.IntervalleSyncMonde", intervalleSyncMonde);
+                PlayerPrefs.Save();
+                champIntervalleSync = intervalleSyncMonde.ToString("0.######", CultureInfo.InvariantCulture);
+                ShowInfo("Synchro monde : " + champIntervalleSync + " s");
+            }
+        }
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 200f, 200f, 28f), "DEFAUT (0,05 s)", buttonStyle))
+        {
+            intervalleSyncMonde = 0.05f;
+            PlayerPrefs.SetFloat("LibreVies.IntervalleSyncMonde", intervalleSyncMonde);
+            PlayerPrefs.Save();
+            champIntervalleSync = "0.05";
+        }
+    }
+
     private void DessinerAdminIA(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 500f, 30f), "IA DES PNJ", titleStyle);
@@ -11258,7 +11286,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // Poignee de redimensionnement (affichee seulement quand la fenetre est deployee).
             GUI.Box(new Rect(fenetre.xMax - 22f, fenetre.yMax - 22f, 22f, 22f), "//", smallStyle);
 
-            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA" };
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA", "SQL" };
             for (int i = 0; i < onglets.Length; i++)
             {
                 Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -11321,6 +11349,10 @@ public sealed class LibreViesGame : MonoBehaviour
             else if (adminTab == 6)
             {
                 DessinerAdminIA(contenu);
+            }
+            else if (adminTab == 7)
+            {
+                DessinerAdminSQL(contenu);
             }
         }
         finally { GUI.matrix = ancienneMatrice; }
