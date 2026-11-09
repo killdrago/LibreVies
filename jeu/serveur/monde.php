@@ -358,8 +358,14 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         $rev = prochaine_revision($pdo);
         // 'edition' : objets de l'editeur (fichier edition/coordonee) ; 'maison' par defaut.
         $genre = (isset($donnees['genre']) && (string)$donnees['genre'] === 'edition') ? 'edition' : 'maison';
-        // Les maisons vont dans monde_maison ; les objets 'edition' dans monde_element.
+        // Une maison existante reste dans la table ou elle se trouve (evite les doublons) ;
+        // une nouvelle maison va dans monde_maison, un nouvel objet 'edition' dans monde_element.
         $table = $genre === 'edition' ? 'monde_element' : 'monde_maison';
+        foreach (array('monde_maison', 'monde_element') as $tableExistante) {
+            $verification = $pdo->prepare('SELECT 1 FROM ' . $tableExistante . ' WHERE cle = :cle LIMIT 1');
+            $verification->execute(array(':cle' => $maison['id']));
+            if ($verification->fetchColumn() !== false) { $table = $tableExistante; break; }
+        }
         $requete = $pdo->prepare("INSERT INTO $table (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
             . " VALUES (:genre, :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
             . " ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),"
