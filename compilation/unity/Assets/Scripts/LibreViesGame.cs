@@ -7758,6 +7758,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // positions des monstres que ce joueur pilote (ou peut prendre).
     private System.Collections.IEnumerator SynchroniserPilotageMonstres()
     {
+        int dernierNombrePilotes = -1;
         while (true)
         {
             yield return new WaitForSeconds(0.2f);
@@ -7814,11 +7815,21 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (String.IsNullOrEmpty(compte.Erreur) && compte.PilotesAcceptes != null)
                     acceptes.AddRange(compte.PilotesAcceptes);
             }
+            int nombreActifs = 0;
             for (int i = 0; i < enemies.Count; i++)
             {
                 EnemyState e = enemies[i];
                 if (e == null) continue;
                 e.Pilote = e.Alive && acceptes.Contains(e.Cle);
+                if (e.Pilote) nombreActifs++;
+            }
+            // Diagnostic : journal seulement quand le nombre de monstres pilotes change.
+            if (nombreActifs != dernierNombrePilotes)
+            {
+                dernierNombrePilotes = nombreActifs;
+                Journal("pilotage : " + nombrePilotes + " envoyes, " + acceptes.Count + " acceptes, "
+                    + nombreActifs + " pilotes ici"
+                    + (String.IsNullOrEmpty(compte.Erreur) ? "" : " ; erreur : " + compte.Erreur));
             }
         }
     }
