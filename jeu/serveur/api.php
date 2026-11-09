@@ -626,7 +626,7 @@ if ($action === 'presence') {
 }
 
 if (in_array($action, array('get_monde', 'ajouter_element_monde', 'modifier_element_monde', 'supprimer_element_monde',
-    'vider_monde', 'enregistrer_maison', 'declarer_monstres', 'frapper_monstre',
+    'vider_monde', 'enregistrer_maison', 'renommer_maison', 'declarer_monstres', 'frapper_monstre',
     'piloter_monstres', 'ressusciter_monstres'), true)) {
     // Lecture pour tous les joueurs connectes ; ecriture reservee aux administrateurs,
     // sauf les monstres (tout joueur connecte peut les declarer et les frapper).

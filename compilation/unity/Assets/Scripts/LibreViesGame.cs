@@ -2296,6 +2296,10 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // ---- Maisons partagees (base mondeLV) ----
     private readonly Dictionary<string, string> maisonsAppliquees = new Dictionary<string, string>();
+    // Nom de chaque maison (colonne nom de la base), par cle.
+    private readonly Dictionary<string, string> nomsMaisons = new Dictionary<string, string>();
+    private string nomMaisonSaisi = "";
+    private string cleMaisonSaisie = "";
 
     private sealed class MaisonAEnvoyer
     {
@@ -2305,6 +2309,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Z;
         public float Rotation;
         public string Json;
+        public string Genre;
     }
 
     // Applique les maisons recues de la base, seulement quand leur contenu change.
@@ -2316,6 +2321,8 @@ public sealed class LibreViesGame : MonoBehaviour
         for (int i = 0; i < maisons.Length; i++)
         {
             LibreViesCompte.LibreViesMaisonMonde maison = maisons[i];
+            if (!string.IsNullOrEmpty(maison.id))
+                nomsMaisons[maison.id] = string.IsNullOrEmpty(maison.nom) ? "sans nom" : maison.nom;
             string donnees = maison.donnees ?? "";
             CoordonneeObjetEdition coordonnee = null;
             try { coordonnee = JsonUtility.FromJson<CoordonneeObjetEdition>(donnees); }
@@ -2393,7 +2400,7 @@ public sealed class LibreViesGame : MonoBehaviour
             MaisonAEnvoyer m = maisons[i];
             string precedent;
             if (maisonsAppliquees.TryGetValue(m.Cle, out precedent) && precedent == m.Json) continue;
-            yield return compte.EnregistrerMaisonMonde(m.Cle, m.Nom, m.X, m.Z, m.Rotation, m.Json, "edition");
+            yield return compte.EnregistrerMaisonMonde(m.Cle, m.Nom, m.X, m.Z, m.Rotation, m.Json, m.Genre ?? "edition");
             if (String.IsNullOrEmpty(compte.Erreur)) maisonsAppliquees[m.Cle] = m.Json;
             else Journal("maison " + m.Nom + " non enregistree : " + compte.Erreur);
         }
@@ -2490,7 +2497,9 @@ public sealed class LibreViesGame : MonoBehaviour
                         X = coordonnee.Position.x,
                         Z = coordonnee.Position.z,
                         Rotation = coordonnee.Rotation.eulerAngles.y,
-                        Json = JsonUtility.ToJson(coordonnee, false)
+                        Json = JsonUtility.ToJson(coordonnee, false),
+                        // Maisons dans monde_maison ; le reste de l'editeur dans monde_element.
+                        Genre = element != null && element.Maison != null ? "maison" : "edition"
                     });
                 }
             }
@@ -5842,6 +5851,34 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // Nom de la maison choisie : champ et bouton en haut du cadre.
+    private void DessinerNomMaisonEdition(Transform racine, Rect cadre)
+    {
+        string cle = CleMaisonEdition(racine.name + "|" + CheminObjetEdition(racine));
+        if (cle != cleMaisonSaisie)
+        {
+            cleMaisonSaisie = cle;
+            string actuel;
+            nomMaisonSaisi = nomsMaisons.TryGetValue(cle, out actuel) ? actuel : "sans nom";
+        }
+        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 60f, 24f), "Nom :", smallStyle);
+        nomMaisonSaisi = GUI.TextField(new Rect(cadre.x + 70f, cadre.y + 30f, 220f, 24f), nomMaisonSaisi, 60);
+        if (GUI.Button(new Rect(cadre.x + 300f, cadre.y + 30f, 164f, 24f), "ENREGISTRER LE NOM", buttonStyle))
+            StartCoroutine(RenommerMaisonServeur(cle, nomMaisonSaisi.Trim()));
+    }
+
+    private System.Collections.IEnumerator RenommerMaisonServeur(string cle, string nom)
+    {
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        yield return compte.RenommerMaisonMonde(cle, nom);
+        if (String.IsNullOrEmpty(compte.Erreur))
+        {
+            nomsMaisons[cle] = nom == "" ? "sans nom" : nom;
+            Journal("maison : nom enregistre : " + nomsMaisons[cle]);
+        }
+        else Journal("maison : nom non enregistre : " + compte.Erreur);
+    }
+
     private void DessinerEditionMaison()
     {
         if (!modeEdition || editionMaisonEnDeplacement
@@ -5859,8 +5896,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Rect cadre = CadreEditionMaison();
         Batiment batiment = elementEditionDernierSelectionne.Maison;
         GUI.Box(cadre, "", boxStyle);
-        GUI.Label(new Rect(cadre.x + 16f, cadre.y + 30f, 390f, 22f),
-            "Choisissez une action : une seule action a la fois.", smallStyle);
+        DessinerNomMaisonEdition(elementEditionDernierSelectionne.Root, cadre);
         float yc = cadre.y + 35f;
         if (GUI.Button(new Rect(cadre.x + 16f, cadre.y + 56f, 190f, 30f),
             "DEPLACER LA MAISON", buttonStyle)) editionOutilMaison = 0;

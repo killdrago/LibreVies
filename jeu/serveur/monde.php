@@ -64,6 +64,41 @@ function valider_maison_monde($donnees) {
     );
 }
 
+// Nom d'une maison : "sans nom" si vide. Renommer ne change que ce champ.
+function valider_nom_maison($donnees) {
+    $id = isset($donnees['id']) ? strtolower(trim((string)$donnees['id'])) : '';
+    if (!preg_match('/^[a-z0-9_]{3,100}$/', $id)) {
+        throw new InvalidArgumentException('Identifiant de maison invalide (lettres, chiffres, _).');
+    }
+    $nom = isset($donnees['nom']) ? mb_substr(trim((string)$donnees['nom']), 0, 60) : '';
+    if ($nom === '') $nom = 'sans nom';
+    return array('id' => $id, 'nom' => $nom);
+}
+
+// Materiau ou texture choisi pour chaque partie de la maison (colonnes de monde_maison).
+// Vide = suit le menu general : colonne NULL.
+function surfaces_maison($reglages) {
+    $r = json_decode((string)$reglages, true);
+    if (!is_array($r)) $r = array();
+    $choisir = function ($cles) use ($r) {
+        foreach ($cles as $cle) {
+            if (isset($r[$cle]) && is_string($r[$cle]) && trim($r[$cle]) !== '') {
+                return mb_substr(trim($r[$cle]), 0, 255);
+            }
+        }
+        return null;
+    };
+    return array(
+        'papier' => $choisir(array('TexturePapier')),
+        'mur' => $choisir(array('TextureMur', 'MateriauMur')),
+        'porte' => $choisir(array('TexturePorte', 'MateriauPorte')),
+        'pancarte' => $choisir(array('MateriauSupportPancarte')),
+        'fenetre' => $choisir(array('MateriauFenetre')),
+        'toit' => $choisir(array('TextureToit', 'MateriauToit')),
+        'sol' => $choisir(array('TextureSol')),
+    );
+}
+
 function connexion_monde($config) {
     $nom = isset($config['monde_db_name']) ? (string)$config['monde_db_name'] : 'mondeLV';
     if (!preg_match('/^[A-Za-z0-9_]+$/', $nom)) throw new RuntimeException('Nom de base monde invalide.');
@@ -90,14 +125,16 @@ function lire_monde($pdo, $depuis) {
     // monde_element : elements (arbres, cailloux, eau...) et 'edition'. monde_maison : maisons.
     $lignes = array();
     foreach (array('monde_element', 'monde_maison') as $table) {
+        // Seule monde_maison a les colonnes nom et territoire.
+        $colonnesNom = $table === 'monde_maison' ? 'nom, territoire' : "'' AS nom, '' AS territoire";
         if ($complet) {
             $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
-                . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+                . ' ' . $colonnesNom . ', TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
                 . ' FROM ' . $table . ' WHERE supprime = 0 ORDER BY id');
             $requete->execute();
         } else {
             $requete = $pdo->prepare('SELECT id, genre, cle, type, position_x, position_z, rotation_y, taille, donnees, supprime,'
-                . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+                . ' ' . $colonnesNom . ', TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
                 . ' FROM ' . $table . ' WHERE revision > :depuis ORDER BY id');
             $requete->execute(array(':depuis' => $depuis));
         }
@@ -109,7 +146,8 @@ function lire_monde($pdo, $depuis) {
         if ($ligne['genre'] === 'maison' || $ligne['genre'] === 'edition') {
             if ($supprime) $maisonsSupprimees[] = (string)$ligne['cle'];
             else $maisons[] = array(
-                'id' => (string)$ligne['cle'], 'nom' => '', 'x' => (float)$ligne['position_x'],
+                'id' => (string)$ligne['cle'], 'nom' => (string)$ligne['nom'], 'territoire' => (string)$ligne['territoire'],
+                'x' => (float)$ligne['position_x'],
                 'z' => (float)$ligne['position_z'], 'rotation' => (float)$ligne['rotation_y'],
                 'donnees' => (string)$ligne['donnees'],
             );
@@ -366,14 +404,45 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
             $verification->execute(array(':cle' => $maison['id']));
             if ($verification->fetchColumn() !== false) { $table = $tableExistante; break; }
         }
-        $requete = $pdo->prepare("INSERT INTO $table (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
-            . " VALUES (:genre, :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
-            . " ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),"
-            . " rotation_y = VALUES(rotation_y), donnees = VALUES(donnees), auteur_id = VALUES(auteur_id),"
-            . " supprime = 0, revision = VALUES(revision)");
-        $requete->execute(array(':genre' => $genre, ':cle' => $maison['id'], ':x' => $maison['x'], ':z' => $maison['z'],
-            ':rotation' => $maison['rotation'], ':donnees' => $maison['donnees'], ':auteur' => $auteur, ':rev' => $rev));
+        if ($table === 'monde_maison') {
+            // Le nom et le territoire ne sont pas modifies ici : seul renommer_maison le change.
+            $surfaces = surfaces_maison($maison['donnees']);
+            $requete = $pdo->prepare('INSERT INTO monde_maison (genre, cle, nom, territoire, type, position_x, position_z,'
+                . ' rotation_y, donnees, papier, mur, porte, pancarte, fenetre, toit, sol, auteur_id, revision)'
+                . " VALUES (:genre, :cle, 'sans nom', 'Depart', 'MAISON', :x, :z, :rotation, :donnees,"
+                . ' :papier, :mur, :porte, :pancarte, :fenetre, :toit, :sol, :auteur, :rev)'
+                . ' ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),'
+                . ' rotation_y = VALUES(rotation_y), donnees = VALUES(donnees), papier = VALUES(papier),'
+                . ' mur = VALUES(mur), porte = VALUES(porte), pancarte = VALUES(pancarte),'
+                . ' fenetre = VALUES(fenetre), toit = VALUES(toit), sol = VALUES(sol),'
+                . ' auteur_id = VALUES(auteur_id), supprime = 0, revision = VALUES(revision)');
+            $requete->execute(array(':genre' => $genre, ':cle' => $maison['id'], ':x' => $maison['x'], ':z' => $maison['z'],
+                ':rotation' => $maison['rotation'], ':donnees' => $maison['donnees'], ':papier' => $surfaces['papier'],
+                ':mur' => $surfaces['mur'], ':porte' => $surfaces['porte'], ':pancarte' => $surfaces['pancarte'],
+                ':fenetre' => $surfaces['fenetre'], ':toit' => $surfaces['toit'], ':sol' => $surfaces['sol'],
+                ':auteur' => $auteur, ':rev' => $rev));
+        } else {
+            $requete = $pdo->prepare("INSERT INTO $table (genre, cle, type, position_x, position_z, rotation_y, donnees, auteur_id, revision)"
+                . " VALUES (:genre, :cle, 'MAISON', :x, :z, :rotation, :donnees, :auteur, :rev)"
+                . " ON DUPLICATE KEY UPDATE position_x = VALUES(position_x), position_z = VALUES(position_z),"
+                . " rotation_y = VALUES(rotation_y), donnees = VALUES(donnees), auteur_id = VALUES(auteur_id),"
+                . " supprime = 0, revision = VALUES(revision)");
+            $requete->execute(array(':genre' => $genre, ':cle' => $maison['id'], ':x' => $maison['x'], ':z' => $maison['z'],
+                ':rotation' => $maison['rotation'], ':donnees' => $maison['donnees'], ':auteur' => $auteur, ':rev' => $rev));
+        }
         return array('message' => 'Maison enregistree.', 'extra' => array('revision' => $rev));
+    }
+    if ($action === 'renommer_maison') {
+        $maison = valider_nom_maison($donnees);
+        $verification = $pdo->prepare('SELECT 1 FROM monde_maison WHERE cle = :cle AND supprime = 0 LIMIT 1');
+        $verification->execute(array(':cle' => $maison['id']));
+        if ($verification->fetchColumn() === false) {
+            throw new InvalidArgumentException("Maison introuvable dans la base : modifiez-la une fois pour l'enregistrer.");
+        }
+        $rev = prochaine_revision($pdo);
+        $requete = $pdo->prepare('UPDATE monde_maison SET nom = :nom, revision = :rev WHERE cle = :cle');
+        $requete->execute(array(':nom' => $maison['nom'], ':rev' => $rev, ':cle' => $maison['id']));
+        return array('message' => 'Nom de la maison enregistre.', 'extra' => array('revision' => $rev));
     }
     throw new InvalidArgumentException('Action monde inconnue.');
 }

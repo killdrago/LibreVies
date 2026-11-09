@@ -246,6 +246,17 @@ public sealed class LibreViesCompte
         yield return Envoyer("enregistrer_maison", null, null, champs);
     }
 
+    // Renomme une maison deja enregistree dans la base partagee.
+    public IEnumerator RenommerMaisonMonde(string cle, string nom)
+    {
+        var champs = new Dictionary<string, string>
+        {
+            { "id", cle ?? "" },
+            { "nom", nom ?? "" }
+        };
+        yield return Envoyer("renommer_maison", null, null, champs);
+    }
+
     // Envoie la position du joueur local et recoit celles des autres joueurs.
     public IEnumerator EnvoyerPresence(float x, float z, float rotation, string animation)
     {
@@ -438,7 +449,7 @@ public sealed class LibreViesCompte
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
             if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
                 || action == "modifier_element_monde" || action == "supprimer_element_monde"
-                || action == "vider_monde" || action == "enregistrer_maison"
+                || action == "vider_monde" || action == "enregistrer_maison" || action == "renommer_maison"
                 || action == "declarer_monstres" || action == "piloter_monstres"
                 || action == "ressusciter_monstres" || action == "frapper_monstre")
                 yield break;
