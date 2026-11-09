@@ -7762,6 +7762,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private System.Collections.IEnumerator SynchroniserPilotageMonstres()
     {
         int dernierNombrePilotes = -1;
+        float prochainJournalMorts = 0f;
         while (true)
         {
             yield return new WaitForSeconds(0.2f);
@@ -7789,7 +7790,19 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 ressurections.Append(']');
                 yield return compte.RessusciterMonstres(ressurections.ToString());
+                int recus = compte.Monstres == null ? 0 : compte.Monstres.Length;
+                Journal("reapparition : " + nombreRessurections + " demandee(s), " + recus + " recue(s)"
+                    + (String.IsNullOrEmpty(compte.Erreur) ? "" : " ; erreur : " + compte.Erreur));
                 if (String.IsNullOrEmpty(compte.Erreur)) AppliquerEtatMonstres(compte.Monstres);
+            }
+            else if (Time.realtimeSinceStartup > prochainJournalMorts)
+            {
+                // Diagnostic : monstres morts localement et leur delai ecoule.
+                prochainJournalMorts = Time.realtimeSinceStartup + 15f;
+                int morts = 0;
+                for (int i = 0; i < enemies.Count; i++)
+                    if (enemies[i] != null && !enemies[i].Alive) morts++;
+                if (morts > 0) Journal("morts : " + morts + " monstre(s) mort(s) en attente de reapparition");
             }
 
             int moi = MonIdentifiant();
