@@ -7053,7 +7053,8 @@ public sealed class LibreViesGame : MonoBehaviour
         // Vasque au sommet, pleine d'eau.
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.2f, 0), new Vector3(0.56f, 0.03f, 0.56f), "Water", root, "Eau");
         ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
-        ColCercle(position.x, position.z, 0.32f, 2.2f);   // colonne
+        // Collision de la colonne : liee a la fontaine, elle suit son deplacement en edition.
+        collisionsObjetsEdition[root] = ColCercle(position.x, position.z, 0.32f, 2.2f);
     }
 
     private void CreateWaterways()
