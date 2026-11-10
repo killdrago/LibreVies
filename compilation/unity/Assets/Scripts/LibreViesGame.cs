@@ -122,7 +122,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool adminOpen;
     private int adminTab;
 
-    // ---- Monde : pinceaux de l'onglet Monde (fichier edition/monde) ----
+    // ---- Monde : pinceaux de l'onglet Monde (donnees de la base) ----
     [Serializable]
     private sealed class ElementMonde
     {
@@ -184,7 +184,6 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool personnageHumainActif;
     private bool previewPersonnageSourisActive;
     private Vector2 previewPersonnageDerniereSouris;
-    private bool razVilleConfirmation;
     private int adminNpcSelection;
     // 0 = bras gauche, 1 = bras droit, 2 = immobile, 3 = alternance.
     private int adminBrasPerso = 3;
@@ -938,7 +937,6 @@ public sealed class LibreViesGame : MonoBehaviour
         StartCoroutine(SurveillerMonde());
         StartCoroutine(SynchroniserPilotageMonstres());
         ConstruireObjetsEdition();
-        ChargerCoordonneesEdition();
         AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
         RafraichirZonesNommees();
         RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
@@ -2157,42 +2155,6 @@ public sealed class LibreViesGame : MonoBehaviour
             + " boite centre=" + boite.center + " taille=" + boite.size);
     }
 
-    private void ChargerCoordonneesEdition()
-    {
-        // Les objets de l'editeur viennent de la base (mondeLV). Le fichier ne sert
-        // plus que de secours quand la base est vide.
-        if (LibreViesCompte.Courant.MaisonsMonde != null && LibreViesCompte.Courant.MaisonsMonde.Length > 0) return;
-        string chemin = CheminCoordonneesEdition;
-        if (!File.Exists(chemin)) return;
-        try
-        {
-            byte[] donnees = DechiffrerCoordonneesEdition(File.ReadAllBytes(chemin));
-            string json = Encoding.UTF8.GetString(donnees);
-            FichierCoordonneesEdition fichier = JsonUtility.FromJson<FichierCoordonneesEdition>(json);
-            if (fichier == null || fichier.Objets == null) return;
-            bool migrationPivotPorte = fichier.Version < 3;
-            bool maisonsDuServeur = LibreViesCompte.Courant.MaisonsMonde != null
-                && LibreViesCompte.Courant.MaisonsMonde.Length > 0;
-            var utilisees = new HashSet<Transform>();
-            for (int i = 0; i < fichier.Objets.Count; i++)
-            {
-                CoordonneeObjetEdition coordonnee = fichier.Objets[i];
-                if (coordonnee == null || string.IsNullOrEmpty(coordonnee.Nom)) continue;
-                // Quand la base contient les maisons, le fichier ne les applique plus.
-                if (maisonsDuServeur && EstMaisonEdition(coordonnee, utilisees)) continue;
-                AppliquerCoordonneeEdition(coordonnee, migrationPivotPorte, utilisees);
-            }
-            SynchroniserTousLesBatiments();
-            AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
-            Journal("coordonnees edition chargees : " + fichier.Objets.Count + " objet(s)");
-        }
-        catch (Exception erreur)
-        {
-            Debug.LogWarning("LibreVies : fichier edition ignore (illisible ou non reconnu) : "
-                + erreur.Message);
-        }
-    }
-
     private void AppliquerCoordonneeEdition(CoordonneeObjetEdition coordonnee, bool migrationPivotPorte,
         HashSet<Transform> utilisees)
     {
@@ -2410,9 +2372,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         try
         {
-            string dossier = Path.GetDirectoryName(CheminCoordonneesEdition);
-            if (!Directory.Exists(dossier)) Directory.CreateDirectory(dossier);
-            var fichier = new FichierCoordonneesEdition();
+            // La base (mondeLV) est la seule source : pas de copie locale.
             var maisonsAEnvoyer = new List<MaisonAEnvoyer>();
             var compteurCles = new Dictionary<string, int>();
             List<Transform> objets = ObjetsCoordonneesEdition();
@@ -2512,29 +2472,6 @@ public sealed class LibreViesGame : MonoBehaviour
             Debug.LogWarning("LibreVies : enregistrement des coordonnees edition impossible : "
                 + erreur.Message);
         }
-    }
-
-    private void RazEditionVille()
-    {
-        try
-        {
-            if (File.Exists(CheminCoordonneesEdition))
-                File.Delete(CheminCoordonneesEdition);
-            string temporaire = CheminCoordonneesEdition + ".tmp";
-            if (File.Exists(temporaire)) File.Delete(temporaire);
-        }
-        catch (Exception erreur)
-        {
-            Debug.LogWarning("LibreVies : RAZ ville impossible : " + erreur.Message);
-        }
-        historiqueEdition.Clear();
-        elementEditionSelectionne = null;
-        elementEditionDernierSelectionne = null;
-        editionMaisonEnDeplacement = false;
-        editionRedimensionnement = false;
-        // Le rechargement reconstruit les maisons puis ne trouve plus de
-        // coordonnees sauvegardees : toutes les modifications sont annulees.
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     private void CreateMaterials()
@@ -11635,23 +11572,6 @@ public sealed class LibreViesGame : MonoBehaviour
                         + "Portails : " + portails.Count + "\n"
                         + "Objets editables : " + objetsEdition.Count,
                     smallStyle);
-                if (!razVilleConfirmation)
-                {
-                    if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 184f, 240f, 32f),
-                        "RAZ VILLE", buttonStyle))
-                        razVilleConfirmation = true;
-                }
-                else
-                {
-                    GUI.Label(new Rect(contenu.x + 18f, contenu.y + 178f, 450f, 24f),
-                        "Confirmer : annuler toutes les modifications ?", smallStyle);
-                    if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 208f, 120f, 32f),
-                        "CONFIRMER", buttonStyle))
-                        RazEditionVille();
-                    if (GUI.Button(new Rect(contenu.x + 146f, contenu.y + 208f, 120f, 32f),
-                        "ANNULER", buttonStyle))
-                        razVilleConfirmation = false;
-                }
             }
             else if (adminTab == 1)
             {

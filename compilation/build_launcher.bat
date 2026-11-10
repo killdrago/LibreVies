@@ -435,45 +435,6 @@ if errorlevel 1 "%GIT%" -C "%LV_GIT_ROOT%" config user.email "librevies-build@us
 exit /b 0
 
 rem ==========================================================================
-rem  PUBLICATION DES COORDONNEES D'EDITION
-rem ==========================================================================
-:publier_edition
-set "LV_GIT_ROOT=%ROOT%.."
-if not exist "%JEU%\edition" exit /b 0
-set "LV_EDITION_FICHIER="
-for /f "delims=" %%F in ('dir /b /a-d "%JEU%\edition" 2^>nul') do if /I not "%%F"==".gitkeep" set "LV_EDITION_FICHIER=%%F"
-if not defined LV_EDITION_FICHIER (
-    echo        Edition locale : aucun changement a publier.
-    exit /b 0
-)
-call :preparer_depot_git
-if errorlevel 1 exit /b 1
-"%GIT%" -C "%LV_GIT_ROOT%" add -- jeu/edition
-if errorlevel 1 (
-    echo ERREUR : git add jeu\edition a echoue.
-    exit /b 1
-)
-"%GIT%" -C "%LV_GIT_ROOT%" diff --cached --quiet -- jeu/edition
-if not errorlevel 1 (
-    echo        Edition locale : aucun changement a publier.
-    exit /b 0
-)
-echo        Edition locale : commit des coordonnees...
-"%GIT%" -C "%LV_GIT_ROOT%" commit -m "Edition : met a jour les coordonnees" --only -- jeu/edition
-if errorlevel 1 (
-    echo ERREUR : le commit des changements de jeu\edition a echoue.
-    exit /b 1
-)
-echo        Edition locale : publication vers origin/%BRANCHE%...
-"%GIT%" -C "%LV_GIT_ROOT%" push origin "%BRANCHE%"
-if errorlevel 1 (
-    echo ERREUR : git push origin %BRANCHE% a echoue.
-    exit /b 1
-)
-echo        Edition locale publiee avec succes.
-exit /b 0
-
-rem ==========================================================================
 rem  ETAPE 1 - le projet (sources) : MISE A JOUR depuis GitHub
 rem  Les fichiers sont mis a jour a chaque lancement (le depot est la
 rem  reference). Avant tout remplacement, l'ancienne version est copiee dans
@@ -511,16 +472,6 @@ set "LV_URL=https://github.com/%DEPOT%/archive/refs/heads/%BRANCHE%.zip"
 set "LV_ZIP=%TEMP%\librevies-projet.zip"
 set "LV_DIR=%TEMP%\librevies-projet"
 set "LV_SAUVE=%BUILD%\sauvegarde_locale"
-
-rem --- Publication obligatoire des coordonnees locales ----------------------
-rem Le depot GitHub est mis a jour AVANT toute lecture ou ecriture de source.
-rem Sans changement dans jeu\edition, aucune validation ni aucun commit n'est cree.
-call :publier_edition
-if errorlevel 1 (
-    echo ERREUR : publication des changements de jeu\edition impossible.
-    echo Le build est interrompu pour proteger les coordonnees locales.
-    exit /b 1
-)
 
 rem --- Copie de sauvegarde de ce qui peut etre remplace ---------------------
 rem     (uniquement les sources : le dossier image\ fait 72 Mo et n'est
