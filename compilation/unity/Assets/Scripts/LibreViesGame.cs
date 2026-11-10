@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 #if UNITY_STANDALONE_WIN
 using System.Runtime.InteropServices;
@@ -493,27 +492,6 @@ public sealed class LibreViesGame : MonoBehaviour
         public string MateriauFenetre;
         public string MateriauPorte;
         public string MateriauToit;
-    }
-
-    [Serializable]
-    private sealed class FichierCoordonneesEdition
-    {
-        public int Version = 4;
-        public List<CoordonneeObjetEdition> Objets = new List<CoordonneeObjetEdition>();
-    }
-
-    private string CheminCoordonneesEdition
-    {
-        get
-        {
-            string dossierJeu = Path.GetDirectoryName(Application.dataPath);
-            string dossierInstallation = dossierJeu == null
-                ? null : Path.GetDirectoryName(dossierJeu);
-            // En build Windows, dataPath vaut .../game/LibreViesGame_Data :
-            // edition est donc .../edition, au meme niveau que game.
-            return Path.Combine(dossierInstallation ?? dossierJeu ?? Application.dataPath,
-                "edition", "coordonee");
-        }
     }
 
     private string CheminHistoriqueEdition
@@ -1851,44 +1829,6 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         return objets;
-    }
-
-    private byte[] CleCoordonneesEdition(out byte[] iv)
-    {
-        using (SHA256 sha = SHA256.Create())
-        {
-            byte[] empreinte = sha.ComputeHash(Encoding.UTF8.GetBytes(
-                "LibreVies edition coordonee 0.5 - cle interne du jeu"));
-            iv = new byte[16];
-            Array.Copy(empreinte, 16, iv, 0, 16);
-            return empreinte;
-        }
-    }
-
-    private byte[] ChiffrerCoordonneesEdition(byte[] texte)
-    {
-        byte[] iv;
-        byte[] cle = CleCoordonneesEdition(out iv);
-        using (Aes aes = Aes.Create())
-        {
-            aes.Key = cle;
-            aes.IV = iv;
-            using (ICryptoTransform chiffreur = aes.CreateEncryptor())
-                return chiffreur.TransformFinalBlock(texte, 0, texte.Length);
-        }
-    }
-
-    private byte[] DechiffrerCoordonneesEdition(byte[] donnees)
-    {
-        byte[] iv;
-        byte[] cle = CleCoordonneesEdition(out iv);
-        using (Aes aes = Aes.Create())
-        {
-            aes.Key = cle;
-            aes.IV = iv;
-            using (ICryptoTransform dechiffreur = aes.CreateDecryptor())
-                return dechiffreur.TransformFinalBlock(donnees, 0, donnees.Length);
-        }
     }
 
     private void ActualiserDimensionsBatiment(Batiment batiment)
@@ -3749,7 +3689,32 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private bool DansVillage(float x, float z)
     {
-        return new Vector2(x, z).magnitude < VillageRadius;
+        return DistanceVillage(x, z) < VillageRadius;
+    }
+
+    // Enceinte carree : la distance est la plus grande des deux coordonnees.
+    private static float DistanceVillage(float x, float z)
+    {
+        return Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
+    }
+
+    private static float DistanceVillage(Vector2 p)
+    {
+        return DistanceVillage(p.x, p.y);
+    }
+
+    // Point du contour carre : t de 0 a 1 fait un tour complet (coins a 1/4, 1/2, 3/4).
+    private Vector2 PointEnceinte(float t)
+    {
+        float R = VillageRadius;
+        Vector2[] coins =
+        {
+            new Vector2(R, -R), new Vector2(R, R), new Vector2(-R, R), new Vector2(-R, -R), new Vector2(R, -R)
+        };
+        float s = Mathf.Repeat(t, 1f) * 8f * R;
+        int cote = Mathf.Min(3, (int)(s / (2f * R)));
+        float u = (s - cote * 2f * R) / (2f * R);
+        return Vector2.Lerp(coins[cote], coins[cote + 1], u);
     }
 
     private float DistRoute(Vector2 p)
@@ -3958,7 +3923,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // Cloture du village : bloquante SAUF aux portails (la ou passe la
             // route). Le heros peut sauter par-dessus ; les monstres (pieds = 0,
             // ils ne sautent pas) ne la franchissent jamais.
-            float dl = p.magnitude;
+            float dl = DistanceVillage(p);
             if (pieds <= TerrainHeight(p.x, p.y) + HauteurCloture - 0.05f
                 && Mathf.Abs(dl - VillageRadius) < 0.4f + rayon
                 && DistRoute(p) > DemiOuverturePortail)
@@ -7177,8 +7142,8 @@ public sealed class LibreViesGame : MonoBehaviour
         float debut = 0f;
         for (int i = 0; i <= pas; i++)
         {
-            float a = i * Mathf.PI * 2f / pas;
-            bool trou = DistRoute(new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius)) < DemiOuverturePortail;
+            float a = i / (float)pas;
+            bool trou = DistRoute(PointEnceinte(a)) < DemiOuverturePortail;
             if (trou && !dansTrou) { dansTrou = true; debut = a; }
             else if (!trou && dansTrou)
             {
@@ -7190,22 +7155,24 @@ public sealed class LibreViesGame : MonoBehaviour
         // 2) Poteaux + traverses sur toute la longueur, portails exclus.
         for (int i = 0; i < posts; i++)
         {
-            float angle = i * Mathf.PI * 2f / posts;
-            float x = Mathf.Cos(angle) * VillageRadius;
-            float z = Mathf.Sin(angle) * VillageRadius;
+            Vector2 pointPoteau = PointEnceinte(i / (float)posts);
+            float x = pointPoteau.x;
+            float z = pointPoteau.y;
             if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
             float y = TerrainHeight(x, z);
             Primitive(PrimitiveType.Cylinder, new Vector3(x, y + 0.65f, z), new Vector3(0.14f, 0.65f, 0.14f), "Wood", null, "Cloture");
         }
         for (int i = 0; i < posts; i++)
         {
-            float angle = (i + 0.5f) * Mathf.PI * 2f / posts;
-            float x = Mathf.Cos(angle) * VillageRadius;
-            float z = Mathf.Sin(angle) * VillageRadius;
+            float tRail = (i + 0.5f) / posts;
+            Vector2 pointRail = PointEnceinte(tRail);
+            float x = pointRail.x;
+            float z = pointRail.y;
             if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
             float y = TerrainHeight(x, z) + 0.85f;
             var rail = Box(new Vector3(x, y, z), new Vector3(0.12f, 0.14f, 2.8f), "Wood", null, "Traverse");
-            rail.transform.rotation = Quaternion.Euler(0, -angle * Mathf.Rad2Deg, 0);
+            Vector2 tangenteRail = (PointEnceinte(tRail + 0.001f) - PointEnceinte(tRail - 0.001f)).normalized;
+            rail.transform.rotation = Quaternion.LookRotation(new Vector3(tangenteRail.x, 0f, tangenteRail.y));
         }
 
         // 3) Les portails : grands poteaux, linteau et panneau LIBREVIES.
@@ -7214,7 +7181,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float a0 = intervalles[g].x;
             float a1 = intervalles[g].y;
             float am = (a0 + a1) * 0.5f;
-            Vector2 passage = new Vector2(Mathf.Cos(am) * VillageRadius, Mathf.Sin(am) * VillageRadius);
+            Vector2 passage = PointEnceinte(am);
             // Le portique est recentré exactement sur la sortie : aucun
             // décalage latéral ne doit repousser la sortie nord (ou sud) vers
             // la gauche. Les faces internes des deux poteaux laissent 5 m.
@@ -8215,7 +8182,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             float x = (float)(random.NextDouble() * 236 - 118);
             float z = (float)(random.NextDouble() * 236 - 118);
-            if (new Vector2(x, z).magnitude < VillageRadius + 4) continue;
+            if (DistanceVillage(x, z) < VillageRadius + 4) continue;
             if (!EmplacementLibre(x, z, 1.5f)) continue;
             string asset = (plantes % 3 == 0) ? "CommonTree_1" : "Pine_1";
             float taille = (float)(random.NextDouble() * 0.24 + 0.92);
@@ -8293,7 +8260,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 float x = (float)(random.NextDouble() * 226f - 113f);
                 float z = (float)(random.NextDouble() * 226f - 113f);
-                if (new Vector2(x, z).magnitude < VillageRadius + 3.5f) continue;
+                if (DistanceVillage(x, z) < VillageRadius + 3.5f) continue;
                 if (!EmplacementLibre(x, z, type == 5 ? 1.4f : 0.65f)) continue;
                 float scale = type == 5
                     ? (float)(random.NextDouble() * 0.55f + 0.75f)
@@ -8473,9 +8440,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 x = Mathf.Clamp(x, -WorldSize + 5, WorldSize - 5);
                 z = Mathf.Clamp(z, -WorldSize + 5, WorldSize - 5);
                 var radial = new Vector2(x, z);
-                if (radial.magnitude > 0.001f && Mathf.Abs(radial.magnitude - VillageRadius) < 2.2f)
+                if (DistanceVillage(radial) > 0.001f && Mathf.Abs(DistanceVillage(radial) - VillageRadius) < 2.2f)
                 {
-                    radial = radial.normalized * (VillageRadius + 2.6f);
+                    radial = radial / DistanceVillage(radial) * (VillageRadius + 2.6f);
                     x = radial.x;
                     z = radial.y;
                 }
@@ -8627,7 +8594,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Vector2 p = RoutePoints[i];
             Vector2 suivant = RoutePoints[i + 1];
             parcouru += Vector2.Distance(p, suivant);
-            if (p.magnitude > VillageRadius - 2f) continue; // hors du village
+            if (DistanceVillage(p) > VillageRadius - 2f) continue; // hors du village
             if (parcouru < prochain) continue;
             // 13 m dans la reference ; 9 m ici car notre trace de route a peu
             // de sommets : cela donne 3 lampadaires bien repartis dans le
@@ -9257,14 +9224,15 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             float x = UnityEngine.Random.Range(-portee, portee);
             float z = UnityEngine.Random.Range(-portee, portee);
-            if (new Vector2(x, z).magnitude < VillageRadius + 2f) continue;
+            if (DistanceVillage(x, z) < VillageRadius + 2f) continue;
             if (DistRoute(new Vector2(x, z)) < margeRoute) continue;
             if (EstDansEau(new Vector2(x, z))) continue;
             return new Vector3(x, 0f, z);
         }
         // Repli : juste a l'exterieur de l'enceinte, jamais devant un portail.
-        float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-        return new Vector3(Mathf.Cos(angle) * (VillageRadius + 4f), 0f, Mathf.Sin(angle) * (VillageRadius + 4f));
+        Vector2 bord = PointEnceinte(UnityEngine.Random.value);
+        bord = bord / DistanceVillage(bord) * (VillageRadius + 4f);
+        return new Vector3(bord.x, 0f, bord.y);
     }
 
     private void CreatePickup(Vector3 position, bool coin)
@@ -9804,8 +9772,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (DansVillage(position.x, position.z))
                 {
                     Vector2 dehors = new Vector2(position.x, position.z);
-                    if (dehors.magnitude < 0.001f) dehors = new Vector2(1f, 0f);
-                    dehors = dehors.normalized * (VillageRadius + 0.5f);
+                    if (DistanceVillage(dehors) < 0.001f) dehors = new Vector2(1f, 0f);
+                    dehors = dehors / DistanceVillage(dehors) * (VillageRadius + 0.5f);
                     position.x = dehors.x; position.z = dehors.y;
                 }
 
@@ -11935,11 +11903,9 @@ public sealed class LibreViesGame : MonoBehaviour
         const int cerclePoints = 96;
         for (int i = 0; i < cerclePoints; i++)
         {
-            float a0 = i * Mathf.PI * 2f / cerclePoints;
-            float a1 = (i + 1) * Mathf.PI * 2f / cerclePoints;
             DessinerLigneMiniCarte(
-                new Vector2(Mathf.Cos(a0) * VillageRadius, Mathf.Sin(a0) * VillageRadius),
-                new Vector2(Mathf.Cos(a1) * VillageRadius, Mathf.Sin(a1) * VillageRadius),
+                PointEnceinte(i / (float)cerclePoints),
+                PointEnceinte((i + 1) / (float)cerclePoints),
                 centreMonde, rayonMonde, new Color(0.48f, 0.70f, 0.35f, 1f), 1);
         }
         for (int i = 0; i < batiments.Count; i++)
