@@ -112,6 +112,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
     private readonly Dictionary<Transform, Obstacle> collisionsObjetsEdition =
         new Dictionary<Transform, Obstacle>();
+    // Collisions supplementaires d'un objet (ex. bassin de la fontaine) : elles
+    // suivent l'objet comme la collision principale.
+    private readonly Dictionary<Transform, List<Obstacle>> collisionsSupplementairesEdition =
+        new Dictionary<Transform, List<Obstacle>>();
     // Rectangles des batiments : le decor (arbres, lampadaires, caisses...)
     // ne doit jamais etre pose dans un mur.
     private readonly List<Batiment> batiments = new List<Batiment>();
@@ -2119,6 +2123,7 @@ public sealed class LibreViesGame : MonoBehaviour
             elementCharge.Collision.X = objet.position.x;
             elementCharge.Collision.Z = objet.position.z;
         }
+        SynchroniserCollisionsSupplementaires(objet);
         if (debugMaison) JournalDebugMaison("apres", objet);
         if (element != null && element.Facade != null
             && coordonnee.TextePancarte != null)
@@ -3699,29 +3704,22 @@ public sealed class LibreViesGame : MonoBehaviour
         return DistanceVillage(x, z) < VillageRadius;
     }
 
-    // Enceinte carree : la distance est la plus grande des deux coordonnees.
+    // Enceinte ronde : distance au centre du village.
     private static float DistanceVillage(float x, float z)
     {
-        return Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
+        return new Vector2(x, z).magnitude;
     }
 
     private static float DistanceVillage(Vector2 p)
     {
-        return DistanceVillage(p.x, p.y);
+        return p.magnitude;
     }
 
-    // Point du contour carre : t de 0 a 1 fait un tour complet (coins a 1/4, 1/2, 3/4).
+    // Point du cercle d'enceinte : t de 0 a 1 fait un tour complet.
     private Vector2 PointEnceinte(float t)
     {
-        float R = VillageRadius;
-        Vector2[] coins =
-        {
-            new Vector2(R, -R), new Vector2(R, R), new Vector2(-R, R), new Vector2(-R, -R), new Vector2(R, -R)
-        };
-        float s = Mathf.Repeat(t, 1f) * 8f * R;
-        int cote = Mathf.Min(3, (int)(s / (2f * R)));
-        float u = (s - cote * 2f * R) / (2f * R);
-        return Vector2.Lerp(coins[cote], coins[cote + 1], u);
+        float a = Mathf.Repeat(t, 1f) * Mathf.PI * 2f;
+        return new Vector2(Mathf.Cos(a) * VillageRadius, Mathf.Sin(a) * VillageRadius);
     }
 
     private float DistRoute(Vector2 p)
@@ -6170,6 +6168,18 @@ public sealed class LibreViesGame : MonoBehaviour
             element.Collision.X = element.Root.position.x;
             element.Collision.Z = element.Root.position.z;
         }
+        SynchroniserCollisionsSupplementaires(element.Root);
+    }
+
+    private void SynchroniserCollisionsSupplementaires(Transform racine)
+    {
+        List<Obstacle> supplementaires;
+        if (racine == null || !collisionsSupplementairesEdition.TryGetValue(racine, out supplementaires)) return;
+        for (int i = 0; i < supplementaires.Count; i++)
+        {
+            supplementaires[i].X = racine.position.x;
+            supplementaires[i].Z = racine.position.z;
+        }
     }
 
     private void EcrireFichierHistoriqueEdition()
@@ -7059,9 +7069,12 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         // Vasque au sommet, pleine d'eau.
         Primitive(PrimitiveType.Cylinder, new Vector3(0, 2.2f, 0), new Vector3(0.56f, 0.03f, 0.56f), "Water", root, "Eau");
-        ColCercle(position.x, position.z, 1.7f, 0.36f);   // bassin
-        // Collision de la colonne : liee a la fontaine, elle suit son deplacement en edition.
-        collisionsObjetsEdition[root] = ColCercle(position.x, position.z, 0.32f, 2.2f);
+        // Collisions liees a la fontaine : elles suivent son deplacement en edition.
+        collisionsSupplementairesEdition[root] = new List<Obstacle>
+        {
+            ColCercle(position.x, position.z, 1.7f, 0.36f)   // bassin
+        };
+        collisionsObjetsEdition[root] = ColCercle(position.x, position.z, 0.32f, 2.2f);   // colonne
     }
 
     private void CreateWaterways()
