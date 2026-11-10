@@ -2112,6 +2112,13 @@ public sealed class LibreViesGame : MonoBehaviour
         objet.position = coordonnee.Position;
         objet.rotation = coordonnee.Rotation;
         objet.localScale = coordonnee.Echelle;
+        // La collision suit la position chargee (sinon elle reste a l'emplacement d'origine).
+        ElementEdition elementCharge = TrouverElementEdition(objet);
+        if (elementCharge != null && elementCharge.Collision != null)
+        {
+            elementCharge.Collision.X = objet.position.x;
+            elementCharge.Collision.Z = objet.position.z;
+        }
         if (debugMaison) JournalDebugMaison("apres", objet);
         if (element != null && element.Facade != null
             && coordonnee.TextePancarte != null)
