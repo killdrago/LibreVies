@@ -7325,10 +7325,19 @@ public sealed class LibreViesGame : MonoBehaviour
         get { return 2f * VillageRadius * Mathf.Sin(Mathf.PI / 96f); }
     }
 
-    // Clôture de la route : troncon dont les poteaux sont nommes Poteau_Cloture.
+    // Clôture de la route : troncons notes dans tronconsRouteEdition (poteaux plus bas).
+    private readonly HashSet<Transform> tronconsRouteEdition = new HashSet<Transform>();
+
     private bool EstTronconRoute(Transform troncon)
     {
-        return troncon.childCount > 0 && troncon.GetChild(0).name == "Poteau_Cloture";
+        return troncon != null && tronconsRouteEdition.Contains(troncon);
+    }
+
+    private Transform EnfantNomme(Transform parent, string nom)
+    {
+        for (int i = 0; i < parent.childCount; i++)
+            if (parent.GetChild(i).name == nom) return parent.GetChild(i);
+        return null;
     }
 
     private float DemiTronconCloture(Transform troncon)
@@ -7340,7 +7349,10 @@ public sealed class LibreViesGame : MonoBehaviour
     // pieds et la traverse suit la pente. La rotation reste horizontale.
     private void AjusterTronconCloture(Transform troncon)
     {
-        if (troncon == null || troncon.childCount < 3) return;
+        Transform poteauA = troncon == null ? null : EnfantNomme(troncon, "Poteau_A");
+        Transform traverse = troncon == null ? null : EnfantNomme(troncon, "Traverse_Cloture");
+        if (poteauA == null || traverse == null) return;
+        Transform poteauB = EnfantNomme(troncon, "Poteau_B");
         bool route = EstTronconRoute(troncon);
         float demi = DemiTronconCloture(troncon);
         float hauteurPoteau = route ? 0.45f : 0.65f;
@@ -7355,11 +7367,8 @@ public sealed class LibreViesGame : MonoBehaviour
         float yb = TerrainHeight(b.x, b.z);
         float ym = TerrainHeight(centre.x, centre.z);
         troncon.position = new Vector3(centre.x, ym, centre.z);
-        Transform poteauA = troncon.GetChild(0);
-        Transform poteauB = troncon.GetChild(1);
-        Transform traverse = troncon.GetChild(2);
         poteauA.localPosition = new Vector3(0f, ya - ym + hauteurPoteau, -demi);
-        poteauB.localPosition = new Vector3(0f, yb - ym + hauteurPoteau, demi);
+        if (poteauB != null) poteauB.localPosition = new Vector3(0f, yb - ym + hauteurPoteau, demi);
         traverse.localPosition = new Vector3(0f, (ya + yb) * 0.5f - ym + hauteurTraverse, 0f);
         Vector3 pente = new Vector3(0f, yb - ya, 2f * demi);
         traverse.localRotation = Quaternion.LookRotation(pente);
@@ -7479,24 +7488,35 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        // 2) Un troncon = deux poteaux + une traverse, entre deux poteaux
-        //    consecutifs, portails exclus. Chaque troncon est un objet autonome
-        //    (deplacable seul, ou avec toute sa portion) et se pose sur le terrain.
+        // 2) Un troncon = un poteau de depart (A) + une traverse jusqu'au poteau
+        //    suivant. Le poteau d'arrivee (B) n'existe que si le troncon suivant
+        //    n'existe pas (portail ou fin de chaine) : jamais deux poteaux au meme endroit.
+        var construit = new bool[posts];
         for (int i = 0; i < posts; i++)
         {
             Vector2 a = PointEnceinte(i / (float)posts);
             Vector2 b = PointEnceinte((i + 1) / (float)posts);
-            if (DistRoute(a) < DemiOuverturePortail || DistRoute(b) < DemiOuverturePortail) continue;
+            construit[i] = !(DistRoute(a) < DemiOuverturePortail || DistRoute(b) < DemiOuverturePortail);
+        }
+        int nbTroncons = 0;
+        for (int i = 0; i < posts; i++)
+        {
+            if (!construit[i]) continue;
+            Vector2 a = PointEnceinte(i / (float)posts);
+            Vector2 b = PointEnceinte((i + 1) / (float)posts);
             Vector2 milieu = (a + b) * 0.5f;
             Vector2 tangente = (b - a).normalized;
             var troncon = new GameObject("Troncon_Cloture").transform;
             troncon.position = new Vector3(milieu.x, 0f, milieu.y);
             troncon.rotation = Quaternion.LookRotation(new Vector3(tangente.x, 0f, tangente.y));
-            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Cloture");
-            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Cloture");
-            Box(Vector3.zero, new Vector3(0.12f, 0.14f, LongueurTronconCloture), "Wood", troncon, "Traverse");
+            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Poteau_A");
+            if (!construit[(i + 1) % posts])
+                Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Poteau_B");
+            Box(Vector3.zero, new Vector3(0.12f, 0.14f, LongueurTronconCloture), "Wood", troncon, "Traverse_Cloture");
             AjusterTronconCloture(troncon);
+            nbTroncons++;
         }
+        Debug.Log("LibreVies : cloture du village : " + nbTroncons + " troncon(s).");
 
         // 3) Les portails : grands poteaux, linteau et panneau LIBREVIES.
         for (int g = 0; g < intervalles.Count; g++)
@@ -8847,29 +8867,42 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateRoadFence()
     {
-        // Petite cloture de bois le long de la route dans le village : un troncon
-        // par paire de poteaux voisins (indices -1, 0 et 1 sautes, comme la reference).
-        // Chaque troncon est deplacable et garde sa collision.
+        // Petite cloture de bois le long de la route : un troncon par paire de
+        // poteaux consecutifs libres (indices -1, 0 et 1 sautes, comme la reference).
+        // Meme regle que la cloture ronde : poteau de depart, poteau d'arrivee
+        // seulement en fin de chaine. Chaque troncon garde sa collision.
         const float z = 4.6f;
+        var construit = new bool[12];           // troncons i = -6 .. 5
         for (int i = -6; i < 6; i++)
         {
-            if (Mathf.Abs(i) < 2 || Mathf.Abs(i + 1) < 2) continue;
             float x0 = i * 2.4f;
             float x1 = (i + 1) * 2.4f;
-            if (!EmplacementLibre(x0, z, 0.2f) || !EmplacementLibre(x1, z, 0.2f)) continue;
+            construit[i + 6] = Mathf.Abs(i) >= 2 && Mathf.Abs(i + 1) >= 2
+                && EmplacementLibre(x0, z, 0.2f) && EmplacementLibre(x1, z, 0.2f);
+        }
+        int nbTroncons = 0;
+        for (int k = 0; k < construit.Length; k++)
+        {
+            if (!construit[k]) continue;
+            float x0 = (k - 6) * 2.4f;
+            float x1 = (k - 5) * 2.4f;
             float milieu = (x0 + x1) * 0.5f;
             var troncon = new GameObject("Troncon_Cloture").transform;
+            tronconsRouteEdition.Add(troncon);
             troncon.position = new Vector3(milieu, 0f, z);
             troncon.rotation = Quaternion.LookRotation(Vector3.right);
-            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_Cloture");
-            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_Cloture");
+            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_A");
+            if (k + 1 >= construit.Length || !construit[k + 1])
+                Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_B");
             Box(Vector3.zero, new Vector3(0.07f, 0.09f, 2.4f), "Bois_Clair", troncon, "Traverse_Cloture");
             collisionsSupplementairesEdition[troncon] = new List<Obstacle>
             {
                 ColBoite(milieu, z, 2.4f, 0.25f, 0.85f)
             };
             AjusterTronconCloture(troncon);
+            nbTroncons++;
         }
+        Debug.Log("LibreVies : cloture de la route : " + nbTroncons + " troncon(s).");
     }
 
     private void CreateBanner(float x, float z, string tissu)
