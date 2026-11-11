@@ -1709,6 +1709,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (objet == null || objet == transform || objet == player) return false;
         string nom = objet.name ?? "";
+        if (nom == "Troncon_Cloture") return objet.parent == null;
         if (nom == "Porte" || nom == "Fenetre" || nom == "Affiche_Maison") return true;
         if (nom == "Sapin" || nom == "Fontaine" || nom == "Panneau"
             || nom == "Lampadaire" || nom == "Banniere" || nom == "Baril"
@@ -2154,6 +2155,7 @@ public sealed class LibreViesGame : MonoBehaviour
             elementCharge.Collision.Z = objet.position.z;
         }
         SynchroniserCollisionsSupplementaires(objet);
+        if (objet.name == "Troncon_Cloture") AjusterTronconCloture(objet);
         if (debugMaison) JournalDebugMaison("apres", objet);
         if (element != null && element.Facade != null
             && coordonnee.TextePancarte != null)
@@ -6203,6 +6205,7 @@ public sealed class LibreViesGame : MonoBehaviour
             element.Collision.Z = element.Root.position.z;
         }
         SynchroniserCollisionsSupplementaires(element.Root);
+        if (element.Type == "Troncon_Cloture") AjusterTronconCloture(element.Root);
     }
 
     private void SynchroniserCollisionsSupplementaires(Transform racine)
@@ -6331,6 +6334,12 @@ public sealed class LibreViesGame : MonoBehaviour
             SynchroniserElementEdition(element);
     }
 
+    // Portion de cloture en cours de deplacement (Maj+clic) et positions de depart.
+    private List<ElementEdition> groupeTronconsEdition = new List<ElementEdition>();
+    private List<Vector3> groupeTronconsPositions = new List<Vector3>();
+    private List<Quaternion> groupeTronconsRotations = new List<Quaternion>();
+    private Vector3 groupeTronconsAncre;
+
     private void CommencerDeplacementMaisonEdition()
     {
         ElementEdition cible;
@@ -6354,6 +6363,19 @@ public sealed class LibreViesGame : MonoBehaviour
         elementEditionSelectionne = cible;
         elementEditionDernierSelectionne = cible;
         CapturerEtatAvantEdition(cible);
+        if (cible.Type == "Troncon_Cloture")
+        {
+            bool maj = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            groupeTronconsEdition = maj ? PortionTronconsCloture(cible) : new List<ElementEdition> { cible };
+            groupeTronconsPositions.Clear();
+            groupeTronconsRotations.Clear();
+            for (int i = 0; i < groupeTronconsEdition.Count; i++)
+            {
+                groupeTronconsPositions.Add(groupeTronconsEdition[i].Root.position);
+                groupeTronconsRotations.Add(groupeTronconsEdition[i].Root.rotation);
+            }
+            groupeTronconsAncre = cible.Root.position;
+        }
         float sol = SolElementEdition(cible);
         cible.Souleve = true;
         if (cible.Maison != null) cible.Maison.EditionSoulevee = true;
@@ -6472,6 +6494,17 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         SynchroniserElementEdition(element);
         ActualiserMarqueurDeplacement(element);
+        if (element.Type == "Troncon_Cloture" && groupeTronconsEdition.Count > 1)
+        {
+            Vector3 delta = element.Root.position - groupeTronconsAncre;
+            for (int i = 0; i < groupeTronconsEdition.Count; i++)
+            {
+                Transform racine = groupeTronconsEdition[i].Root;
+                if (racine == element.Root) continue;
+                racine.position = groupeTronconsPositions[i] + new Vector3(delta.x, 0f, delta.z);
+                AjusterTronconCloture(racine);
+            }
+        }
     }
 
     private void AnnulerDeplacementEdition()
@@ -6481,6 +6514,14 @@ public sealed class LibreViesGame : MonoBehaviour
         element.Root.position = element.PositionAvant;
         element.Root.rotation = element.RotationAvant;
         element.Root.localScale = element.EchelleAvant;
+        for (int i = 0; i < groupeTronconsEdition.Count; i++)
+        {
+            if (groupeTronconsEdition[i].Root == element.Root) continue;
+            groupeTronconsEdition[i].Root.position = groupeTronconsPositions[i];
+            groupeTronconsEdition[i].Root.rotation = groupeTronconsRotations[i];
+            AjusterTronconCloture(groupeTronconsEdition[i].Root);
+        }
+        groupeTronconsEdition = new List<ElementEdition>();
         if (element.MaisonParent != null)
         {
             element.HauteurLocale = element.Root.localPosition.y;
@@ -6512,6 +6553,9 @@ public sealed class LibreViesGame : MonoBehaviour
         ElementEdition element = elementEditionSelectionne;
         CacherMarqueurDeplacement();
         PoserElementEdition(element);
+        for (int i = 0; i < groupeTronconsEdition.Count; i++)
+            AjusterTronconCloture(groupeTronconsEdition[i].Root);
+        groupeTronconsEdition = new List<ElementEdition>();
         AjouterHistoriqueEdition(element);
         editionRedimensionnement = false;
         editionMaisonEnDeplacement = false;
@@ -6634,6 +6678,9 @@ public sealed class LibreViesGame : MonoBehaviour
             && new Rect(18f, Screen.height - 405f, 470f, 385f).Contains(souris))
             return true;
         if (SourisSurPanneauMaison()) return true;
+        ElementEdition selection = elementEditionSelectionne ?? elementEditionDernierSelectionne;
+        if (modeEdition && selection != null && selection.Type == "Troncon_Cloture"
+            && new Rect(Screen.width - 300f, 110f, 280f, 110f).Contains(souris)) return true;
         for (int i = 0; i < flechesEdition.Count; i++)
             if (flechesEdition[i].Contains(souris)) return true;
         if (texturesOpen && fenetreTextures.Contains(souris)) return true;
@@ -7221,6 +7268,116 @@ public sealed class LibreViesGame : MonoBehaviour
         return ruban.VersMesh(nom);
     }
 
+    // Longueur d'un troncon : la corde entre deux poteaux voisins de l'enceinte.
+    private float LongueurTronconCloture
+    {
+        get { return 2f * VillageRadius * Mathf.Sin(Mathf.PI / 96f); }
+    }
+
+    // Pose un troncon sur le terrain : ses deux poteaux touchent le sol a leurs
+    // pieds et la traverse suit la pente. La rotation reste horizontale.
+    private void AjusterTronconCloture(Transform troncon)
+    {
+        if (troncon == null || troncon.childCount < 3) return;
+        float demi = LongueurTronconCloture * 0.5f;
+        Vector3 avant = troncon.forward;
+        avant.y = 0f;
+        avant.Normalize();
+        Vector3 centre = troncon.position;
+        Vector3 a = centre - avant * demi;
+        Vector3 b = centre + avant * demi;
+        float ya = TerrainHeight(a.x, a.z);
+        float yb = TerrainHeight(b.x, b.z);
+        float ym = TerrainHeight(centre.x, centre.z);
+        troncon.position = new Vector3(centre.x, ym, centre.z);
+        Transform poteauA = troncon.GetChild(0);
+        Transform poteauB = troncon.GetChild(1);
+        Transform traverse = troncon.GetChild(2);
+        poteauA.localPosition = new Vector3(0f, ya - ym + 0.65f, -demi);
+        poteauB.localPosition = new Vector3(0f, yb - ym + 0.65f, demi);
+        traverse.localPosition = new Vector3(0f, (ya + yb) * 0.5f - ym + 0.85f, 0f);
+        Vector3 pente = new Vector3(0f, yb - ya, 2f * demi);
+        traverse.localRotation = Quaternion.LookRotation(pente);
+        traverse.localScale = new Vector3(0.12f, 0.14f, pente.magnitude);
+    }
+
+    // Troncons relies bout a bout (extremites communes) : la portion entiere.
+    private List<ElementEdition> PortionTronconsCloture(ElementEdition depart)
+    {
+        var portion = new List<ElementEdition> { depart };
+        var restants = new List<ElementEdition>();
+        for (int i = 0; i < objetsEdition.Count; i++)
+            if (objetsEdition[i] != depart && objetsEdition[i].Type == "Troncon_Cloture")
+                restants.Add(objetsEdition[i]);
+        for (int k = 0; k < portion.Count; k++)
+        {
+            Vector2[] bouts = ExtremitesTroncon(portion[k].Root);
+            for (int i = restants.Count - 1; i >= 0; i--)
+            {
+                Vector2[] autre = ExtremitesTroncon(restants[i].Root);
+                bool relie = false;
+                for (int u = 0; u < 2 && !relie; u++)
+                    for (int v = 0; v < 2 && !relie; v++)
+                        if (Vector2.Distance(bouts[u], autre[v]) < 0.3f) relie = true;
+                if (!relie) continue;
+                portion.Add(restants[i]);
+                restants.RemoveAt(i);
+            }
+        }
+        return portion;
+    }
+
+    private Vector2[] ExtremitesTroncon(Transform troncon)
+    {
+        float demi = LongueurTronconCloture * 0.5f;
+        Vector3 avant = troncon.forward;
+        avant.y = 0f;
+        avant.Normalize();
+        Vector3 c = troncon.position;
+        return new[]
+        {
+            new Vector2(c.x - avant.x * demi, c.z - avant.z * demi),
+            new Vector2(c.x + avant.x * demi, c.z + avant.z * demi)
+        };
+    }
+
+    // Tourne un troncon, ou toute sa portion, autour de son centre (horizontal).
+    private void PivoterTronconsCloture(bool portion, float degres)
+    {
+        ElementEdition element = elementEditionSelectionne ?? elementEditionDernierSelectionne;
+        if (element == null || element.Type != "Troncon_Cloture") return;
+        List<ElementEdition> membres = portion ? PortionTronconsCloture(element)
+            : new List<ElementEdition> { element };
+        Quaternion rotation = Quaternion.AngleAxis(degres, Vector3.up);
+        Vector3 pivot = Vector3.zero;
+        for (int i = 0; i < membres.Count; i++) pivot += membres[i].Root.position;
+        pivot /= membres.Count;
+        for (int i = 0; i < membres.Count; i++)
+        {
+            Transform racine = membres[i].Root;
+            Vector3 decalage = racine.position - pivot;
+            Vector3 tourne = rotation * decalage;
+            racine.position = new Vector3(pivot.x + tourne.x, racine.position.y, pivot.z + tourne.z);
+            racine.rotation = rotation * racine.rotation;
+            AjusterTronconCloture(racine);
+        }
+        ShowInfo(membres.Count > 1 ? "Portion de cloture pivotee" : "Troncon pivote");
+        if (mondePret) EnregistrerCoordonneesEdition();
+    }
+
+    private void DessinerBoutonsTronconCloture()
+    {
+        ElementEdition element = elementEditionSelectionne ?? elementEditionDernierSelectionne;
+        if (!modeEdition || element == null || element.Type != "Troncon_Cloture") return;
+        Rect cadre = new Rect(Screen.width - 300f, 110f, 280f, 110f);
+        GUI.Box(cadre, "", boxStyle);
+        GUI.Label(new Rect(cadre.x + 12f, cadre.y + 8f, 256f, 22f), "CLOTURE : pivoter (horizontal)", smallStyle);
+        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 36f, 124f, 30f), "TRONCON -15", buttonStyle)) PivoterTronconsCloture(false, -15f);
+        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 36f, 124f, 30f), "TRONCON +15", buttonStyle)) PivoterTronconsCloture(false, 15f);
+        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 72f, 124f, 30f), "PORTION -15", buttonStyle)) PivoterTronconsCloture(true, -15f);
+        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 72f, 124f, 30f), "PORTION +15", buttonStyle)) PivoterTronconsCloture(true, 15f);
+    }
+
     private void CreateFence()
     {
         const int posts = 96;                 // 96 poteaux, comme la reference
@@ -7250,27 +7407,23 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
 
-        // 2) Poteaux + traverses sur toute la longueur, portails exclus.
+        // 2) Un troncon = deux poteaux + une traverse, entre deux poteaux
+        //    consecutifs, portails exclus. Chaque troncon est un objet autonome
+        //    (deplacable seul, ou avec toute sa portion) et se pose sur le terrain.
         for (int i = 0; i < posts; i++)
         {
-            Vector2 pointPoteau = PointEnceinte(i / (float)posts);
-            float x = pointPoteau.x;
-            float z = pointPoteau.y;
-            if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
-            float y = TerrainHeight(x, z);
-            Primitive(PrimitiveType.Cylinder, new Vector3(x, y + 0.65f, z), new Vector3(0.14f, 0.65f, 0.14f), "Wood", null, "Cloture");
-        }
-        for (int i = 0; i < posts; i++)
-        {
-            float tRail = (i + 0.5f) / posts;
-            Vector2 pointRail = PointEnceinte(tRail);
-            float x = pointRail.x;
-            float z = pointRail.y;
-            if (DistRoute(new Vector2(x, z)) < DemiOuverturePortail) continue;
-            float y = TerrainHeight(x, z) + 0.85f;
-            var rail = Box(new Vector3(x, y, z), new Vector3(0.12f, 0.14f, 2.8f), "Wood", null, "Traverse");
-            Vector2 tangenteRail = (PointEnceinte(tRail + 0.001f) - PointEnceinte(tRail - 0.001f)).normalized;
-            rail.transform.rotation = Quaternion.LookRotation(new Vector3(tangenteRail.x, 0f, tangenteRail.y));
+            Vector2 a = PointEnceinte(i / (float)posts);
+            Vector2 b = PointEnceinte((i + 1) / (float)posts);
+            if (DistRoute(a) < DemiOuverturePortail || DistRoute(b) < DemiOuverturePortail) continue;
+            Vector2 milieu = (a + b) * 0.5f;
+            Vector2 tangente = (b - a).normalized;
+            var troncon = new GameObject("Troncon_Cloture").transform;
+            troncon.position = new Vector3(milieu.x, 0f, milieu.y);
+            troncon.rotation = Quaternion.LookRotation(new Vector3(tangente.x, 0f, tangente.y));
+            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Cloture");
+            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Cloture");
+            Box(Vector3.zero, new Vector3(0.12f, 0.14f, LongueurTronconCloture), "Wood", troncon, "Traverse");
+            AjusterTronconCloture(troncon);
         }
 
         // 3) Les portails : grands poteaux, linteau et panneau LIBREVIES.
@@ -11733,6 +11886,7 @@ public sealed class LibreViesGame : MonoBehaviour
             GUI.color = Color.white;
         }
         DessinerEditionMaison();
+        DessinerBoutonsTronconCloture();
         DessinerFlechesEdition();
         DessinerEditionPancarte();
         if (!CompteAdministrateur) adminOpen = false;
