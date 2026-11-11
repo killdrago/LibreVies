@@ -2140,6 +2140,10 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         Transform objet = TrouverRacineCoordonnee(coordonnee.Nom, coordonnee.Chemin, coordonnee.Position, utilisees);
         if (objet == null) return;
+        // Les troncons de cloture sont poses par le code (rond et route) : on ne reprend
+        // pas les positions sauvegardees, qui pourraient etre celles d'un autre troncon
+        // (numerotation changee) et superposer ou faire disparaitre des poteaux.
+        if (objet.name == "Troncon_Cloture") return;
         ElementEdition element = TrouverElementEdition(objet);
         bool debugMaison = element != null && element.Maison != null;
         if (debugMaison)
