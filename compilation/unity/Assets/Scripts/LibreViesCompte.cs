@@ -307,6 +307,16 @@ public sealed class LibreViesCompte
         });
     }
 
+    public IEnumerator SauvegarderCaracteristiques(int id, string experience, string chasse, string territoire)
+    {
+        if (!EstAdministrateur) { Erreur = "Modification reservee aux administrateurs."; yield break; }
+        yield return Envoyer("save_player_stats", null, null, new Dictionary<string, string>
+        {
+            { "player_id", id.ToString(CultureInfo.InvariantCulture) },
+            { "experience", experience }, { "chasse", chasse }, { "territoire", territoire }
+        });
+    }
+
     public System.Collections.IEnumerator SauvegarderPosition(LibreViesPosition position)
     {
         // Erreur distincte : les autosaves ne doivent pas effacer le retour du panel ADMIN.
@@ -408,7 +418,8 @@ public sealed class LibreViesCompte
                 PilotesAcceptes = reponse.pilotes ?? new string[0];
             if (action == "ajouter_element_monde") DernierIdMonde = reponse.id;
             if (action == "presence") JoueursPresents = reponse.joueurs ?? new LibreViesJoueurPresent[0];
-            if (action == "search_players" || action == "get_player" || action == "save_player_ban")
+            if (action == "search_players" || action == "get_player" || action == "save_player_ban"
+                || action == "save_player_stats")
             {
                 if (Joueur == null || reponse.membre.id != Joueur.id)
                 {

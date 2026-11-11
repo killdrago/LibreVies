@@ -166,6 +166,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private LibreViesJoueurAdmin adminJoueurSelectionne;
     private bool adminJoueurRequeteEnCours;
     private bool adminJoueurBani;
+    private string adminStatExperience = "";
+    private string adminStatChasse = "";
+    private string adminStatTerritoire = "";
+    private bool adminStatsRemplies;
     private string adminMessageJoueur = "Recherchez un pseudo puis cliquez sur le joueur.";
     private Vector2 adminRechercheScroll;
     private Vector2 adminCaracteristiquesScroll;
@@ -10976,6 +10980,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!String.IsNullOrEmpty(compteJoueur.Erreur))
         { adminMessageJoueur = compteJoueur.Erreur; yield break; }
         adminJoueurSelectionne = compteJoueur.JoueurAdministratif;
+        RemplirStatsAdministration();
         adminJoueurBani = adminJoueurSelectionne != null && adminJoueurSelectionne.membre.bani == "oui";
         adminCaracteristiquesScroll = Vector2.zero;
         adminMessageJoueur = "Cochez/decochez Bannir, puis VALIDER pour enregistrer en BDD.";
@@ -10998,6 +11003,39 @@ public sealed class LibreViesGame : MonoBehaviour
         adminMessageJoueur = "BDD confirmee : " + adminJoueurSelectionne.membre.pseudo
             + " / bani = " + adminJoueurSelectionne.membre.bani;
         if (!CompteAdministrateur) { adminOpen = false; ShowInfo("Votre compte est bani. Reconnectez-vous depuis le launcher."); }
+    }
+
+    private void RemplirStatsAdministration()
+    {
+        LibreViesJoueurAdmin.Classement scores = adminJoueurSelectionne == null
+            ? null : adminJoueurSelectionne.classement;
+        adminStatExperience = scores == null ? "0" : scores.experience;
+        adminStatChasse = scores == null ? "0" : scores.chasse;
+        adminStatTerritoire = scores == null ? "0" : scores.territoire;
+    }
+
+    private System.Collections.IEnumerator EnregistrerCaracteristiquesJoueur()
+    {
+        if (!CompteAdministrateur || adminJoueurRequeteEnCours || adminJoueurSelectionne == null) yield break;
+        string e = (adminStatExperience ?? "").Trim();
+        string c = (adminStatChasse ?? "").Trim();
+        string t = (adminStatTerritoire ?? "").Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(e + c + t, "^[0-9]+$")
+            || e.Length > 18 || c.Length > 18 || t.Length > 18 || e.Length == 0 || c.Length == 0 || t.Length == 0)
+        {
+            adminMessageJoueur = "Experience, chasse et territoire : entiers positifs (18 chiffres maximum).";
+            yield break;
+        }
+        int id = adminJoueurSelectionne.membre.id;
+        adminJoueurRequeteEnCours = true;
+        adminMessageJoueur = "Enregistrement des caracteristiques...";
+        yield return compteJoueur.SauvegarderCaracteristiques(id, e, c, t);
+        adminJoueurRequeteEnCours = false;
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { adminMessageJoueur = compteJoueur.Erreur; yield break; }
+        adminJoueurSelectionne = compteJoueur.JoueurAdministratif;
+        RemplirStatsAdministration();
+        adminMessageJoueur = "BDD confirmee : caracteristiques de " + adminJoueurSelectionne.membre.pseudo + " enregistrees.";
     }
 
     private string CaracteristiquesJoueurAdministration()
@@ -11064,14 +11102,20 @@ public sealed class LibreViesGame : MonoBehaviour
         bool ancienEnabled = GUI.enabled;
         GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours;
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 50f, 140f, 24f), "Pseudo :", smallStyle);
+        // Entree : detectee AVANT le champ, car le champ de texte consomme la touche.
+        bool entreePseudo = Event.current.type == EventType.KeyDown
+            && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
+            && GUI.GetNameOfFocusedControl() == "Admin_RecherchePseudo" && GUI.enabled;
         GUI.SetNextControlName("Admin_RecherchePseudo");
         adminPseudoRecherche = GUI.TextField(new Rect(contenu.x + 116f, contenu.y + 48f, contenu.width - 350f, 32f),
             adminPseudoRecherche, 50);
         bool demanderRecherche = GUI.Button(new Rect(contenu.x + contenu.width - 218f, contenu.y + 48f, 200f, 32f),
             "RECHERCHER", buttonStyle);
-        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return
-            && GUI.GetNameOfFocusedControl() == "Admin_RecherchePseudo" && GUI.enabled)
-        { demanderRecherche = true; Event.current.Use(); }
+        if (entreePseudo)
+        {
+            demanderRecherche = true;
+            Event.current.Use();
+        }
         if (demanderRecherche) StartCoroutine(RechercherJoueursAdministration());
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 91f, 700f, 22f), "Resultats (cliquez sur un pseudo) :", smallStyle);
         Rect liste = new Rect(contenu.x + 18f, contenu.y + 118f, contenu.width - 36f, 132f);
@@ -11088,7 +11132,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.EndScrollView();
         GUI.enabled = ancienEnabled;
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 265f, 700f, 25f), "CARACTERISTIQUES DU JOUEUR", titleStyle);
-        Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 407f);
+        Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 477f);
         GUI.Box(details, "", boxStyle);
         string rapport = CaracteristiquesJoueurAdministration();
         GUIStyle style = new GUIStyle(smallStyle) { wordWrap = true, richText = false,
@@ -11101,6 +11145,15 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(8f, 8f, largeurTexte, hauteurTexte + 4f), rapport, style);
         GUI.EndScrollView();
         GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours && adminJoueurSelectionne != null;
+        float yStats = contenu.y + contenu.height - 166f;
+        GUI.Label(new Rect(contenu.x + 18f, yStats, 140f, 22f), "Experience", smallStyle);
+        GUI.Label(new Rect(contenu.x + 168f, yStats, 140f, 22f), "Chasse", smallStyle);
+        GUI.Label(new Rect(contenu.x + 318f, yStats, 140f, 22f), "Territoire", smallStyle);
+        adminStatExperience = GUI.TextField(new Rect(contenu.x + 18f, yStats + 22f, 140f, 28f), adminStatExperience ?? "", 18);
+        adminStatChasse = GUI.TextField(new Rect(contenu.x + 168f, yStats + 22f, 140f, 28f), adminStatChasse ?? "", 18);
+        adminStatTerritoire = GUI.TextField(new Rect(contenu.x + 318f, yStats + 22f, 140f, 28f), adminStatTerritoire ?? "", 18);
+        if (GUI.Button(new Rect(contenu.x + 470f, yStats + 22f, 220f, 28f), "ENREGISTRER STATS", buttonStyle))
+            StartCoroutine(EnregistrerCaracteristiquesJoueur());
         adminJoueurBani = GUI.Toggle(new Rect(contenu.x + 18f, contenu.y + contenu.height - 86f, 520f, 30f),
             adminJoueurBani, "Bannir ce joueur (coche = oui ; decoche = non)");
         if (GUI.Button(new Rect(contenu.x + contenu.width - 218f, contenu.y + contenu.height - 88f, 200f, 32f),

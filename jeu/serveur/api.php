@@ -492,7 +492,8 @@ if ($action === 'register') {
     ));
 }
 
-if ($action === 'search_players' || $action === 'get_player' || $action === 'save_player_ban') {
+if ($action === 'search_players' || $action === 'get_player' || $action === 'save_player_ban'
+    || $action === 'save_player_stats') {
     $admin = membre_authentifie($pdo, $config, $donnees);
     verifier_administrateur($admin); // Relu en BDD a chaque requete, exactement droit=1.
     try {
@@ -534,8 +535,34 @@ if ($action === 'search_players' || $action === 'get_player' || $action === 'sav
             $query = $pdo->prepare('UPDATE membre SET bani = :bani WHERE id = :id');
             $query->execute(array(':bani' => $bani, ':id' => $id));
         }
+        if ($action === 'save_player_stats') {
+            // Experience, chasse, territoire : entiers positifs, ecrits dans classement seulement.
+            $valeurs = array();
+            foreach (array('experience', 'chasse', 'territoire') as $champ) {
+                $brut = isset($donnees[$champ]) ? $donnees[$champ] : '';
+                if (is_int($brut)) $brut = (string)$brut;
+                if (!is_string($brut) || !preg_match('/^[0-9]{1,18}$/D', $brut)) {
+                    repondre(false, 'Valeur invalide pour ' . $champ . ' : entier positif attendu.', array(), 400);
+                }
+                $valeurs[$champ] = $brut;
+            }
+            $pdo->beginTransaction();
+            $query = $pdo->prepare('SELECT id FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
+            $query->execute(array(':id' => $id));
+            if (!$query->fetchColumn()) {
+                $pdo->rollBack();
+                repondre(false, 'Joueur introuvable.', array(), 404);
+            }
+            $query = $pdo->prepare('INSERT INTO classement (id, experience, chasse, territoire) '
+                . 'VALUES (:id, :experience, :chasse, :territoire) '
+                . 'ON DUPLICATE KEY UPDATE experience = VALUES(experience), chasse = VALUES(chasse), '
+                . 'territoire = VALUES(territoire)');
+            $query->execute(array(':id' => $id, ':experience' => $valeurs['experience'],
+                ':chasse' => $valeurs['chasse'], ':territoire' => $valeurs['territoire']));
+        }
         $joueur = lire_joueur_administration($pdo, $id);
         if (!$joueur) repondre(false, 'Joueur introuvable.', array(), 404);
+        if ($action === 'save_player_stats') $pdo->commit();
         if ($action === 'save_player_ban') {
             // Si un admin se bannit lui-meme, le client recoit aussitot le vrai statut.
             if ((int)$admin['id'] === $id) $admin['bani'] = $bani;
