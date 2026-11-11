@@ -6101,10 +6101,46 @@ public sealed class LibreViesGame : MonoBehaviour
         return MaisonSousRayonSouris(true);
     }
 
+    // Troncon de cloture sous le curseur : on mesure la distance entre le curseur
+    // et le segment projete (poteau a poteau), plus fiable qu'une boite englobante.
+    private bool TronconSousSourisCloture(out ElementEdition cible)
+    {
+        cible = null;
+        Vector2 souris = Input.mousePosition;
+        float meilleureProfondeur = float.MaxValue;
+        for (int i = 0; i < objetsEdition.Count; i++)
+        {
+            ElementEdition element = objetsEdition[i];
+            if (element.Type != "Troncon_Cloture" || element.Root == null) continue;
+            Vector2[] bouts = ExtremitesTroncon(element.Root);
+            Vector3 a = gameCamera.WorldToScreenPoint(new Vector3(bouts[0].x, element.Root.position.y, bouts[0].y));
+            Vector3 b = gameCamera.WorldToScreenPoint(new Vector3(bouts[1].x, element.Root.position.y, bouts[1].y));
+            if (a.z <= 0f || b.z <= 0f) continue;
+            float distance = DistanceSegmentEcran(souris, new Vector2(a.x, a.y), new Vector2(b.x, b.y));
+            if (distance > 14f) continue;
+            float profondeur = Mathf.Min(a.z, b.z);
+            if (profondeur < meilleureProfondeur)
+            {
+                meilleureProfondeur = profondeur;
+                cible = element;
+            }
+        }
+        return cible != null;
+    }
+
+    private static float DistanceSegmentEcran(Vector2 p, Vector2 a, Vector2 b)
+    {
+        Vector2 ab = b - a;
+        float longueur2 = ab.sqrMagnitude;
+        float t = longueur2 < 0.0001f ? 0f : Mathf.Clamp01(Vector2.Dot(p - a, ab) / longueur2);
+        return Vector2.Distance(p, a + ab * t);
+    }
+
     private bool TryTrouverElementEdition(out ElementEdition cible)
     {
         cible = null;
         if (gameCamera == null) return false;
+        if (editionOutilMaison == 0 && TronconSousSourisCloture(out cible)) return true;
         // Mode DEPLACER : tous les objets (maisons comprises) sont candidats ;
         // le plus proche de la camera gagne. Les autres boutons gardent leur ordre.
         bool deplacer = editionOutilMaison == 0;
@@ -6334,7 +6370,9 @@ public sealed class LibreViesGame : MonoBehaviour
             SynchroniserElementEdition(element);
     }
 
-    // Portion de cloture en cours de deplacement (Maj+clic) et positions de depart.
+    // Choix du panneau cloture : 0 = troncon seul, 1 = portion entiere.
+    private int modeTronconEdition;
+    // Portion de cloture en cours de deplacement et positions de depart.
     private List<ElementEdition> groupeTronconsEdition = new List<ElementEdition>();
     private List<Vector3> groupeTronconsPositions = new List<Vector3>();
     private List<Quaternion> groupeTronconsRotations = new List<Quaternion>();
@@ -6365,8 +6403,8 @@ public sealed class LibreViesGame : MonoBehaviour
         CapturerEtatAvantEdition(cible);
         if (cible.Type == "Troncon_Cloture")
         {
-            bool maj = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            groupeTronconsEdition = maj ? PortionTronconsCloture(cible) : new List<ElementEdition> { cible };
+            groupeTronconsEdition = modeTronconEdition == 1 ? PortionTronconsCloture(cible)
+                : new List<ElementEdition> { cible };
             groupeTronconsPositions.Clear();
             groupeTronconsRotations.Clear();
             for (int i = 0; i < groupeTronconsEdition.Count; i++)
@@ -7341,12 +7379,12 @@ public sealed class LibreViesGame : MonoBehaviour
         };
     }
 
-    // Tourne un troncon, ou toute sa portion, autour de son centre (horizontal).
-    private void PivoterTronconsCloture(bool portion, float degres)
+    // Tourne le troncon, ou toute sa portion selon le choix, autour du centre (horizontal).
+    private void PivoterTronconsCloture(float degres)
     {
         ElementEdition element = elementEditionSelectionne ?? elementEditionDernierSelectionne;
         if (element == null || element.Type != "Troncon_Cloture") return;
-        List<ElementEdition> membres = portion ? PortionTronconsCloture(element)
+        List<ElementEdition> membres = modeTronconEdition == 1 ? PortionTronconsCloture(element)
             : new List<ElementEdition> { element };
         Quaternion rotation = Quaternion.AngleAxis(degres, Vector3.up);
         Vector3 pivot = Vector3.zero;
@@ -7371,11 +7409,16 @@ public sealed class LibreViesGame : MonoBehaviour
         if (!modeEdition || element == null || element.Type != "Troncon_Cloture") return;
         Rect cadre = new Rect(Screen.width - 300f, 110f, 280f, 110f);
         GUI.Box(cadre, "", boxStyle);
-        GUI.Label(new Rect(cadre.x + 12f, cadre.y + 8f, 256f, 22f), "CLOTURE : pivoter (horizontal)", smallStyle);
-        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 36f, 124f, 30f), "TRONCON -15", buttonStyle)) PivoterTronconsCloture(false, -15f);
-        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 36f, 124f, 30f), "TRONCON +15", buttonStyle)) PivoterTronconsCloture(false, 15f);
-        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 72f, 124f, 30f), "PORTION -15", buttonStyle)) PivoterTronconsCloture(true, -15f);
-        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 72f, 124f, 30f), "PORTION +15", buttonStyle)) PivoterTronconsCloture(true, 15f);
+        GUI.Label(new Rect(cadre.x + 12f, cadre.y + 8f, 256f, 22f), "CLOTURE : que deplacer / pivoter ?", smallStyle);
+        Color ancienne = GUI.color;
+        GUI.color = modeTronconEdition == 0 ? new Color(1f, 0.85f, 0.15f) : Color.white;
+        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 36f, 124f, 30f), "TRONCON SEUL", buttonStyle)) modeTronconEdition = 0;
+        GUI.color = modeTronconEdition == 1 ? new Color(1f, 0.85f, 0.15f) : Color.white;
+        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 36f, 124f, 30f), "PORTION ENTIERE", buttonStyle)) modeTronconEdition = 1;
+        GUI.color = Color.white;
+        if (GUI.Button(new Rect(cadre.x + 12f, cadre.y + 76f, 124f, 30f), "GAUCHE", buttonStyle)) PivoterTronconsCloture(-15f);
+        if (GUI.Button(new Rect(cadre.x + 144f, cadre.y + 76f, 124f, 30f), "DROITE", buttonStyle)) PivoterTronconsCloture(15f);
+        GUI.color = ancienne;
     }
 
     private void CreateFence()
