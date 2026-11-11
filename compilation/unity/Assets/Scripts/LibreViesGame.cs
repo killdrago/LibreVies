@@ -6232,6 +6232,10 @@ public sealed class LibreViesGame : MonoBehaviour
         if (element == null) return 0f;
         if (element.Maison != null) return element.Maison.SolY;
         if (element.MaisonParent != null && element.Root != null) return element.Root.position.y;
+        // Objet posé directement sur le terrain : il se repose au sol de sa nouvelle place
+        // (une hauteur mémorisée pendant le levage ferait flotter PNJ, caisses, arbres...).
+        if (element.Root != null && element.Type != "Troncon_Cloture")
+            return TerrainHeight(element.Root.position.x, element.Root.position.z);
         return element.SolY;
     }
 
