@@ -23,9 +23,9 @@ public sealed class LibreViesCompte
     }
 
     [Serializable]
-    [Serializable]
     public sealed class LibreViesReglageMonstres
     {
+        public int id;
         public string lieu;
         public int nombre;
     }
@@ -38,7 +38,7 @@ public sealed class LibreViesCompte
         public Membre membre;
         public LibreViesPersonnage personnage;
         public LibreViesNpc[] npcs;
-        public LibreViesReglageMonstres monstres;
+        public LibreViesReglageMonstres reglage_monstres;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
         public LibreViesPosition position;
@@ -486,10 +486,10 @@ public sealed class LibreViesCompte
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
             if (action == "get_monstres" || action == "save_monstres")
             {
-                if (reponse.monstres == null || reponse.monstres.lieu != "village depart"
-                    || reponse.monstres.nombre < 0 || reponse.monstres.nombre > 120)
+                if (reponse.reglage_monstres == null || reponse.reglage_monstres.lieu != "village depart"
+                    || reponse.reglage_monstres.nombre < 0 || reponse.reglage_monstres.nombre > 120)
                 { Erreur = "Reponse monstres invalide."; yield break; }
-                NombreMonstres = reponse.monstres.nombre;
+                NombreMonstres = reponse.reglage_monstres.nombre;
                 yield break;
             }
             if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
