@@ -1734,7 +1734,8 @@ public sealed class LibreViesGame : MonoBehaviour
             // Pieces d'un objet qui doivent suivre leur objet (couvercle, enclume, cloture...).
             "Couvercle_", "Carton_", "Chapeau", "Feuill", "Tronc", "Branche", "Traverse",
             "Poteau", "Cloture", "Colonne", "Bassin", "Filet", "Gouttes", "Touffe", "Brins",
-            "Enclume_", "Guard_", "PNJ_", "Point_Main", "Marteau_", "Manche_", "Cheminee_"
+            "Enclume_", "Guard_", "PNJ_", "Point_Main", "Marteau_", "Manche_", "Cheminee_",
+            "MarqueurDeplacement"
         };
         for (int i = 0; i < exclus.Length; i++)
             if (nom.StartsWith(exclus[i], StringComparison.Ordinal)) return false;
@@ -1828,6 +1829,7 @@ public sealed class LibreViesGame : MonoBehaviour
             return false;
         string nom = objet.name ?? "";
         if (nom == "Soleil" || nom == "Main Camera" || nom == "EventSystem") return false;
+        if (nom == "MarqueurDeplacement") return false;
         return true;
     }
 
@@ -6385,7 +6387,47 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         editionMaisonEnDeplacement = true;
         SynchroniserElementEdition(cible);
+        MontrerMarqueurDeplacement(cible);
         ShowInfo(cible.Type + " souleve : maintenez le clic et deplacez-le");
+    }
+
+    // Marqueur au sol : empreinte de l'objet souleve, la ou il va se poser.
+    private GameObject marqueurDeplacementEdition;
+
+    private void MontrerMarqueurDeplacement(ElementEdition element)
+    {
+        if (element == null || element.Root == null || element.MaisonParent != null) return;
+        if (marqueurDeplacementEdition == null)
+        {
+            marqueurDeplacementEdition = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            marqueurDeplacementEdition.name = "MarqueurDeplacement";
+            Collider col = marqueurDeplacementEdition.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            Renderer rendu = marqueurDeplacementEdition.GetComponent<Renderer>();
+            rendu.sharedMaterial = new Material(rendu.sharedMaterial);
+            rendu.sharedMaterial.color = new Color(1f, 0.85f, 0.15f, 0.55f);
+            rendu.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        marqueurDeplacementEdition.SetActive(true);
+        ActualiserMarqueurDeplacement(element);
+    }
+
+    private void ActualiserMarqueurDeplacement(ElementEdition element)
+    {
+        if (marqueurDeplacementEdition == null || element == null || element.Root == null) return;
+        Renderer[] rendus = element.Root.GetComponentsInChildren<Renderer>(true);
+        if (rendus.Length == 0) return;
+        Bounds limites = rendus[0].bounds;
+        for (int i = 1; i < rendus.Length; i++) limites.Encapsulate(rendus[i].bounds);
+        float sol = TerrainHeight(limites.center.x, limites.center.z);
+        marqueurDeplacementEdition.transform.position = new Vector3(limites.center.x, sol + 0.03f, limites.center.z);
+        marqueurDeplacementEdition.transform.localScale = new Vector3(
+            Mathf.Max(0.3f, limites.size.x), 0.04f, Mathf.Max(0.3f, limites.size.z));
+    }
+
+    private void CacherMarqueurDeplacement()
+    {
+        if (marqueurDeplacementEdition != null) marqueurDeplacementEdition.SetActive(false);
     }
 
     private void DeplacerMaisonEdition()
@@ -6429,6 +6471,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 sol + HauteurSoulevementMaisonEdition, position.z);
         }
         SynchroniserElementEdition(element);
+        ActualiserMarqueurDeplacement(element);
     }
 
     private void AnnulerDeplacementEdition()
@@ -6452,6 +6495,7 @@ public sealed class LibreViesGame : MonoBehaviour
         element.Souleve = false;
         if (element.Maison != null) element.Maison.EditionSoulevee = false;
         SynchroniserElementEdition(element);
+        CacherMarqueurDeplacement();
         editionRedimensionnement = false;
         editionMaisonEnDeplacement = false;
         if (element.MaisonParent != null)
@@ -6466,6 +6510,7 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (!editionMaisonEnDeplacement) return;
         ElementEdition element = elementEditionSelectionne;
+        CacherMarqueurDeplacement();
         PoserElementEdition(element);
         AjouterHistoriqueEdition(element);
         editionRedimensionnement = false;
@@ -8535,10 +8580,11 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             if (!EmplacementLibre(p[0], p[1], 0.6f)) continue;
             float y = TerrainHeight(p[0], p[1]);
-            Primitive(PrimitiveType.Cylinder, new Vector3(p[0], y + 0.45f, p[1]),
+            // Le couvercle est enfant du baril : il suit le baril quand on le deplace.
+            var baril = Primitive(PrimitiveType.Cylinder, new Vector3(p[0], y + 0.45f, p[1]),
                 new Vector3(0.68f, 0.45f, 0.68f), "Wood", null, "Baril");
-            Primitive(PrimitiveType.Cylinder, new Vector3(p[0], y + 0.62f, p[1]),
-                new Vector3(0.72f, 0.05f, 0.72f), "Metal", null, "Couvercle_Baril");
+            Primitive(PrimitiveType.Cylinder, new Vector3(0f, 0.17f, 0f),
+                new Vector3(0.72f, 0.05f, 0.72f), "Metal", baril.transform, "Couvercle_Baril");
             ColCercle(p[0], p[1], 0.45f, 0.95f);
         }
 
@@ -8566,9 +8612,10 @@ public sealed class LibreViesGame : MonoBehaviour
     private void CreateCrate(float x, float z, float taille)
     {
         float y = TerrainHeight(x, z);
-        Box(new Vector3(x, y + taille * 0.5f, z), new Vector3(taille, taille, taille), "Wood", null, "Caisse");
-        Box(new Vector3(x, y + taille * 0.62f, z), new Vector3(taille * 1.03f, taille * 0.17f, taille * 1.03f),
-            "Bois_Clair", null, "Couvercle_Caisse");
+        // Le couvercle est enfant de la caisse : il suit la caisse quand on la deplace.
+        var caisse = Box(new Vector3(x, y + taille * 0.5f, z), new Vector3(taille, taille, taille), "Wood", null, "Caisse");
+        Box(new Vector3(0f, taille * 0.12f, 0f), new Vector3(taille * 1.03f, taille * 0.17f, taille * 1.03f),
+            "Bois_Clair", caisse.transform, "Couvercle_Caisse");
         // Moins d'un metre de haut : on saute dessus (saut de 1,60 m).
         ColBoite(x, z, taille + 0.1f, taille + 0.1f, taille * 0.75f);
     }
