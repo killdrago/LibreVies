@@ -169,7 +169,8 @@ public sealed class LibreViesGame : MonoBehaviour
     private string adminStatExperience = "";
     private string adminStatChasse = "";
     private string adminStatTerritoire = "";
-    private bool adminStatsRemplies;
+    private string adminStatPseudo = "";
+    private string adminStatDroit = "";
     private string adminMessageJoueur = "Recherchez un pseudo puis cliquez sur le joueur.";
     private Vector2 adminRechercheScroll;
     private Vector2 adminCaracteristiquesScroll;
@@ -7324,12 +7325,26 @@ public sealed class LibreViesGame : MonoBehaviour
         get { return 2f * VillageRadius * Mathf.Sin(Mathf.PI / 96f); }
     }
 
+    // Clôture de la route : troncon dont les poteaux sont nommes Poteau_Cloture.
+    private bool EstTronconRoute(Transform troncon)
+    {
+        return troncon.childCount > 0 && troncon.GetChild(0).name == "Poteau_Cloture";
+    }
+
+    private float DemiTronconCloture(Transform troncon)
+    {
+        return EstTronconRoute(troncon) ? 1.2f : LongueurTronconCloture * 0.5f;
+    }
+
     // Pose un troncon sur le terrain : ses deux poteaux touchent le sol a leurs
     // pieds et la traverse suit la pente. La rotation reste horizontale.
     private void AjusterTronconCloture(Transform troncon)
     {
         if (troncon == null || troncon.childCount < 3) return;
-        float demi = LongueurTronconCloture * 0.5f;
+        bool route = EstTronconRoute(troncon);
+        float demi = DemiTronconCloture(troncon);
+        float hauteurPoteau = route ? 0.45f : 0.65f;
+        float hauteurTraverse = route ? 0.7f : 0.85f;
         Vector3 avant = troncon.forward;
         avant.y = 0f;
         avant.Normalize();
@@ -7343,12 +7358,14 @@ public sealed class LibreViesGame : MonoBehaviour
         Transform poteauA = troncon.GetChild(0);
         Transform poteauB = troncon.GetChild(1);
         Transform traverse = troncon.GetChild(2);
-        poteauA.localPosition = new Vector3(0f, ya - ym + 0.65f, -demi);
-        poteauB.localPosition = new Vector3(0f, yb - ym + 0.65f, demi);
-        traverse.localPosition = new Vector3(0f, (ya + yb) * 0.5f - ym + 0.85f, 0f);
+        poteauA.localPosition = new Vector3(0f, ya - ym + hauteurPoteau, -demi);
+        poteauB.localPosition = new Vector3(0f, yb - ym + hauteurPoteau, demi);
+        traverse.localPosition = new Vector3(0f, (ya + yb) * 0.5f - ym + hauteurTraverse, 0f);
         Vector3 pente = new Vector3(0f, yb - ya, 2f * demi);
         traverse.localRotation = Quaternion.LookRotation(pente);
-        traverse.localScale = new Vector3(0.12f, 0.14f, pente.magnitude);
+        Vector3 echelle = traverse.localScale;
+        traverse.localScale = new Vector3(echelle.x, echelle.y, pente.magnitude);
+        SynchroniserCollisionsSupplementaires(troncon);
     }
 
     // Troncons relies bout a bout (extremites communes) : la portion entiere.
@@ -7379,7 +7396,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private Vector2[] ExtremitesTroncon(Transform troncon)
     {
-        float demi = LongueurTronconCloture * 0.5f;
+        float demi = DemiTronconCloture(troncon);
         Vector3 avant = troncon.forward;
         avant.y = 0f;
         avant.Normalize();
@@ -8830,35 +8847,28 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateRoadFence()
     {
-        // Petite clouture de bois le long de la route dans le village :
-        // positions de la reference (aucun poteau devant le passage : les
-        // indices -1, 0 et 1 sont sautes).
-        var libre = new List<bool>();
-        var positions = new List<float>();
-        for (int i = -6; i <= 6; i++)
+        // Petite cloture de bois le long de la route dans le village : un troncon
+        // par paire de poteaux voisins (indices -1, 0 et 1 sautes, comme la reference).
+        // Chaque troncon est deplacable et garde sa collision.
+        const float z = 4.6f;
+        for (int i = -6; i < 6; i++)
         {
-            float x = i * 2.4f;
-            bool place = Mathf.Abs(i) >= 2 && EmplacementLibre(x, 4.6f, 0.2f);
-            libre.Add(place);
-            positions.Add(x);
-            if (!place) continue;
-            float y = TerrainHeight(x, 4.6f);
-            Box(new Vector3(x, y + 0.45f, 4.6f), new Vector3(0.1f, 0.9f, 0.1f), "Wood", null, "Poteau_Cloture");
-            Box(new Vector3(x, y + 0.7f, 4.6f), new Vector3(2.4f, 0.09f, 0.07f), "Bois_Clair", null, "Traverse_Cloture");
-        }
-        // Collisions : un bloc par suite de poteaux consecutifs.
-        int debut = -1;
-        for (int k = 0; k <= libre.Count; k++)
-        {
-            bool place = k < libre.Count && libre[k];
-            if (place && debut < 0) debut = k;
-            if (!place && debut >= 0)
+            if (Mathf.Abs(i) < 2 || Mathf.Abs(i + 1) < 2) continue;
+            float x0 = i * 2.4f;
+            float x1 = (i + 1) * 2.4f;
+            if (!EmplacementLibre(x0, z, 0.2f) || !EmplacementLibre(x1, z, 0.2f)) continue;
+            float milieu = (x0 + x1) * 0.5f;
+            var troncon = new GameObject("Troncon_Cloture").transform;
+            troncon.position = new Vector3(milieu, 0f, z);
+            troncon.rotation = Quaternion.LookRotation(Vector3.right);
+            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_Cloture");
+            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_Cloture");
+            Box(Vector3.zero, new Vector3(0.07f, 0.09f, 2.4f), "Bois_Clair", troncon, "Traverse_Cloture");
+            collisionsSupplementairesEdition[troncon] = new List<Obstacle>
             {
-                float premier = positions[debut];
-                float dernier = positions[k - 1];
-                ColBoite((premier + dernier) * 0.5f, 4.6f, dernier - premier + 1.2f, 0.25f, 0.85f);
-                debut = -1;
-            }
+                ColBoite(milieu, z, 2.4f, 0.25f, 0.85f)
+            };
+            AjusterTronconCloture(troncon);
         }
     }
 
@@ -11009,6 +11019,8 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         LibreViesJoueurAdmin.Classement scores = adminJoueurSelectionne == null
             ? null : adminJoueurSelectionne.classement;
+        adminStatPseudo = adminJoueurSelectionne == null ? "" : adminJoueurSelectionne.membre.pseudo;
+        adminStatDroit = adminJoueurSelectionne == null ? "0" : adminJoueurSelectionne.membre.droit.ToString();
         adminStatExperience = scores == null ? "0" : scores.experience;
         adminStatChasse = scores == null ? "0" : scores.chasse;
         adminStatTerritoire = scores == null ? "0" : scores.territoire;
@@ -11017,9 +11029,21 @@ public sealed class LibreViesGame : MonoBehaviour
     private System.Collections.IEnumerator EnregistrerCaracteristiquesJoueur()
     {
         if (!CompteAdministrateur || adminJoueurRequeteEnCours || adminJoueurSelectionne == null) yield break;
+        string p = (adminStatPseudo ?? "").Trim();
+        string d = (adminStatDroit ?? "").Trim();
         string e = (adminStatExperience ?? "").Trim();
         string c = (adminStatChasse ?? "").Trim();
         string t = (adminStatTerritoire ?? "").Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(p, @"^[\p{L}\p{Nd}_ -]{3,30}$"))
+        {
+            adminMessageJoueur = "Pseudo invalide : 3 a 30 caracteres (lettres, chiffres, _, espace ou -).";
+            yield break;
+        }
+        if (d != "0" && d != "1")
+        {
+            adminMessageJoueur = "Droit : 0 (joueur) ou 1 (administrateur).";
+            yield break;
+        }
         if (!System.Text.RegularExpressions.Regex.IsMatch(e + c + t, "^[0-9]+$")
             || e.Length > 18 || c.Length > 18 || t.Length > 18 || e.Length == 0 || c.Length == 0 || t.Length == 0)
         {
@@ -11028,14 +11052,15 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         int id = adminJoueurSelectionne.membre.id;
         adminJoueurRequeteEnCours = true;
-        adminMessageJoueur = "Enregistrement des caracteristiques...";
-        yield return compteJoueur.SauvegarderCaracteristiques(id, e, c, t);
+        adminMessageJoueur = "Enregistrement de la fiche...";
+        yield return compteJoueur.SauvegarderCaracteristiques(id, p, int.Parse(d), e, c, t);
         adminJoueurRequeteEnCours = false;
         if (!String.IsNullOrEmpty(compteJoueur.Erreur))
         { adminMessageJoueur = compteJoueur.Erreur; yield break; }
         adminJoueurSelectionne = compteJoueur.JoueurAdministratif;
         RemplirStatsAdministration();
-        adminMessageJoueur = "BDD confirmee : caracteristiques de " + adminJoueurSelectionne.membre.pseudo + " enregistrees.";
+        adminJoueurBani = adminJoueurSelectionne.membre.bani == "oui";
+        adminMessageJoueur = "BDD confirmee : fiche de " + adminJoueurSelectionne.membre.pseudo + " enregistree.";
     }
 
     private string CaracteristiquesJoueurAdministration()
@@ -11132,7 +11157,7 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.EndScrollView();
         GUI.enabled = ancienEnabled;
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 265f, 700f, 25f), "CARACTERISTIQUES DU JOUEUR", titleStyle);
-        Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 477f);
+        Rect details = new Rect(contenu.x + 18f, contenu.y + 303f, contenu.width - 36f, contenu.height - 517f);
         GUI.Box(details, "", boxStyle);
         string rapport = CaracteristiquesJoueurAdministration();
         GUIStyle style = new GUIStyle(smallStyle) { wordWrap = true, richText = false,
@@ -11145,14 +11170,19 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(8f, 8f, largeurTexte, hauteurTexte + 4f), rapport, style);
         GUI.EndScrollView();
         GUI.enabled = ancienEnabled && !adminJoueurRequeteEnCours && adminJoueurSelectionne != null;
-        float yStats = contenu.y + contenu.height - 166f;
-        GUI.Label(new Rect(contenu.x + 18f, yStats, 140f, 22f), "Experience", smallStyle);
-        GUI.Label(new Rect(contenu.x + 168f, yStats, 140f, 22f), "Chasse", smallStyle);
-        GUI.Label(new Rect(contenu.x + 318f, yStats, 140f, 22f), "Territoire", smallStyle);
-        adminStatExperience = GUI.TextField(new Rect(contenu.x + 18f, yStats + 22f, 140f, 28f), adminStatExperience ?? "", 18);
-        adminStatChasse = GUI.TextField(new Rect(contenu.x + 168f, yStats + 22f, 140f, 28f), adminStatChasse ?? "", 18);
-        adminStatTerritoire = GUI.TextField(new Rect(contenu.x + 318f, yStats + 22f, 140f, 28f), adminStatTerritoire ?? "", 18);
-        if (GUI.Button(new Rect(contenu.x + 470f, yStats + 22f, 220f, 28f), "ENREGISTRER STATS", buttonStyle))
+        float yIdentite = contenu.y + contenu.height - 206f;
+        GUI.Label(new Rect(contenu.x + 18f, yIdentite, 140f, 20f), "Pseudo", smallStyle);
+        GUI.Label(new Rect(contenu.x + 318f, yIdentite, 140f, 20f), "Droit (0 / 1)", smallStyle);
+        adminStatPseudo = GUI.TextField(new Rect(contenu.x + 18f, yIdentite + 20f, 290f, 26f), adminStatPseudo ?? "", 30);
+        adminStatDroit = GUI.TextField(new Rect(contenu.x + 318f, yIdentite + 20f, 60f, 26f), adminStatDroit ?? "", 1);
+        float yStats = contenu.y + contenu.height - 152f;
+        GUI.Label(new Rect(contenu.x + 18f, yStats, 140f, 20f), "Experience", smallStyle);
+        GUI.Label(new Rect(contenu.x + 168f, yStats, 140f, 20f), "Chasse", smallStyle);
+        GUI.Label(new Rect(contenu.x + 318f, yStats, 140f, 20f), "Territoire", smallStyle);
+        adminStatExperience = GUI.TextField(new Rect(contenu.x + 18f, yStats + 20f, 140f, 26f), adminStatExperience ?? "", 18);
+        adminStatChasse = GUI.TextField(new Rect(contenu.x + 168f, yStats + 20f, 140f, 26f), adminStatChasse ?? "", 18);
+        adminStatTerritoire = GUI.TextField(new Rect(contenu.x + 318f, yStats + 20f, 140f, 26f), adminStatTerritoire ?? "", 18);
+        if (GUI.Button(new Rect(contenu.x + 470f, yIdentite + 20f, 220f, 52f), "ENREGISTRER LA FICHE", buttonStyle))
             StartCoroutine(EnregistrerCaracteristiquesJoueur());
         adminJoueurBani = GUI.Toggle(new Rect(contenu.x + 18f, contenu.y + contenu.height - 86f, 520f, 30f),
             adminJoueurBani, "Bannir ce joueur (coche = oui ; decoche = non)");
@@ -12016,7 +12046,7 @@ public sealed class LibreViesGame : MonoBehaviour
         if (CompteAdministrateur && adminOpen && !creationPersonnageOpen) DessinerAdmin();
         if (CompteAdministrateur && adminOpen && adminTab == 3 && choixTypeMondeOuvert && elementMondeSelectionne != null)
             fenetreChoixTypeMonde = GUI.Window(IdFenetreChoixTypeMonde, fenetreChoixTypeMonde, DessinerChoixTypeMonde, "TYPE");
-        if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
+        if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
             "ADMIN", buttonStyle))
         {
             adminOpen = !adminOpen;

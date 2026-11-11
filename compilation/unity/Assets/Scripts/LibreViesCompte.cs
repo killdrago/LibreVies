@@ -307,12 +307,14 @@ public sealed class LibreViesCompte
         });
     }
 
-    public IEnumerator SauvegarderCaracteristiques(int id, string experience, string chasse, string territoire)
+    public IEnumerator SauvegarderCaracteristiques(int id, string pseudo, int droit,
+        string experience, string chasse, string territoire)
     {
         if (!EstAdministrateur) { Erreur = "Modification reservee aux administrateurs."; yield break; }
         yield return Envoyer("save_player_stats", null, null, new Dictionary<string, string>
         {
             { "player_id", id.ToString(CultureInfo.InvariantCulture) },
+            { "pseudo", pseudo }, { "droit", droit.ToString(CultureInfo.InvariantCulture) },
             { "experience", experience }, { "chasse", chasse }, { "territoire", territoire }
         });
     }

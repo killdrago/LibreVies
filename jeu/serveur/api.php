@@ -536,7 +536,16 @@ if ($action === 'search_players' || $action === 'get_player' || $action === 'sav
             $query->execute(array(':bani' => $bani, ':id' => $id));
         }
         if ($action === 'save_player_stats') {
-            // Experience, chasse, territoire : entiers positifs, ecrits dans classement seulement.
+            // Pseudo, droit (0 ou 1) et caracteristiques : entrees verifiees avant toute ecriture.
+            $pseudo = isset($donnees['pseudo']) && is_string($donnees['pseudo']) ? trim($donnees['pseudo']) : '';
+            if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
+                repondre(false, 'Pseudo invalide : 3 a 30 caracteres (lettres, chiffres, _, espace ou -).', array(), 400);
+            }
+            $droitBrut = isset($donnees['droit']) ? $donnees['droit'] : '';
+            if (is_int($droitBrut)) $droitBrut = (string)$droitBrut;
+            if ($droitBrut !== '0' && $droitBrut !== '1') {
+                repondre(false, 'Droit invalide : 0 ou 1 attendu.', array(), 400);
+            }
             $valeurs = array();
             foreach (array('experience', 'chasse', 'territoire') as $champ) {
                 $brut = isset($donnees[$champ]) ? $donnees[$champ] : '';
@@ -547,12 +556,25 @@ if ($action === 'search_players' || $action === 'get_player' || $action === 'sav
                 $valeurs[$champ] = $brut;
             }
             $pdo->beginTransaction();
-            $query = $pdo->prepare('SELECT id FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
+            $query = $pdo->prepare('SELECT id, droit FROM membre WHERE id = :id LIMIT 1 FOR UPDATE');
             $query->execute(array(':id' => $id));
-            if (!$query->fetchColumn()) {
+            if (!$query->fetch()) {
                 $pdo->rollBack();
                 repondre(false, 'Joueur introuvable.', array(), 404);
             }
+            $query = $pdo->prepare('SELECT id FROM membre WHERE pseudo = :pseudo AND id <> :id LIMIT 1');
+            $query->execute(array(':pseudo' => $pseudo, ':id' => $id));
+            if ($query->fetchColumn()) {
+                $pdo->rollBack();
+                repondre(false, 'Ce pseudo est deja utilise.', array(), 409);
+            }
+            // Un administrateur ne peut pas retirer son propre droit (evite le verrouillage).
+            if ((int)$admin['id'] === $id && $droitBrut !== '1') {
+                $pdo->rollBack();
+                repondre(false, 'Vous ne pouvez pas retirer votre propre droit administrateur.', array(), 400);
+            }
+            $query = $pdo->prepare('UPDATE membre SET pseudo = :pseudo, droit = :droit WHERE id = :id');
+            $query->execute(array(':pseudo' => $pseudo, ':droit' => (int)$droitBrut, ':id' => $id));
             $query = $pdo->prepare('INSERT INTO classement (id, experience, chasse, territoire) '
                 . 'VALUES (:id, :experience, :chasse, :territoire) '
                 . 'ON DUPLICATE KEY UPDATE experience = VALUES(experience), chasse = VALUES(chasse), '
