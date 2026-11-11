@@ -1715,6 +1715,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (objet == null || objet == transform || objet == player) return false;
         string nom = objet.name ?? "";
         if (nom == "Troncon_Cloture") return objet.parent == null;
+        // NPC (medecin, forgeron...) : leur racine PNJ_ se deplace avec tout son modele.
+        if (nom.StartsWith("PNJ_", StringComparison.Ordinal)) return objet.parent == null;
         if (nom == "Porte" || nom == "Fenetre" || nom == "Affiche_Maison") return true;
         if (nom == "Sapin" || nom == "Fontaine" || nom == "Panneau"
             || nom == "Lampadaire" || nom == "Banniere" || nom == "Baril"
@@ -11892,7 +11894,8 @@ public sealed class LibreViesGame : MonoBehaviour
             Rect fenetre = fenetreAdminRect;
             if (fenetreAdminReduite) fenetre.height = FenetreAdminHauteurBarre;
             fenetreAdminMonde = fenetre;
-            GUI.Box(fenetre, "", boxStyle);
+            // Meme fond que les cadres du HUD (quete, experience, vie, endurance) : opaque.
+            FondHudTransparent(fenetre);
             GUI.Label(new Rect(fenetre.x + 22f, fenetre.y + 18f, 470f, 32f),
                 "ADMINISTRATION", titleStyle);
             if (GUI.Button(new Rect(fenetre.x + fenetre.width - 42f, fenetre.y + 14f, 28f, 28f),
