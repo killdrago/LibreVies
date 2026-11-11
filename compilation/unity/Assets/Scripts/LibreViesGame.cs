@@ -1715,7 +1715,35 @@ public sealed class LibreViesGame : MonoBehaviour
             || nom == "Caisse" || nom == "Garde"
             || nom.StartsWith("Asset_CC0_") || nom.StartsWith("PNJ_")
             || nom == "Araignee" || nom == "Souris" || nom == "Rat") return true;
-        return false;
+        return EstDecorDeplacable(objet);
+    }
+
+    // Decor de premier niveau (caisse, tonneau, rocher, arbre, tonnelle...) :
+    // deplacable en edition. Restent fixes : le sol, les routes, l'eau, le ciel,
+    // la camera, le joueur et les objets du monde (geres par l'onglet Monde).
+    private bool EstDecorDeplacable(Transform objet)
+    {
+        if (objet.parent != null || !objet.gameObject.activeInHierarchy) return false;
+        string nom = objet.name ?? "";
+        string[] exclus =
+        {
+            "Case_", "Monde_", "Route", "Pave", "Riviere", "Eau", "Terrain", "Sol",
+            "Soleil", "Ciel", "Main Camera", "EventSystem", "CameraPivot", "Joueur",
+            "Heros", "Player", "Heroine", "Avatar", "PNJ_", "Garde_", "Texte3D",
+            "Etincelle", "BarreVie", "Silhouette", "LV_", "Water", "Ground", "Chemin",
+            // Pieces d'un objet qui doivent suivre leur objet (couvercle, enclume, cloture...).
+            "Couvercle_", "Carton_", "Chapeau", "Feuill", "Tronc", "Branche", "Traverse",
+            "Poteau", "Cloture", "Colonne", "Bassin", "Filet", "Gouttes", "Touffe", "Brins",
+            "Enclume_", "Guard_", "PNJ_", "Point_Main", "Marteau_", "Manche_", "Cheminee_"
+        };
+        for (int i = 0; i < exclus.Length; i++)
+            if (nom.StartsWith(exclus[i], StringComparison.Ordinal)) return false;
+        Renderer[] rendus = objet.GetComponentsInChildren<Renderer>(true);
+        if (rendus.Length == 0) return false;
+        Bounds limites = rendus[0].bounds;
+        for (int i = 1; i < rendus.Length; i++) limites.Encapsulate(rendus[i].bounds);
+        // Au-dela de 8 m, c'est du terrain ou un gros ouvrage : on ne le deplace pas.
+        return Mathf.Max(limites.size.x, Mathf.Max(limites.size.y, limites.size.z)) < 8f;
     }
 
     private void ConstruireObjetsEdition()
@@ -6073,27 +6101,31 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         cible = null;
         if (gameCamera == null) return false;
-        ElementEdition toucheMaison = editionOutilMaison == 2 || editionOutilMaison == 3
-            || editionOutilMaison == 5 ? MaisonSousRayonSouris() : MaisonSousToitSouris();
-        if (toucheMaison != null && ElementCompatibleOutil(toucheMaison))
+        // Mode DEPLACER : tous les objets (maisons comprises) sont candidats ;
+        // le plus proche de la camera gagne. Les autres boutons gardent leur ordre.
+        bool deplacer = editionOutilMaison == 0;
+        if (!deplacer)
         {
-            cible = toucheMaison;
-            return true;
+            ElementEdition toucheMaison = editionOutilMaison == 2 || editionOutilMaison == 3
+                || editionOutilMaison == 5 ? MaisonSousRayonSouris() : MaisonSousToitSouris();
+            if (toucheMaison != null && ElementCompatibleOutil(toucheMaison))
+            {
+                cible = toucheMaison;
+                return true;
+            }
         }
         Vector2 souris = Input.mousePosition;
         float meilleureAire = float.MaxValue;
         float meilleureProfondeur = float.MaxValue;
-        // En mode deplacement, une maison gagne toujours sur un objet projete
-        // derriere elle. Les autres elements ne deviennent selectionnables que
-        // depuis leur bouton de mode dedie.
-        for (int passe = 0; passe < 2; passe++)
+        int passes = deplacer ? 1 : 2;
+        for (int passe = 0; passe < passes; passe++)
         {
             for (int i = 0; i < objetsEdition.Count; i++)
             {
                 ElementEdition element = objetsEdition[i];
                 if (!ElementCompatibleOutil(element)) continue;
-                if (editionOutilMaison == 0 && passe == 0 && element.Maison == null) continue;
-                if (editionOutilMaison == 0 && passe == 1 && element.Maison != null) continue;
+                if (!deplacer && passe == 0 && element.Maison == null) continue;
+                if (!deplacer && passe == 1 && element.Maison != null) continue;
                 Rect zone;
                 float profondeur;
                 if (!TryZoneEcranElementEdition(element, out zone, out profondeur)
@@ -10404,41 +10436,6 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.matrix = ancienneMatrice;
     }
 
-    private void DessinerLigneCage(Rect zone, float x, float y, float largeur, float hauteur)
-    {
-        GUI.DrawTexture(new Rect(zone.x + x, zone.y + y, largeur, hauteur), Texture2D.whiteTexture);
-    }
-
-    private void DessinerCagesMaisonsEdition()
-    {
-        if (!modeEdition || gameCamera == null) return;
-        for (int i = 0; i < batiments.Count; i++)
-        {
-            Batiment batiment = batiments[i];
-            if (batiment == null || batiment.Root == null) continue;
-            ElementEdition element = TrouverElementEdition(batiment.Root);
-            if (element == null) continue;
-            Rect zoneMonde;
-            float profondeur;
-            if (!TryZoneEcranElementEdition(element, out zoneMonde, out profondeur)) continue;
-            // WorldToScreenPoint a son origine en bas a gauche, GUI en haut a
-            // gauche : cette conversion dessine la zone exacte du clic.
-            Rect zone = new Rect(zoneMonde.x, Screen.height - zoneMonde.yMax,
-                zoneMonde.width, zoneMonde.height);
-            bool selectionnee = elementEditionSelectionne == element
-                || elementEditionDernierSelectionne == element;
-            GUI.color = selectionnee
-                ? new Color(0.10f, 0.95f, 1f, 0.95f)
-                : new Color(1f, 0.80f, 0.18f, 0.72f);
-            const float epaisseur = 2f;
-            DessinerLigneCage(zone, 0f, 0f, zone.width, epaisseur);
-            DessinerLigneCage(zone, 0f, zone.height - epaisseur, zone.width, epaisseur);
-            DessinerLigneCage(zone, 0f, 0f, epaisseur, zone.height);
-            DessinerLigneCage(zone, zone.width - epaisseur, 0f, epaisseur, zone.height);
-        }
-        GUI.color = Color.white;
-    }
-
     private string NomModeBrasAdmin(int mode)
     {
         if (mode == 0) return "Gauche";
@@ -11629,7 +11626,6 @@ public sealed class LibreViesGame : MonoBehaviour
         bool ancienEnabledHud = GUI.enabled;
         if (creationPersonnageOpen) GUI.enabled = false;
         DessinerCorrectionCouleur();
-        DessinerCagesMaisonsEdition();
         if (playerUnderwater)
         {
             GUI.color = new Color(0.04f, 0.30f, 0.46f, 0.24f);
