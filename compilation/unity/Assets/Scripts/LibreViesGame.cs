@@ -11787,7 +11787,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // Poignee de redimensionnement (affichee seulement quand la fenetre est deployee).
             GUI.Box(new Rect(fenetre.xMax - 22f, fenetre.yMax - 22f, 22f, 22f), "//", smallStyle);
 
-            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA", "SQL" };
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA", "SQL", "Edition" };
             for (int i = 0; i < onglets.Length; i++)
             {
                 Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -11838,8 +11838,27 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 DessinerAdminSQL(contenu);
             }
+            else if (adminTab == 8)
+            {
+                DessinerAdminEdition(contenu);
+            }
         }
         finally { GUI.matrix = ancienneMatrice; }
+    }
+
+    // Onglet EDITION de l'administration : active ou quitte le mode edition du monde.
+    private void DessinerAdminEdition(Rect contenu)
+    {
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f), "EDITION DU MONDE", titleStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, contenu.width - 36f, 60f),
+            "Le mode edition permet de deplacer les maisons, le decor et les clotures.\n"
+                + "Les positions sont enregistrees en quittant le mode.", smallStyle);
+        string libelle = modeEdition ? "QUITTER LE MODE EDITION" : "ACTIVER LE MODE EDITION";
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 130f, 300f, 36f), libelle, buttonStyle))
+        {
+            adminOpen = false;
+            BasculerModeEdition();
+        }
     }
 
     private void OnGUI()
@@ -11947,21 +11966,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (CompteAdministrateur && !creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 350f, Screen.height - 42f, 164f, 28f),
             "ADMIN", buttonStyle))
         {
-            if (!adminOpen && modeEdition) BasculerModeEdition();
             adminOpen = !adminOpen;
             if (adminOpen) ShowInfo("MENU ADMINISTRATION");
-        }
-        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 42f, 164f, 28f),
-            "EDITION", buttonStyle))
-        {
-            adminOpen = false;
-            BasculerModeEdition();
-        }
-        if (!creationPersonnageOpen && GUI.Button(new Rect(Screen.width - 178f, Screen.height - 76f, 164f, 28f),
-            "TEXTURES", buttonStyle))
-        {
-            if (texturesOpen) AnnulerChoixTextures();
-            else OuvrirMenuTextures(-1);
         }
         if (texturesOpen && !creationPersonnageOpen) DessinerChoixTextures();
         if (conversationOpen) DessinerConversation();
