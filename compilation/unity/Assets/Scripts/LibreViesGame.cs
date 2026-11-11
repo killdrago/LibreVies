@@ -7513,9 +7513,11 @@ public sealed class LibreViesGame : MonoBehaviour
             var troncon = new GameObject("Troncon_Cloture").transform;
             troncon.position = new Vector3(milieu.x, 0f, milieu.y);
             troncon.rotation = Quaternion.LookRotation(new Vector3(tangente.x, 0f, tangente.y));
+            // Chaque troncon garde ses deux poteaux : si un voisin est deplace, il
+            // emporte son poteau et le troncon restant garde le sien (pas de trou).
+            // Les poteaux de jonction se superposent exactement : ils ne se voient pas.
             Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Poteau_A");
-            if (!construit[(i + 1) % posts])
-                Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Poteau_B");
+            Primitive(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.14f, 0.65f, 0.14f), "Wood", troncon, "Poteau_B");
             Box(Vector3.zero, new Vector3(0.12f, 0.14f, LongueurTronconCloture), "Wood", troncon, "Traverse_Cloture");
             AjusterTronconCloture(troncon);
             nbTroncons++;
@@ -8896,8 +8898,7 @@ public sealed class LibreViesGame : MonoBehaviour
             troncon.position = new Vector3(milieu, 0f, z);
             troncon.rotation = Quaternion.LookRotation(Vector3.right);
             Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_A");
-            if (k + 1 >= construit.Length || !construit[k + 1])
-                Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_B");
+            Box(Vector3.zero, new Vector3(0.1f, 0.9f, 0.1f), "Wood", troncon, "Poteau_B");
             Box(Vector3.zero, new Vector3(0.07f, 0.09f, 2.4f), "Bois_Clair", troncon, "Traverse_Cloture");
             collisionsSupplementairesEdition[troncon] = new List<Obstacle>
             {
