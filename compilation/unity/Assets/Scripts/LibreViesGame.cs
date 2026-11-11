@@ -1713,8 +1713,8 @@ public sealed class LibreViesGame : MonoBehaviour
         if (nom == "Porte" || nom == "Fenetre" || nom == "Affiche_Maison") return true;
         if (nom == "Sapin" || nom == "Fontaine" || nom == "Panneau"
             || nom == "Lampadaire" || nom == "Banniere" || nom == "Baril"
-            || nom == "Caisse" || nom == "Garde"
-            || nom.StartsWith("Asset_CC0_") || nom.StartsWith("PNJ_")
+            || nom == "Caisse"
+            || nom.StartsWith("Asset_CC0_")
             || nom == "Araignee" || nom == "Souris" || nom == "Rat") return true;
         return EstDecorDeplacable(objet);
     }
@@ -6766,6 +6766,14 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void BasculerModeEdition()
     {
+        // Edition du monde reservee aux comptes administrateurs (droit = 1). Les
+        // joueurs ordinaires (droit = 0) ne peuvent rien editer ; plus tard, ils
+        // pourront editer leurs maisons et ce qui se trouve dans leur territoire.
+        if (!modeEdition && !CompteAdministrateur)
+        {
+            ShowInfo("Edition reservee aux administrateurs");
+            return;
+        }
         deplacementPancarteActive = false;
         pancarteEnDeplacement = false;
         if (modeEdition)
