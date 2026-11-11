@@ -625,6 +625,35 @@ if ($action === 'save_npc') {
     repondre(true, 'NPC enregistre.', array('membre' => membre_public($membre), 'npcs' => $npcs));
 }
 
+if ($action === 'get_monstres' || $action === 'save_monstres') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    if ($action === 'save_monstres' && (int)$membre['droit'] !== 1) {
+        repondre(false, 'Quantite de monstres reservee aux administrateurs.', array(), 403);
+    }
+    try {
+        if ($action === 'save_monstres') {
+            $nombre = isset($donnees['nombre']) ? $donnees['nombre'] : null;
+            if (is_string($nombre) && preg_match('/^[0-9]{1,3}$/D', $nombre)) $nombre = (int)$nombre;
+            if (!is_int($nombre) || $nombre < 0 || $nombre > 120) {
+                repondre(false, 'Quantite de monstres invalide : 0 a 120.', array(), 400);
+            }
+            $query = $pdo->prepare('UPDATE monstre SET nombre = :nombre WHERE lieu = :lieu');
+            $query->execute(array(':nombre' => $nombre, ':lieu' => 'village depart'));
+        }
+        $query = $pdo->prepare('SELECT lieu, nombre FROM monstre WHERE lieu = :lieu LIMIT 1');
+        $query->execute(array(':lieu' => 'village depart'));
+        $ligne = $query->fetch();
+        if (!$ligne) {
+            repondre(false, 'Reglage des monstres absent de la base (table monstre).', array(), 409);
+        }
+        $monstres = array('lieu' => (string)$ligne['lieu'], 'nombre' => (int)$ligne['nombre']);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, $action === 'save_monstres' ? 'Quantite de monstres enregistree.' : 'Quantite de monstres chargee.',
+        array('membre' => membre_public($membre), 'monstres' => $monstres));
+}
+
 if ($action === 'get_npcs') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     try {

@@ -23,6 +23,13 @@ public sealed class LibreViesCompte
     }
 
     [Serializable]
+    [Serializable]
+    public sealed class LibreViesReglageMonstres
+    {
+        public string lieu;
+        public int nombre;
+    }
+
     private sealed class ReponseApi
     {
         public bool ok;
@@ -31,6 +38,7 @@ public sealed class LibreViesCompte
         public Membre membre;
         public LibreViesPersonnage personnage;
         public LibreViesNpc[] npcs;
+        public LibreViesReglageMonstres monstres;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
         public LibreViesPosition position;
@@ -159,6 +167,22 @@ public sealed class LibreViesCompte
     public IEnumerator Sauvegarder(LibreViesPersonnage profil)
     {
         yield return Envoyer("save_character", profil);
+    }
+    // Quantite de monstres enregistree dans la table monstre (-1 = pas encore lue).
+    public int NombreMonstres { get; private set; }
+    public IEnumerator ChargerMonstres()
+    {
+        NombreMonstres = -1;
+        yield return Envoyer("get_monstres", null);
+    }
+    public IEnumerator SauvegarderMonstres(int nombre)
+    {
+        if (!EstAdministrateur) { Erreur = "Quantite de monstres reservee aux administrateurs."; yield break; }
+        var champs = new Dictionary<string, string>
+        {
+            { "nombre", nombre.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+        };
+        yield return Envoyer("save_monstres", null, null, champs);
     }
     public IEnumerator SauvegarderNpc(string id, LibreViesPersonnage profil)
     {
@@ -460,6 +484,14 @@ public sealed class LibreViesCompte
             { Erreur = "Joueur bani veuillez contacter l'administrateur"; jeton = null; Joueur = null; yield break; }
             // Actions du monde et de la presence : leur reponse ne contient pas de personnage.
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
+            if (action == "get_monstres" || action == "save_monstres")
+            {
+                if (reponse.monstres == null || reponse.monstres.lieu != "village depart"
+                    || reponse.monstres.nombre < 0 || reponse.monstres.nombre > 120)
+                { Erreur = "Reponse monstres invalide."; yield break; }
+                NombreMonstres = reponse.monstres.nombre;
+                yield break;
+            }
             if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
                 || action == "modifier_element_monde" || action == "supprimer_element_monde"
                 || action == "vider_monde" || action == "enregistrer_maison" || action == "renommer_maison"

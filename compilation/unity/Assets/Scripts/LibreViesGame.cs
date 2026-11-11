@@ -882,6 +882,14 @@ public sealed class LibreViesGame : MonoBehaviour
                 erreurChargementCompte = compteJoueur.Erreur;
                 yield break;
             }
+            // Quantite de monstres enregistree en base (table monstre) ; sans reponse, on garde 18.
+            yield return compteJoueur.ChargerMonstres();
+            if (String.IsNullOrEmpty(compteJoueur.Erreur) && compteJoueur.NombreMonstres >= 0)
+            {
+                nombreMonstresAdmin = Mathf.Clamp(compteJoueur.NombreMonstres, 0, 120);
+                nombreMonstresAdminTexte = nombreMonstresAdmin.ToString(CultureInfo.InvariantCulture);
+            }
+            else Debug.LogWarning("[LV] quantite de monstres non lue : " + compteJoueur.Erreur);
         }
         yield return ChargerMondeServeur();
         string[] noms =
@@ -10968,6 +10976,16 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    private System.Collections.IEnumerator EnregistrerNombreMonstres(int valeur)
+    {
+        if (compteJoueur == null) yield break;
+        yield return compteJoueur.SauvegarderMonstres(valeur);
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+            ShowInfo("Quantite non enregistree : " + compteJoueur.Erreur);
+        else
+            ShowInfo("Quantite de monstres enregistree dans la base : " + valeur);
+    }
+
     private void DessinerAdminMonstres(Rect contenu)
     {
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
@@ -10993,6 +11011,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 {
                     nombreMonstresAdmin = valeur;
                     ReconfigurerMonstresAdmin();
+                    StartCoroutine(EnregistrerNombreMonstres(valeur));
                 }
             }
             else
