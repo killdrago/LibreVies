@@ -296,7 +296,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int level = 1;
     private LibreViesCompte.LibreViesTypeMonstre[] typesMonstres;
     private int adminMonstreEdition = -1;                 // id du monstre en cours d'edition
-    private string[] adminMonstreChamps = new string[8];  // nom, pv, agressif, xp, loot, coup min, coup max, atk/min
+    private string[] adminMonstreChamps = new string[9];  // nom, pv, agressif, xp, loot, coup min, coup max, atk/min, regen
     private Vector2 adminMonstresScroll;
     private int ratsKilled;
     private int spidersKilled;
@@ -710,6 +710,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
         public float DernierEssaiRessurection;
         public float AttackCooldown;
+        public float DernierCoup = -10f; // dernier coup donne par ce client (Time.time)
         public int AttParMin = 50;      // table monstre : attaques par minute (50 = 1,2 s entre deux coups)
         public string NomAffiche = "Monstre"; // nom de la table monstre (affiche au-dessus de la bete)
         public float ProvoqueJusqua;    // riposte : le monstre frappe le heros a portee jusqu'a cet instant (Time.time)
@@ -8014,8 +8015,11 @@ public sealed class LibreViesGame : MonoBehaviour
                     ennemi.Corps.Z = position.z;
                 }
             }
-            else if (etat.pv < ennemi.Hp)
+            else if (etat.pv < ennemi.Hp
+                || (etat.pv > ennemi.Hp && Time.time - ennemi.DernierCoup > 2f))
             {
+                // Baisse (coup d'un autre joueur) ou regeneration serveur (hausse),
+                // la hausse n'est pas acceptee juste apres un coup donne ici.
                 ennemi.Hp = etat.pv;
             }
             ennemi.CibleDistante = position;
@@ -10293,6 +10297,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (distance > 0.01f && Vector3.Dot(forward, delta.normalized) < 0.1f) continue;
             if (ClotureEntre(player.position, enemy.Root.transform.position)) continue;
             enemy.Hp -= HammerDamage;
+            enemy.DernierCoup = Time.time;
             // Riposte : un monstre frappe, meme non agressif, rend le coup pendant 10 s.
             enemy.ProvoqueJusqua = Time.time + 10f;
             EnvoyerCoupMonstre(enemy, HammerDamage);
@@ -11069,8 +11074,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Table monstre non chargee.", tableauTexte);
             return;
         }
-        string[] entetes = { "ID", "Nom", "PV", "Agressif", "XP", "Loot", "Coup min", "Coup max", "Atk / min" };
-        float[] largeurs = { 50f, 0f, 60f, 90f, 60f, 60f, 90f, 90f, 90f };
+        string[] entetes = { "ID", "Nom", "PV", "Agressif", "XP", "Loot", "Coup min", "Coup max", "Atk / min", "Regen pts/min" };
+        float[] largeurs = { 50f, 0f, 60f, 90f, 60f, 60f, 90f, 90f, 90f, 110f };
         float actionW = 110f;
         float fixes = 0f;
         for (int c = 0; c < largeurs.Length; c++) if (c != 1) fixes += largeurs[c];
@@ -11110,7 +11115,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 t.pv.ToString(CultureInfo.InvariantCulture), t.agressif == 1 ? "oui" : "non",
                 t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
                 t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
-                t.attparmin.ToString(CultureInfo.InvariantCulture) };
+                t.attparmin.ToString(CultureInfo.InvariantCulture), t.regen.ToString(CultureInfo.InvariantCulture) };
             x = 8f;   // coordonnees locales a la zone a defilement
             for (int c = 0; c < valeurs.Length; c++)
             {
@@ -11125,16 +11130,16 @@ public sealed class LibreViesGame : MonoBehaviour
                     t.nom, t.pv.ToString(CultureInfo.InvariantCulture), t.agressif.ToString(CultureInfo.InvariantCulture),
                     t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
                     t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
-                    t.attparmin.ToString(CultureInfo.InvariantCulture)
+                    t.attparmin.ToString(CultureInfo.InvariantCulture), t.regen.ToString(CultureInfo.InvariantCulture)
                 };
             }
             y += ligne;
             if (adminMonstreEdition == t.id)
             {
-                string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max", "Atk / minute" };
-                float[] largeursForm = { 200f, 80f, 110f, 80f, 80f, 90f, 90f, 100f };
+                string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max", "Atk / minute", "Regen pts/min" };
+                float[] largeursForm = { 160f, 70f, 100f, 70f, 70f, 85f, 85f, 85f, 95f };
                 float fx = 8f;
-                for (int c = 0; c < 8; c++)
+                for (int c = 0; c < 9; c++)
                 {
                     GUI.Label(new Rect(fx, y + 4f, largeursForm[c], 22f), etiquettes[c], tableauEntete);
                     adminMonstreChamps[c] = GUI.TextField(new Rect(fx, y + 28f, largeursForm[c] - 8f, 26f),
@@ -11155,22 +11160,23 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (!CompteAdministrateur || compteJoueur == null) yield break;
         string nom = (adminMonstreChamps[0] ?? "").Trim();
-        int pv, agressif, xp, loot, coupMin, coupMax, attParMin;
+        int pv, agressif, xp, loot, coupMin, coupMax, attParMin, regen;
         if (!int.TryParse(adminMonstreChamps[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out pv)
             || !int.TryParse(adminMonstreChamps[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out agressif)
             || !int.TryParse(adminMonstreChamps[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out xp)
             || !int.TryParse(adminMonstreChamps[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out loot)
             || !int.TryParse(adminMonstreChamps[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMin)
             || !int.TryParse(adminMonstreChamps[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMax)
-            || !int.TryParse(adminMonstreChamps[7], NumberStyles.Integer, CultureInfo.InvariantCulture, out attParMin))
+            || !int.TryParse(adminMonstreChamps[7], NumberStyles.Integer, CultureInfo.InvariantCulture, out attParMin)
+            || !int.TryParse(adminMonstreChamps[8], NumberStyles.Integer, CultureInfo.InvariantCulture, out regen))
         { ShowInfo("Valeurs numeriques invalides (PV, agressif, XP, loot, coups)."); yield break; }
         if (nom.Length == 0 || pv < 1 || agressif < 0 || agressif > 1 || xp < 0 || loot < 0
-            || coupMin < 0 || coupMax < coupMin || attParMin < 0)
+            || coupMin < 0 || coupMax < coupMin || attParMin < 0 || regen < 0)
         { ShowInfo("Valeurs invalides : agressif 0 ou 1, PV au moins 1, coup min <= coup max."); yield break; }
         var t = new LibreViesCompte.LibreViesTypeMonstre
         {
             id = id, nom = nom, pv = pv, agressif = agressif, xp = xp, loot = loot,
-            coup_min = coupMin, coup_max = coupMax, attparmin = attParMin
+            coup_min = coupMin, coup_max = coupMax, attparmin = attParMin, regen = regen
         };
         yield return compteJoueur.SauvegarderTypeMonstre(t);
         if (!String.IsNullOrEmpty(compteJoueur.Erreur))

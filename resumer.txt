@@ -4663,6 +4663,36 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     apres un coup elle riposte et suit ; alignement du tableau ; quantite
     superieure a 120 acceptee.
 
+8.49 MAJ 60 - REGENERATION DES MONSTRES (colonne regen)
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+
+  - Constat : il n'existait aucune regeneration des PV des monstres (ni cote
+    client, ni cote serveur).
+  - Ajout : colonne monstre.regen (points de vie par minute), reglable dans
+    ADMIN > Monstre (colonne « Regen pts/min » du tableau et champ du formulaire
+    EDITER). Lue par get_types_monstres / save_type_monstre.
+  - SQL A APPLIQUER par l'utilisateur (non ecrit dans le depot) :
+        ALTER TABLE monstre ADD COLUMN regen INT NOT NULL DEFAULT 0 AFTER attparmin;
+        ALTER TABLE monde_monstre ADD COLUMN pv_modifie_le DATETIME NULL DEFAULT NULL AFTER pv;
+    La 2e colonne memorise la date de la derniere variation de PV, pour calculer
+    la regeneration (modifie_le ne convient pas : il change a chaque deplacement
+    du monstre). Sans elle, la regeneration ne demarre qu'apres le premier coup.
+    Tant que la colonne regen n'existe pas, monde.php ne regenere rien (pas
+    d'erreur). Tant que pv_modifie_le n'existe pas, get_monde et les coups
+    echouent : appliquer les deux ALTER avant de deployer monde.php.
+  - Serveur (monde.php) : calcul paresseux, rien n'est ecrit a chaque tick.
+    PV courants = pv + regen x secondes depuis pv_modifie_le / 60, plafonnes a
+    pv_max. Un coup part des PV courants puis enregistre pv_modifie_le = NOW().
+    Les monstres blesses sont renvoyes a chaque synchronisation (la regeneration
+    ne change pas la revision).
+  - Client : un monstre peut remonter de PV (synchronisation) sauf dans les
+    2 secondes qui suivent un coup donne sur cette machine.
+  - Verification : compilation Unity NON faite, PHP NON teste (php absent du bac
+    a sable). Controle de syntaxe C# : memes erreurs pre-existantes qu'avant.
+    A tester : un rat blesse remonte de PV ; le compteur regen se reflete dans
+    le tableau ; un coup part bien des PV regeneres.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================

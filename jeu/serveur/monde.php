@@ -173,10 +173,48 @@ function lire_monde($pdo, $depuis) {
 }
 
 // ---- Monstres partages ----
-function formater_monstre($ligne) {
+// Regeneration (colonne monstre.regen = pts/minute) : lue par type de monstre.
+// Les types correspondent aux identifiants de la table monstre (1 rat, 2 souris, 3 araignee).
+// Si la colonne regen n'existe pas encore, il n'y a pas de regeneration (le monde reste lisible).
+function regen_par_type($pdo) {
+    $regens = array('rat' => 0, 'souris' => 0, 'araignee' => 0);
+    try {
+        $noms = array(1 => 'rat', 2 => 'souris', 3 => 'araignee');
+        $requete = $pdo->prepare('SELECT id, regen FROM monstre WHERE id IN (1, 2, 3)');
+        $requete->execute();
+        foreach ($requete->fetchAll() as $ligne) {
+            $id = (int)$ligne['id'];
+            if (isset($noms[$id])) $regens[$noms[$id]] = max(0, (int)$ligne['regen']);
+        }
+    } catch (Exception $erreur) {
+        // Pas de colonne regen : aucune regeneration.
+    }
+    return $regens;
+}
+
+// PV actuels : pv enregistre + regeneration depuis la derniere variation de pv.
+// Calcul paresseux : rien n'est ecrit en base, la regeneration se lit a chaque demande.
+function pv_courant($ligne, $regens) {
+    $pv = (int)$ligne['pv'];
+    $pvMax = (int)$ligne['pv_max'];
+    if ((int)$ligne['mort'] === 1 || $pv >= $pvMax) return $pv;
+    if (!isset($ligne['pv_age']) || $ligne['pv_age'] === null) return $pv;
+    $regen = isset($regens[$ligne['type']]) ? (int)$regens[$ligne['type']] : 0;
+    if ($regen <= 0) return $pv;
+    return min($pvMax, $pv + (int)floor($regen * (int)$ligne['pv_age'] / 60));
+}
+
+// Colonnes lues pour un monstre partage.
+function colonnes_monstre() {
+    return 'cle, type, position_x, position_z, rotation_y, proprietaire_id, pv, pv_max, mort,'
+        . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age,'
+        . ' TIMESTAMPDIFF(SECOND, pv_modifie_le, NOW()) AS pv_age';
+}
+
+function formater_monstre($ligne, $regens) {
     return array(
         'cle' => (string)$ligne['cle'], 'x' => (float)$ligne['position_x'], 'z' => (float)$ligne['position_z'],
-        'pv' => (int)$ligne['pv'], 'pv_max' => (int)$ligne['pv_max'], 'mort' => (int)$ligne['mort'],
+        'pv' => pv_courant($ligne, $regens), 'pv_max' => (int)$ligne['pv_max'], 'mort' => (int)$ligne['mort'],
         'age' => (int)$ligne['age'], 'rot' => (float)$ligne['rotation_y'],
         'proprietaire' => (int)$ligne['proprietaire_id'],
     );
@@ -184,28 +222,30 @@ function formater_monstre($ligne) {
 
 // depuis = 0 : tous les monstres ; sinon seulement ceux qui ont change.
 function lire_monstres($pdo, $depuis) {
-    $sql = 'SELECT cle, position_x, position_z, rotation_y, proprietaire_id, pv, pv_max, mort,'
-        . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age FROM monde_monstre';
+    $regens = regen_par_type($pdo);
+    $sql = 'SELECT ' . colonnes_monstre() . ' FROM monde_monstre';
+    // Les monstres blesses sont renvoyes a chaque demande : la regeneration ne change
+    // pas la revision, sans cela le client ne verrait jamais les PV remonter.
     if ((int)$depuis > 0) {
-        $requete = $pdo->prepare($sql . ' WHERE revision > :depuis ORDER BY cle');
+        $requete = $pdo->prepare($sql . ' WHERE revision > :depuis OR (mort = 0 AND pv < pv_max) ORDER BY cle');
         $requete->execute(array(':depuis' => (int)$depuis));
     } else {
         $requete = $pdo->prepare($sql . ' ORDER BY cle');
         $requete->execute();
     }
     $liste = array();
-    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne);
+    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne, $regens);
     return $liste;
 }
 
 function lire_monstres_par_cle($pdo, $cles) {
     if (count($cles) === 0) return array();
     $marques = implode(',', array_fill(0, count($cles), '?'));
-    $requete = $pdo->prepare('SELECT cle, position_x, position_z, rotation_y, proprietaire_id, pv, pv_max, mort,'
-        . ' TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age FROM monde_monstre WHERE cle IN (' . $marques . ')');
+    $regens = regen_par_type($pdo);
+    $requete = $pdo->prepare('SELECT ' . colonnes_monstre() . ' FROM monde_monstre WHERE cle IN (' . $marques . ')');
     $requete->execute(array_values($cles));
     $liste = array();
-    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne);
+    foreach ($requete->fetchAll() as $ligne) $liste[] = formater_monstre($ligne, $regens);
     return $liste;
 }
 
@@ -217,8 +257,8 @@ function traiter_declaration_monstres($pdo, $donnees) {
     if (!is_array($liste) || count($liste) > 200) throw new InvalidArgumentException('Liste de monstres invalide.');
     $rev = prochaine_revision($pdo);
     $insertion = $pdo->prepare('INSERT IGNORE INTO monde_monstre'
-        . ' (cle, type, position_x, position_z, pv, pv_max, mort, revision)'
-        . ' VALUES (:cle, :type, :x, :z, :pv, :pvmax, 0, :rev)');
+        . ' (cle, type, position_x, position_z, pv, pv_max, mort, revision, pv_modifie_le)'
+        . ' VALUES (:cle, :type, :x, :z, :pv, :pvmax, 0, :rev, NOW())');
     $cles = array();
     foreach ($liste as $monstre) {
         if (!is_array($monstre)) throw new InvalidArgumentException('Monstre invalide.');
@@ -247,23 +287,24 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
     if ($degats < 1 || $degats > 999) throw new InvalidArgumentException('Degats invalides.');
     $pdo->beginTransaction();
     try {
-        $requete = $pdo->prepare('SELECT pv, pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age'
+        $regens = regen_par_type($pdo);
+        $requete = $pdo->prepare('SELECT type, pv, pv_max, mort, TIMESTAMPDIFF(SECOND, modifie_le, NOW()) AS age,'
+            . ' TIMESTAMPDIFF(SECOND, pv_modifie_le, NOW()) AS pv_age'
             . ' FROM monde_monstre WHERE cle = :cle FOR UPDATE');
         $requete->execute(array(':cle' => $cle));
         $ligne = $requete->fetch();
         if (!$ligne) throw new InvalidArgumentException('Monstre inconnu : declaration manquante.');
-        $pv = (int)$ligne['pv'];
         $pvMax = (int)$ligne['pv_max'];
         $mort = (int)$ligne['mort'] === 1;
         if ($mort) {
             $pdo->commit();
             return array('message' => 'Monstre deja mort.', 'extra' => array());
         }
-        $pv = max(0, $pv - $degats);
+        $pv = max(0, pv_courant($ligne, $regens) - $degats);
         $mort = ($pv === 0);
         $rev = prochaine_revision($pdo);
-        $miseAJour = $pdo->prepare('UPDATE monde_monstre SET pv = :pv, mort = :mort, revision = :rev, auteur_id = :auteur'
-            . ' WHERE cle = :cle');
+        $miseAJour = $pdo->prepare('UPDATE monde_monstre SET pv = :pv, mort = :mort, revision = :rev, auteur_id = :auteur,'
+            . ' pv_modifie_le = NOW() WHERE cle = :cle');
         $miseAJour->execute(array(':pv' => $pv, ':mort' => $mort ? 1 : 0, ':rev' => $rev,
             ':auteur' => $auteur, ':cle' => $cle));
         $pdo->commit();
