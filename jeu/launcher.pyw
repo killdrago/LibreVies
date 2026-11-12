@@ -255,10 +255,13 @@ def texte_saisi(value, limite):
 
 
 def motdepasse_saisi(value):
-    """Le mot de passe n'est jamais journalise ni echappe dans du HTML."""
+    """Le mot de passe n'est jamais journalise ni echappe dans du HTML.
+    Memes caracteres que le pseudo : lettres, chiffres, _, espace, - et ."""
     if not isinstance(value, str) or len(value) > 128:
         return ''
     if any(ord(caractere) < 32 or ord(caractere) == 127 for caractere in value):
+        return ''
+    if re.fullmatch(r"[\w .-]+", value, re.UNICODE) is None:
         return ''
     return value
 
@@ -273,7 +276,7 @@ def email_valide(email):
 def pseudo_valide(pseudo):
     pseudo = texte_saisi(pseudo, 30)
     return (3 <= len(pseudo) <= 30
-            and re.fullmatch(r"[\w -]+", pseudo, re.UNICODE) is not None)
+            and re.fullmatch(r"[\w .-]+", pseudo, re.UNICODE) is not None)
 
 
 def journal_auth(message):

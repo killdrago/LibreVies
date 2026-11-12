@@ -294,6 +294,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int rocks;
     private int xp;
     private int level = 1;
+    private LibreViesCompte.LibreViesTypeMonstre[] typesMonstres;
     private int ratsKilled;
     private int spidersKilled;
     private int selectedSlot;
@@ -713,7 +714,11 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 Direction;   // direction de deplacement (errance / poursuite)
         public float WanderTimer;
         public float Speed = 1.6f;
-        public int PvMax = 50;          // souris 25, rat 50, araignee 75
+        public int PvMax = 50;          // souris 25, rat 50, araignee 75 (secours sans table)
+        public bool Agressif = true;    // table monstre : 1 = attaque le heros a portee
+        public int CoupMin = 6;         // degats d'un coup : tire au hasard entre min et max
+        public int CoupMax = 6;
+        public int XpGain = 20;         // experience donnee a la mort
         public bool Souris;
         public Transform Barre;         // barre de vie (orientee camera)
         public Transform Remplissage;   // partie rouge de la barre
@@ -883,6 +888,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 yield break;
             }
             // Quantite de monstres enregistree en base (table monstre) ; sans reponse, on garde 18.
+            // Stats des monstres (table monstre) : avant la creation des monstres.
             yield return compteJoueur.ChargerMonstres();
             if (String.IsNullOrEmpty(compteJoueur.Erreur) && compteJoueur.NombreMonstres >= 0)
             {
@@ -890,6 +896,10 @@ public sealed class LibreViesGame : MonoBehaviour
                 nombreMonstresAdminTexte = nombreMonstresAdmin.ToString(CultureInfo.InvariantCulture);
             }
             else Debug.LogWarning("[LV] quantite de monstres non lue : " + compteJoueur.Erreur);
+            yield return compteJoueur.ChargerTypesMonstres();
+            if (String.IsNullOrEmpty(compteJoueur.Erreur) && compteJoueur.TypesMonstres != null)
+                typesMonstres = compteJoueur.TypesMonstres;
+            else Debug.LogWarning("[LV] types de monstres non lus (valeurs de secours) : " + compteJoueur.Erreur);
         }
         yield return ChargerMondeServeur();
         string[] noms =
@@ -9506,10 +9516,22 @@ public sealed class LibreViesGame : MonoBehaviour
             + " (quantite ADMIN = " + nombreMonstresAdmin + ", positions aleatoires)");
     }
 
+    // Stats d'un type depuis la table monstre (rat = 1, souris = 2, araignee = 3).
+    // Null si la table n'a pas pu etre lue : on garde les valeurs de secours.
+    private LibreViesCompte.LibreViesTypeMonstre StatsTypeMonstre(string type)
+    {
+        if (typesMonstres == null) return null;
+        int id = type == "rat" ? 1 : (type == "souris" ? 2 : (type == "araignee" ? 3 : 0));
+        for (int i = 0; i < typesMonstres.Length; i++)
+            if (typesMonstres[i] != null && typesMonstres[i].id == id) return typesMonstres[i];
+        return null;
+    }
+
     private void CreateEnemy(Vector3 position, string type)
     {
         bool spider = type == "araignee";
         bool souris = type == "souris";
+        LibreViesCompte.LibreViesTypeMonstre stats = StatsTypeMonstre(type);
         var enemyObject = new GameObject(spider ? "Araignee" : (souris ? "Souris" : "Rat"));
         Vector2 depart = new Vector2(position.x, position.z);
         if (ZoneEauInterditeMonstre(depart))
@@ -9525,7 +9547,11 @@ public sealed class LibreViesGame : MonoBehaviour
             Root = enemyObject,
             Spider = spider,
             Souris = souris,
-            PvMax = spider ? 75 : (souris ? 25 : 50),
+            PvMax = stats != null ? stats.pv : (spider ? 75 : (souris ? 25 : 50)),
+            Agressif = stats == null || stats.agressif == 1,
+            CoupMin = stats != null ? stats.coup_min : 6,
+            CoupMax = stats != null ? stats.coup_max : 6,
+            XpGain = stats != null ? stats.xp : (spider ? 35 : 20),
             Home = position,
             Legs = new Transform[spider ? 8 : 0],
             // Vitesse tiree au hasard d'un monstre a l'autre (1,2 a 2,0 m/s),
@@ -10196,11 +10222,12 @@ public sealed class LibreViesGame : MonoBehaviour
             // Attaque : a portee et pas a travers la cloture du village.
             // Cadence 1,2 s / portee 1,6 m / 6 degats : les valeurs de la
             // reference (c'etait 0,8 s / 1,8 m / 8 degats).
-            if (distance < 1.6f && enemy.AttackCooldown <= 0 && !dead
+            // Seuls les monstres agressifs (table monstre) attaquent le heros.
+            if (enemy.Agressif && distance < 1.6f && enemy.AttackCooldown <= 0 && !dead
                 && !ClotureEntre(position, player.position))
             {
                 enemy.AttackCooldown = 1.2f;
-                DamagePlayer(6);
+                DamagePlayer(UnityEngine.Random.Range(enemy.CoupMin, enemy.CoupMax + 1));
             }
 
             if (enemy.Spider && enemy.Legs != null)
@@ -10280,7 +10307,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 enemy.Alive = false; enemy.Pilote = false; enemy.RespawnAt = Time.time + 1.5f; enemy.Root.SetActive(false);
                 if (enemy.Spider) spidersKilled++; else ratsKilled++;
-                GainXp(enemy.Spider ? 35 : 20);
+                GainXp(enemy.XpGain);
                 coins += enemy.Spider ? 4 : 2;
             }
         }
@@ -11022,7 +11049,18 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 184f, 470f, 60f),
             "La modification recree les monstres immediatement.\n"
-                + "La valeur par defaut reste 18.", smallStyle);
+            "La valeur par defaut reste 18.", smallStyle);
+        string stats = "Stats des monstres (table monstre) :\n";
+        if (typesMonstres == null) stats += "Table non chargee : valeurs de secours.";
+        else
+            for (int i = 0; i < typesMonstres.Length; i++)
+            {
+                LibreViesCompte.LibreViesTypeMonstre t = typesMonstres[i];
+                if (t == null) continue;
+                stats += t.nom + " : PV " + t.pv + " | agressif " + (t.agressif == 1 ? "oui" : "non")
+                    + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max + "\n";
+            }
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 250f, 760f, 120f), stats, smallStyle);
     }
 
     private System.Collections.IEnumerator RechercherJoueursAdministration()

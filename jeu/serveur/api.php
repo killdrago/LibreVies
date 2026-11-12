@@ -350,7 +350,7 @@ if ($action === 'check_account') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         repondre(false, 'Adresse email invalide.', array(), 400);
     }
-    if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
+    if (!preg_match('/^[[:alnum:]_ .-]{3,30}$/u', $pseudo)) {
         repondre(false, 'Pseudo invalide : 3 a 30 caracteres.', array(), 400);
     }
     try {
@@ -398,7 +398,7 @@ if ($action === 'register') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         repondre(false, 'Adresse email invalide.', array(), 400);
     }
-    if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
+    if (!preg_match('/^[[:alnum:]_ .-]{3,30}$/u', $pseudo)) {
         repondre(false, 'Pseudo invalide : 3 a 30 caracteres.', array(), 400);
     }
     if (strlen($motdepasse) < 8) {
@@ -538,7 +538,7 @@ if ($action === 'search_players' || $action === 'get_player' || $action === 'sav
         if ($action === 'save_player_stats') {
             // Pseudo, droit (0 ou 1) et caracteristiques : entrees verifiees avant toute ecriture.
             $pseudo = isset($donnees['pseudo']) && is_string($donnees['pseudo']) ? trim($donnees['pseudo']) : '';
-            if (!preg_match('/^[[:alnum:]_ -]{3,30}$/u', $pseudo)) {
+            if (!preg_match('/^[[:alnum:]_ .-]{3,30}$/u', $pseudo)) {
                 repondre(false, 'Pseudo invalide : 3 a 30 caracteres (lettres, chiffres, _, espace ou -).', array(), 400);
             }
             $droitBrut = isset($donnees['droit']) ? $donnees['droit'] : '';
@@ -652,6 +652,24 @@ if ($action === 'get_monstres' || $action === 'save_monstres') {
     }
     repondre(true, $action === 'save_monstres' ? 'Quantite de monstres enregistree.' : 'Quantite de monstres chargee.',
         array('membre' => membre_public($membre), 'reglage_monstres' => $monstres));
+}
+
+if ($action === 'get_types_monstres') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    try {
+        $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max FROM monstre ORDER BY id');
+        $query->execute();
+        $types = array();
+        foreach ($query->fetchAll() as $ligne) {
+            $types[] = array(
+                'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
+                'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
+                'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max']);
+        }
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'Types de monstres charges.', array('membre' => membre_public($membre), 'types_monstres' => $types));
 }
 
 if ($action === 'get_npcs') {

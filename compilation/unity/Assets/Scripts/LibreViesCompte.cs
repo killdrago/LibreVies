@@ -23,6 +23,19 @@ public sealed class LibreViesCompte
     }
 
     [Serializable]
+    public sealed class LibreViesTypeMonstre
+    {
+        public int id;
+        public string nom;
+        public int pv;
+        public int agressif;
+        public int xp;
+        public int loot;
+        public int coup_min;
+        public int coup_max;
+    }
+
+    [Serializable]
     public sealed class LibreViesReglageMonstres
     {
         public int id;
@@ -39,6 +52,7 @@ public sealed class LibreViesCompte
         public LibreViesPersonnage personnage;
         public LibreViesNpc[] npcs;
         public LibreViesReglageMonstres reglage_monstres;
+        public LibreViesTypeMonstre[] types_monstres;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
         public LibreViesPosition position;
@@ -167,6 +181,13 @@ public sealed class LibreViesCompte
     public IEnumerator Sauvegarder(LibreViesPersonnage profil)
     {
         yield return Envoyer("save_character", profil);
+    }
+    // Stats des types de monstres (table monstre). Null = pas encore lues.
+    public LibreViesTypeMonstre[] TypesMonstres { get; private set; }
+    public IEnumerator ChargerTypesMonstres()
+    {
+        TypesMonstres = null;
+        yield return Envoyer("get_types_monstres", null);
     }
     // Quantite de monstres enregistree dans la table monstre (-1 = pas encore lue).
     public int NombreMonstres { get; private set; }
@@ -484,6 +505,22 @@ public sealed class LibreViesCompte
             { Erreur = "Joueur bani veuillez contacter l'administrateur"; jeton = null; Joueur = null; yield break; }
             // Actions du monde et de la presence : leur reponse ne contient pas de personnage.
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
+            if (action == "get_types_monstres")
+            {
+                LibreViesTypeMonstre[] types = reponse.types_monstres;
+                if (types == null || types.Length == 0) { Erreur = "Reponse types de monstres invalide."; yield break; }
+                HashSet<int> identifiants = new HashSet<int>();
+                for (int i = 0; i < types.Length; i++)
+                {
+                    LibreViesTypeMonstre t = types[i];
+                    if (t == null || t.id < 1 || !identifiants.Add(t.id) || string.IsNullOrEmpty(t.nom)
+                        || t.pv <= 0 || (t.agressif != 0 && t.agressif != 1) || t.xp < 0 || t.loot < 0
+                        || t.coup_min < 0 || t.coup_min > t.coup_max)
+                    { Erreur = "Type de monstre invalide dans la table monstre."; yield break; }
+                }
+                TypesMonstres = types;
+                yield break;
+            }
             if (action == "get_monstres" || action == "save_monstres")
             {
                 if (reponse.reglage_monstres == null || reponse.reglage_monstres.lieu != "village depart"
