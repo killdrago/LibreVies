@@ -30,11 +30,18 @@ public sealed class LibreViesCompte
         public int pv;
         public int agressif;
         public int xp;
-        public int loot;
+        public string loot;     // lignes de monde_loot : "0" = rien, sinon "1,2"
         public int coup_min;
         public int coup_max;
         public int attparmin;   // attaques par minute (0 = n'attaque jamais)
         public int regen;       // regeneration des PV, en points par minute
+    }
+
+    [Serializable]
+    public sealed class LibreViesButin
+    {
+        public string objet;    // "or" ou "cailloux"
+        public int quantite;
     }
 
     [Serializable]
@@ -55,6 +62,7 @@ public sealed class LibreViesCompte
         public LibreViesNpc[] npcs;
         public LibreViesReglageMonstres reglage_monstres;
         public LibreViesTypeMonstre[] types_monstres;
+        public LibreViesButin[] butin;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
         public LibreViesPosition position;
@@ -149,6 +157,15 @@ public sealed class LibreViesCompte
     public LibreViesMonstre[] Monstres { get; private set; }
     // Monstres que ce joueur pilote (accepte par le serveur) lors du dernier envoi.
     public string[] PilotesAcceptes { get; private set; }
+
+    // Butin remis par le serveur depuis le dernier appel (objets gagnes sur des monstres).
+    public LibreViesButin[] ButinRecu { get; private set; }
+
+    public IEnumerator ReclamerButin()
+    {
+        ButinRecu = new LibreViesButin[0];
+        yield return Envoyer("reclamer_butin", null, null, new Dictionary<string, string>());
+    }
     public LibreViesJoueurPresent[] JoueursPresents { get; private set; }
     public int RevisionMonde { get; private set; }
     public bool MondeComplet { get; private set; }
@@ -200,7 +217,7 @@ public sealed class LibreViesCompte
         {
             { "id", t.id.ToString(ci) }, { "nom", t.nom ?? "" }, { "pv", t.pv.ToString(ci) },
             { "agressif", t.agressif.ToString(ci) }, { "xp", t.xp.ToString(ci) },
-            { "loot", t.loot.ToString(ci) }, { "coup_min", t.coup_min.ToString(ci) },
+            { "loot", string.IsNullOrEmpty(t.loot) ? "0" : t.loot }, { "coup_min", t.coup_min.ToString(ci) },
             { "coup_max", t.coup_max.ToString(ci) }, { "attparmin", t.attparmin.ToString(ci) }, { "regen", t.regen.ToString(ci) }
         };
         yield return Envoyer("save_type_monstre", null, null, champs);
@@ -530,11 +547,16 @@ public sealed class LibreViesCompte
                 {
                     LibreViesTypeMonstre t = types[i];
                     if (t == null || t.id < 1 || !identifiants.Add(t.id) || string.IsNullOrEmpty(t.nom)
-                        || t.pv <= 0 || (t.agressif != 0 && t.agressif != 1) || t.xp < 0 || t.loot < 0
+                        || t.pv <= 0 || (t.agressif != 0 && t.agressif != 1) || t.xp < 0 || t.loot == null
                         || t.coup_min < 0 || t.coup_min > t.coup_max || t.attparmin < 0 || t.regen < 0)
                     { Erreur = "Type de monstre invalide dans la table monstre."; yield break; }
                 }
                 TypesMonstres = types;
+                yield break;
+            }
+            if (action == "reclamer_butin")
+            {
+                ButinRecu = reponse.butin ?? new LibreViesButin[0];
                 yield break;
             }
             if (action == "get_monstres" || action == "save_monstres")

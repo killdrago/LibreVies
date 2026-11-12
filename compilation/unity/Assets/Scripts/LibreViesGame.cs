@@ -948,6 +948,7 @@ public sealed class LibreViesGame : MonoBehaviour
             PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());
         StartCoroutine(SynchroniserPilotageMonstres());
+        StartCoroutine(SynchroniserButin());
         ConstruireObjetsEdition();
         AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
         RafraichirZonesNommees();
@@ -8088,6 +8089,26 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // Toutes les 0,2 s : ressuscite les monstres morts depuis 10 s, puis envoie les
     // positions des monstres que ce joueur pilote (ou peut prendre).
+    // Recupere chaque seconde le butin gagne par ce joueur (or et cailloux en memoire).
+    private System.Collections.IEnumerator SynchroniserButin()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(1f);
+            LibreViesCompte compte = compteJoueur;
+            if (compte == null || !compte.LanceParLauncher || !compte.Authentifie) continue;
+            yield return compte.ReclamerButin();
+            if (!String.IsNullOrEmpty(compte.Erreur) || compte.ButinRecu == null) continue;
+            for (int i = 0; i < compte.ButinRecu.Length; i++)
+            {
+                LibreViesCompte.LibreViesButin b = compte.ButinRecu[i];
+                if (b == null || b.quantite <= 0) continue;
+                if (b.objet == "or") { coins += b.quantite; ShowInfo("+" + b.quantite + " or"); }
+                else if (b.objet == "cailloux") { rocks += b.quantite; ShowInfo("+" + b.quantite + " cailloux"); }
+            }
+        }
+    }
+
     private System.Collections.IEnumerator SynchroniserPilotageMonstres()
     {
         int dernierNombrePilotes = -1;
@@ -10313,7 +10334,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 enemy.Alive = false; enemy.Pilote = false; enemy.RespawnAt = Time.time + 1.5f; enemy.Root.SetActive(false);
                 if (enemy.Spider) spidersKilled++; else ratsKilled++;
                 GainXp(enemy.XpGain);
-                coins += enemy.Spider ? 4 : 2;
+                // Le butin ne vient plus de la mort locale : il est tire et remis par le serveur (SynchroniserButin).
             }
         }
         if (touches == 0) { ShowInfo("Aucune cible à portée"); return; }
@@ -11116,7 +11137,7 @@ public sealed class LibreViesGame : MonoBehaviour
             string[] valeurs = {
                 t.id.ToString(CultureInfo.InvariantCulture), t.nom ?? "",
                 t.pv.ToString(CultureInfo.InvariantCulture), t.agressif == 1 ? "oui" : "non",
-                t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
+                t.xp.ToString(CultureInfo.InvariantCulture), t.loot ?? "0",
                 t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
                 t.attparmin.ToString(CultureInfo.InvariantCulture), t.regen.ToString(CultureInfo.InvariantCulture) };
             x = 8f;   // coordonnees locales a la zone a defilement
@@ -11131,7 +11152,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 adminMonstreChamps = new string[]
                 {
                     t.nom, t.pv.ToString(CultureInfo.InvariantCulture), t.agressif.ToString(CultureInfo.InvariantCulture),
-                    t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
+                    t.xp.ToString(CultureInfo.InvariantCulture), t.loot ?? "0",
                     t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
                     t.attparmin.ToString(CultureInfo.InvariantCulture), t.regen.ToString(CultureInfo.InvariantCulture)
                 };
@@ -11163,17 +11184,19 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (!CompteAdministrateur || compteJoueur == null) yield break;
         string nom = (adminMonstreChamps[0] ?? "").Trim();
-        int pv, agressif, xp, loot, coupMin, coupMax, attParMin, regen;
+        int pv, agressif, xp, coupMin, coupMax, attParMin, regen;
+        string loot = (adminMonstreChamps[4] ?? "0").Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(loot, "^(0|[1-9][0-9]{0,2}(,[1-9][0-9]{0,2})*)$"))
+        { ShowInfo("Loot invalide : 0 ou numeros separes par des virgules (ex : 1,2)."); yield break; }
         if (!int.TryParse(adminMonstreChamps[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out pv)
             || !int.TryParse(adminMonstreChamps[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out agressif)
             || !int.TryParse(adminMonstreChamps[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out xp)
-            || !int.TryParse(adminMonstreChamps[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out loot)
             || !int.TryParse(adminMonstreChamps[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMin)
             || !int.TryParse(adminMonstreChamps[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMax)
             || !int.TryParse(adminMonstreChamps[7], NumberStyles.Integer, CultureInfo.InvariantCulture, out attParMin)
             || !int.TryParse(adminMonstreChamps[8], NumberStyles.Integer, CultureInfo.InvariantCulture, out regen))
         { ShowInfo("Valeurs numeriques invalides (PV, agressif, XP, loot, coups)."); yield break; }
-        if (nom.Length == 0 || pv < 1 || agressif < 0 || agressif > 1 || xp < 0 || loot < 0
+        if (nom.Length == 0 || pv < 1 || agressif < 0 || agressif > 1 || xp < 0
             || coupMin < 0 || coupMax < coupMin || attParMin < 0 || regen < 0)
         { ShowInfo("Valeurs invalides : agressif 0 ou 1, PV au moins 1, coup min <= coup max."); yield break; }
         var t = new LibreViesCompte.LibreViesTypeMonstre

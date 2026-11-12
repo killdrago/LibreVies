@@ -297,6 +297,108 @@ function traiter_declaration_monstres($pdo, $donnees) {
         'revision' => $rev, 'monstres' => lire_monstres_par_cle($pdo, $cles)));
 }
 
+// ---- Butin des monstres ----
+// Tables (mondeLV) : monde_loot (catalogue : id, objet, quantite, pourcentage),
+// monde_degats (degats par joueur et par monstre), monde_butin (butin en attente
+// de recuperation par le joueur). La liste de lignes d'un monstre est dans
+// monstre.loot (base principale) : texte « 1,2 » ou « 0 » pour rien.
+function id_monstre_du_type($type) {
+    $ids = array('rat' => 1, 'souris' => 2, 'araignee' => 3);
+    return isset($ids[$type]) ? $ids[$type] : 0;
+}
+
+function loot_du_type($type) {
+    $base = base_regen_monstres();
+    $id = id_monstre_du_type($type);
+    if ($base === null || $id === 0) return '0';
+    try {
+        $requete = $base->prepare('SELECT loot FROM monstre WHERE id = :id LIMIT 1');
+        $requete->execute(array(':id' => $id));
+        $loot = $requete->fetchColumn();
+        return ($loot === false || $loot === null) ? '0' : trim((string)$loot);
+    } catch (Exception $erreur) {
+        if (function_exists('journal_api')) journal_api('BUTIN : lecture de monstre.loot impossible : ' . $erreur->getMessage());
+        return '0';
+    }
+}
+
+// Tirage independant pour chaque ligne du monstre : chaque ligne tiree peut donner son objet.
+function tirer_butin($pdo, $type, $membreId) {
+    $loot = loot_du_type($type);
+    if ($loot === '' || $loot === '0') return;
+    $ids = array();
+    foreach (explode(',', $loot) as $morceau) {
+        $numero = (int)trim($morceau);
+        if ($numero > 0) $ids[] = $numero;
+    }
+    foreach ($ids as $numero) {
+        try {
+            $requete = $pdo->prepare('SELECT objet, quantite, pourcentage FROM monde_loot WHERE id = :id LIMIT 1');
+            $requete->execute(array(':id' => $numero));
+            $ligne = $requete->fetch();
+            if (!$ligne) continue;
+            $tirage = mt_rand(0, 9999999) / 100000; // 0 a 99,99999 %
+            if ($tirage < (float)$ligne['pourcentage']) {
+                $ajout = $pdo->prepare('INSERT INTO monde_butin (membre_id, objet, quantite) VALUES (:membre, :objet, :quantite)');
+                $ajout->execute(array(':membre' => $membreId, ':objet' => (string)$ligne['objet'],
+                    ':quantite' => (int)$ligne['quantite']));
+            }
+        } catch (Exception $erreur) {
+            if (function_exists('journal_api')) journal_api('BUTIN : ligne ' . $numero . ' impossible : ' . $erreur->getMessage());
+        }
+    }
+}
+
+function enregistrer_degats($pdo, $cle, $membreId, $degats) {
+    try {
+        $requete = $pdo->prepare('INSERT INTO monde_degats (cle, membre_id, degats) VALUES (:cle, :membre, :degats)'
+            . ' ON DUPLICATE KEY UPDATE degats = degats + VALUES(degats)');
+        $requete->execute(array(':cle' => $cle, ':membre' => $membreId, ':degats' => $degats));
+    } catch (Exception $erreur) {
+        if (function_exists('journal_api')) journal_api('BUTIN : degats non enregistres : ' . $erreur->getMessage());
+    }
+}
+
+// A la mort : le joueur qui a fait le plus de degats sur le monstre recoit le butin.
+function attribuer_butin_mort($pdo, $cle, $type) {
+    try {
+        $requete = $pdo->prepare('SELECT membre_id FROM monde_degats WHERE cle = :cle'
+            . ' ORDER BY degats DESC, membre_id ASC LIMIT 1');
+        $requete->execute(array(':cle' => $cle));
+        $premier = $requete->fetchColumn();
+        if ($premier !== false) tirer_butin($pdo, $type, (int)$premier);
+        $suppression = $pdo->prepare('DELETE FROM monde_degats WHERE cle = :cle');
+        $suppression->execute(array(':cle' => $cle));
+    } catch (Exception $erreur) {
+        if (function_exists('journal_api')) journal_api('BUTIN : attribution impossible : ' . $erreur->getMessage());
+    }
+}
+
+// Le joueur recupere son butin en attente (supprime cote serveur une fois remis).
+function reclamer_butin($pdo, $membreId) {
+    $pdo->beginTransaction();
+    try {
+        $requete = $pdo->prepare('SELECT id, objet, quantite FROM monde_butin WHERE membre_id = :membre ORDER BY id FOR UPDATE');
+        $requete->execute(array(':membre' => $membreId));
+        $lignes = $requete->fetchAll();
+        $ids = array();
+        $butin = array();
+        foreach ($lignes as $ligne) {
+            $ids[] = (int)$ligne['id'];
+            $butin[] = array('objet' => (string)$ligne['objet'], 'quantite' => (int)$ligne['quantite']);
+        }
+        if (count($ids) > 0) {
+            $suppression = $pdo->prepare('DELETE FROM monde_butin WHERE membre_id = :membre AND id IN (' . implode(',', $ids) . ')');
+            $suppression->execute(array(':membre' => $membreId));
+        }
+        $pdo->commit();
+    } catch (Exception $erreur) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $erreur;
+    }
+    return array('message' => 'Butin recu.', 'extra' => array('butin' => $butin));
+}
+
 // Un coup porte sur un monstre : les pv baissent pour tout le monde. Un monstre
 // mort se releve 10 s apres sa mort (remise a pleine vie au premier coup apres ce delai).
 function traiter_coup_monstre($pdo, $donnees, $auteur) {
@@ -318,8 +420,11 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
             $pdo->commit();
             return array('message' => 'Monstre deja mort.', 'extra' => array());
         }
-        $pv = max(0, pv_courant($ligne, $regens) - $degats);
+        $pvAvant = pv_courant($ligne, $regens);
+        $pv = max(0, $pvAvant - $degats);
         $mort = ($pv === 0);
+        enregistrer_degats($pdo, $cle, $auteur, min($degats, $pvAvant));
+        if ($mort) attribuer_butin_mort($pdo, $cle, (string)$ligne['type']);
         $rev = prochaine_revision($pdo);
         $miseAJour = $pdo->prepare('UPDATE monde_monstre SET pv = :pv, mort = :mort, revision = :rev, auteur_id = :auteur,'
             . ' pv_modifie_le = NOW() WHERE cle = :cle');
@@ -452,6 +557,7 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
     }
     if ($action === 'declarer_monstres') return traiter_declaration_monstres($pdo, $donnees);
     if ($action === 'frapper_monstre') return traiter_coup_monstre($pdo, $donnees, $auteur);
+    if ($action === 'reclamer_butin') return reclamer_butin($pdo, $auteur);
     if ($action === 'piloter_monstres') return traiter_pilotage_monstres($pdo, $donnees, $auteur);
     if ($action === 'ressusciter_monstres') return traiter_ressurection_monstres($pdo, $donnees);
     if ($action === 'enregistrer_maison') {

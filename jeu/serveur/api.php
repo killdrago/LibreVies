@@ -664,7 +664,7 @@ if ($action === 'get_types_monstres') {
         foreach ($query->fetchAll() as $ligne) {
             $types[] = array(
                 'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
-                'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
+                'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (string)$ligne['loot'],
                 'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max'],
                 'attparmin' => (int)$ligne['attparmin'], 'regen' => (int)$ligne['regen']);
         }
@@ -682,7 +682,7 @@ function lire_types_monstres($pdo) {
     foreach ($query->fetchAll() as $ligne) {
         $types[] = array(
             'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
-            'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
+            'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (string)$ligne['loot'],
             'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max'],
                 'attparmin' => (int)$ligne['attparmin'], 'regen' => (int)$ligne['regen']);
     }
@@ -693,7 +693,7 @@ if ($action === 'save_type_monstre') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     verifier_administrateur($membre); // Relu en BDD, exactement droit=1.
     $valeurs = array();
-    foreach (array('id', 'pv', 'agressif', 'xp', 'loot', 'coup_min', 'coup_max', 'attparmin', 'regen') as $champ) {
+    foreach (array('id', 'pv', 'agressif', 'xp', 'coup_min', 'coup_max', 'attparmin', 'regen') as $champ) {
         $valeur = isset($donnees[$champ]) ? $donnees[$champ] : null;
         if (is_string($valeur) && preg_match('/^[0-9]{1,6}$/D', $valeur)) $valeur = (int)$valeur;
         if (!is_int($valeur) || $valeur < 0 || $valeur > 1000000) {
@@ -701,6 +701,12 @@ if ($action === 'save_type_monstre') {
         }
         $valeurs[$champ] = $valeur;
     }
+    // Loot : « 0 » (rien) ou numeros des lignes de monde_loot separes par des virgules, ex : 1,2
+    $loot = isset($donnees['loot']) ? trim((string)$donnees['loot']) : '';
+    if (!preg_match('/^(0|[1-9][0-9]{0,2}(,[1-9][0-9]{0,2})*)$/D', $loot)) {
+        repondre(false, 'Loot invalide : 0 ou numeros separes par des virgules (ex : 1,2).', array(), 400);
+    }
+    $valeurs['loot'] = $loot;
     $nom = isset($donnees['nom']) ? texte_recu($donnees['nom'], 40) : '';
     if ($nom === '') repondre(false, 'Nom du monstre obligatoire.', array(), 400);
     if ($valeurs['id'] < 1 || $valeurs['pv'] < 1 || $valeurs['agressif'] > 1
@@ -779,13 +785,13 @@ if ($action === 'presence') {
 }
 
 if (in_array($action, array('get_monde', 'ajouter_element_monde', 'modifier_element_monde', 'supprimer_element_monde',
-    'vider_monde', 'enregistrer_maison', 'renommer_maison', 'declarer_monstres', 'frapper_monstre',
-    'piloter_monstres', 'ressusciter_monstres'), true)) {
+    'vider_monde', 'enregistrer_maison', 'renommer_maison', 'declarer_monstres', 'frapper_monstre', 'reclamer_butin',
+    'piloter_monstres', 'ressusciter_monstres', 'reclamer_butin'), true)) {
     // Lecture pour tous les joueurs connectes ; ecriture reservee aux administrateurs,
     // sauf les monstres (tout joueur connecte peut les declarer et les frapper).
     $membre = membre_authentifie($pdo, $config, $donnees);
     $monstres = in_array($action, array('declarer_monstres', 'frapper_monstre',
-        'piloter_monstres', 'ressusciter_monstres'), true);
+        'piloter_monstres', 'ressusciter_monstres', 'reclamer_butin'), true);
     if ($action !== 'get_monde' && !$monstres && (int)$membre['droit'] !== 1) {
         repondre(false, 'Modification du monde reservee aux administrateurs.', array(), 403);
     }

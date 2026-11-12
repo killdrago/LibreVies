@@ -4743,6 +4743,36 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.52 MAJ 63 - BUTIN DES MONSTRES (monde_loot, monstre.loot en texte)
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+
+  - Modele : monde_loot (mondeLV) = catalogue des lignes de butin : id, objet
+    (« or » ou « cailloux »), quantite, pourcentage (decimal, 0,10 = 0,10 %).
+    monstre.loot (librevies) = texte : « 0 » = rien, sinon les numeros de
+    lignes separes par des virgules (« 1,2 »). Lignes partagees entre monstres.
+  - Tirage : a la mort, chaque ligne de la liste est tiree independamment. Un
+    tirage gagne donne l'objet de la ligne (quantite fixee par la ligne).
+  - Attribution : le joueur qui a fait le plus de degats sur le monstre (somme
+    des degats enregistres dans monde_degats, egalite : plus petit identifiant).
+  - Remise : monde_butin = butin en attente. Le client appelle reclamer_butin
+    chaque seconde ; le serveur renvoie puis supprime le butin du joueur.
+  - Client : or et cailloux sont ajoutes a la memoire (coins, rocks), comme
+    avant : non sauvegardes entre deux sessions. La pièce fixe donnee a la mort
+    locale (coins += 2 / 4) est supprimee : le butin vient du serveur seulement.
+  - Admin : la colonne Loot et le champ EDITER acceptent « 0 » ou « 1,2 ».
+    Validation de format seulement (cote serveur, les numeros inconnus sont
+    ignores au tirage, car monde_loot est dans une autre base).
+  - Objets reconnus : or (coins), cailloux (rocks). Bois : non cree (mis de cote).
+  - SQL A APPLIQUER (non committe, donne dans le chat) : creation de monde_loot,
+    monde_degats, monde_butin dans mondeLV ; ALTER de monstre.loot en VARCHAR
+    dans librevies.
+  - Verification : compilation Unity NON faite, PHP NON teste (php absent du bac
+    a sable). Controle de syntaxe C# : memes erreurs pre-existantes ; accolades
+    et parentheses PHP equilibrees.
+    A tester : un monstre avec loot « 1,2 » ; le joueur qui fait le plus de degats
+    recoit or/cailloux selon les tirages ; la remise apparait en message.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
