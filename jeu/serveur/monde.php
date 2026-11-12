@@ -176,18 +176,29 @@ function lire_monde($pdo, $depuis) {
 // Regeneration (colonne monstre.regen = pts/minute) : lue par type de monstre.
 // Les types correspondent aux identifiants de la table monstre (1 rat, 2 souris, 3 araignee).
 // Si la colonne regen n'existe pas encore, il n'y a pas de regeneration (le monde reste lisible).
+// La table monstre est dans la base principale (config db_name), pas dans mondeLV :
+// api.php transmet sa connexion via base_regen_monstres().
+function base_regen_monstres($pdo = null) {
+    static $base = null;
+    if ($pdo !== null) $base = $pdo;
+    return $base;
+}
+
 function regen_par_type($pdo) {
     $regens = array('rat' => 0, 'souris' => 0, 'araignee' => 0);
+    $source = base_regen_monstres();
+    if ($source === null) $source = $pdo;
     try {
         $noms = array(1 => 'rat', 2 => 'souris', 3 => 'araignee');
-        $requete = $pdo->prepare('SELECT id, regen FROM monstre WHERE id IN (1, 2, 3)');
+        $requete = $source->prepare('SELECT id, regen FROM monstre WHERE id IN (1, 2, 3)');
         $requete->execute();
         foreach ($requete->fetchAll() as $ligne) {
             $id = (int)$ligne['id'];
             if (isset($noms[$id])) $regens[$noms[$id]] = max(0, (int)$ligne['regen']);
         }
     } catch (Exception $erreur) {
-        // Pas de colonne regen : aucune regeneration.
+        // Colonne regen absente ou table absente : aucune regeneration, signalee dans le journal.
+        if (function_exists('journal_api')) journal_api('REGEN monstres : lecture impossible : ' . $erreur->getMessage());
     }
     return $regens;
 }

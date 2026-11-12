@@ -323,6 +323,7 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ));
+    base_regen_monstres($pdo); // table monstre (regeneration) dans la base principale
 } catch (Exception $erreur) {
     repondre(false, detail_erreur($erreur, $config), array(), 503);
 }

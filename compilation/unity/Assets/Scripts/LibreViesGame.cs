@@ -10148,6 +10148,9 @@ public sealed class LibreViesGame : MonoBehaviour
                 // le heros, sauf pendant la riposte (apres un coup recu) : poursuite a 25 m.
                 bool poursuite = (enemy.Agressif && distanceChasse < 10f)
                     || (Time.time < enemy.ProvoqueJusqua && distanceChasse < 25f);
+                // Monstre non agressif qui poursuit apres un coup : la riposte se prolonge
+                // tant que le heros reste a moins de 25 m (il ne decroche pas apres 10 s).
+                if (poursuite && !enemy.Agressif) enemy.ProvoqueJusqua = Time.time + 10f;
                 if (poursuite)
                 {
                     Vector3 vers = cibleChasse - position; vers.y = 0f;

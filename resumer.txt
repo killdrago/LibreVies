@@ -4718,6 +4718,31 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     le jeu apres deploiement de monde.php et verifier qu'une souris (200 PV) part
     a 200 PV ; blesser puis attendre pour voir la remontee.
 
+8.51 MAJ 62 - REGENERATION LUE DANS LA BONNE BASE ; POURSUITE DES MONSTRES NON AGRESSIFS
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+
+  - Constat utilisateur : pv corrects, mais la regeneration ne se fait pas ; une
+    souris frappee ne suit pas le joueur qui s'enfuit.
+  - Cause regeneration : monde.php se connecte a la base mondeLV, alors que la
+    table monstre est dans la base principale (db_name). La lecture de regen
+    echouait et l'erreur etait avalee : regen restait a 0 partout.
+    Correctif : api.php transmet sa connexion principale a monde.php
+    (base_regen_monstres) ; la lecture de regen s'en sert. Une erreur de lecture
+    est maintenant ecrite dans le journal (REGEN monstres : lecture impossible).
+  - Cause poursuite : la riposte d'un monstre non agressif durait 10 s fixes ;
+    apres 10 s, il abandonnait meme si le joueur restait a 25 m.
+    Correctif : tant qu'il poursuit, la riposte est prolongee (10 s a chaque
+    pas). Il decroche seulement quand le joueur est a plus de 25 m depuis 10 s.
+  - Limite : la riposte et la poursuite sont calculees sur la machine du joueur
+    qui frappe et sur le client qui pilote le monstre. Si un autre joueur pilote
+    cette souris, la poursuite n'est pas vue par le pilote (a traiter plus tard).
+  - Pas de SQL a appliquer pour ce correctif.
+  - Verification : compilation Unity NON faite, PHP NON teste (php absent du bac
+    a sable). Controle de syntaxe C# : memes erreurs pre-existantes.
+    A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
+    de 10 s.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
