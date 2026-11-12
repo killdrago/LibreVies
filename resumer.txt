@@ -4743,6 +4743,18 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.54 MAJ 65 - ADMIN > LOOT (table monde_loot)
+================================================================================
+  - Nouvel onglet LOOT (dernier onglet de ADMIN) : tableau blanc plein hauteur,
+    defilement, colonnes ID, objet, quantite, pourcentage, bouton EDITER par ligne,
+    bouton AJOUTER UNE LIGNE (id attribue par la base), ACTUALISER.
+  - Serveur : actions get_loot (tout joueur connecte) et save_loot (administrateur,
+    relu en BDD). save_loot : id 0 = insertion, sinon modification. Objet limite a
+    « or » ou « cailloux », quantite entiere, pourcentage de 0 a 100 (2 decimales).
+  - Client : LibreViesCompte.ChargerLoot / SauvegarderLoot, champ LootTable.
+  - Aucun SQL a appliquer. Verification : PHP non teste (absent du bac a sable),
+    Unity non compile. Controle de syntaxe C# : memes erreurs pre-existantes.
+
 8.53 MAJ 64 - BUTIN : OBJETS NORMALISES + JOURNAL DES TIRAGES
 ================================================================================
   - Serveur : objet_butin_normalise() (casse, espaces, synonymes or/cailloux).

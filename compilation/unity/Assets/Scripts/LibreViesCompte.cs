@@ -22,6 +22,16 @@ public sealed class LibreViesCompte
         public string email;
     }
 
+    // Ligne de la table monde_loot (mondeLV) : objet « or » ou « cailloux ».
+    [Serializable]
+    public sealed class LibreViesLoot
+    {
+        public int id;
+        public string objet;
+        public int quantite;
+        public float pourcentage;   // 0 a 100
+    }
+
     [Serializable]
     public sealed class LibreViesTypeMonstre
     {
@@ -62,6 +72,7 @@ public sealed class LibreViesCompte
         public LibreViesNpc[] npcs;
         public LibreViesReglageMonstres reglage_monstres;
         public LibreViesTypeMonstre[] types_monstres;
+        public LibreViesLoot[] loot;
         public LibreViesButin[] butin;
         public Membre[] players;
         public LibreViesJoueurAdmin player;
@@ -221,6 +232,25 @@ public sealed class LibreViesCompte
             { "coup_max", t.coup_max.ToString(ci) }, { "attparmin", t.attparmin.ToString(ci) }, { "regen", t.regen.ToString(ci) }
         };
         yield return Envoyer("save_type_monstre", null, null, champs);
+    }
+    // Table monde_loot (ADMIN > Loot). Null = pas encore lue.
+    public LibreViesLoot[] LootTable { get; private set; }
+    public IEnumerator ChargerLoot()
+    {
+        LootTable = null;
+        yield return Envoyer("get_loot", null);
+    }
+    // Ajoute (id = 0) ou modifie une ligne de monde_loot (admin) ; la reponse renvoie toute la table.
+    public IEnumerator SauvegarderLoot(int id, string objet, int quantite, float pourcentage)
+    {
+        if (!EstAdministrateur) { Erreur = "Modification du loot reservee aux administrateurs."; yield break; }
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var champs = new Dictionary<string, string>
+        {
+            { "id", id.ToString(ci) }, { "objet", objet ?? "" }, { "quantite", quantite.ToString(ci) },
+            { "pourcentage", pourcentage.ToString("0.00", ci) }
+        };
+        yield return Envoyer("save_loot", null, null, champs);
     }
     // Quantite de monstres enregistree dans la table monstre (-1 = pas encore lue).
     public int NombreMonstres { get; private set; }
@@ -552,6 +582,12 @@ public sealed class LibreViesCompte
                     { Erreur = "Type de monstre invalide dans la table monstre."; yield break; }
                 }
                 TypesMonstres = types;
+                yield break;
+            }
+            if (action == "get_loot" || action == "save_loot")
+            {
+                if (reponse.loot == null) { Erreur = "Reponse loot invalide."; yield break; }
+                LootTable = reponse.loot;
                 yield break;
             }
             if (action == "reclamer_butin")

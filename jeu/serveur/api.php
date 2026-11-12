@@ -735,6 +735,66 @@ if ($action === 'save_type_monstre') {
     repondre(true, 'Monstre enregistre.', array('membre' => membre_public($membre), 'types_monstres' => $types));
 }
 
+// ---- Table monde_loot (mondeLV) : catalogue du butin, lu et modifie depuis ADMIN > Loot ----
+function lire_loot($pdoMonde) {
+    $query = $pdoMonde->prepare('SELECT id, objet, quantite, pourcentage FROM monde_loot ORDER BY id');
+    $query->execute();
+    $lignes = array();
+    foreach ($query->fetchAll() as $ligne) {
+        $lignes[] = array('id' => (int)$ligne['id'], 'objet' => (string)$ligne['objet'],
+            'quantite' => (int)$ligne['quantite'], 'pourcentage' => round((float)$ligne['pourcentage'], 2));
+    }
+    return $lignes;
+}
+
+if ($action === 'get_loot' || $action === 'save_loot') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    if ($action === 'save_loot') verifier_administrateur($membre); // Relu en BDD, exactement droit=1.
+    try {
+        $pdoMonde = connexion_monde($config);
+        if ($action === 'save_loot') {
+            $id = isset($donnees['id']) ? $donnees['id'] : '';
+            if (!is_string($id) || !preg_match('/^[0-9]{1,6}$/D', $id)) {
+                repondre(false, 'Identifiant de ligne invalide.', array(), 400);
+            }
+            $id = (int)$id; // 0 = nouvelle ligne
+            // Objet : seulement « or » ou « cailloux » (les seuls objets que le jeu reconnait).
+            $objet = objet_butin_normalise(isset($donnees['objet']) ? $donnees['objet'] : '');
+            if ($objet === '') repondre(false, 'Objet invalide : or ou cailloux.', array(), 400);
+            $quantite = isset($donnees['quantite']) ? $donnees['quantite'] : '';
+            if (!is_string($quantite) || !preg_match('/^[0-9]{1,7}$/D', trim($quantite))) {
+                repondre(false, 'Quantite invalide : nombre entier positif.', array(), 400);
+            }
+            $quantite = (int)trim($quantite);
+            // Pourcentage : 0 a 100, deux decimales au maximum (virgule ou point).
+            $pourcentage = isset($donnees['pourcentage']) ? str_replace(',', '.', trim((string)$donnees['pourcentage'])) : '';
+            if (!preg_match('/^[0-9]{1,3}(\.[0-9]{1,2})?$/D', $pourcentage) || (float)$pourcentage > 100) {
+                repondre(false, 'Pourcentage invalide : entre 0 et 100, deux decimales maximum.', array(), 400);
+            }
+            $pourcentage = number_format((float)$pourcentage, 2, '.', '');
+            if ($id > 0) {
+                $query = $pdoMonde->prepare('SELECT id FROM monde_loot WHERE id = :id LIMIT 1');
+                $query->execute(array(':id' => $id));
+                if (!$query->fetchColumn()) repondre(false, 'Ligne de loot introuvable.', array(), 404);
+                $query = $pdoMonde->prepare('UPDATE monde_loot SET objet = :objet, quantite = :quantite,'
+                    . ' pourcentage = :pourcentage WHERE id = :id');
+                $query->execute(array(':objet' => $objet, ':quantite' => $quantite,
+                    ':pourcentage' => $pourcentage, ':id' => $id));
+            } else {
+                $query = $pdoMonde->prepare('INSERT INTO monde_loot (objet, quantite, pourcentage)'
+                    . ' VALUES (:objet, :quantite, :pourcentage)');
+                $query->execute(array(':objet' => $objet, ':quantite' => $quantite,
+                    ':pourcentage' => $pourcentage));
+            }
+        }
+        $lignes = lire_loot($pdoMonde);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, $action === 'save_loot' ? 'Ligne de loot enregistree.' : 'Loot charge.',
+        array('membre' => membre_public($membre), 'loot' => $lignes));
+}
+
 if ($action === 'get_npcs') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     try {

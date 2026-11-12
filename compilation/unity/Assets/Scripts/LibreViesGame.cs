@@ -298,6 +298,11 @@ public sealed class LibreViesGame : MonoBehaviour
     private int adminMonstreEdition = -1;                 // id du monstre en cours d'edition
     private string[] adminMonstreChamps = new string[9];  // nom, pv, agressif, xp, loot, coup min, coup max, atk/min, regen
     private Vector2 adminMonstresScroll;
+    // ADMIN > Loot (table monde_loot) : -2 aucune ligne ouverte, 0 nouvelle ligne, sinon id.
+    private int adminLootEdition = -2;
+    private string[] adminLootChamps = new string[3];   // objet, quantite, pourcentage
+    private Vector2 adminLootScroll;
+    private bool adminLootDemande;
     private int ratsKilled;
     private int spidersKilled;
     private int selectedSlot;
@@ -12196,7 +12201,7 @@ public sealed class LibreViesGame : MonoBehaviour
             // Poignee de redimensionnement (affichee seulement quand la fenetre est deployee).
             GUI.Box(new Rect(fenetre.xMax - 22f, fenetre.yMax - 22f, 22f, 22f), "//", smallStyle);
 
-            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA", "SQL", "Edition" };
+            string[] onglets = { "Ville", "Joueur", "NPC", "Monde", "Monstre", "Textures", "IA", "SQL", "Edition", "Loot" };
             for (int i = 0; i < onglets.Length; i++)
             {
                 Rect onglet = new Rect(fenetre.x + 18f, fenetre.y + 70f + i * 52f,
@@ -12251,8 +12256,163 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 DessinerAdminEdition(contenu);
             }
+            else if (adminTab == 9)
+            {
+                DessinerAdminLoot(contenu);
+            }
         }
         finally { GUI.matrix = ancienneMatrice; }
+    }
+
+    // Liste de la table monde_loot : tableau blanc plein hauteur, defilement, EDITER par ligne,
+    // AJOUTER UNE LIGNE pour creer une ligne (id attribue par la base).
+    private void DessinerAdminLoot(Rect contenu)
+    {
+        EnsureTableauStyles();
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f), "LOOT", titleStyle);
+        if (compteJoueur != null && compteJoueur.LootTable == null && !adminLootDemande)
+            StartCoroutine(ChargerLootAdmin());
+        LibreViesCompte.LibreViesLoot[] lignes = compteJoueur != null ? compteJoueur.LootTable : null;
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 56f, 420f, 22f),
+            "Lignes de loot : " + (lignes != null ? lignes.Length.ToString(CultureInfo.InvariantCulture) : "chargement..."),
+            smallStyle);
+        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 78f, contenu.width - 36f, 22f),
+            "Objet : or ou cailloux. Pourcentage de 0 a 100 (deux decimales). Une ligne est partagee par les monstres qui la referencent.",
+            smallStyle);
+        if (GUI.Button(new Rect(contenu.x + 18f, contenu.y + 110f, 170f, 30f), "AJOUTER UNE LIGNE", buttonStyle))
+        {
+            adminLootEdition = 0;
+            adminLootChamps = new string[] { "or", "1", "0.00" };
+        }
+        if (GUI.Button(new Rect(contenu.x + 198f, contenu.y + 110f, 110f, 30f), "ACTUALISER", buttonStyle))
+            StartCoroutine(ChargerLootAdmin());
+
+        Rect zone = new Rect(contenu.x + 18f, contenu.y + 152f, contenu.width - 36f, contenu.height - 170f);
+        GUI.color = Color.white;
+        GUI.DrawTexture(zone, Texture2D.whiteTexture);
+        if (lignes == null)
+        {
+            GUI.Label(new Rect(zone.x + 10f, zone.y + 10f, zone.width - 20f, 40f),
+                compteJoueur != null && !String.IsNullOrEmpty(compteJoueur.Erreur)
+                    ? "Table loot inaccessible : " + compteJoueur.Erreur : "Chargement du loot...", tableauTexte);
+            return;
+        }
+        string[] entetes = { "ID", "Objet", "Quantite", "Pourcentage" };
+        float[] largeurs = { 60f, 0f, 110f, 130f };
+        float actionW = 110f;
+        largeurs[1] = Mathf.Max(140f, zone.width - 16f - largeurs[0] - largeurs[2] - largeurs[3] - actionW);
+
+        GUI.color = new Color(0.82f, 0.82f, 0.82f);
+        GUI.DrawTexture(new Rect(zone.x, zone.y, zone.width, 30f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        float x = zone.x + 8f;
+        for (int c = 0; c < largeurs.Length; c++)
+        {
+            GUI.Label(new Rect(x, zone.y + 5f, largeurs[c] - 4f, 22f), entetes[c], tableauEntete);
+            x += largeurs[c];
+        }
+        GUI.Label(new Rect(x, zone.y + 5f, actionW, 22f), "Modifier", tableauEntete);
+
+        const float ligne = 34f;
+        const float hauteurFormulaire = 80f;
+        Rect corps = new Rect(zone.x, zone.y + 30f, zone.width, zone.height - 30f);
+        float hauteur = lignes.Length * ligne + (adminLootEdition != -2 ? hauteurFormulaire : 0f) + 8f;
+        Rect vue = new Rect(0f, 0f, corps.width - 16f, Mathf.Max(hauteur, corps.height));
+        adminLootScroll = GUI.BeginScrollView(corps, adminLootScroll, vue, false, true);
+        float y = 0f;
+        if (adminLootEdition == 0)
+        {
+            DessinerFormulaireLootAdmin(0, vue.width, y);
+            y += hauteurFormulaire;
+        }
+        for (int i = 0; i < lignes.Length; i++)
+        {
+            LibreViesCompte.LibreViesLoot l = lignes[i];
+            if (l == null) continue;
+            if (i % 2 == 1)
+            {
+                GUI.color = new Color(0.93f, 0.93f, 0.93f);
+                GUI.DrawTexture(new Rect(0f, y, vue.width, ligne), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
+            string[] valeurs = {
+                l.id.ToString(CultureInfo.InvariantCulture), l.objet ?? "",
+                l.quantite.ToString(CultureInfo.InvariantCulture),
+                l.pourcentage.ToString("0.00", CultureInfo.InvariantCulture) + " %" };
+            x = 8f;
+            for (int c = 0; c < valeurs.Length; c++)
+            {
+                GUI.Label(new Rect(x, y + 6f, largeurs[c] - 4f, 22f), valeurs[c], tableauTexte);
+                x += largeurs[c];
+            }
+            if (GUI.Button(new Rect(x, y + 3f, 100f, 28f), "EDITER", buttonStyle))
+            {
+                adminLootEdition = l.id;
+                adminLootChamps = new string[] {
+                    l.objet ?? "", l.quantite.ToString(CultureInfo.InvariantCulture),
+                    l.pourcentage.ToString("0.00", CultureInfo.InvariantCulture) };
+            }
+            y += ligne;
+            if (adminLootEdition == l.id)
+            {
+                DessinerFormulaireLootAdmin(l.id, vue.width, y);
+                y += hauteurFormulaire;
+            }
+        }
+        GUI.EndScrollView();
+    }
+
+    // Formulaire d'une ligne de loot (id 0 = nouvelle ligne), dessine a la position y du tableau.
+    private void DessinerFormulaireLootAdmin(int id, float largeur, float y)
+    {
+        GUI.color = new Color(0.97f, 0.97f, 0.9f);
+        GUI.DrawTexture(new Rect(0f, y, largeur, 76f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        string[] etiquettes = { "Objet : or / cailloux", "Quantite", "Pourcentage : %" };
+        float[] largeursForm = { 190f, 110f, 130f };
+        float fx = 8f;
+        for (int c = 0; c < 3; c++)
+        {
+            GUI.Label(new Rect(fx, y + 4f, largeursForm[c], 22f), etiquettes[c], tableauEntete);
+            adminLootChamps[c] = GUI.TextField(new Rect(fx, y + 26f, largeursForm[c] - 10f, 26f),
+                adminLootChamps[c] ?? "", 20, tableauChamp);
+            fx += largeursForm[c] + 8f;
+        }
+        if (GUI.Button(new Rect(8f, y + 46f, 130f, 26f), "ENREGISTRER", buttonStyle))
+            StartCoroutine(SauvegarderLootAdmin(id));
+        if (GUI.Button(new Rect(148f, y + 46f, 110f, 26f), "ANNULER", buttonStyle))
+            adminLootEdition = -2;
+    }
+
+    private System.Collections.IEnumerator ChargerLootAdmin()
+    {
+        if (compteJoueur == null) yield break;
+        adminLootDemande = true;
+        yield return compteJoueur.ChargerLoot();
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+            ShowInfo("Loot non charge : " + compteJoueur.Erreur);
+    }
+
+    private System.Collections.IEnumerator SauvegarderLootAdmin(int id)
+    {
+        if (!CompteAdministrateur || compteJoueur == null) yield break;
+        string objet = (adminLootChamps[0] ?? "").Trim().ToLowerInvariant();
+        if (objet != "or" && objet != "cailloux")
+        { ShowInfo("Objet invalide : or ou cailloux."); yield break; }
+        int quantite;
+        if (!int.TryParse((adminLootChamps[1] ?? "").Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out quantite)
+            || quantite < 0)
+        { ShowInfo("Quantite invalide : nombre entier positif."); yield break; }
+        float pourcentage;
+        string pct = (adminLootChamps[2] ?? "").Trim().Replace(',', '.');
+        if (!float.TryParse(pct, NumberStyles.Float, CultureInfo.InvariantCulture, out pourcentage)
+            || pourcentage < 0f || pourcentage > 100f)
+        { ShowInfo("Pourcentage invalide : entre 0 et 100."); yield break; }
+        yield return compteJoueur.SauvegarderLoot(id, objet, quantite, pourcentage);
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { ShowInfo("Loot non enregistre : " + compteJoueur.Erreur); yield break; }
+        adminLootEdition = -2;
+        ShowInfo("Ligne de loot enregistree : " + objet);
     }
 
     // Onglet EDITION de l'administration : active ou quitte le mode edition du monde.
