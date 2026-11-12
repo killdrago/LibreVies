@@ -688,9 +688,7 @@ function lire_types_monstres($pdo) {
 
 if ($action === 'save_type_monstre') {
     $membre = membre_authentifie($pdo, $config, $donnees);
-    if ((int)$membre['droit'] !== 1) {
-        repondre(false, 'Modification des monstres reservee aux administrateurs.', array(), 403);
-    }
+    verifier_administrateur($membre); // Relu en BDD, exactement droit=1.
     $valeurs = array();
     foreach (array('id', 'pv', 'agressif', 'xp', 'loot', 'coup_min', 'coup_max') as $champ) {
         $valeur = isset($donnees[$champ]) ? $donnees[$champ] : null;
