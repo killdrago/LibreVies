@@ -898,7 +898,7 @@ public sealed class LibreViesGame : MonoBehaviour
             yield return compteJoueur.ChargerMonstres();
             if (String.IsNullOrEmpty(compteJoueur.Erreur) && compteJoueur.NombreMonstres >= 0)
             {
-                nombreMonstresAdmin = Mathf.Clamp(compteJoueur.NombreMonstres, 0, 120);
+                nombreMonstresAdmin = Mathf.Max(0, compteJoueur.NombreMonstres);
                 nombreMonstresAdminTexte = nombreMonstresAdmin.ToString(CultureInfo.InvariantCulture);
             }
             else Debug.LogWarning("[LV] quantite de monstres non lue : " + compteJoueur.Erreur);
@@ -10140,7 +10140,11 @@ public sealed class LibreViesGame : MonoBehaviour
 
                 // Poursuite quand le heros est proche, errance sinon : les betes ne
                 // restent plus plantees a ne rien faire (comme la reference).
-                if (distanceChasse < 10f)
+                // Agressif : poursuit a moins de 10 m. Non agressif : ne vient jamais vers
+                // le heros, sauf pendant la riposte (apres un coup recu) : poursuite a 25 m.
+                bool poursuite = (enemy.Agressif && distanceChasse < 10f)
+                    || (Time.time < enemy.ProvoqueJusqua && distanceChasse < 25f);
+                if (poursuite)
                 {
                     Vector3 vers = cibleChasse - position; vers.y = 0f;
                     if (vers.sqrMagnitude > 0.01f) enemy.Direction = vers.normalized;
@@ -10156,7 +10160,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     }
                 }
 
-                float speed = enemy.Speed * (distanceChasse < 10f ? 1.4f : 0.6f);
+                float speed = enemy.Speed * (poursuite ? 1.4f : 0.6f);
                 Vector3 deplacement = enemy.Direction;
                 // A portee de coup, la bete s'arrete : elle n'entre plus dans les
                 // jambes du heros.
@@ -11013,18 +11017,30 @@ public sealed class LibreViesGame : MonoBehaviour
             if (enemy == null || !enemy.Alive || enemy.Root == null || !enemy.Root.activeInHierarchy) continue;
             Vector3 tete = enemy.Root.transform.position + Vector3.up * (enemy.Spider ? 1.25f : 0.9f);
             Vector3 ecran = gameCamera.WorldToScreenPoint(tete);
-            if (ecran.z <= 0f || ecran.z > 40f) continue;
+            if (ecran.z <= 0f || ecran.z > DistanceNomsMonstres()) continue;
             float x = ecran.x, y = Screen.height - ecran.y;
-            // Nom au-dessus, barre de PV en dessous du nom.
+            // Nom au-dessus, barre de PV en dessous du nom (ensemble remonte d'une hauteur de nom).
             GUI.color = Color.white;
-            GUI.Label(new Rect(x - 80f, y - 22f, 160f, 18f), enemy.NomAffiche, nomMonstreStyle);
+            GUI.Label(new Rect(x - 80f, y - 40f, 160f, 18f), enemy.NomAffiche, nomMonstreStyle);
             float ratio = Mathf.Clamp01(enemy.Hp / (float)Mathf.Max(1, enemy.PvMax));
             GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.85f);
-            GUI.DrawTexture(new Rect(x - 40f, y - 2f, 80f, 8f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x - 40f, y - 20f, 80f, 8f), Texture2D.whiteTexture);
             GUI.color = new Color(0.85f, 0.1f, 0.1f);
-            GUI.DrawTexture(new Rect(x - 40f, y - 2f, 80f * ratio, 8f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x - 40f, y - 20f, 80f * ratio, 8f), Texture2D.whiteTexture);
             GUI.color = Color.white;
         }
+    }
+
+    // Distance (m) a laquelle le nom et la barre des monstres sont affiches.
+    // Reglage local a ce PC (PlayerPrefs), modifiable dans ADMIN > Monstre.
+    private const string CleDistanceNomsMonstres = "LV_DistanceNomsMonstres";
+    private float distanceNomsMonstresValeur = -1f;
+    private string adminDistanceNomsTexte;
+    private float DistanceNomsMonstres()
+    {
+        if (distanceNomsMonstresValeur < 0f)
+            distanceNomsMonstresValeur = Mathf.Clamp(PlayerPrefs.GetFloat(CleDistanceNomsMonstres, 40f), 5f, 200f);
+        return distanceNomsMonstresValeur;
     }
 
     // Styles du tableau admin : texte noir sur fond blanc.
@@ -11044,7 +11060,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private void DessinerListeMonstresAdmin(Rect contenu)
     {
         EnsureTableauStyles();
-        Rect zone = new Rect(contenu.x + 18f, contenu.y + 250f, contenu.width - 36f, contenu.height - 268f);
+        Rect zone = new Rect(contenu.x + 18f, contenu.y + 186f, contenu.width - 36f, contenu.height - 204f);
         GUI.color = Color.white;
         GUI.DrawTexture(zone, Texture2D.whiteTexture);
         if (typesMonstres == null || typesMonstres.Length == 0)
@@ -11095,7 +11111,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
                 t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
                 t.attparmin.ToString(CultureInfo.InvariantCulture) };
-            x = zone.x + 8f;
+            x = 8f;   // coordonnees locales a la zone a defilement
             for (int c = 0; c < valeurs.Length; c++)
             {
                 GUI.Label(new Rect(x, y + 6f, largeurs[c] - 4f, 22f), valeurs[c], tableauTexte);
@@ -11180,13 +11196,12 @@ public sealed class LibreViesGame : MonoBehaviour
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 18f, 370f, 30f),
             "MONSTRES", titleStyle);
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 64f, 410f, 44f),
-            "Nombre de monstres charges : " + enemies.Count + "\n"
-                + "Souris, rats et araignees sont repartis dans les zones.", smallStyle);
+            "Nombre de monstres charges : " + enemies.Count, smallStyle);
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 132f, 230f, 24f),
-            "Nouvelle quantite (0 a 120)", smallStyle);
+            "Nouvelle quantite", smallStyle);
         nombreMonstresAdminTexte = GUI.TextField(
             new Rect(contenu.x + 250f, contenu.y + 128f, 82f, 30f),
-            nombreMonstresAdminTexte, 4, buttonStyle);
+            nombreMonstresAdminTexte, 6, buttonStyle);
         if (GUI.Button(new Rect(contenu.x + 342f, contenu.y + 128f, 110f, 30f),
             "APPLIQUER", buttonStyle))
         {
@@ -11194,7 +11209,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (int.TryParse(nombreMonstresAdminTexte, NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out valeur))
             {
-                valeur = Mathf.Clamp(valeur, 0, 120);
+                valeur = Mathf.Max(0, valeur);
                 nombreMonstresAdminTexte = valeur.ToString(CultureInfo.InvariantCulture);
                 if (valeur != nombreMonstresAdmin)
                 {
@@ -11209,9 +11224,31 @@ public sealed class LibreViesGame : MonoBehaviour
                 ShowInfo("Quantite de monstres invalide");
             }
         }
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 184f, 470f, 60f),
-            "La modification recree les monstres immediatement.\n"
-            + "La valeur par defaut reste 18.", smallStyle);
+        // Distance d'affichage du nom et de la barre de PV (a droite de la quantite).
+        GUI.Label(new Rect(contenu.x + 480f, contenu.y + 132f, 230f, 24f),
+            "Distance d'affichage des noms (m)", smallStyle);
+        if (adminDistanceNomsTexte == null)
+            adminDistanceNomsTexte = DistanceNomsMonstres().ToString("0.#", CultureInfo.InvariantCulture);
+        adminDistanceNomsTexte = GUI.TextField(
+            new Rect(contenu.x + 712f, contenu.y + 128f, 82f, 30f),
+            adminDistanceNomsTexte, 6, buttonStyle);
+        if (GUI.Button(new Rect(contenu.x + 804f, contenu.y + 128f, 110f, 30f), "APPLIQUER", buttonStyle))
+        {
+            float distance;
+            if (float.TryParse(adminDistanceNomsTexte, NumberStyles.Float, CultureInfo.InvariantCulture, out distance)
+                && distance >= 5f && distance <= 200f)
+            {
+                distanceNomsMonstresValeur = distance;
+                PlayerPrefs.SetFloat(CleDistanceNomsMonstres, distance);
+                PlayerPrefs.Save();
+                ShowInfo("Distance d'affichage : " + distance.ToString("0.#", CultureInfo.InvariantCulture) + " m");
+            }
+            else
+            {
+                adminDistanceNomsTexte = DistanceNomsMonstres().ToString("0.#", CultureInfo.InvariantCulture);
+                ShowInfo("Distance invalide : entre 5 et 200 m");
+            }
+        }
         DessinerListeMonstresAdmin(contenu);
     }
 

@@ -539,7 +539,7 @@ public sealed class LibreViesCompte
             if (action == "get_monstres" || action == "save_monstres")
             {
                 if (reponse.reglage_monstres == null || reponse.reglage_monstres.lieu != "village depart"
-                    || reponse.reglage_monstres.nombre < 0 || reponse.reglage_monstres.nombre > 120)
+                    || reponse.reglage_monstres.nombre < 0)
                 { Erreur = "Reponse monstres invalide."; yield break; }
                 NombreMonstres = reponse.reglage_monstres.nombre;
                 yield break;

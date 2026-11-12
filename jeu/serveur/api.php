@@ -633,9 +633,9 @@ if ($action === 'get_monstres' || $action === 'save_monstres') {
     try {
         if ($action === 'save_monstres') {
             $nombre = isset($donnees['nombre']) ? $donnees['nombre'] : null;
-            if (is_string($nombre) && preg_match('/^[0-9]{1,3}$/D', $nombre)) $nombre = (int)$nombre;
-            if (!is_int($nombre) || $nombre < 0 || $nombre > 120) {
-                repondre(false, 'Quantite de monstres invalide : 0 a 120.', array(), 400);
+            if (is_string($nombre) && preg_match('/^[0-9]{1,6}$/D', $nombre)) $nombre = (int)$nombre;
+            if (!is_int($nombre) || $nombre < 0 || $nombre > 1000000) {
+                repondre(false, 'Quantite de monstres invalide.', array(), 400);
             }
             $query = $pdo->prepare('UPDATE qttmonstrezone SET nombre = :nombre WHERE lieu = :lieu');
             $query->execute(array(':nombre' => $nombre, ':lieu' => 'village depart'));

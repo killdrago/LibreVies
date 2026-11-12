@@ -4631,6 +4631,38 @@ Date : 12/11/2026 (heure de la machine : UTC, Europe/Paris = UTC+1).
     un monstre frappe par un autre joueur ne riposte pas chez les autres
     joueurs ; la duree de riposte (10 s) n'est pas en base.
 
+8.48 MAJ 59 - MONSTRES NON AGRESSIFS, TABLEAU ADMIN CORRIGE, PLUS DE PLAFOND 120
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+
+  - Monstre non agressif (agressif = 0) : ne vient plus vers le heros. Il
+    n'attaque qu'apres avoir ete frappe : il passe alors en agressif pendant
+    10 secondes (ProvoqueJusqua), il poursuit le heros jusqu'a 25 m et le
+    frappe a portee (attparmin coups par minute). Apres 10 s sans nouveau coup,
+    il redevient passif. Les 10 s sont codees en dur (non configurees).
+  - Monstre agressif : inchange (poursuite a 10 m, attaque a 1,6 m).
+
+  - En jeu : nom et barre de PV remontes d'une hauteur de nom (nom a 40 px
+    au-dessus du point de reference, barre a 20 px).
+  - Distance d'affichage du nom et de la barre : reglage dans ADMIN > Monstre
+    (valeur par defaut 40 m, entre 5 et 200 m). Stockage PlayerPrefs
+    (cle LV_DistanceNomsMonstres) : reglage LOCAL a ce PC, pas en base.
+
+  - ADMIN > Monstre : suppression des lignes « Souris, rats et araignees... »,
+    « La modification recree les monstres immediatement » et « La valeur par
+    defaut reste 18 ». Plus de plafond de 120 : client (Clamp), validation
+    serveur (save_monstres, 0 a 1 000 000) et lecture (get_monstres).
+  - Tableau : decalage corrige. Les cellules etaient dessinees avec des
+    coordonnees absolues dans une zone a defilement (decalees de la position du
+    tableau). Elles sont maintenant en coordonnees locales ; les colonnes
+    s'alignent sur l'en-tete.
+  - Verification : compilation Unity NON faite, PHP non teste. Controle de
+    syntaxe C# du depot : aucune erreur nouvelle (memes 5 erreurs signalees
+    qu'avant, pre-existantes).
+    A tester en jeu : une souris non frappee ne bouge pas vers le heros ;
+    apres un coup elle riposte et suit ; alignement du tableau ; quantite
+    superieure a 120 acceptee.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
