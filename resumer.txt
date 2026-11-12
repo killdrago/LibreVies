@@ -4693,6 +4693,31 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : un rat blesse remonte de PV ; le compteur regen se reflete dans
     le tableau ; un coup part bien des PV regeneres.
 
+8.50 MAJ 61 - PV MAXIMUM PERIMES EN BASE, REGENERATION VERIFIEE
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+
+  - Constat utilisateur : souris a 200 PV dans la table monstre, mais elles
+    reapparaissaient et demarraient a 25 PV ; apres 2 min avec regen 200, pas de
+    remontee.
+  - Cause : la declaration des monstres (traiter_declaration_monstres) faisait
+    INSERT IGNORE. Un monstre deja present dans monde_monstre gardait son ancien
+    pv_max (25). Le client affichait 200 mais le serveur bornait les PV a 25 :
+    la regeneration ne renvoyait plus rien (pv = pv_max) et la ressurection
+    remettait 25 PV.
+  - Correctif (monde.php) : apres l'INSERT, si pv_max en base differe de la
+    valeur de la table monstre, UPDATE pv_max + revision ; le monstre repart a
+    pleine vie (sauf s'il est mort). Ceci se fait a chaque lancement du jeu
+    (declaration). Pas de SQL a appliquer pour ce correctif.
+  - Plafond serveur de pv_max releve de 200 a 100 000 : avec 200 ou plus, la
+    declaration aurait ete refusee et aucun monstre n'apparaissait.
+  - Regeneration : la valeur saisie est en pts/minute (regen). Le serveur
+    calcule regen x secondes / 60, soit l'equivalent d'un gain chaque seconde ;
+    le total est recalcule a chaque synchronisation (pas d'ecriture par seconde).
+  - Verification : compilation Unity NON faite, PHP NON teste. A tester : redemarrer
+    le jeu apres deploiement de monde.php et verifier qu'une souris (200 PV) part
+    a 200 PV ; blesser puis attendre pour voir la remontee.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================

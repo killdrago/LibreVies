@@ -259,6 +259,11 @@ function traiter_declaration_monstres($pdo, $donnees) {
     $insertion = $pdo->prepare('INSERT IGNORE INTO monde_monstre'
         . ' (cle, type, position_x, position_z, pv, pv_max, mort, revision, pv_modifie_le)'
         . ' VALUES (:cle, :type, :x, :z, :pv, :pvmax, 0, :rev, NOW())');
+    // Monstre deja en base avec un autre pv_max (table monstre modifiee) : on prend la
+    // nouvelle valeur et le monstre repart a pleine vie (sauf s'il est mort).
+    $miseAJourMax = $pdo->prepare('UPDATE monde_monstre SET pv_max = :pvmax1,'
+        . ' pv = CASE WHEN mort = 0 THEN :pvmax2 ELSE pv END, pv_modifie_le = NOW(), revision = :rev'
+        . ' WHERE cle = :cle AND pv_max <> :pvmax3');
     $cles = array();
     foreach ($liste as $monstre) {
         if (!is_array($monstre)) throw new InvalidArgumentException('Monstre invalide.');
@@ -270,9 +275,11 @@ function traiter_declaration_monstres($pdo, $donnees) {
         $x = nombre_monde(isset($monstre['x']) ? $monstre['x'] : 0, -130, 130);
         $z = nombre_monde(isset($monstre['z']) ? $monstre['z'] : 0, -130, 130);
         $pvMax = isset($monstre['pv_max']) ? (int)$monstre['pv_max'] : 0;
-        if ($pvMax < 1 || $pvMax > 200) throw new InvalidArgumentException('Points de vie invalides.');
+        if ($pvMax < 1 || $pvMax > 100000) throw new InvalidArgumentException('Points de vie invalides.');
         $insertion->execute(array(':cle' => $cle, ':type' => $type, ':x' => $x, ':z' => $z,
             ':pv' => $pvMax, ':pvmax' => $pvMax, ':rev' => $rev));
+        $miseAJourMax->execute(array(':pvmax1' => $pvMax, ':pvmax2' => $pvMax, ':pvmax3' => $pvMax,
+            ':rev' => $rev, ':cle' => $cle));
         $cles[] = $cle;
     }
     return array('message' => 'Monstres declares.', 'extra' => array(
