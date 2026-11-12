@@ -711,6 +711,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float DernierEssaiRessurection;
         public float AttackCooldown;
         public int AttParMin = 50;      // table monstre : attaques par minute (50 = 1,2 s entre deux coups)
+        public string NomAffiche = "Monstre"; // nom de la table monstre (affiche au-dessus de la bete)
         public float ProvoqueJusqua;    // riposte : le monstre frappe le heros a portee jusqu'a cet instant (Time.time)
         public float RespawnAt;
         public Vector3 Home;
@@ -9557,6 +9558,7 @@ public sealed class LibreViesGame : MonoBehaviour
             CoupMin = stats != null ? stats.coup_min : 6,
             CoupMax = stats != null ? stats.coup_max : 6,
             AttParMin = stats != null ? stats.attparmin : 50,
+            NomAffiche = stats != null && !string.IsNullOrEmpty(stats.nom) ? stats.nom : (spider ? "Araignee" : (souris ? "Souris" : "Rat")),
             XpGain = stats != null ? stats.xp : (spider ? 35 : 20),
             Home = position,
             Legs = new Transform[spider ? 8 : 0],
@@ -10240,25 +10242,7 @@ public sealed class LibreViesGame : MonoBehaviour
             if (enemy.Spider && enemy.Legs != null)
                 for (int i = 0; i < enemy.Legs.Length; i++) enemy.Legs[i].localRotation *= Quaternion.Euler(0, dt * 50f, 0);
 
-            // Barre de vie : visible des que la bete est blessee, tournee vers
-            // la camera, remplie proportionnellement (tailles et formules de la
-            // reference : 0,86 m de remplissage qui se retrecit vers la gauche).
-            // On voit enfin combien de coups il reste a donner.
-            if (enemy.Barre != null && enemy.Remplissage != null)
-            {
-                if (enemy.Alive && enemy.Hp < enemy.PvMax)
-                {
-                    enemy.Barre.gameObject.SetActive(true);
-                    enemy.Barre.LookAt(gameCamera.transform.position, Vector3.up);
-                    float proportion = Mathf.Clamp01(enemy.Hp / (float)enemy.PvMax);
-                    enemy.Remplissage.localScale = new Vector3(0.86f * Mathf.Max(proportion, 0.001f), 0.07f, 0.03f);
-                    enemy.Remplissage.localPosition = new Vector3(-(1f - proportion) * 0.43f, 0f, 0.02f);
-                }
-                else
-                {
-                    enemy.Barre.gameObject.SetActive(false);
-                }
-            }
+            // Nom et barre de PV : dessines en OnGUI (DessinerNomsMonstres).
         }
     }
 
@@ -11012,29 +10996,112 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    // Liste des monstres (table monstre) : une ligne par monstre, bouton EDITER.
+    // Nom et barre de PV au-dessus de chaque monstre vivant (en jeu).
+    private GUIStyle nomMonstreStyle;
+    private void DessinerNomsMonstres()
+    {
+        if (gameCamera == null || enemies == null) return;
+        if (nomMonstreStyle == null)
+            nomMonstreStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter, fontSize = 12, fontStyle = FontStyle.Bold,
+                normal = { textColor = Color.white }
+            };
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyState enemy = enemies[i];
+            if (enemy == null || !enemy.Alive || enemy.Root == null || !enemy.Root.activeInHierarchy) continue;
+            Vector3 tete = enemy.Root.transform.position + Vector3.up * (enemy.Spider ? 1.25f : 0.9f);
+            Vector3 ecran = gameCamera.WorldToScreenPoint(tete);
+            if (ecran.z <= 0f || ecran.z > 40f) continue;
+            float x = ecran.x, y = Screen.height - ecran.y;
+            // Nom au-dessus, barre de PV en dessous du nom.
+            GUI.color = Color.white;
+            GUI.Label(new Rect(x - 80f, y - 22f, 160f, 18f), enemy.NomAffiche, nomMonstreStyle);
+            float ratio = Mathf.Clamp01(enemy.Hp / (float)Mathf.Max(1, enemy.PvMax));
+            GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.85f);
+            GUI.DrawTexture(new Rect(x - 40f, y - 2f, 80f, 8f), Texture2D.whiteTexture);
+            GUI.color = new Color(0.85f, 0.1f, 0.1f);
+            GUI.DrawTexture(new Rect(x - 40f, y - 2f, 80f * ratio, 8f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+        }
+    }
+
+    // Styles du tableau admin : texte noir sur fond blanc.
+    private GUIStyle tableauTexte, tableauEntete, tableauChamp;
+    private void EnsureTableauStyles()
+    {
+        if (tableauTexte != null) return;
+        tableauTexte = new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.MiddleLeft,
+            normal = { textColor = Color.black } };
+        tableauEntete = new GUIStyle(tableauTexte) { fontStyle = FontStyle.Bold };
+        tableauChamp = new GUIStyle(GUI.skin.textField) { fontSize = 12,
+            normal = { textColor = Color.black }, focused = { textColor = Color.black } };
+    }
+
+    // Liste des monstres (table monstre) : tableau blanc qui occupe toute la hauteur
+    // restante du panneau, avec defilement vertical et un bouton EDITER par ligne.
     private void DessinerListeMonstresAdmin(Rect contenu)
     {
-        Rect zone = new Rect(contenu.x + 18f, contenu.y + 250f, contenu.width - 36f, contenu.height - 262f);
+        EnsureTableauStyles();
+        Rect zone = new Rect(contenu.x + 18f, contenu.y + 250f, contenu.width - 36f, contenu.height - 268f);
+        GUI.color = Color.white;
+        GUI.DrawTexture(zone, Texture2D.whiteTexture);
         if (typesMonstres == null || typesMonstres.Length == 0)
         {
-            GUI.Label(new Rect(zone.x, zone.y, zone.width, 40f),
-                "Table monstre non chargee : valeurs de secours.", smallStyle);
+            GUI.Label(new Rect(zone.x + 10f, zone.y + 10f, zone.width - 20f, 40f),
+                "Table monstre non chargee.", tableauTexte);
             return;
         }
-        float hauteur = typesMonstres.Length * 36f + (adminMonstreEdition >= 0 ? 130f : 0f) + 10f;
-        Rect vue = new Rect(0f, 0f, zone.width - 18f, Mathf.Max(hauteur, zone.height));
-        adminMonstresScroll = GUI.BeginScrollView(zone, adminMonstresScroll, vue);
+        string[] entetes = { "ID", "Nom", "PV", "Agressif", "XP", "Loot", "Coup min", "Coup max", "Atk / min" };
+        float[] largeurs = { 50f, 0f, 60f, 90f, 60f, 60f, 90f, 90f, 90f };
+        float actionW = 110f;
+        float fixes = 0f;
+        for (int c = 0; c < largeurs.Length; c++) if (c != 1) fixes += largeurs[c];
+        largeurs[1] = Mathf.Max(120f, zone.width - 16f - fixes - actionW);
+
+        // En-tete fixe (ne defile pas).
+        GUI.color = new Color(0.82f, 0.82f, 0.82f);
+        GUI.DrawTexture(new Rect(zone.x, zone.y, zone.width, 30f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        float x = zone.x + 8f;
+        for (int c = 0; c < largeurs.Length; c++)
+        {
+            GUI.Label(new Rect(x, zone.y + 5f, largeurs[c] - 4f, 22f), entetes[c], tableauEntete);
+            x += largeurs[c];
+        }
+        GUI.Label(new Rect(x, zone.y + 5f, actionW, 22f), "Modifier", tableauEntete);
+
+        const float ligne = 34f;
+        const float hauteurFormulaire = 110f;
+        Rect corps = new Rect(zone.x, zone.y + 30f, zone.width, zone.height - 30f);
+        float hauteur = typesMonstres.Length * ligne + (adminMonstreEdition >= 0 ? hauteurFormulaire : 0f) + 8f;
+        Rect vue = new Rect(0f, 0f, corps.width - 16f, Mathf.Max(hauteur, corps.height));
+        adminMonstresScroll = GUI.BeginScrollView(corps, adminMonstresScroll, vue, false, true);
         float y = 0f;
         for (int i = 0; i < typesMonstres.Length; i++)
         {
             LibreViesCompte.LibreViesTypeMonstre t = typesMonstres[i];
             if (t == null) continue;
-            GUI.Label(new Rect(0f, y + 4f, vue.width - 120f, 26f),
-                t.nom + " : PV " + t.pv + " | agressif " + (t.agressif == 1 ? "oui" : "non")
-                + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max
-                + " | atk/min " + t.attparmin, smallStyle);
-            if (GUI.Button(new Rect(vue.width - 110f, y, 100f, 28f), "EDITER", buttonStyle))
+            if (i % 2 == 1)
+            {
+                GUI.color = new Color(0.93f, 0.93f, 0.93f);
+                GUI.DrawTexture(new Rect(0f, y, vue.width, ligne), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
+            string[] valeurs = {
+                t.id.ToString(CultureInfo.InvariantCulture), t.nom ?? "",
+                t.pv.ToString(CultureInfo.InvariantCulture), t.agressif == 1 ? "oui" : "non",
+                t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
+                t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
+                t.attparmin.ToString(CultureInfo.InvariantCulture) };
+            x = zone.x + 8f;
+            for (int c = 0; c < valeurs.Length; c++)
+            {
+                GUI.Label(new Rect(x, y + 6f, largeurs[c] - 4f, 22f), valeurs[c], tableauTexte);
+                x += largeurs[c];
+            }
+            if (GUI.Button(new Rect(x, y + 3f, 100f, 28f), "EDITER", buttonStyle))
             {
                 adminMonstreEdition = t.id;
                 adminMonstreChamps = new string[]
@@ -11045,25 +11112,24 @@ public sealed class LibreViesGame : MonoBehaviour
                     t.attparmin.ToString(CultureInfo.InvariantCulture)
                 };
             }
-            y += 36f;
+            y += ligne;
             if (adminMonstreEdition == t.id)
             {
                 string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max", "Atk / minute" };
-                float[] largeurs = { 200f, 80f, 110f, 80f, 80f, 90f, 90f, 100f };
-                float x = 0f;
+                float[] largeursForm = { 200f, 80f, 110f, 80f, 80f, 90f, 90f, 100f };
+                float fx = 8f;
                 for (int c = 0; c < 8; c++)
                 {
-                    GUI.Label(new Rect(x, y, largeurs[c], 22f), etiquettes[c], smallStyle);
-                    adminMonstreChamps[c] = GUI.TextField(new Rect(x, y + 22f, largeurs[c] - 8f, 26f),
-                        adminMonstreChamps[c] ?? "", c == 0 ? 40 : 18);
-                    x += largeurs[c] + 8f;
+                    GUI.Label(new Rect(fx, y + 4f, largeursForm[c], 22f), etiquettes[c], tableauEntete);
+                    adminMonstreChamps[c] = GUI.TextField(new Rect(fx, y + 28f, largeursForm[c] - 8f, 26f),
+                        adminMonstreChamps[c] ?? "", c == 0 ? 40 : 18, tableauChamp);
+                    fx += largeursForm[c] + 8f;
                 }
-                y += 56f;
-                if (GUI.Button(new Rect(0f, y, 150f, 28f), "ENREGISTRER", buttonStyle))
+                if (GUI.Button(new Rect(8f, y + 64f, 150f, 28f), "ENREGISTRER", buttonStyle))
                     StartCoroutine(SauvegarderTypeMonstreAdmin(t.id));
-                if (GUI.Button(new Rect(160f, y, 120f, 28f), "ANNULER", buttonStyle))
+                if (GUI.Button(new Rect(168f, y + 64f, 120f, 28f), "ANNULER", buttonStyle))
                     adminMonstreEdition = -1;
-                y += 40f;
+                y += hauteurFormulaire;
             }
         }
         GUI.EndScrollView();
@@ -12141,6 +12207,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 "Fermeture en cours...", boxStyle);
             return;
         }
+        DessinerNomsMonstres();
         if (focusCreationAReinitialiser)
         {
             GUIUtility.hotControl = 0;

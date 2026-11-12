@@ -4570,6 +4570,67 @@ INCIDENT 19 - Le jeu se fige au demarrage : une boucle qui ajoute dans la liste
   - Version de la build : 0.5.58. Relancer la compilation Windows avant la
     publication.
 
+8.47 MAJ 58 - MONSTRES : STATS EN BASE, RIPOSTE, NOM ET BARRE DE PV, TABLEAU ADMIN
+================================================================================
+Date : 12/11/2026 (heure de la machine : UTC, Europe/Paris = UTC+1).
+
+  - Cette entree couvre aussi les commits monstres qui n'avaient pas ete
+    consignes dans ce fichier (regle du point 2 non respectee pour eux) :
+    f1ae4f4, 2517f39, 4de8155, 3202aba, ebac7ac, 8569148, 3d60940, 6027d9c,
+    c3a1eb5, 92151fb, c794ff8 et le commit de cette MAJ.
+
+  - Quantite de monstres : table qttmonstrezone (id, nombre, lieu), ligne
+    nombre = 18, lieu = village depart. Lue et ecrite via get_monstres /
+    save_monstres (droit = 1 pour l'ecriture).
+
+  - Stats des monstres : table monstre (id, nom, pv, agressif, xp, loot,
+    coup_min, coup_max) + colonne attparmin ajoutee ensuite. Lue par
+    get_types_monstres ; modifiee par save_type_monstre (droit = 1, valeurs
+    verifiees cote serveur). Le SQL d'insertion est fourni par l'utilisateur,
+    il n'est pas dans le depot. Ajout a appliquer par l'utilisateur :
+        ALTER TABLE monstre ADD COLUMN attparmin INT NOT NULL DEFAULT 50
+            AFTER coup_max;
+    Tant que cette colonne n'existe pas, get_types_monstres et
+    save_type_monstre echouent (erreur SQL renvoyee).
+    Remplacent les valeurs codees en dur : PV (souris 25, rat 50,
+    araignee 75), agressif, coups, XP (35 / 20).
+
+  - attparmin = nombre d'attaques que fait le monstre en 1 minute. Il sert a
+    la fois a l'attaque normale d'un monstre agressif et a la riposte d'un
+    monstre non agressif. Delai entre deux coups = 60 / attparmin secondes ;
+    attparmin = 0 : le monstre n'attaque jamais. Plus de delai fixe de 1,2 s.
+
+  - Monstre non agressif (agressif = 0) : n'attaque pas au contact. S'il est
+    frappe par le heros (marteau, portee 2,4 m), il riposte pendant 10 secondes
+    (ProvoqueJusqua) tant que le heros reste a 2,4 m ou moins. La riposte est
+    calculee sur le client du joueur qui frappe ; les degats ne touchent que ce
+    joueur. Duree de 10 s codee en dur (non configuree).
+
+  - Monstre agressif : attaque a 1,6 m, comme avant.
+
+  - En jeu : nom du monstre au-dessus de chaque monstre vivant, barre de PV
+    en dessous du nom (fond sombre, partie rouge). Dessin en OnGUI
+    (DessinerNomsMonstres), a 40 m maximum de la camera. L'ancienne barre 3D,
+    cachee tant que le monstre est intact, n'est plus utilisee.
+
+  - ADMIN > Monstre : la liste est un tableau a fond blanc et texte noir, qui
+    occupe toute la hauteur restante du panneau. En-tete fixe (ID, Nom, PV,
+    Agressif, XP, Loot, Coup min, Coup max, Atk / min, Modifier) ; ligne
+    alternee en gris clair ; defilement vertical (curseur) ; bouton EDITER en
+    fin de ligne. Le formulaire d'edition s'ouvre sous la ligne et contient les
+    8 champs (nom, PV, agressif 0/1, XP, loot, coup min, coup max, atk / min).
+
+  - Verification : compilation Unity NON faite (Unity indisponible dans le bac
+    a sable) ; PHP non teste (php absent du bac a sable). Verification statique
+    seulement. Aucun essai en jeu.
+    A tester en jeu : nom et barre au-dessus des trois monstres ; un monstre
+    non agressif frappe riposte ; attparmin change la cadence ; tableau admin
+    scrollable avec plusieurs lignes ; enregistrement d'une modification.
+
+  - Limites connues : la riposte ne fait pas courir le monstre vers le heros ;
+    un monstre frappe par un autre joueur ne riposte pas chez les autres
+    joueurs ; la duree de riposte (10 s) n'est pas en base.
+
 ================================================================================
 9. CE QU'IL RESTE A FAIRE (TODO, par ordre de priorite)
 ================================================================================
