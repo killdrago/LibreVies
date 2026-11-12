@@ -33,6 +33,7 @@ public sealed class LibreViesCompte
         public int loot;
         public int coup_min;
         public int coup_max;
+        public int attparmin;   // attaques par minute (0 = n'attaque jamais)
     }
 
     [Serializable]
@@ -199,7 +200,7 @@ public sealed class LibreViesCompte
             { "id", t.id.ToString(ci) }, { "nom", t.nom ?? "" }, { "pv", t.pv.ToString(ci) },
             { "agressif", t.agressif.ToString(ci) }, { "xp", t.xp.ToString(ci) },
             { "loot", t.loot.ToString(ci) }, { "coup_min", t.coup_min.ToString(ci) },
-            { "coup_max", t.coup_max.ToString(ci) }
+            { "coup_max", t.coup_max.ToString(ci) }, { "attparmin", t.attparmin.ToString(ci) }
         };
         yield return Envoyer("save_type_monstre", null, null, champs);
     }
@@ -529,7 +530,7 @@ public sealed class LibreViesCompte
                     LibreViesTypeMonstre t = types[i];
                     if (t == null || t.id < 1 || !identifiants.Add(t.id) || string.IsNullOrEmpty(t.nom)
                         || t.pv <= 0 || (t.agressif != 0 && t.agressif != 1) || t.xp < 0 || t.loot < 0
-                        || t.coup_min < 0 || t.coup_min > t.coup_max)
+                        || t.coup_min < 0 || t.coup_min > t.coup_max || t.attparmin < 0)
                     { Erreur = "Type de monstre invalide dans la table monstre."; yield break; }
                 }
                 TypesMonstres = types;

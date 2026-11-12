@@ -296,7 +296,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private int level = 1;
     private LibreViesCompte.LibreViesTypeMonstre[] typesMonstres;
     private int adminMonstreEdition = -1;                 // id du monstre en cours d'edition
-    private string[] adminMonstreChamps = new string[7];  // nom, pv, agressif, xp, loot, coup min, coup max
+    private string[] adminMonstreChamps = new string[8];  // nom, pv, agressif, xp, loot, coup min, coup max, atk/min
     private Vector2 adminMonstresScroll;
     private int ratsKilled;
     private int spidersKilled;
@@ -710,6 +710,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
         public float DernierEssaiRessurection;
         public float AttackCooldown;
+        public int AttParMin = 50;      // table monstre : attaques par minute (50 = 1,2 s entre deux coups)
+        public float ProvoqueJusqua;    // riposte : le monstre frappe le heros a portee jusqu'a cet instant (Time.time)
         public float RespawnAt;
         public Vector3 Home;
         public Transform[] Legs;
@@ -9554,6 +9556,7 @@ public sealed class LibreViesGame : MonoBehaviour
             Agressif = stats == null || stats.agressif == 1,
             CoupMin = stats != null ? stats.coup_min : 6,
             CoupMax = stats != null ? stats.coup_max : 6,
+            AttParMin = stats != null ? stats.attparmin : 50,
             XpGain = stats != null ? stats.xp : (spider ? 35 : 20),
             Home = position,
             Legs = new Transform[spider ? 8 : 0],
@@ -10223,13 +10226,14 @@ public sealed class LibreViesGame : MonoBehaviour
             }
 
             // Attaque : a portee et pas a travers la cloture du village.
-            // Cadence 1,2 s / portee 1,6 m / 6 degats : les valeurs de la
-            // reference (c'etait 0,8 s / 1,8 m / 8 degats).
-            // Seuls les monstres agressifs (table monstre) attaquent le heros.
-            if (enemy.Agressif && distance < 1.6f && enemy.AttackCooldown <= 0 && !dead
+            // Agressif (table monstre) : attaque a 1,6 m. Non agressif : attaque
+            // seulement s'il a ete frappe (riposte) et que le heros est a portee
+            // du coup (2,4 m). Cadence = attparmin par minute (colonne SQL).
+            bool riposte = Time.time < enemy.ProvoqueJusqua && distance < 2.4f;
+            if (((enemy.Agressif && distance < 1.6f) || riposte) && enemy.AttackCooldown <= 0 && !dead
                 && !ClotureEntre(position, player.position))
             {
-                enemy.AttackCooldown = 1.2f;
+                enemy.AttackCooldown = enemy.AttParMin > 0 ? 60f / enemy.AttParMin : 999999f;
                 DamagePlayer(UnityEngine.Random.Range(enemy.CoupMin, enemy.CoupMax + 1));
             }
 
@@ -10301,6 +10305,8 @@ public sealed class LibreViesGame : MonoBehaviour
             if (distance > 0.01f && Vector3.Dot(forward, delta.normalized) < 0.1f) continue;
             if (ClotureEntre(player.position, enemy.Root.transform.position)) continue;
             enemy.Hp -= HammerDamage;
+            // Riposte : un monstre frappe, meme non agressif, rend le coup pendant 10 s.
+            enemy.ProvoqueJusqua = Time.time + 10f;
             EnvoyerCoupMonstre(enemy, HammerDamage);
             touches++;
             // Le "-25" qui s'envole et les etincelles de l'impact.
@@ -11026,7 +11032,8 @@ public sealed class LibreViesGame : MonoBehaviour
             if (t == null) continue;
             GUI.Label(new Rect(0f, y + 4f, vue.width - 120f, 26f),
                 t.nom + " : PV " + t.pv + " | agressif " + (t.agressif == 1 ? "oui" : "non")
-                + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max, smallStyle);
+                + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max
+                + " | atk/min " + t.attparmin, smallStyle);
             if (GUI.Button(new Rect(vue.width - 110f, y, 100f, 28f), "EDITER", buttonStyle))
             {
                 adminMonstreEdition = t.id;
@@ -11034,16 +11041,17 @@ public sealed class LibreViesGame : MonoBehaviour
                 {
                     t.nom, t.pv.ToString(CultureInfo.InvariantCulture), t.agressif.ToString(CultureInfo.InvariantCulture),
                     t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
-                    t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture)
+                    t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture),
+                    t.attparmin.ToString(CultureInfo.InvariantCulture)
                 };
             }
             y += 36f;
             if (adminMonstreEdition == t.id)
             {
-                string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max" };
-                float[] largeurs = { 200f, 80f, 110f, 80f, 80f, 90f, 90f };
+                string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max", "Atk / minute" };
+                float[] largeurs = { 200f, 80f, 110f, 80f, 80f, 90f, 90f, 100f };
                 float x = 0f;
-                for (int c = 0; c < 7; c++)
+                for (int c = 0; c < 8; c++)
                 {
                     GUI.Label(new Rect(x, y, largeurs[c], 22f), etiquettes[c], smallStyle);
                     adminMonstreChamps[c] = GUI.TextField(new Rect(x, y + 22f, largeurs[c] - 8f, 26f),
@@ -11065,21 +11073,22 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (!CompteAdministrateur || compteJoueur == null) yield break;
         string nom = (adminMonstreChamps[0] ?? "").Trim();
-        int pv, agressif, xp, loot, coupMin, coupMax;
+        int pv, agressif, xp, loot, coupMin, coupMax, attParMin;
         if (!int.TryParse(adminMonstreChamps[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out pv)
             || !int.TryParse(adminMonstreChamps[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out agressif)
             || !int.TryParse(adminMonstreChamps[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out xp)
             || !int.TryParse(adminMonstreChamps[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out loot)
             || !int.TryParse(adminMonstreChamps[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMin)
-            || !int.TryParse(adminMonstreChamps[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMax))
+            || !int.TryParse(adminMonstreChamps[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMax)
+            || !int.TryParse(adminMonstreChamps[7], NumberStyles.Integer, CultureInfo.InvariantCulture, out attParMin))
         { ShowInfo("Valeurs numeriques invalides (PV, agressif, XP, loot, coups)."); yield break; }
         if (nom.Length == 0 || pv < 1 || agressif < 0 || agressif > 1 || xp < 0 || loot < 0
-            || coupMin < 0 || coupMax < coupMin)
+            || coupMin < 0 || coupMax < coupMin || attParMin < 0)
         { ShowInfo("Valeurs invalides : agressif 0 ou 1, PV au moins 1, coup min <= coup max."); yield break; }
         var t = new LibreViesCompte.LibreViesTypeMonstre
         {
             id = id, nom = nom, pv = pv, agressif = agressif, xp = xp, loot = loot,
-            coup_min = coupMin, coup_max = coupMax
+            coup_min = coupMin, coup_max = coupMax, attparmin = attParMin
         };
         yield return compteJoueur.SauvegarderTypeMonstre(t);
         if (!String.IsNullOrEmpty(compteJoueur.Erreur))

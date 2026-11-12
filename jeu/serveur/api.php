@@ -657,14 +657,15 @@ if ($action === 'get_monstres' || $action === 'save_monstres') {
 if ($action === 'get_types_monstres') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     try {
-        $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max FROM monstre ORDER BY id');
+        $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max, attparmin FROM monstre ORDER BY id');
         $query->execute();
         $types = array();
         foreach ($query->fetchAll() as $ligne) {
             $types[] = array(
                 'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
                 'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
-                'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max']);
+                'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max'],
+                'attparmin' => (int)$ligne['attparmin']);
         }
     } catch (Exception $erreur) {
         repondre(false, detail_erreur($erreur, $config), array(), 500);
@@ -674,14 +675,15 @@ if ($action === 'get_types_monstres') {
 
 // Relit toutes les lignes de la table monstre (meme forme que get_types_monstres).
 function lire_types_monstres($pdo) {
-    $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max FROM monstre ORDER BY id');
+    $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max, attparmin FROM monstre ORDER BY id');
     $query->execute();
     $types = array();
     foreach ($query->fetchAll() as $ligne) {
         $types[] = array(
             'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
             'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
-            'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max']);
+            'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max'],
+                'attparmin' => (int)$ligne['attparmin']);
     }
     return $types;
 }
@@ -690,7 +692,7 @@ if ($action === 'save_type_monstre') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     verifier_administrateur($membre); // Relu en BDD, exactement droit=1.
     $valeurs = array();
-    foreach (array('id', 'pv', 'agressif', 'xp', 'loot', 'coup_min', 'coup_max') as $champ) {
+    foreach (array('id', 'pv', 'agressif', 'xp', 'loot', 'coup_min', 'coup_max', 'attparmin') as $champ) {
         $valeur = isset($donnees[$champ]) ? $donnees[$champ] : null;
         if (is_string($valeur) && preg_match('/^[0-9]{1,6}$/D', $valeur)) $valeur = (int)$valeur;
         if (!is_int($valeur) || $valeur < 0 || $valeur > 1000000) {
@@ -701,7 +703,7 @@ if ($action === 'save_type_monstre') {
     $nom = isset($donnees['nom']) ? texte_recu($donnees['nom'], 40) : '';
     if ($nom === '') repondre(false, 'Nom du monstre obligatoire.', array(), 400);
     if ($valeurs['id'] < 1 || $valeurs['pv'] < 1 || $valeurs['agressif'] > 1
-        || $valeurs['coup_max'] < $valeurs['coup_min']) {
+        || $valeurs['coup_max'] < $valeurs['coup_min'] || $valeurs['attparmin'] > 6000) {
         repondre(false, 'Valeurs invalides : PV au moins 1, agressif 0 ou 1, coup min <= coup max.', array(), 400);
     }
     try {
@@ -709,11 +711,12 @@ if ($action === 'save_type_monstre') {
         $query->execute(array(':id' => $valeurs['id']));
         if (!$query->fetchColumn()) repondre(false, 'Monstre introuvable.', array(), 404);
         $query = $pdo->prepare('UPDATE monstre SET nom = :nom, pv = :pv, agressif = :agressif, xp = :xp,'
-            . ' loot = :loot, coup_min = :coup_min, coup_max = :coup_max WHERE id = :id');
+            . ' loot = :loot, coup_min = :coup_min, coup_max = :coup_max, attparmin = :attparmin WHERE id = :id');
         $query->execute(array(
             ':nom' => $nom, ':pv' => $valeurs['pv'], ':agressif' => $valeurs['agressif'],
             ':xp' => $valeurs['xp'], ':loot' => $valeurs['loot'],
             ':coup_min' => $valeurs['coup_min'], ':coup_max' => $valeurs['coup_max'],
+            ':attparmin' => $valeurs['attparmin'],
             ':id' => $valeurs['id']));
         $types = lire_types_monstres($pdo);
     } catch (PDOException $erreur) {
