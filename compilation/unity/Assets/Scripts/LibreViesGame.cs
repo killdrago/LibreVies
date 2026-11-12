@@ -8099,13 +8099,16 @@ public sealed class LibreViesGame : MonoBehaviour
             if (compte == null || !compte.LanceParLauncher || !compte.Authentifie) continue;
             yield return compte.ReclamerButin();
             if (!String.IsNullOrEmpty(compte.Erreur) || compte.ButinRecu == null) continue;
+            string recu = "";
             for (int i = 0; i < compte.ButinRecu.Length; i++)
             {
                 LibreViesCompte.LibreViesButin b = compte.ButinRecu[i];
-                if (b == null || b.quantite <= 0) continue;
-                if (b.objet == "or") { coins += b.quantite; ShowInfo("+" + b.quantite + " or"); }
-                else if (b.objet == "cailloux") { rocks += b.quantite; ShowInfo("+" + b.quantite + " cailloux"); }
+                if (b == null || b.quantite <= 0 || b.objet == null) continue;
+                string objet = b.objet.Trim().ToLowerInvariant();
+                if (objet == "or") { coins += b.quantite; recu += (recu == "" ? "" : "  ") + "+" + b.quantite + " or"; }
+                else if (objet == "cailloux") { rocks += b.quantite; recu += (recu == "" ? "" : "  ") + "+" + b.quantite + " cailloux"; }
             }
+            if (recu != "") ShowInfo(recu);
         }
     }
 

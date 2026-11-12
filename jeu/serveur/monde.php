@@ -322,6 +322,15 @@ function loot_du_type($type) {
     }
 }
 
+// Objets reconnus par le client : 'or' et 'cailloux'. Tolere casse, espaces et synonymes.
+function objet_butin_normalise($brut) {
+    $texte = strtolower(trim((string)$brut));
+    $texte = str_replace(array('é', 'è', 'É'), 'e', $texte);
+    if (in_array($texte, array('or', 'pieces', 'piece', 'pièces', 'pièce', 'gold', 'coin', 'coins'), true)) return 'or';
+    if (in_array($texte, array('cailloux', 'caillou', 'pierre', 'pierres', 'rock', 'rocks'), true)) return 'cailloux';
+    return '';
+}
+
 // Tirage independant pour chaque ligne du monstre : chaque ligne tiree peut donner son objet.
 function tirer_butin($pdo, $type, $membreId) {
     $loot = loot_du_type($type);
@@ -337,10 +346,16 @@ function tirer_butin($pdo, $type, $membreId) {
             $requete->execute(array(':id' => $numero));
             $ligne = $requete->fetch();
             if (!$ligne) continue;
+            // Nom de l'objet normalise (casse, espaces, synonymes) pour que le client le reconnaisse.
+            $objet = objet_butin_normalise($ligne['objet']);
             $tirage = mt_rand(0, 9999999) / 100000; // 0 a 99,99999 %
-            if ($tirage < (float)$ligne['pourcentage']) {
+            $gagne = ($objet !== '') && ($tirage < (float)$ligne['pourcentage']);
+            if (function_exists('journal_api')) journal_api('BUTIN : ligne ' . $numero . ' objet=[' . (string)$ligne['objet']
+                . '] -> [' . $objet . '] pourcentage=' . $ligne['pourcentage'] . ' tirage=' . round($tirage, 5)
+                . ($gagne ? ' GAGNE' : ' perdu'));
+            if ($gagne) {
                 $ajout = $pdo->prepare('INSERT INTO monde_butin (membre_id, objet, quantite) VALUES (:membre, :objet, :quantite)');
-                $ajout->execute(array(':membre' => $membreId, ':objet' => (string)$ligne['objet'],
+                $ajout->execute(array(':membre' => $membreId, ':objet' => $objet,
                     ':quantite' => (int)$ligne['quantite']));
             }
         } catch (Exception $erreur) {

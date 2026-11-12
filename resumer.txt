@@ -4743,6 +4743,13 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.53 MAJ 64 - BUTIN : OBJETS NORMALISES + JOURNAL DES TIRAGES
+================================================================================
+  - Serveur : objet_butin_normalise() (casse, espaces, synonymes or/cailloux).
+    Chaque tirage est journalise (BUTIN : ligne N objet=[...] -> [...] tirage).
+  - Client : tous les objets recus d'un coup sont affiches dans un seul message.
+  - Cause de « or jamais donne » non identifiee : a verifier dans journal_api.log.
+
 8.52 MAJ 63 - BUTIN DES MONSTRES (monde_loot, monstre.loot en texte)
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
