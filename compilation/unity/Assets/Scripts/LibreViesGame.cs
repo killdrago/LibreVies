@@ -295,6 +295,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private int xp;
     private int level = 1;
     private LibreViesCompte.LibreViesTypeMonstre[] typesMonstres;
+    private int adminMonstreEdition = -1;                 // id du monstre en cours d'edition
+    private string[] adminMonstreChamps = new string[7];  // nom, pv, agressif, xp, loot, coup min, coup max
+    private Vector2 adminMonstresScroll;
     private int ratsKilled;
     private int spidersKilled;
     private int selectedSlot;
@@ -11003,6 +11006,90 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
+    // Liste des monstres (table monstre) : une ligne par monstre, bouton EDITER.
+    private void DessinerListeMonstresAdmin(Rect contenu)
+    {
+        Rect zone = new Rect(contenu.x + 18f, contenu.y + 250f, contenu.width - 36f, contenu.height - 262f);
+        if (typesMonstres == null || typesMonstres.Length == 0)
+        {
+            GUI.Label(new Rect(zone.x, zone.y, zone.width, 40f),
+                "Table monstre non chargee : valeurs de secours.", smallStyle);
+            return;
+        }
+        float hauteur = typesMonstres.Length * 36f + (adminMonstreEdition >= 0 ? 130f : 0f) + 10f;
+        Rect vue = new Rect(0f, 0f, zone.width - 18f, Mathf.Max(hauteur, zone.height));
+        adminMonstresScroll = GUI.BeginScrollView(zone, adminMonstresScroll, vue);
+        float y = 0f;
+        for (int i = 0; i < typesMonstres.Length; i++)
+        {
+            LibreViesCompte.LibreViesTypeMonstre t = typesMonstres[i];
+            if (t == null) continue;
+            GUI.Label(new Rect(0f, y + 4f, vue.width - 120f, 26f),
+                t.nom + " : PV " + t.pv + " | agressif " + (t.agressif == 1 ? "oui" : "non")
+                + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max, smallStyle);
+            if (GUI.Button(new Rect(vue.width - 110f, y, 100f, 28f), "EDITER", buttonStyle))
+            {
+                adminMonstreEdition = t.id;
+                adminMonstreChamps = new string[]
+                {
+                    t.nom, t.pv.ToString(CultureInfo.InvariantCulture), t.agressif.ToString(CultureInfo.InvariantCulture),
+                    t.xp.ToString(CultureInfo.InvariantCulture), t.loot.ToString(CultureInfo.InvariantCulture),
+                    t.coup_min.ToString(CultureInfo.InvariantCulture), t.coup_max.ToString(CultureInfo.InvariantCulture)
+                };
+            }
+            y += 36f;
+            if (adminMonstreEdition == t.id)
+            {
+                string[] etiquettes = { "Nom", "PV", "Agressif (0/1)", "XP", "Loot", "Coup min", "Coup max" };
+                float[] largeurs = { 200f, 80f, 110f, 80f, 80f, 90f, 90f };
+                float x = 0f;
+                for (int c = 0; c < 7; c++)
+                {
+                    GUI.Label(new Rect(x, y, largeurs[c], 22f), etiquettes[c], smallStyle);
+                    adminMonstreChamps[c] = GUI.TextField(new Rect(x, y + 22f, largeurs[c] - 8f, 26f),
+                        adminMonstreChamps[c] ?? "", c == 0 ? 40 : 18);
+                    x += largeurs[c] + 8f;
+                }
+                y += 56f;
+                if (GUI.Button(new Rect(0f, y, 150f, 28f), "ENREGISTRER", buttonStyle))
+                    StartCoroutine(SauvegarderTypeMonstreAdmin(t.id));
+                if (GUI.Button(new Rect(160f, y, 120f, 28f), "ANNULER", buttonStyle))
+                    adminMonstreEdition = -1;
+                y += 40f;
+            }
+        }
+        GUI.EndScrollView();
+    }
+
+    private System.Collections.IEnumerator SauvegarderTypeMonstreAdmin(int id)
+    {
+        if (!CompteAdministrateur || compteJoueur == null) yield break;
+        string nom = (adminMonstreChamps[0] ?? "").Trim();
+        int pv, agressif, xp, loot, coupMin, coupMax;
+        if (!int.TryParse(adminMonstreChamps[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out pv)
+            || !int.TryParse(adminMonstreChamps[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out agressif)
+            || !int.TryParse(adminMonstreChamps[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out xp)
+            || !int.TryParse(adminMonstreChamps[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out loot)
+            || !int.TryParse(adminMonstreChamps[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMin)
+            || !int.TryParse(adminMonstreChamps[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out coupMax))
+        { ShowInfo("Valeurs numeriques invalides (PV, agressif, XP, loot, coups)."); yield break; }
+        if (nom.Length == 0 || pv < 1 || agressif < 0 || agressif > 1 || xp < 0 || loot < 0
+            || coupMin < 0 || coupMax < coupMin)
+        { ShowInfo("Valeurs invalides : agressif 0 ou 1, PV au moins 1, coup min <= coup max."); yield break; }
+        var t = new LibreViesCompte.LibreViesTypeMonstre
+        {
+            id = id, nom = nom, pv = pv, agressif = agressif, xp = xp, loot = loot,
+            coup_min = coupMin, coup_max = coupMax
+        };
+        yield return compteJoueur.SauvegarderTypeMonstre(t);
+        if (!String.IsNullOrEmpty(compteJoueur.Erreur))
+        { ShowInfo("Monstre non enregistre : " + compteJoueur.Erreur); yield break; }
+        typesMonstres = compteJoueur.TypesMonstres ?? typesMonstres;
+        adminMonstreEdition = -1;
+        ReconfigurerMonstresAdmin();   // les monstres reprennent les nouvelles stats
+        ShowInfo("Monstre enregistre dans la base : " + nom);
+    }
+
     private System.Collections.IEnumerator EnregistrerNombreMonstres(int valeur)
     {
         if (compteJoueur == null) yield break;
@@ -11049,18 +11136,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         GUI.Label(new Rect(contenu.x + 18f, contenu.y + 184f, 470f, 60f),
             "La modification recree les monstres immediatement.\n"
-            "La valeur par defaut reste 18.", smallStyle);
-        string stats = "Stats des monstres (table monstre) :\n";
-        if (typesMonstres == null) stats += "Table non chargee : valeurs de secours.";
-        else
-            for (int i = 0; i < typesMonstres.Length; i++)
-            {
-                LibreViesCompte.LibreViesTypeMonstre t = typesMonstres[i];
-                if (t == null) continue;
-                stats += t.nom + " : PV " + t.pv + " | agressif " + (t.agressif == 1 ? "oui" : "non")
-                    + " | XP " + t.xp + " | loot " + t.loot + " | coup " + t.coup_min + " a " + t.coup_max + "\n";
-            }
-        GUI.Label(new Rect(contenu.x + 18f, contenu.y + 250f, 760f, 120f), stats, smallStyle);
+            + "La valeur par defaut reste 18.", smallStyle);
+        DessinerListeMonstresAdmin(contenu);
     }
 
     private System.Collections.IEnumerator RechercherJoueursAdministration()

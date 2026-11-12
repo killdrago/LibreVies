@@ -672,6 +672,61 @@ if ($action === 'get_types_monstres') {
     repondre(true, 'Types de monstres charges.', array('membre' => membre_public($membre), 'types_monstres' => $types));
 }
 
+// Relit toutes les lignes de la table monstre (meme forme que get_types_monstres).
+function lire_types_monstres($pdo) {
+    $query = $pdo->prepare('SELECT id, nom, pv, agressif, xp, loot, coup_min, coup_max FROM monstre ORDER BY id');
+    $query->execute();
+    $types = array();
+    foreach ($query->fetchAll() as $ligne) {
+        $types[] = array(
+            'id' => (int)$ligne['id'], 'nom' => (string)$ligne['nom'], 'pv' => (int)$ligne['pv'],
+            'agressif' => (int)$ligne['agressif'], 'xp' => (int)$ligne['xp'], 'loot' => (int)$ligne['loot'],
+            'coup_min' => (int)$ligne['coup_min'], 'coup_max' => (int)$ligne['coup_max']);
+    }
+    return $types;
+}
+
+if ($action === 'save_type_monstre') {
+    $membre = membre_authentifie($pdo, $config, $donnees);
+    if ((int)$membre['droit'] !== 1) {
+        repondre(false, 'Modification des monstres reservee aux administrateurs.', array(), 403);
+    }
+    $valeurs = array();
+    foreach (array('id', 'pv', 'agressif', 'xp', 'loot', 'coup_min', 'coup_max') as $champ) {
+        $valeur = isset($donnees[$champ]) ? $donnees[$champ] : null;
+        if (is_string($valeur) && preg_match('/^[0-9]{1,6}$/D', $valeur)) $valeur = (int)$valeur;
+        if (!is_int($valeur) || $valeur < 0 || $valeur > 1000000) {
+            repondre(false, 'Valeur invalide : ' . $champ . '.', array(), 400);
+        }
+        $valeurs[$champ] = $valeur;
+    }
+    $nom = isset($donnees['nom']) ? texte_recu($donnees['nom'], 40) : '';
+    if ($nom === '') repondre(false, 'Nom du monstre obligatoire.', array(), 400);
+    if ($valeurs['id'] < 1 || $valeurs['pv'] < 1 || $valeurs['agressif'] > 1
+        || $valeurs['coup_max'] < $valeurs['coup_min']) {
+        repondre(false, 'Valeurs invalides : PV au moins 1, agressif 0 ou 1, coup min <= coup max.', array(), 400);
+    }
+    try {
+        $query = $pdo->prepare('SELECT id FROM monstre WHERE id = :id LIMIT 1');
+        $query->execute(array(':id' => $valeurs['id']));
+        if (!$query->fetchColumn()) repondre(false, 'Monstre introuvable.', array(), 404);
+        $query = $pdo->prepare('UPDATE monstre SET nom = :nom, pv = :pv, agressif = :agressif, xp = :xp,'
+            . ' loot = :loot, coup_min = :coup_min, coup_max = :coup_max WHERE id = :id');
+        $query->execute(array(
+            ':nom' => $nom, ':pv' => $valeurs['pv'], ':agressif' => $valeurs['agressif'],
+            ':xp' => $valeurs['xp'], ':loot' => $valeurs['loot'],
+            ':coup_min' => $valeurs['coup_min'], ':coup_max' => $valeurs['coup_max'],
+            ':id' => $valeurs['id']));
+        $types = lire_types_monstres($pdo);
+    } catch (PDOException $erreur) {
+        if ($erreur->getCode() === '23000') repondre(false, 'Ce nom de monstre existe deja.', array(), 409);
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    } catch (Exception $erreur) {
+        repondre(false, detail_erreur($erreur, $config), array(), 500);
+    }
+    repondre(true, 'Monstre enregistre.', array('membre' => membre_public($membre), 'types_monstres' => $types));
+}
+
 if ($action === 'get_npcs') {
     $membre = membre_authentifie($pdo, $config, $donnees);
     try {

@@ -189,6 +189,20 @@ public sealed class LibreViesCompte
         TypesMonstres = null;
         yield return Envoyer("get_types_monstres", null);
     }
+    // Modifie une ligne de la table monstre (admin) ; la reponse renvoie toute la table.
+    public IEnumerator SauvegarderTypeMonstre(LibreViesTypeMonstre t)
+    {
+        if (!EstAdministrateur) { Erreur = "Modification des monstres reservee aux administrateurs."; yield break; }
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var champs = new Dictionary<string, string>
+        {
+            { "id", t.id.ToString(ci) }, { "nom", t.nom ?? "" }, { "pv", t.pv.ToString(ci) },
+            { "agressif", t.agressif.ToString(ci) }, { "xp", t.xp.ToString(ci) },
+            { "loot", t.loot.ToString(ci) }, { "coup_min", t.coup_min.ToString(ci) },
+            { "coup_max", t.coup_max.ToString(ci) }
+        };
+        yield return Envoyer("save_type_monstre", null, null, champs);
+    }
     // Quantite de monstres enregistree dans la table monstre (-1 = pas encore lue).
     public int NombreMonstres { get; private set; }
     public IEnumerator ChargerMonstres()
@@ -505,7 +519,7 @@ public sealed class LibreViesCompte
             { Erreur = "Joueur bani veuillez contacter l'administrateur"; jeton = null; Joueur = null; yield break; }
             // Actions du monde et de la presence : leur reponse ne contient pas de personnage.
             // Elles ne doivent pas passer par le controle du personnage (sinon : « Reponse du compte invalide »).
-            if (action == "get_types_monstres")
+            if (action == "get_types_monstres" || action == "save_type_monstre")
             {
                 LibreViesTypeMonstre[] types = reponse.types_monstres;
                 if (types == null || types.Length == 0) { Erreur = "Reponse types de monstres invalide."; yield break; }
