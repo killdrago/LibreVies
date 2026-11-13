@@ -952,7 +952,9 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         if (compteJoueur.LanceParLauncher && !AppliquerAvatarsNpcs()) yield break;
         ReconstruireObjetsMonde();
-        yield return DeclarerMonstresServeur();
+        // Au lancement, les positions tirees ici remplacent celles restees en base (anciennes sessions) :
+        // sinon les betes apparaissent aux anciens endroits. PV pleins, comme a la reconfiguration.
+        yield return DeclarerMonstresServeur(true);
         intervalleSyncMonde = Mathf.Clamp(
             PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());

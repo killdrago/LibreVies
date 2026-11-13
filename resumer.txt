@@ -4940,6 +4940,15 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.64 MAJ 75 - POSITIONS DE LANCEMENT ECRASEES PAR LA BASE
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - Journal 14:26 : 200 positions serveur appliquees, ecart max 290,8 m avec le local.
+    Les betes apparaissaient aux anciennes positions de la base (INSERT IGNORE garde
+    la premiere position connue pour chaque cle monstre_N).
+  - Correction : au lancement, DeclarerMonstresServeur(true) (reinitialiser). Positions
+    et PV repartent des valeurs locales, comme a la reconfiguration ADMIN.
+  - Non teste ; Unity non compile.
 8.63 MAJ 74 - MONSTRES QUI S'ENTASSENT PRES DE LA CLOTURE (PORTAILS)
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).
