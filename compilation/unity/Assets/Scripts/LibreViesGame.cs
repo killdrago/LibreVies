@@ -714,8 +714,6 @@ public sealed class LibreViesGame : MonoBehaviour
         public bool MortServeur;       // mort selon le serveur
         public float MortLe;           // instant local (Time.time) de la mort recue du serveur
         public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
-        public Vector3 Separation;     // repousse des autres monstres proches (recalculee toutes les 0,3 s)
-        public float SeparationTimer;
         public float DernierEssaiRessurection;
         public float AttackCooldown;
         public float DernierCoup = -10f; // dernier coup donne par ce client (Time.time)
@@ -9521,34 +9519,19 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         // La quantite est reglable dans ADMIN > Monstre. Les positions sont
         // tirees sur toute la carte, jamais dans le village ni dans la riviere.
-        // Un ecart minimal evite de former des tas lorsque la quantite augmente.
+        // Aucun ecart minimal entre monstres : la carte doit pouvoir accueillir la quantite.
         string[] types = { "souris", "rat", "araignee" };
         for (int index = 0; index < nombreMonstresAdmin; index++)
         {
             Vector3 position = Vector3.zero;
             bool positionValide = false;
-            for (int essai = 0; essai < 400 && !positionValide; essai++)
+            for (int essai = 0; essai < 160 && !positionValide; essai++)
             {
                 float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
                 float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
                 Vector2 candidate = new Vector2(x, z);
                 positionValide = !DansVillage(x, z)
                     && !ZoneEauInterditeMonstre(candidate);
-                if (positionValide)
-                {
-                    for (int precedent = 0; precedent < enemies.Count; precedent++)
-                    {
-                        EnemyState autre = enemies[precedent];
-                        if (autre == null || autre.Root == null) continue;
-                        Vector3 delta = autre.Root.transform.position - new Vector3(x, 0f, z);
-                        delta.y = 0f;
-                        if (delta.sqrMagnitude < 25f)
-                        {
-                            positionValide = false;
-                            break;
-                        }
-                    }
-                }
                 if (positionValide)
                     position = new Vector3(x, 0f, z);
             }
@@ -10156,23 +10139,6 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    // Somme des repulsions des autres monstres vivants a moins de 6 m (plus proche = plus forte).
-    private Vector3 CalculerSeparationMonstre(EnemyState moi, Vector3 position)
-    {
-        Vector3 repousse = Vector3.zero;
-        for (int i = 0; i < enemies.Count; i++)
-        {
-            EnemyState autre = enemies[i];
-            if (autre == null || autre == moi || autre.Root == null || !autre.Alive) continue;
-            Vector3 d = position - autre.Root.transform.position;
-            d.y = 0f;
-            float distance2 = d.sqrMagnitude;
-            if (distance2 < 0.0001f || distance2 > 36f) continue;
-            repousse += d / distance2;
-        }
-        return repousse;
-    }
-
     private void UpdateEnemies(float dt)
     {
         foreach (EnemyState enemy in enemies)
@@ -10242,16 +10208,6 @@ public sealed class LibreViesGame : MonoBehaviour
                     dehors = dehors / DistanceVillage(dehors) * (VillageRadius + 0.5f);
                     position.x = dehors.x; position.z = dehors.y;
                 }
-
-                // Separation : deux betes proches s'ecartent, pour eviter les tas.
-                enemy.SeparationTimer -= dt;
-                if (enemy.SeparationTimer <= 0f)
-                {
-                    enemy.SeparationTimer = 0.3f;
-                    enemy.Separation = CalculerSeparationMonstre(enemy, position);
-                }
-                if (deplacement.sqrMagnitude > 0.01f && enemy.Separation.sqrMagnitude > 0f)
-                    deplacement = (deplacement + enemy.Separation.normalized * 0.6f).normalized;
 
                 if (deplacement.sqrMagnitude > 0.01f)
                 {

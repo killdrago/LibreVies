@@ -4940,6 +4940,17 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.60 MAJ 71 - RETRAIT DES LIMITES D'ECART ENTRE MONSTRES
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Constat : avec beaucoup de monstres, il n'y a plus de place pour les respecter ;
+    ceux qui ne trouvent pas de place ne sont pas crees, et les autres s'entassent.
+  - Retrait de l'ecart minimal au placement initial (CreateEnemies : plus de test
+    de distance entre monstres). Retour a 160 essais.
+  - Retrait de la separation en mouvement (MAJ 70 : CalculerSeparationMonstre). Elle
+    poussait les monstres vers les coins quand la carte etait pleine.
+  - La reapparition (PositionReapparitionMonstre) n'avait deja pas d'ecart minimal.
+  - Non teste en jeu ; Unity non compile.
 8.59 MAJ 70 - MONSTRES QUI S'ENTASSENT (SEPARATION)
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
