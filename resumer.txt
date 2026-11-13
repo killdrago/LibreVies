@@ -4940,6 +4940,18 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.63 MAJ 74 - MONSTRES QUI S'ENTASSENT PRES DE LA CLOTURE (PORTAILS)
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - Constat (journal 14:03-14:08 et base) : une partie des betes (cles monstre_0 a
+    monstre_53 dans la derniere declaration de 210) finit collee a la cloture, vers
+    x = 40,5 et z = 0 (portail est de la route). Elles ne sont pas placees la au depart.
+  - Cause probable : quand une bete entrait dans le rayon du village, elle etait remise
+    sur le cercle de la cloture (rayon 40,5) et la direction etait tournee de 90 degres a
+    chaque image, ce qui la collait a la cloture. Les betes s'accumulaient au meme endroit.
+  - Correction : les betes restent hors d'un cercle de rayon VillageRadius + 12 (DansZoneVillageMonstres,
+    meme marge que le placement). Une bete qui s'en approche prend une direction qui s'eloigne du village.
+  - Non teste ; Unity non compile.
 8.62 MAJ 73 - MONSTRES EN TROP PLACES DANS LES VIDES
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).

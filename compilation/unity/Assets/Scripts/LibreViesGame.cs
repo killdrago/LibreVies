@@ -3782,6 +3782,13 @@ public sealed class LibreViesGame : MonoBehaviour
         return DistanceVillage(x, z) < VillageRadius;
     }
 
+    // Les betes restent hors de ce cercle (rayon du village + marge). Sans cette marge, elles
+    // venaient toucher la cloture et s'y entassaient pres des portails.
+    private bool DansZoneVillageMonstres(float x, float z)
+    {
+        return DistanceVillage(x, z) < VillageRadius + MargeVillageMonstres;
+    }
+
     // Enceinte ronde : distance au centre du village.
     private static float DistanceVillage(float x, float z)
     {
@@ -10224,11 +10231,11 @@ public sealed class LibreViesGame : MonoBehaviour
                     enemy.Direction = deplacement;
                 }
                 // Securite : une bete egaree dans le village est remise dehors.
-                if (DansVillage(position.x, position.z))
+                if (DansZoneVillageMonstres(position.x, position.z))
                 {
                     Vector2 dehors = new Vector2(position.x, position.z);
                     if (DistanceVillage(dehors) < 0.001f) dehors = new Vector2(1f, 0f);
-                    dehors = dehors / DistanceVillage(dehors) * (VillageRadius + 0.5f);
+                    dehors = dehors / DistanceVillage(dehors) * (VillageRadius + MargeVillageMonstres + 0.5f);
                     position.x = dehors.x; position.z = dehors.y;
                 }
 
@@ -10240,11 +10247,18 @@ public sealed class LibreViesGame : MonoBehaviour
                     deplacement = DirectionSansEau(new Vector2(position.x, position.z), deplacement);
                     enemy.Direction = deplacement;
                     Vector3 suivant = position + deplacement * speed * dt;
-                    if (DansVillage(suivant.x, suivant.z))
+                    if (DansZoneVillageMonstres(suivant.x, suivant.z))
                     {
-                        // Village protege : la bete longe la cloture sans entrer.
-                        enemy.WanderTimer = 0f;
-                        enemy.Direction = Quaternion.Euler(0f, 90f, 0f) * deplacement;
+                        // Zone du village : la bete s'eloigne vers l'exterieur en longeant
+                        // ce cercle. Elle ne s'accroche plus a la cloture (ou elle s'entassait).
+                        Vector2 radial = new Vector2(position.x, position.z);
+                        if (radial.sqrMagnitude < 0.0001f) radial = new Vector2(1f, 0f);
+                        radial.Normalize();
+                        Vector2 tangente = new Vector2(-radial.y, radial.x);
+                        if (Vector2.Dot(tangente, new Vector2(deplacement.x, deplacement.z)) < 0f) tangente = -tangente;
+                        Vector2 nouvelle = (tangente + radial * 0.8f).normalized;
+                        enemy.WanderTimer = UnityEngine.Random.Range(1.5f, 4f);
+                        enemy.Direction = new Vector3(nouvelle.x, 0f, nouvelle.y);
                     }
                     else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
                     {
