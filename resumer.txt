@@ -4940,6 +4940,16 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.62 MAJ 73 - MONSTRES EN TROP PLACES DANS LES VIDES
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Constat : au-dela d'environ 99 monstres, la carte se remplit et les betes en trop
+    s'entassent pres de la cloture du village.
+  - Correction : CreateEnemies place chaque monstre au point le plus eloigne des
+    monstres deja poses (meilleur de 60 essais, DistanceMonstreLaPlusProche). Les vides
+    se remplissent d'abord. Pas de point a moins de 12 m de l'enceinte (MargeVillageMonstres).
+  - Non teste ; Unity non compile. S'applique au depart et a la reconfiguration ADMIN.
+    La reapparition apres mort (PositionReapparitionMonstre) n'a pas change.
 8.61 MAJ 72 - LES MONSTRES NE SE BLOQUENT PLUS ENTRE EUX
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).

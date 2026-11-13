@@ -34,6 +34,8 @@ public sealed class LibreViesGame : MonoBehaviour
     // Les monstres ne nagent pas : une marge de sécurité autour de la nappe
     // leur laisse le temps de tourner avant que leur corps ne touche l'eau.
     private const float MargeEauMonstres = 0.85f;
+    // Les betes placees au depart restent a cette distance du village (en plus de son rayon).
+    private const float MargeVillageMonstres = 12f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
     // Ruisseau : la largeur entre rives varie de LargeurMinRiviere a
@@ -9519,30 +9521,49 @@ public sealed class LibreViesGame : MonoBehaviour
 
     private void CreateEnemies()
     {
-        // La quantite est reglable dans ADMIN > Monstre. Les positions sont
-        // tirees sur toute la carte, jamais dans le village ni dans la riviere.
-        // Aucun ecart minimal entre monstres : la carte doit pouvoir accueillir la quantite.
+        // La quantite est reglable dans ADMIN > Monstre. Chaque monstre est place
+        // au point le plus eloigne des monstres deja poses (meilleur de N essais
+        // aleatoires) : les vides de la carte se remplissent d'abord, et les betes
+        // en trop s'intercalent entre les autres au lieu de s'entasser au village.
         string[] types = { "souris", "rat", "araignee" };
         for (int index = 0; index < nombreMonstresAdmin; index++)
         {
             Vector3 position = Vector3.zero;
-            bool positionValide = false;
-            for (int essai = 0; essai < 160 && !positionValide; essai++)
+            float meilleurVide = -1f;
+            for (int essai = 0; essai < 60; essai++)
             {
                 float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
                 float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
+                if (DistanceVillage(x, z) < VillageRadius + MargeVillageMonstres) continue;
                 Vector2 candidate = new Vector2(x, z);
-                positionValide = !DansVillage(x, z)
-                    && !ZoneEauInterditeMonstre(candidate);
-                if (positionValide)
+                if (ZoneEauInterditeMonstre(candidate)) continue;
+                float vide = DistanceMonstreLaPlusProche(candidate);
+                if (vide > meilleurVide)
+                {
+                    meilleurVide = vide;
                     position = new Vector3(x, 0f, z);
+                }
             }
-            if (!positionValide) continue;
+            if (meilleurVide < 0f) continue;
             CreateEnemy(position, types[index % types.Length]);
             if (enemies.Count > 0) enemies[enemies.Count - 1].Cle = "monstre_" + index;
         }
         Debug.Log("[LV] monstres créés : " + enemies.Count
-            + " (quantite ADMIN = " + nombreMonstresAdmin + ", positions aleatoires)");
+            + " (quantite ADMIN = " + nombreMonstresAdmin + ", places dans les vides)");
+    }
+
+    // Distance entre un point et le monstre le plus proche (infini s'il n'y en a pas).
+    private float DistanceMonstreLaPlusProche(Vector2 point)
+    {
+        float plusPetit = float.MaxValue;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyState autre = enemies[i];
+            if (autre == null || autre.Root == null) continue;
+            float d = (new Vector2(autre.Home.x, autre.Home.z) - point).sqrMagnitude;
+            if (d < plusPetit) plusPetit = d;
+        }
+        return plusPetit == float.MaxValue ? float.MaxValue : Mathf.Sqrt(plusPetit);
     }
 
     // Stats d'un type depuis la table monstre (rat = 1, souris = 2, araignee = 3).
