@@ -285,10 +285,11 @@ public sealed class LibreViesCompte
 
     // Declare les monstres du client (JSON : cle, type, x, z, pv_max). Le serveur
     // garde la premiere position connue et renvoie l'etat de chaque monstre.
-    public IEnumerator DeclarerMonstres(string monstresJson)
+    public IEnumerator DeclarerMonstres(string monstresJson, bool reinitialiser = false)
     {
         yield return Envoyer("declarer_monstres", null, null,
-            new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" } });
+            new Dictionary<string, string> { { "monstres", monstresJson ?? "[]" },
+                { "reinitialiser", reinitialiser ? "1" : "0" } });
     }
 
     // Envoie les positions des monstres pilotes ; le serveur renvoie ceux qu'il accepte.

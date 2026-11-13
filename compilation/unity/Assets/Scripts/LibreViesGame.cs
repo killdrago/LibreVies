@@ -7909,7 +7909,7 @@ public sealed class LibreViesGame : MonoBehaviour
         return ennemi.Souris ? "souris" : (ennemi.Spider ? "araignee" : "rat");
     }
 
-    private System.Collections.IEnumerator DeclarerMonstresServeur()
+    private System.Collections.IEnumerator DeclarerMonstresServeur(bool reinitialiser = false)
     {
         if (LibreViesCompte.Courant == null || !LibreViesCompte.Courant.Authentifie) yield break;
         var culture = CultureInfo.InvariantCulture;
@@ -7933,7 +7933,7 @@ public sealed class LibreViesGame : MonoBehaviour
         Journal("monstres : declaration de " + nombre + " ; debut envoye : "
                 + json.ToString(0, Math.Min(json.Length, 160)));
         LibreViesCompte compte = LibreViesCompte.Courant;
-        yield return compte.DeclarerMonstres(json.ToString());
+        yield return compte.DeclarerMonstres(json.ToString(), reinitialiser);
         if (!String.IsNullOrEmpty(compte.Erreur))
         {
             Journal("monstres : declaration impossible : " + compte.Erreur);
@@ -9509,7 +9509,8 @@ public sealed class LibreViesGame : MonoBehaviour
         }
         enemies.Clear();
         CreateEnemies();
-        StartCoroutine(DeclarerMonstresServeur());
+        // Nouvelles positions : le serveur repart de ces positions au lieu des anciennes en base.
+        StartCoroutine(DeclarerMonstresServeur(true));
         ShowInfo("Nombre de monstres applique : " + nombreMonstresAdmin);
     }
 

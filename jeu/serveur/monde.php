@@ -275,6 +275,12 @@ function traiter_declaration_monstres($pdo, $donnees) {
     $miseAJourMax = $pdo->prepare('UPDATE monde_monstre SET pv_max = :pvmax1,'
         . ' pv = CASE WHEN mort = 0 THEN :pvmax2 ELSE pv END, pv_modifie_le = NOW(), revision = :rev'
         . ' WHERE cle = :cle AND pv_max <> :pvmax3');
+    // « reinitialiser = 1 » (reconfiguration de la quantite par l'admin) : les positions et les
+    // PV en base repartent des valeurs envoyees, au lieu de garder les anciennes positions.
+    $reinitialiser = isset($donnees['reinitialiser']) && (string)$donnees['reinitialiser'] === '1';
+    $reinit = $pdo->prepare('UPDATE monde_monstre SET position_x = :x, position_z = :z, rotation_y = 0,'
+        . ' pv = pv_max, mort = 0, proprietaire_id = NULL, pv_modifie_le = NOW(), revision = :rev'
+        . ' WHERE cle = :cle');
     $cles = array();
     foreach ($liste as $monstre) {
         if (!is_array($monstre)) throw new InvalidArgumentException('Monstre invalide.');
@@ -291,6 +297,9 @@ function traiter_declaration_monstres($pdo, $donnees) {
             ':pv' => $pvMax, ':pvmax' => $pvMax, ':rev' => $rev));
         $miseAJourMax->execute(array(':pvmax1' => $pvMax, ':pvmax2' => $pvMax, ':pvmax3' => $pvMax,
             ':rev' => $rev, ':cle' => $cle));
+        if ($reinitialiser) {
+            $reinit->execute(array(':x' => $x, ':z' => $z, ':rev' => $rev, ':cle' => $cle));
+        }
         $cles[] = $cle;
     }
     return array('message' => 'Monstres declares.', 'extra' => array(

@@ -4940,6 +4940,22 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.57 MAJ 68 - REPARTITION DES MONSTRES APRES CHANGEMENT DE QUANTITE
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Symptome : avec 100 monstres, ils apparaissent groupes le long de la riviere.
+  - Cause : monde_monstre garde la position du premier passage (INSERT IGNORE). Les
+    anciennes positions (anciennes quantites, monstres pousses vers la berge) restaient
+    donc en base, meme quand l'admin changeait la quantite.
+  - Correction : quand l'admin applique une quantite, le client envoie
+    reinitialiser=1 ; monde.php remet alors pour chaque monstre declare la position
+    envoyee, PV au maximum, mort=0 et proprietaire vide (LibreViesGame.cs
+    ReconfigurerMonstresAdmin -> DeclarerMonstresServeur(true)).
+  - Non teste en jeu, PHP absent du bac a sable, Unity non compile.
+  - A surveiller si le groupement reste : le monstre est repousse sur la berge par
+    SortirZoneEauMonstre (UpdateEnemies) ; cette repulsion peut aussi accumuler les
+    monstres le long de la riviere.
+
 8.56 MAJ 67 - QUANTITE DE MONSTRES AU-DELA DE 200 : LISTE REFUSEE
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
