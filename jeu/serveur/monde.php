@@ -265,7 +265,7 @@ function lire_monstres_par_cle($pdo, $cles) {
 function traiter_declaration_monstres($pdo, $donnees) {
     $brut = isset($donnees['monstres']) ? $donnees['monstres'] : '[]';
     $liste = is_string($brut) ? json_decode($brut, true) : $brut;
-    if (!is_array($liste) || count($liste) > 200) throw new InvalidArgumentException('Liste de monstres invalide.');
+    if (!is_array($liste) || count($liste) > 2000) throw new InvalidArgumentException('Liste de monstres invalide.');
     $rev = prochaine_revision($pdo);
     $insertion = $pdo->prepare('INSERT IGNORE INTO monde_monstre'
         . ' (cle, type, position_x, position_z, pv, pv_max, mort, revision, pv_modifie_le)'
@@ -469,7 +469,7 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
 function liste_monstres_recue($donnees) {
     $brut = isset($donnees['monstres']) ? $donnees['monstres'] : '[]';
     $liste = is_string($brut) ? json_decode($brut, true) : $brut;
-    if (!is_array($liste) || count($liste) > 200) throw new InvalidArgumentException('Liste de monstres invalide.');
+    if (!is_array($liste) || count($liste) > 2000) throw new InvalidArgumentException('Liste de monstres invalide.');
     return $liste;
 }
 

@@ -4940,6 +4940,23 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.56 MAJ 67 - QUANTITE DE MONSTRES AU-DELA DE 200 : LISTE REFUSEE
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Symptome : avec une quantite au-dessus de 120 (300, 600), les monstres
+    s'entassent au meme endroit a la reapparition, et certaines quantites ne passent pas.
+  - Cause : monde.php refusait toute liste de plus de 200 monstres (declaration et
+    pilotage). Le client envoie tous les monstres dans une seule requete : au-dela de
+    200, la declaration echoue, les monstres restent a la position par defaut (0, 0)
+    en base et tous s'entassent.
+  - Correction : limite portee a 2000 (traiter_declaration_monstres et
+    liste_monstres_recue). Aucun changement client.
+  - Non teste en jeu, PHP absent du bac a sable. A tester : 300 puis 600 monstres,
+    verifier qu'ils sont repartis sur la carte, et que le journal ne signale plus
+    « declaration impossible ».
+  - Limite restante : la liste complete part a chaque declaration et toutes les 0,2 s
+    pour le pilotage. Avec 600 monstres, cela pese sur le serveur : a surveiller.
+
 8.55 MAJ 66 - COUP DE BASE 1 PV ET COUP DU GARDE = MORT
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
