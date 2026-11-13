@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-mondeLV.py : le monde vit sur le serveur.
+mondeLV.py : un seul programme pour le serveur LibreVies.
 
-Ce script tourne en continu, comme serveur_ia.py, et fait vivre les monstres
-(déplacements, poursuite, réapparition) que les joueurs connectés soient là ou non.
-Le jeu ne calcule plus les monstres : il lit leurs positions dans la base et
-affiche ce qu'il reçoit. Les monstres sont marqués « tenus par le serveur »
-(proprietaire_id = -1) : l'API (monde.php) refuse alors les positions envoyées
-par les jeux.
+  1. Le monde vit en permanence : les monstres se deplacent, poursuivent, reapparaissent,
+     que des joueurs soient connectes ou non. Le jeu ne fait que lire leurs positions.
+     Les monstres sont marques proprietaire_id = -1 : monde.php refuse le pilotage des jeux.
+  2. Le serveur IA des PNJ (Qwen2.5-1.5B-Instruct) tourne dans le meme programme,
+     sur http://127.0.0.1:8765/npc_chat. Les poids se trouvent dans le dossier IA
+     (voir IA/README.md). Sans poids ou sans torch, le monde tourne quand meme.
 
-Lancement (même principe que le serveur IA) :
-    cd serveur
-    pip install pymysql          (une fois)
-    python mondeLV.py
-
-Lit la configuration dans config.php (même dossier). Garder la fenêtre ouverte.
+Lancement (sur le PC serveur, dans ce dossier) :
+    pip install pymysql              (une fois)
+    python mondeLV.py                (ou demarrer_mondeLV.bat)
+Lit la configuration dans config.php (meme dossier). Garder la fenetre ouverte.
 
 Limites actuelles :
-  - les monstres ne tiennent compte que du village (cercle), de la rivière et des
-    bords de la carte ; les arbres, rochers et barrières ne sont pas pris en compte ;
-  - les monstres ne frappent pas les joueurs (les dégâts restent côté jeu) ;
-  - la géométrie de la rivière et les constantes de vitesse sont recopiées du jeu
-    (LibreViesGame.cs) : à garder synchronisées si le jeu change.
+  - les monstres ne tiennent compte que du village (cercle d'enceinte), de la riviere et
+    des bords de la carte ; les arbres, rochers et barrieres ne sont pas pris en compte ;
+  - les monstres ne frappent pas les joueurs (les degats restent cote jeu) ;
+  - la geometrie de la riviere et les vitesses sont recopiees de LibreViesGame.cs.
 """
 
+import json
 import math
 import os
 import random
 import re
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
     import pymysql
@@ -41,9 +41,14 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "config.php")
 
+# ---- Serveur IA des PNJ (ex serveur_ia.py) ----
+IA_MODELE = os.environ.get("LIBREVIES_IA_MODELE", os.path.join(HERE, "IA"))
+IA_HOTE = os.environ.get("LIBREVIES_IA_HOTE", "127.0.0.1")
+IA_PORT = int(os.environ.get("LIBREVIES_IA_PORT", "8765"))
+
 PAS_DU_MONDE = 0.5            # secondes entre deux tours de calcul
 RAYON_VILLAGE = 40.0          # cercle du village (LibreViesGame.cs : VillageRadius)
-MARGE_VILLAGE = 12.0          # les monstres restent a cette distance de l'enceinte
+MARGE_VILLAGE = 1.0           # les monstres vont jusqu'au mur (a cote de l'enceinte)
 LIMITE_CARTE = 119.0          # bords de la carte utilisables pour les monstres
 MARGE_EAU = 0.85              # MargeEauMonstres
 LARGEUR_MIN_RIVIERE = 5.0
@@ -69,6 +74,226 @@ RIVIERE = [
 # Type de monstre -> identifiant dans la table monstre (id_monstre_du_type dans monde.php).
 ID_TYPE = {"rat": 1, "souris": 2, "araignee": 3}
 TYPES_DEFAUT_AGRESSIFS = {"rat": True, "souris": False, "araignee": True}
+
+
+
+# ==================================================================
+# Serveur IA des PNJ
+# ==================================================================
+
+MAX_MESSAGE = 400          # caracteres par message du joueur
+MAX_NOM = 60
+MAX_HISTORIQUE = 10        # messages gardes du dialogue en cours
+MAX_CORPS = 20000          # octets acceptes dans une requete
+
+REGLE_COMMUNE = (
+    "Tu joues un habitant du village de LibreVies. Reponds toujours en francais, "
+    "a la premiere personne et dans le role de ton personnage. Ne dis jamais que "
+    "tu es une IA, un modele ou un programme. Si on te pose une question hors du "
+    "jeu, reponds brievement en restant dans ton role et reviens au village. "
+    "N'invente pas de prix, de dates ou de chiffres precis."
+)
+
+CONSIGNE_COURT = (
+    "Reponds en une a trois phrases courtes, comme une replique de jeu video."
+)
+CONSIGNE_TRES_COURT = (
+    "Reponds en une seule phrase tres courte, de moins de quinze mots."
+)
+CONSIGNE_LIBRE = (
+    "Tu peux tenir une conversation plus developpee : trois a six phrases, "
+    "en posant parfois une question en retour."
+)
+
+PERSONNAGES = {
+    "maire": "Tu es le maire du village. Tu es sage et un peu solennel. Tu parles "
+             "de la vie du village et de ses habitants.",
+    "forgeron": "Tu es le forgeron du village. Tu es direct, travailleur, fier de "
+                "ton metier. Tu parles de metal, de charbon et d'outils.",
+    "marchand": "Tu es le marchand du village. Tu es commercant, souriant, tu "
+                "aimes raconter les nouvelles qui circulent sur les routes.",
+    "vendeur": "Tu es le marchand du village. Tu es commercant, souriant, tu "
+               "aimes raconter les nouvelles qui circulent sur les routes.",
+    "esthetique": "Tu es la conseillere en apparence du village. Tu es attentive, "
+                  "aimable, tu aides les voyageurs a se presenter et a se "
+                  "faire une belle image.",
+    "medecin": "Tu es le medecin du village. Tu es calme et rassurant. Tu "
+               "parles de soins, de repos et de prudence.",
+}
+PERSONNAGE_DEFAUT = "Tu es un habitant ordinaire du village, curieux et accueillant."
+
+VERROU = threading.Lock()
+ETAT = {"modele": None, "tokenizer": None, "appareil": "cpu"}
+
+
+def charger_modele():
+    """Charge le modele une seule fois, au demarrage du serveur."""
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+    except ImportError:
+        print("IA desactivee : pip install -r IA/requirements.txt", flush=True)
+        return
+
+    fichiers = ["config.json", "tokenizer.json", "model.safetensors"]
+    manquants = [f for f in fichiers if not os.path.isfile(os.path.join(IA_MODELE, f))]
+    if manquants:
+        print("IA desactivee : fichiers manquants dans " + IA_MODELE + " : " + ", ".join(manquants)
+              + " (voir IA/README.md)", flush=True)
+        return
+
+    appareil = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.float16 if appareil == "cuda" else torch.float32
+    print("Chargement de Qwen2.5-1.5B-Instruct sur " + appareil + "...", flush=True)
+    tokenizer = AutoTokenizer.from_pretrained(IA_MODELE)
+    modele = AutoModelForCausalLM.from_pretrained(IA_MODELE, torch_dtype=dtype)
+    modele.to(appareil)
+    modele.eval()
+    ETAT.update(modele=modele, tokenizer=tokenizer, appareil=appareil)
+    print("Modele pret.", flush=True)
+
+
+def texte_propre(valeur, limite):
+    """Retourne une chaine nettoyee, ou None si elle est absente ou invalide."""
+    if not isinstance(valeur, str):
+        return None
+    valeur = valeur.strip()
+    if not valeur or len(valeur) > limite:
+        return None
+    if any(ord(c) < 32 or ord(c) == 127 for c in valeur):
+        return None
+    return valeur
+
+
+def historique_valide(brut):
+    if brut is None:
+        return []
+    if not isinstance(brut, list):
+        return None
+    propre = []
+    for entree in brut[-MAX_HISTORIQUE:]:
+        if not isinstance(entree, dict):
+            return None
+        role = entree.get("role")
+        contenu = texte_propre(entree.get("content"), MAX_MESSAGE)
+        if role not in ("user", "assistant") or contenu is None:
+            return None
+        propre.append({"role": role, "content": contenu})
+    return propre
+
+
+def generer_reponse(metier, nom, ville, mode, message, historique):
+    tokenizer = ETAT["tokenizer"]
+    modele = ETAT["modele"]
+
+    personnage = PERSONNAGES.get(metier, PERSONNAGE_DEFAUT)
+    consigne = {"libre": CONSIGNE_LIBRE, "tres_court": CONSIGNE_TRES_COURT}.get(mode, CONSIGNE_COURT)
+    identite = "Ton nom est " + nom + ". Tu habites " + (ville or "le village") + "."
+    systeme = "\n\n".join([REGLE_COMMUNE, personnage, identite, consigne])
+
+    messages = [{"role": "system", "content": systeme}]
+    messages.extend(historique)
+    messages.append({"role": "user", "content": message})
+
+    texte = tokenizer.apply_chat_template(messages, tokenize=False,
+                                          add_generation_prompt=True)
+    entree = tokenizer(texte, return_tensors="pt").to(ETAT["appareil"])
+    # Limite en tokens (morceaux de mots), pas en caracteres : 60 tokens ~ 200 caracteres.
+    max_tokens = {"libre": 320, "tres_court": 60}.get(mode, 120)
+
+    import torch
+    with VERROU, torch.no_grad():
+        sortie = modele.generate(
+            **entree,
+            max_new_tokens=max_tokens,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.1,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+    nouveaux = sortie[0][entree["input_ids"].shape[1]:]
+    return tokenizer.decode(nouveaux, skip_special_tokens=True).strip()
+
+
+class GestionnaireIA(BaseHTTPRequestHandler):
+    server_version = "LibreViesIA/1.0"
+
+    def _envoyer(self, code, donnees):
+        corps = json.dumps(donnees, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(corps)))
+        self.end_headers()
+        self.wfile.write(corps)
+
+    def do_GET(self):
+        if self.path.split("?")[0] == "/health":
+            self._envoyer(200, {"ok": True, "modele_charge": ETAT["modele"] is not None})
+        else:
+            self._envoyer(404, {"ok": False, "message": "Route inconnue."})
+
+    def do_POST(self):
+        if self.path.split("?")[0] != "/npc_chat":
+            self._envoyer(404, {"ok": False, "message": "Route inconnue."})
+            return
+        try:
+            longueur = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            longueur = 0
+        if longueur <= 0 or longueur > MAX_CORPS:
+            self._envoyer(400, {"ok": False, "message": "Requete invalide."})
+            return
+        try:
+            donnees = json.loads(self.rfile.read(longueur).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            self._envoyer(400, {"ok": False, "message": "JSON invalide."})
+            return
+        if not isinstance(donnees, dict):
+            self._envoyer(400, {"ok": False, "message": "JSON invalide."})
+            return
+
+        metier = texte_propre(donnees.get("metier"), 40)
+        nom = texte_propre(donnees.get("nom"), MAX_NOM) or "Habitant"
+        ville = texte_propre(donnees.get("ville"), MAX_NOM) or ""
+        message = texte_propre(donnees.get("message"), MAX_MESSAGE)
+        mode = donnees.get("mode") if donnees.get("mode") in ("tres_court", "court", "libre") else "court"
+        historique = historique_valide(donnees.get("historique"))
+        if metier is None or message is None or historique is None:
+            self._envoyer(400, {"ok": False, "message": "Message ou contexte invalide."})
+            return
+        if ETAT["modele"] is None:
+            self._envoyer(503, {"ok": False, "message": "Le modele n'est pas encore charge."})
+            return
+
+        try:
+            reponse = generer_reponse(metier.lower(), nom, ville, mode, message, historique)
+        except Exception as erreur:  # pas de details internes vers le jeu
+            print("Erreur de generation : " + type(erreur).__name__, flush=True)
+            self._envoyer(500, {"ok": False, "message": "Generation impossible."})
+            return
+        if not reponse:
+            reponse = "Hum... Pardonnez-moi, je n'ai pas bien saisi. Redites-moi cela ?"
+        self._envoyer(200, {"ok": True, "reponse": reponse})
+
+    def log_message(self, format, *args):
+        # Silence volontaire : pas de journal des requetes ni des messages.
+        pass
+
+
+
+def demarrer_ia():
+    """Ecoute les requetes des PNJ et charge le modele (dans un thread separe).
+    Le serveur repond meme sans modele : /health indique alors modele_charge = false."""
+    try:
+        serveur = ThreadingHTTPServer((IA_HOTE, IA_PORT), GestionnaireIA)
+    except OSError as erreur:
+        print("IA : port " + str(IA_PORT) + " indisponible : " + str(erreur), flush=True)
+        return
+    print("Serveur IA LibreVies sur http://" + IA_HOTE + ":" + str(IA_PORT) + "/npc_chat",
+          flush=True)
+    threading.Thread(target=charger_modele, daemon=True).start()
+    serveur.serve_forever()
 
 
 def lire_config():
@@ -327,6 +552,7 @@ class Monde:
 
 def main():
     config = lire_config()
+    threading.Thread(target=demarrer_ia, daemon=True).start()
     monde = Monde(config)
     print("mondeLV : le monde tourne (un tour toutes les {} s). Ctrl+C pour arreter.".format(PAS_DU_MONDE))
     while True:

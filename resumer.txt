@@ -4940,6 +4940,17 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.67 MAJ 78 - UN SEUL PROGRAMME SERVEUR (mondeLV.py) ET MURS
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - serveur_ia.py fusionne dans jeu/serveur/mondeLV.py, qui lance aussi le monde des monstres.
+    Le serveur IA reste sur 127.0.0.1:8765 et charge le modele en arriere-plan ; sans poids
+    ou sans torch, il repond /health (modele_charge = false) et le monde continue.
+  - Lancement : demarrer_mondeLV.bat (ou python mondeLV.py dans serveur).
+  - Monstres : marge de 12 m retiree (jeu et serveur) ; ils vont jusqu'au mur d'enceinte
+    (rayon 40 + 1 m). Le blocage des coups a travers la cloture (ClotureEntre) est inchange.
+  - Le serveur ne frappe pas les joueurs : la logique agressif / non agressif reste celle du jeu.
+  - Limite restante : arbres, rochers et barrieres ne sont pas pris en compte par le serveur.
 8.66 MAJ 77 - LE MONDE VIT SUR LE SERVEUR (mondeLV.py)
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).

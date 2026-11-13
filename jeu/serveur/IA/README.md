@@ -1,7 +1,7 @@
 # IA des PNJ (Qwen2.5-1.5B-Instruct, local)
 
 Ce dossier contient le serveur qui fait répondre les PNJ du jeu.
-Pour l'instant il tourne sur votre PC ; il sera déplacé sur l'hébergeur plus tard.
+Il tourne sur votre PC, dans le meme programme que le monde (`serveur/mondeLV.py`) ; il sera déplacé sur l'hébergeur plus tard.
 
 ## Installation (une fois)
 
@@ -14,13 +14,12 @@ Pour l'instant il tourne sur votre PC ; il sera déplacé sur l'hébergeur plus 
 
 ## Lancer le serveur
 
-```bat
-cd serveur\IA
-python serveur_ia.py
-```
+Le serveur IA est maintenant dans `serveur\mondeLV.py`, avec le monde des monstres.
+Pour le lancer, voir le fichier `serveur\demarrer_mondeLV.bat` (ou `python mondeLV.py`
+dans le dossier `serveur`). Les poids du modele restent dans ce dossier `IA`.
 
-Attendez le message « Modele pret ». Le serveur écoute sur `http://127.0.0.1:8765`.
-Laissez cette fenêtre ouverte pendant que vous jouez.
+Si les poids ou `torch` manquent, le monde tourne quand meme : le message
+« IA desactivee » est affiche au demarrage.
 
 ## Tester sans le jeu
 

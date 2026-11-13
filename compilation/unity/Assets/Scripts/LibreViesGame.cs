@@ -35,7 +35,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // leur laisse le temps de tourner avant que leur corps ne touche l'eau.
     private const float MargeEauMonstres = 0.85f;
     // Les betes placees au depart restent a cette distance du village (en plus de son rayon).
-    private const float MargeVillageMonstres = 12f;
+    private const float MargeVillageMonstres = 1f;
     // L'eau est une nappe qui suit le relief naturel : la surface reste au
     // niveau du sol naturel et son lit est creuse de cette profondeur.
     // Ruisseau : la largeur entre rives varie de LargeurMinRiviere a
