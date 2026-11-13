@@ -318,6 +318,12 @@ def demarrer_ia():
 
 def lire_config():
     """Lit les valeurs simples de config.php (sans l'interpréter)."""
+    if not os.path.isfile(CONFIG):
+        raise RuntimeError(
+            "config.php introuvable dans ce dossier (" + HERE + ").\n"
+            "Copiez config.php.example vers config.php, puis reglez db_host, db_user, "
+            "db_password et les noms de base (db_name, monde_db_name)."
+        )
     with open(CONFIG, encoding="utf-8") as fichier:
         texte = fichier.read()
     valeurs = {}
@@ -640,7 +646,11 @@ class Monde:
 
 def main():
     assurer_pymysql()
-    config = lire_config()
+    try:
+        config = lire_config()
+    except RuntimeError as erreur:
+        print("ERREUR : " + str(erreur), flush=True)
+        sys.exit(1)
     threading.Thread(target=demarrer_ia, daemon=True).start()
     monde = Monde(config)
     print("mondeLV : le monde tourne (un tour toutes les {} s). Ctrl+C pour arreter.".format(PAS_DU_MONDE))

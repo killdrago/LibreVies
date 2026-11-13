@@ -4953,6 +4953,10 @@ Date : 13/11/2026 (horloge du bac a sable, UTC).
   - Le fichier obstacles.json est ignore par git (genere).
   - Non teste ; Unity non compile. Le controle syntaxe signale UTF8Encoding (faux positif :
     using System.Text est present).
+8.68b MAJ 80 - MESSAGE SI config.php MANQUE (mondeLV.py)
+  - Si config.php est absent, mondeLV.py affiche la marche a suivre (copier config.php.example) et s'arrete proprement, sans trace Python.
+  - pymysql est bien installe automatiquement (verifie sur le PC de test).
+
 8.67 MAJ 78 - UN SEUL PROGRAMME SERVEUR (mondeLV.py) ET MURS
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).
