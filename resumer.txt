@@ -4940,6 +4940,20 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.65 MAJ 76 - PERSISTANCE DES POSITIONS DES MONSTRES ENTRE LES SESSIONS
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - Besoin exprime : les betes gardent leur derniere place connue. Quand le dernier
+    joueur se deconnecte, elles restent figees ; le joueur suivant les retrouve. Tant
+    qu'au moins un joueur est connecte, leurs positions sont communes a tous.
+  - Retour sur MAJ 75 : la reinitialisation au lancement est annulee. Au lancement,
+    DeclarerMonstresServeur() sans reinitialisation : la base garde la position de chaque
+    cle monstre_N ; seules les betes absentes de la base prennent une position locale.
+  - Pas de sauvegarde supplementaire a la deconnexion : le joueur qui pilote envoie la
+    position de chaque bete a la base toutes les 0,2 s (PiloterMonstres). La base a donc
+    la derniere position a 0,2 s pres.
+  - Reinitialisation (positions et PV) uniquement a la reconfiguration ADMIN.
+  - Non teste ; Unity non compile.
 8.64 MAJ 75 - POSITIONS DE LANCEMENT ECRASEES PAR LA BASE
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).
