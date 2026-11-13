@@ -7958,6 +7958,9 @@ public sealed class LibreViesGame : MonoBehaviour
     private void AppliquerDeclarationMonstres(LibreViesCompte.LibreViesMonstre[] etats)
     {
         if (etats == null) return;
+        // Diagnostic : ecart entre la position locale (creee au demarrage) et celle du serveur.
+        int appliques = 0, ecartsGrands = 0;
+        float ecartMax = 0f;
         for (int i = 0; i < etats.Length; i++)
         {
             LibreViesCompte.LibreViesMonstre etat = etats[i];
@@ -7966,9 +7969,15 @@ public sealed class LibreViesGame : MonoBehaviour
             if (ennemi == null || ennemi.Root == null) continue;
             Vector3 position = new Vector3(etat.x, 0f, etat.z);
             position.y = TerrainHeight(etat.x, etat.z);
+            float ecart = Vector2.Distance(new Vector2(ennemi.Root.transform.position.x, ennemi.Root.transform.position.z), new Vector2(position.x, position.z));
+            if (ecart > ecartMax) ecartMax = ecart;
+            if (ecart > 1f) ecartsGrands++;
+            appliques++;
             ennemi.Home = position;
             if (ennemi.Alive) ennemi.Root.transform.position = position;
         }
+        Journal("monstres : " + appliques + " position(s) serveur appliquee(s), ecart max avec le local "
+            + ecartMax.ToString("0.0", CultureInfo.InvariantCulture) + " m, " + ecartsGrands + " au-dela de 1 m");
         AppliquerEtatMonstres(etats);
     }
 
