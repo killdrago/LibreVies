@@ -4940,6 +4940,17 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.58 MAJ 69 - MAXIMUM 500 MONSTRES
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - ADMIN > Monstre : la quantite est limitee a 500 (MaxMonstresAdmin). Une valeur
+    superieure est ramenee a 500.
+  - Non teste en jeu. Verifier 500 monstres : ils doivent tous apparaitre.
+  - Rappel : les monstres ne bougent que sur le jeu d'un joueur connecte (pilotage
+    client). Le serveur n'a aucun processus automatique : quand plus aucun joueur
+    n'est connecte, les monstres restent figes a leur derniere position ; la
+    regeneration des PV, elle, se calcule au moment de la lecture.
+
 8.57 MAJ 68 - REPARTITION DES MONSTRES APRES CHANGEMENT DE QUANTITE
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).

@@ -229,6 +229,7 @@ public sealed class LibreViesGame : MonoBehaviour
     private Font policeDefaut;
     private bool policeCherchee;
     private readonly List<EnemyState> enemies = new List<EnemyState>();
+    private const int MaxMonstresAdmin = 500;
     private int nombreMonstresAdmin = 18;
     private string nombreMonstresAdminTexte = "18";
     private readonly List<PickupState> pickups = new List<PickupState>();
@@ -11251,7 +11252,8 @@ public sealed class LibreViesGame : MonoBehaviour
             if (int.TryParse(nombreMonstresAdminTexte, NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out valeur))
             {
-                valeur = Mathf.Max(0, valeur);
+                // Maximum 500 monstres : au-dela, le jeu ne les affiche plus correctement.
+                valeur = Mathf.Clamp(valeur, 0, MaxMonstresAdmin);
                 nombreMonstresAdminTexte = valeur.ToString(CultureInfo.InvariantCulture);
                 if (valeur != nombreMonstresAdmin)
                 {
