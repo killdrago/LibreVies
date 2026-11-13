@@ -292,6 +292,13 @@ public sealed class LibreViesCompte
                 { "reinitialiser", reinitialiser ? "1" : "0" } });
     }
 
+    // Remplace la liste des obstacles du monde en base (JSON : type, x, z, rayon ou largeur/profondeur).
+    public IEnumerator DeclarerObstacles(string obstaclesJson)
+    {
+        yield return Envoyer("declarer_obstacles", null, null,
+            new Dictionary<string, string> { { "obstacles", obstaclesJson ?? "[]" } });
+    }
+
     // Envoie les positions des monstres pilotes ; le serveur renvoie ceux qu'il accepte.
     public IEnumerator PiloterMonstres(string monstresJson)
     {
@@ -608,7 +615,7 @@ public sealed class LibreViesCompte
             if (action == "get_monde" || action == "presence" || action == "ajouter_element_monde"
                 || action == "modifier_element_monde" || action == "supprimer_element_monde"
                 || action == "vider_monde" || action == "enregistrer_maison" || action == "renommer_maison"
-                || action == "declarer_monstres" || action == "piloter_monstres"
+                || action == "declarer_monstres" || action == "declarer_obstacles" || action == "piloter_monstres"
                 || action == "ressusciter_monstres" || action == "frapper_monstre")
                 yield break;
             if (action == "get_npcs" || action == "save_npc")

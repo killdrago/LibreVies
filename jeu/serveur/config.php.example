@@ -18,9 +18,4 @@ return [
     // Serveur IA des PNJ (jeu/serveur/IA/serveur_ia.py), vu depuis ce serveur.
     // Il tourne sur la meme machine que l'API : garder cette adresse.
     'ia_url' => 'http://127.0.0.1:8765/npc_chat',
-    // Fichier des obstacles ecrit par le jeu (arbres, rochers, barrieres) et lu par mondeLV.py.
-    // Chemin complet, avec des / (ex. 'C:/Program Files (x86)/EasyPHP-Devserver-17/eds-www/serveur/obstacles.json').
-    // Vide = jeu/serveur/obstacles.json, a cote de mondeLV.py.
-    // Le jeu doit avoir le meme chemin dans obstacles_chemin.txt, place a cote de son exécutable.
-    'obstacles_fichier' => '',
 ];

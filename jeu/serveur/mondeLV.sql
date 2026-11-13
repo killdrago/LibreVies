@@ -102,3 +102,16 @@ CREATE TABLE IF NOT EXISTS monde_monstre (
   PRIMARY KEY (cle),
   KEY idx_monde_monstre_revision (revision)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Obstacles du monde (arbres, rochers, barrieres, cloture) : envoyes par le jeu au demarrage
+-- (declarer_obstacles), lus par mondeLV.py. forme = 'cercle' (rayon) ou 'boite' (largeur, profondeur).
+CREATE TABLE IF NOT EXISTS monde_obstacle (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  forme VARCHAR(10) NOT NULL,
+  x DOUBLE NOT NULL,
+  z DOUBLE NOT NULL,
+  rayon DOUBLE NOT NULL DEFAULT 0,
+  largeur DOUBLE NOT NULL DEFAULT 0,
+  profondeur DOUBLE NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

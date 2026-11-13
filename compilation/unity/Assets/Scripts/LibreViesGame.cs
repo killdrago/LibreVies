@@ -956,6 +956,7 @@ public sealed class LibreViesGame : MonoBehaviour
         // mise a jour en continu par le joueur qui pilote). Seules les betes absentes de la base
         // prennent une position tiree ici. La reinitialisation ne se fait qu'a la reconfiguration ADMIN.
         yield return DeclarerMonstresServeur();
+        yield return EnvoyerObstaclesServeur();
         intervalleSyncMonde = Mathf.Clamp(
             PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());
@@ -966,7 +967,6 @@ public sealed class LibreViesGame : MonoBehaviour
         RafraichirZonesNommees();
         RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
         prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
-        ExporterObstaclesServeur();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
         Renderer[] renderers = FindObjectsByType<Renderer>();
@@ -3805,56 +3805,37 @@ public sealed class LibreViesGame : MonoBehaviour
         return false;
     }
 
-    // Ecrit la liste des obstacles dans jeu/serveur/obstacles.json (lu par mondeLV.py),
-    // pour que les monstres du serveur ne traversent pas les arbres, rochers, barrieres.
-    // Le dossier jeu/serveur est a cote du dossier jeu/game ou tourne le jeu.
-    private void ExporterObstaclesServeur()
+    // Envoie la liste des obstacles a la base (table monde_obstacle, lue par mondeLV.py).
+    // Remplace la liste precedente a chaque demarrage du jeu.
+    private System.Collections.IEnumerator EnvoyerObstaclesServeur()
     {
-        try
+        if (LibreViesCompte.Courant == null || !LibreViesCompte.Courant.Authentifie) yield break;
+        var culture = CultureInfo.InvariantCulture;
+        var json = new StringBuilder("[");
+        int nombre = 0;
+        for (int i = 0; i < obstacles.Count; i++)
         {
-            string dossierJeu = Path.GetDirectoryName(Application.dataPath);
-            // Par defaut : ..\serveur\obstacles.json. Si le fichier obstacles_chemin.txt existe
-            // a cote du jeu, son contenu (chemin complet de obstacles.json) est utilise a la place.
-            string cheminJson = Path.GetFullPath(Path.Combine(dossierJeu ?? Application.dataPath, "..", "serveur", "obstacles.json"));
-            string reglageChemin = Path.Combine(dossierJeu ?? Application.dataPath, "obstacles_chemin.txt");
-            if (File.Exists(reglageChemin))
-            {
-                string lu = File.ReadAllText(reglageChemin, Encoding.UTF8).Trim();
-                if (lu.Length > 0) cheminJson = lu;
-            }
-            string dossierServeur = Path.GetDirectoryName(cheminJson);
-            if (String.IsNullOrEmpty(dossierServeur) || !Directory.Exists(dossierServeur))
-            {
-                Journal("obstacles : dossier introuvable pour " + cheminJson + ", export ignore");
-                return;
-            }
-            var culture = CultureInfo.InvariantCulture;
-            var json = new StringBuilder("{\"obstacles\":[");
-            int nombre = 0;
-            for (int i = 0; i < obstacles.Count; i++)
-            {
-                Obstacle o = obstacles[i];
-                if (o == null || !o.Actif || o.EstMonstre || o.Batiment != null) continue;
-                if (nombre > 0) json.Append(',');
-                if (o.Cercle)
-                    json.Append("{\"type\":\"cercle\",\"x\":").Append(o.X.ToString("0.###", culture))
-                        .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
-                        .Append(",\"rayon\":").Append(o.Rayon.ToString("0.###", culture)).Append('}');
-                else
-                    json.Append("{\"type\":\"boite\",\"x\":").Append(o.X.ToString("0.###", culture))
-                        .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
-                        .Append(",\"largeur\":").Append(o.Largeur.ToString("0.###", culture))
-                        .Append(",\"profondeur\":").Append(o.Profondeur.ToString("0.###", culture)).Append('}');
-                nombre++;
-            }
-            json.Append("]}");
-            File.WriteAllText(cheminJson, json.ToString(), new UTF8Encoding(false));
-            Journal("obstacles : " + nombre + " exporte(s) vers " + cheminJson);
+            Obstacle o = obstacles[i];
+            if (o == null || !o.Actif || o.EstMonstre || o.Batiment != null) continue;
+            if (nombre > 0) json.Append(',');
+            if (o.Cercle)
+                json.Append("{\"type\":\"cercle\",\"x\":").Append(o.X.ToString("0.###", culture))
+                    .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
+                    .Append(",\"rayon\":").Append(o.Rayon.ToString("0.###", culture)).Append('}');
+            else
+                json.Append("{\"type\":\"boite\",\"x\":").Append(o.X.ToString("0.###", culture))
+                    .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
+                    .Append(",\"largeur\":").Append(o.Largeur.ToString("0.###", culture))
+                    .Append(",\"profondeur\":").Append(o.Profondeur.ToString("0.###", culture)).Append('}');
+            nombre++;
         }
-        catch (Exception erreur)
-        {
-            Journal("obstacles : export impossible : " + erreur.Message);
-        }
+        json.Append(']');
+        LibreViesCompte compte = LibreViesCompte.Courant;
+        yield return compte.DeclarerObstacles(json.ToString());
+        if (!String.IsNullOrEmpty(compte.Erreur))
+            Journal("obstacles : envoi impossible : " + compte.Erreur);
+        else
+            Journal("obstacles : " + nombre + " envoye(s) a la base");
     }
 
     // Les betes restent hors de ce cercle (rayon du village + marge). Sans cette marge, elles

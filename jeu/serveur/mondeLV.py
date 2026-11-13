@@ -62,7 +62,6 @@ IA_MODELE = os.environ.get("LIBREVIES_IA_MODELE", os.path.join(HERE, "IA"))
 IA_HOTE = os.environ.get("LIBREVIES_IA_HOTE", "127.0.0.1")
 IA_PORT = int(os.environ.get("LIBREVIES_IA_PORT", "8765"))
 
-OBSTACLES_FICHIER = os.path.join(HERE, "obstacles.json")   # ecrit par le jeu (ExporterObstaclesServeur)
 MARGE_OBSTACLE = 0.4          # rayon de la bete pour les obstacles
 TAILLE_CASE = 10.0            # grille de recherche des obstacles
 
@@ -378,37 +377,38 @@ def zone_interdite(x, z):
 
 
 class Obstacles:
-    """Arbres, rochers, barrieres... lus dans obstacles.json, ranges par cases de 10 m."""
+    """Arbres, rochers, barrieres... lus dans la table monde_obstacle, ranges par cases de 10 m.
+    Relue seulement quand la table change (nombre de lignes ou plus grand id)."""
 
     def __init__(self):
-        self.fichier = OBSTACLES_FICHIER
-        self.date = None
+        self.signature = None
         self.cases = {}
         self.nombre = 0
 
-    def charger(self):
-        if not os.path.isfile(self.fichier):
-            if self.date != 0.0:
-                print("obstacles.json absent (" + self.fichier + ") : lancez le jeu une fois sur ce PC "
-                      "(les monstres traverseront les obstacles en attendant).", flush=True)
-            self.date = 0.0
-            self.cases = {}
-            self.nombre = 0
+    def charger(self, curseur):
+        curseur.execute("SELECT COUNT(*) AS nombre, COALESCE(MAX(id), 0) AS maxi FROM monde_obstacle")
+        ligne = curseur.fetchone()
+        signature = (int(ligne["nombre"]), int(ligne["maxi"]))
+        if signature == self.signature:
             return
-        date = os.path.getmtime(self.fichier)
-        if date == self.date:
-            return
-        with open(self.fichier, encoding="utf-8") as fichier:
-            donnees = json.load(fichier)
+        curseur.execute("SELECT forme, x, z, rayon, largeur, profondeur FROM monde_obstacle")
         cases = {}
         nombre = 0
-        for obstacle in donnees.get("obstacles", []):
-            x = float(obstacle["x"])
-            z = float(obstacle["z"])
-            if obstacle.get("type") == "cercle":
-                etendue = float(obstacle["rayon"])
+        for ligne in curseur.fetchall():
+            obstacle = {
+                "type": "cercle" if ligne["forme"] == "cercle" else "boite",
+                "x": float(ligne["x"]),
+                "z": float(ligne["z"]),
+                "rayon": float(ligne["rayon"]),
+                "largeur": float(ligne["largeur"]),
+                "profondeur": float(ligne["profondeur"]),
+            }
+            x = obstacle["x"]
+            z = obstacle["z"]
+            if obstacle["type"] == "cercle":
+                etendue = obstacle["rayon"]
             else:
-                etendue = max(float(obstacle["largeur"]), float(obstacle["profondeur"])) * 0.5
+                etendue = max(obstacle["largeur"], obstacle["profondeur"]) * 0.5
             etendue += MARGE_OBSTACLE
             for i in range(int(math.floor((x - etendue) / TAILLE_CASE)), int(math.floor((x + etendue) / TAILLE_CASE)) + 1):
                 for k in range(int(math.floor((z - etendue) / TAILLE_CASE)), int(math.floor((z + etendue) / TAILLE_CASE)) + 1):
@@ -416,18 +416,18 @@ class Obstacles:
             nombre += 1
         self.cases = cases
         self.nombre = nombre
-        self.date = date
-        print("mondeLV : " + str(nombre) + " obstacle(s) charge(s)", flush=True)
+        self.signature = signature
+        print("mondeLV : " + str(nombre) + " obstacle(s) charge(s) depuis la base", flush=True)
 
     def bloque(self, x, z):
         cle = (int(math.floor(x / TAILLE_CASE)), int(math.floor(z / TAILLE_CASE)))
         for obstacle in self.cases.get(cle, ()):
-            if obstacle.get("type") == "cercle":
-                rayon = float(obstacle["rayon"]) + MARGE_OBSTACLE
-                if (x - float(obstacle["x"])) ** 2 + (z - float(obstacle["z"])) ** 2 < rayon * rayon:
+            if obstacle["type"] == "cercle":
+                rayon = obstacle["rayon"] + MARGE_OBSTACLE
+                if (x - obstacle["x"]) ** 2 + (z - obstacle["z"]) ** 2 < rayon * rayon:
                     return True
-            elif (abs(x - float(obstacle["x"])) < float(obstacle["largeur"]) * 0.5 + MARGE_OBSTACLE
-                  and abs(z - float(obstacle["z"])) < float(obstacle["profondeur"]) * 0.5 + MARGE_OBSTACLE):
+            elif (abs(x - obstacle["x"]) < obstacle["largeur"] * 0.5 + MARGE_OBSTACLE
+                  and abs(z - obstacle["z"]) < obstacle["profondeur"] * 0.5 + MARGE_OBSTACLE):
                 return True
         return False
 
@@ -512,7 +512,7 @@ class Monde:
         # Commit en début de tour : sinon la lecture reste figée sur l'ancienne image de la base.
         self.connexion.commit()
         curseur = self.connexion.cursor()
-        OBSTACLES.charger()
+        OBSTACLES.charger(curseur)
 
         if maintenant >= self.prochaines_stats:
             self.lire_stats(curseur)
@@ -652,9 +652,6 @@ def main():
     except RuntimeError as erreur:
         print("ERREUR : " + str(erreur), flush=True)
         sys.exit(1)
-    if config.get("obstacles_fichier"):
-        OBSTACLES.fichier = str(config["obstacles_fichier"]).replace("\\", "/")
-    print("mondeLV : fichier des obstacles : " + OBSTACLES.fichier, flush=True)
     threading.Thread(target=demarrer_ia, daemon=True).start()
     monde = Monde(config)
     print("mondeLV : le monde tourne (un tour toutes les {} s). Ctrl+C pour arreter.".format(PAS_DU_MONDE))

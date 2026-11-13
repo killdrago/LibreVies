@@ -262,6 +262,39 @@ function lire_monstres_par_cle($pdo, $cles) {
 
 // Declare les monstres du client. La premiere declaration fixe la position ;
 // ensuite tous les joueurs recoivent la meme position (INSERT IGNORE).
+// Remplace la liste des obstacles du monde (envoyee par le jeu au demarrage).
+function traiter_declaration_obstacles($pdo, $donnees) {
+    $brut = isset($donnees['obstacles']) ? $donnees['obstacles'] : '[]';
+    $liste = is_string($brut) ? json_decode($brut, true) : $brut;
+    if (!is_array($liste) || count($liste) > 20000) throw new InvalidArgumentException('Liste d\'obstacles invalide.');
+    $pdo->beginTransaction();
+    try {
+        $pdo->exec('DELETE FROM monde_obstacle');
+        $insertion = $pdo->prepare('INSERT INTO monde_obstacle (forme, x, z, rayon, largeur, profondeur)'
+            . ' VALUES (:forme, :x, :z, :rayon, :largeur, :profondeur)');
+        $nombre = 0;
+        foreach ($liste as $o) {
+            if (!is_array($o) || !isset($o['type'], $o['x'], $o['z'])) continue;
+            $forme = $o['type'] === 'cercle' ? 'cercle' : 'boite';
+            $x = (float)$o['x'];
+            $z = (float)$o['z'];
+            if (!is_finite($x) || !is_finite($z)) continue;
+            $insertion->execute(array(
+                ':forme' => $forme, ':x' => $x, ':z' => $z,
+                ':rayon' => $forme === 'cercle' ? (float)(isset($o['rayon']) ? $o['rayon'] : 0) : 0,
+                ':largeur' => $forme === 'boite' ? (float)(isset($o['largeur']) ? $o['largeur'] : 0) : 0,
+                ':profondeur' => $forme === 'boite' ? (float)(isset($o['profondeur']) ? $o['profondeur'] : 0) : 0,
+            ));
+            $nombre++;
+        }
+        $pdo->commit();
+    } catch (Exception $erreur) {
+        $pdo->rollBack();
+        throw $erreur;
+    }
+    return array('message' => 'Obstacles enregistres.', 'extra' => array('nombre' => $nombre));
+}
+
 function traiter_declaration_monstres($pdo, $donnees) {
     $brut = isset($donnees['monstres']) ? $donnees['monstres'] : '[]';
     $liste = is_string($brut) ? json_decode($brut, true) : $brut;
@@ -593,6 +626,7 @@ function traiter_monde($pdo, $action, $donnees, $membre) {
         return array('message' => 'Elements du monde supprimes.', 'extra' => array('revision' => $rev));
     }
     if ($action === 'declarer_monstres') return traiter_declaration_monstres($pdo, $donnees);
+    if ($action === 'declarer_obstacles') return traiter_declaration_obstacles($pdo, $donnees);
     if ($action === 'frapper_monstre') return traiter_coup_monstre($pdo, $donnees, $auteur);
     if ($action === 'reclamer_butin') return reclamer_butin($pdo, $auteur);
     if ($action === 'piloter_monstres') return traiter_pilotage_monstres($pdo, $donnees, $auteur);

@@ -4953,6 +4953,16 @@ Date : 13/11/2026 (horloge du bac a sable, UTC).
   - Le fichier obstacles.json est ignore par git (genere).
   - Non teste ; Unity non compile. Le controle syntaxe signale UTF8Encoding (faux positif :
     using System.Text est present).
+8.68 MAJ 82 - OBSTACLES DANS LA BASE (remplace obstacles.json)
+  - Table monde_obstacle (mondeLV.sql, SQL dans le chat). forme, x, z, rayon, largeur, profondeur.
+  - Action API declarer_obstacles (monde.php : traiter_declaration_obstacles) : remplace la liste.
+    Ouverte a tout joueur connecte, comme les monstres.
+  - Jeu : EnvoyerObstaclesServeur au demarrage (apres DeclarerMonstresServeur), via
+    LibreViesCompte.DeclarerObstacles. Plus de fichier obstacles.json ni obstacles_chemin.txt.
+  - mondeLV.py : lit monde_obstacle a chaque tour, relit seulement si COUNT/MAX(id) changent.
+    Plus de cle obstacles_fichier dans config.php.
+  - Non teste sur la vraie base ; PHP absent du bac a sable.
+
 8.68a MAJ 81 - CHEMIN DU FICHIER OBSTACLES REGLABLE
   - Jeu : si un fichier obstacles_chemin.txt existe a cote de l'executable du jeu, son contenu
     (chemin complet de obstacles.json) remplace le chemin par defaut ..\serveur\obstacles.json.
