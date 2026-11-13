@@ -4940,6 +4940,16 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.59 MAJ 70 - MONSTRES QUI S'ENTASSENT (SEPARATION)
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Symptome : avec 500 monstres, certains restent entasses malgre la dispersion.
+  - Correction : chaque monstre pilote s'ecarte des autres monstres vivants a moins
+    de 6 m (CalculerSeparationMonstre, recalcule toutes les 0,3 s, force 0,6). Le
+    placement initial essaie 400 positions au lieu de 160.
+  - Non teste en jeu, Unity non compile. Controle C# : memes 5 erreurs pre-existantes.
+  - Reponse a la question : pendant qu'un joueur est connecte, les monstres pilotes
+    par son jeu continuent de bouger ; les autres suivent les positions recues.
 8.58 MAJ 69 - MAXIMUM 500 MONSTRES
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
