@@ -420,6 +420,8 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
     $cle = valider_cle_monstre($donnees);
     $degats = isset($donnees['degats']) ? (int)$donnees['degats'] : 0;
     if ($degats < 1 || $degats > 999) throw new InvalidArgumentException('Degats invalides.');
+    // « tue = 1 » (coup du garde) : le monstre meurt, quels que soient ses PV.
+    $tue = isset($donnees['tue']) && (string)$donnees['tue'] === '1';
     $pdo->beginTransaction();
     try {
         $regens = regen_par_type($pdo);
@@ -436,7 +438,7 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
             return array('message' => 'Monstre deja mort.', 'extra' => array());
         }
         $pvAvant = pv_courant($ligne, $regens);
-        $pv = max(0, $pvAvant - $degats);
+        $pv = $tue ? 0 : max(0, $pvAvant - $degats);
         $mort = ($pv === 0);
         enregistrer_degats($pdo, $cle, $auteur, min($degats, $pvAvant));
         if ($mort) attribuer_butin_mort($pdo, $cle, (string)$ligne['type']);

@@ -307,12 +307,13 @@ public sealed class LibreViesCompte
     }
 
     // Un coup porte sur un monstre : les pv baissent pour tous les joueurs.
-    public IEnumerator FrapperMonstre(string cle, int degats)
+    public IEnumerator FrapperMonstre(string cle, int degats, bool tue = false)
     {
         yield return Envoyer("frapper_monstre", null, null, new Dictionary<string, string>
         {
             { "cle", cle ?? "" },
-            { "degats", degats.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+            { "degats", degats.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            { "tue", tue ? "1" : "0" }
         });
     }
 

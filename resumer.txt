@@ -4940,6 +4940,21 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.55 MAJ 66 - COUP DE BASE 1 PV ET COUP DU GARDE = MORT
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Coup de base sans arme : HammerDamage 25 -> 1 (LibreViesGame.cs). Le message
+    affiche « -1 » ou « -1 xN ».
+  - Coup du garde : le client envoyait 999 degats et le serveur retirait 999 PV.
+    Un monstre a plus de 999 PV survivait, et le client reprenait la valeur du
+    serveur. Correction : le client envoie le drapeau tue=1 (LibreViesCompte.
+    FrapperMonstre) ; monde.php traiter_coup_monstre met alors les PV a 0.
+    Le chiffre affiche est les PV restants du monstre (au plus 999 envoyes).
+  - Controle de syntaxe C# : memes 5 erreurs pre-existantes, aucune nouvelle.
+  - Non teste en jeu, PHP absent du bac a sable, Unity non compile.
+  - A tester : coup de base (1 PV), garde sur un rat, et un monstre a 1 000 000 PV
+    si on en declare un (ADMIN > Monstre).
+
 8.54 MAJ 65 - ADMIN > LOOT (table monde_loot)
 ================================================================================
   - Nouvel onglet LOOT (dernier onglet de ADMIN) : tableau blanc plein hauteur,

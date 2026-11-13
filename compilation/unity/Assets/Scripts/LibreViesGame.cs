@@ -49,7 +49,7 @@ public sealed class LibreViesGame : MonoBehaviour
     // Niveau de l'eau au-dessus du fond du lit.
     private const float ProfondeurEauCentre = 0.20f;
     private const int MaxHp = 100;
-    private const int HammerDamage = 25;
+    private const int HammerDamage = 1;   // coup de base sans arme : 1 point
     // Valeurs reprises de la reference de jeu : hauteur logique par defaut
     // d'un obstacle, hauteur de la cloture du village (franchissable en
     // sautant par le heros, jamais par les monstres), rayon du heros.
@@ -7836,14 +7836,14 @@ public sealed class LibreViesGame : MonoBehaviour
                 {
                     garde.Recharge = 0.8f;
                     // Coup de grace : "-999" et etincelles, comme la reference.
+                    // 1 coup = mort, quels que soient les PV du monstre : le chiffre affiche
+                    // est ses PV restants (les degats reellement infliges).
+                    int degatsGarde = Mathf.Max(1, cible.Hp);
                     cible.Hp = 0;
-                    SpawnFloater(cible.Root.transform.position + Vector3.up * 1.3f, "-999",
+                    SpawnFloater(cible.Root.transform.position + Vector3.up * 1.3f, "-" + degatsGarde,
                         new Color(1f, 0.85f, 0.30f));
                     SpawnSpark(cible.Root.transform.position + Vector3.up * 0.6f);
-                    if (cible.Hp <= 0)
-                    {
-                        TuerEnnemiParGarde(cible);
-                    }
+                    TuerEnnemiParGarde(cible, degatsGarde);
                 }
             }
             else
@@ -7960,11 +7960,11 @@ public sealed class LibreViesGame : MonoBehaviour
         AppliquerEtatMonstres(etats);
     }
 
-    private void EnvoyerCoupMonstre(EnemyState ennemi, int degats)
+    private void EnvoyerCoupMonstre(EnemyState ennemi, int degats, bool tue = false)
     {
         if (ennemi == null || String.IsNullOrEmpty(ennemi.Cle)) return;
         if (LibreViesCompte.Courant == null || !LibreViesCompte.Courant.Authentifie) return;
-        StartCoroutine(LibreViesCompte.Courant.FrapperMonstre(ennemi.Cle, degats));
+        StartCoroutine(LibreViesCompte.Courant.FrapperMonstre(ennemi.Cle, degats, tue));
     }
 
     private EnemyState TrouverEnnemiParCle(string cle)
@@ -8208,13 +8208,14 @@ public sealed class LibreViesGame : MonoBehaviour
         }
     }
 
-    private void TuerEnnemiParGarde(EnemyState ennemi)
+    private void TuerEnnemiParGarde(EnemyState ennemi, int degats)
     {
         ennemi.Alive = false;
         ennemi.RespawnAt = Time.time + 1.5f;
         ennemi.Pilote = false;
         ennemi.Root.SetActive(false);
-        EnvoyerCoupMonstre(ennemi, 999);
+        // Drapeau « tue » : le serveur met le monstre a 0 PV, quels que soient ses PV.
+        EnvoyerCoupMonstre(ennemi, Mathf.Clamp(degats, 1, 999), true);
         // Remarque : la reference ne compte pas ce monstre pour la quete et ne
         // donne pas d'experience au heros (c'est le garde qui l'a tue).
     }
@@ -10346,7 +10347,7 @@ public sealed class LibreViesGame : MonoBehaviour
             }
         }
         if (touches == 0) { ShowInfo("Aucune cible à portée"); return; }
-        ShowInfo(touches > 1 ? "-25 x" + touches : "-25");
+        ShowInfo(touches > 1 ? "-" + HammerDamage + " x" + touches : "-" + HammerDamage);
     }
 
     private void DamagePlayer(int amount)
