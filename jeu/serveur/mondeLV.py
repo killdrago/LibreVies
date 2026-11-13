@@ -381,23 +381,24 @@ class Obstacles:
     """Arbres, rochers, barrieres... lus dans obstacles.json, ranges par cases de 10 m."""
 
     def __init__(self):
+        self.fichier = OBSTACLES_FICHIER
         self.date = None
         self.cases = {}
         self.nombre = 0
 
     def charger(self):
-        if not os.path.isfile(OBSTACLES_FICHIER):
+        if not os.path.isfile(self.fichier):
             if self.date != 0.0:
-                print("obstacles.json absent : lancez le jeu une fois sur ce PC (les monstres "
-                      "traverseront les obstacles en attendant).", flush=True)
+                print("obstacles.json absent (" + self.fichier + ") : lancez le jeu une fois sur ce PC "
+                      "(les monstres traverseront les obstacles en attendant).", flush=True)
             self.date = 0.0
             self.cases = {}
             self.nombre = 0
             return
-        date = os.path.getmtime(OBSTACLES_FICHIER)
+        date = os.path.getmtime(self.fichier)
         if date == self.date:
             return
-        with open(OBSTACLES_FICHIER, encoding="utf-8") as fichier:
+        with open(self.fichier, encoding="utf-8") as fichier:
             donnees = json.load(fichier)
         cases = {}
         nombre = 0
@@ -651,6 +652,9 @@ def main():
     except RuntimeError as erreur:
         print("ERREUR : " + str(erreur), flush=True)
         sys.exit(1)
+    if config.get("obstacles_fichier"):
+        OBSTACLES.fichier = str(config["obstacles_fichier"]).replace("\\", "/")
+    print("mondeLV : fichier des obstacles : " + OBSTACLES.fichier, flush=True)
     threading.Thread(target=demarrer_ia, daemon=True).start()
     monde = Monde(config)
     print("mondeLV : le monde tourne (un tour toutes les {} s). Ctrl+C pour arreter.".format(PAS_DU_MONDE))

@@ -3813,10 +3813,19 @@ public sealed class LibreViesGame : MonoBehaviour
         try
         {
             string dossierJeu = Path.GetDirectoryName(Application.dataPath);
-            string dossierServeur = Path.GetFullPath(Path.Combine(dossierJeu ?? Application.dataPath, "..", "serveur"));
-            if (!Directory.Exists(dossierServeur))
+            // Par defaut : ..\serveur\obstacles.json. Si le fichier obstacles_chemin.txt existe
+            // a cote du jeu, son contenu (chemin complet de obstacles.json) est utilise a la place.
+            string cheminJson = Path.GetFullPath(Path.Combine(dossierJeu ?? Application.dataPath, "..", "serveur", "obstacles.json"));
+            string reglageChemin = Path.Combine(dossierJeu ?? Application.dataPath, "obstacles_chemin.txt");
+            if (File.Exists(reglageChemin))
             {
-                Journal("obstacles : dossier serveur introuvable, export ignore");
+                string lu = File.ReadAllText(reglageChemin, Encoding.UTF8).Trim();
+                if (lu.Length > 0) cheminJson = lu;
+            }
+            string dossierServeur = Path.GetDirectoryName(cheminJson);
+            if (String.IsNullOrEmpty(dossierServeur) || !Directory.Exists(dossierServeur))
+            {
+                Journal("obstacles : dossier introuvable pour " + cheminJson + ", export ignore");
                 return;
             }
             var culture = CultureInfo.InvariantCulture;
@@ -3839,8 +3848,8 @@ public sealed class LibreViesGame : MonoBehaviour
                 nombre++;
             }
             json.Append("]}");
-            File.WriteAllText(Path.Combine(dossierServeur, "obstacles.json"), json.ToString(), new UTF8Encoding(false));
-            Journal("obstacles : " + nombre + " exporte(s) vers jeu/serveur/obstacles.json");
+            File.WriteAllText(cheminJson, json.ToString(), new UTF8Encoding(false));
+            Journal("obstacles : " + nombre + " exporte(s) vers " + cheminJson);
         }
         catch (Exception erreur)
         {
