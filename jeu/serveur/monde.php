@@ -440,8 +440,17 @@ function traiter_coup_monstre($pdo, $donnees, $auteur) {
         $pvAvant = pv_courant($ligne, $regens);
         $pv = $tue ? 0 : max(0, $pvAvant - $degats);
         $mort = ($pv === 0);
-        enregistrer_degats($pdo, $cle, $auteur, min($degats, $pvAvant));
-        if ($mort) attribuer_butin_mort($pdo, $cle, (string)$ligne['type']);
+        // Coup du garde (tue) : le garde a tue le monstre, donc ni degats comptes, ni butin.
+        // Les degats deja comptes par les joueurs sont effaces.
+        if ($tue) {
+            if ($mort) {
+                $effacement = $pdo->prepare('DELETE FROM monde_degats WHERE cle = :cle');
+                $effacement->execute(array(':cle' => $cle));
+            }
+        } else {
+            enregistrer_degats($pdo, $cle, $auteur, min($degats, $pvAvant));
+            if ($mort) attribuer_butin_mort($pdo, $cle, (string)$ligne['type']);
+        }
         $rev = prochaine_revision($pdo);
         $miseAJour = $pdo->prepare('UPDATE monde_monstre SET pv = :pv, mort = :mort, revision = :rev, auteur_id = :auteur,'
             . ' pv_modifie_le = NOW() WHERE cle = :cle');

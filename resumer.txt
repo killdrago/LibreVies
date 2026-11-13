@@ -4950,6 +4950,8 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     serveur. Correction : le client envoie le drapeau tue=1 (LibreViesCompte.
     FrapperMonstre) ; monde.php traiter_coup_monstre met alors les PV a 0.
     Le chiffre affiche est les PV restants du monstre (au plus 999 envoyes).
+  - Coup du garde (tue=1) : aucun butin et degats des joueurs effaces. Le garde a tue
+    le monstre ; personne ne touche le loot, meme celui qui l'avait blesse.
   - Controle de syntaxe C# : memes 5 erreurs pre-existantes, aucune nouvelle.
   - Non teste en jeu, PHP absent du bac a sable, Unity non compile.
   - A tester : coup de base (1 PV), garde sur un rat, et un monstre a 1 000 000 PV
