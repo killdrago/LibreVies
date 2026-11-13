@@ -699,6 +699,7 @@ public sealed class LibreViesGame : MonoBehaviour
         public float Hauteur;   // hauteur AU-DESSUS du terrain
         public Batiment Batiment;
         public bool Actif = true;
+        public bool EstMonstre;  // corps d'une bete : les autres betes ne la poussent pas
     }
 
     private sealed class EnemyState
@@ -3953,7 +3954,7 @@ public sealed class LibreViesGame : MonoBehaviour
 
     // 'ignorer' sert aux monstres : leur propre corps est un obstacle (le heros
     // ne les traverse pas), ils ne doivent donc pas se repousser eux-memes.
-    private Vector2 ResoudreCollisions(float px, float pz, float rayon, float pieds = 0f, Obstacle ignorer = null)
+    private Vector2 ResoudreCollisions(float px, float pz, float rayon, float pieds = 0f, Obstacle ignorer = null, bool ignorerMonstres = false)
     {
         var p = new Vector2(px, pz);
         for (int passe = 0; passe < 2; passe++)
@@ -3962,6 +3963,7 @@ public sealed class LibreViesGame : MonoBehaviour
             {
                 Obstacle c = obstacles[i];
                 if (!c.Actif || c == ignorer) continue;
+                if (ignorerMonstres && c.EstMonstre) continue;
                 if (Mathf.Abs(p.x - c.X) > c.Portee + rayon && Mathf.Abs(p.y - c.Z) > c.Portee + rayon) continue;
                 // Ce qui est plus bas que le saut peut etre franchi (et on peut
                 // atterrir dessus, voir HauteurSupport). Epsilon 0,05 : debout
@@ -9594,7 +9596,7 @@ public sealed class LibreViesGame : MonoBehaviour
         {
             Cercle = true, X = position.x, Z = position.z,
             Rayon = spider ? 0.5f : (souris ? 0.30f : 0.45f), Portee = 1.5f,
-            Hauteur = spider ? 0.7f : 0.9f
+            Hauteur = spider ? 0.7f : 0.9f, EstMonstre = true
         };
         obstacles.Add(state.Corps);
         // La silhouette est dans un sous-objet : une souris est une petite bete.
@@ -10226,7 +10228,7 @@ public sealed class LibreViesGame : MonoBehaviour
                     else if (Mathf.Abs(suivant.x) < WorldSize - 3f && Mathf.Abs(suivant.z) < WorldSize - 3f)
                     {
                         // Les monstres ne traversent rien non plus (murs, arbres).
-                        Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps);
+                        Vector2 resolu = ResoudreCollisions(suivant.x, suivant.z, 0.35f, 0f, enemy.Corps, true);
                         if (ZoneEauInterditeMonstre(resolu))
                         {
                             // Une collision avec un obstacle ne doit jamais pousser

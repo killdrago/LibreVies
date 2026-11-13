@@ -4940,6 +4940,18 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.61 MAJ 72 - LES MONSTRES NE SE BLOQUENT PLUS ENTRE EUX
+================================================================================
+Date : 12/11/2026 (horloge du bac a sable, UTC).
+  - Constat : a partir de ~200 monstres, les betes restantes s'entassent pres de la
+    cloture du village ; elles ne se chevauchent pas.
+  - Cause probable (non reproduite, Unity non lance) : chaque bete est un obstacle
+    circulaire pour les autres betes. Une bete poussee par la foule est renvoyee vers
+    la cloture ou la securite du village, et s'empile contre elle.
+  - Correction : le corps d'une bete (Obstacle.EstMonstre) n'est plus pris en compte
+    lorsqu'une autre bete se deplace (ResoudreCollisions(..., ignorerMonstres = true)).
+    Le joueur et les gardes buttent toujours sur les betes.
+  - Consequence voulue ou non : les betes peuvent se chevaucher.
 8.60 MAJ 71 - RETRAIT DES LIMITES D'ECART ENTRE MONSTRES
 ================================================================================
 Date : 12/11/2026 (horloge du bac a sable, UTC).
