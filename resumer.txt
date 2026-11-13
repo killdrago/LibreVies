@@ -4940,6 +4940,20 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.66 MAJ 77 - LE MONDE VIT SUR LE SERVEUR (mondeLV.py)
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - Besoin exprime : le monde doit vivre sans joueur connecte ; le jeu ne fait que
+    s'y connecter. Cela annule le pilotage des monstres par le client (decision du 10/11).
+  - Nouveau fichier jeu/serveur/mondeLV.py, lance comme serveur_ia.py (pip install pymysql ;
+    python mondeLV.py). Un tour toutes les 0,5 s : deplacements (balade, poursuite des
+    agressifs, riposte des bêtes frappees pendant 10 s), reapparition 10 s apres la mort.
+    Les monstres sont marques proprietaire_id = -1.
+  - monde.php : la pilotage ignore les monstres a proprietaire -1 (le jeu ne les pilote plus).
+  - Limites : arbres, rochers et barrieres non pris en compte ; pas de degats sur les joueurs ;
+    rivière et vitesses recopiees de LibreViesGame.cs.
+  - Non teste ; Unity non compile. Le jeu doit encore etre verifie pour le rendu des monstres
+    non pilotes (CibleDistante).
 8.65 MAJ 76 - PERSISTANCE DES POSITIONS DES MONSTRES ENTRE LES SESSIONS
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).

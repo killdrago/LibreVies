@@ -505,6 +505,8 @@ function traiter_pilotage_monstres($pdo, $donnees, $auteur) {
             $ligne = $lecture->fetch();
             if (!$ligne || (int)$ligne['mort'] === 1) continue;
             $proprietaire = $ligne['proprietaire_id'] === null ? 0 : (int)$ligne['proprietaire_id'];
+            // -1 : monstre tenu par le serveur (jeu/serveur/mondeLV.py). Les jeux ne le pilotent plus.
+            if ($proprietaire === -1) continue;
             if (!($proprietaire === 0 || $proprietaire === (int)$auteur || (int)$ligne['age'] >= 2)) continue;
             $miseAJour->execute(array(':auteur' => $auteur, ':x' => $x, ':z' => $z, ':rot' => $rot,
                 ':rev' => $rev, ':cle' => $cle));
