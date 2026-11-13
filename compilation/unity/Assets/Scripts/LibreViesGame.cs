@@ -966,6 +966,7 @@ public sealed class LibreViesGame : MonoBehaviour
         RafraichirZonesNommees();
         RestaurerPositionJoueur(); // Apres les objets/coordonnees de ce monde.
         prochainEnregistrementPosition = Time.realtimeSinceStartup + 20f;
+        ExporterObstaclesServeur();
         Journal("demarrage termine : " + objetsCrees + " objets, " + obstacles.Count
                 + " obstacles, " + enemies.Count + " monstres, " + gardes.Count + " gardes");
         Renderer[] renderers = FindObjectsByType<Renderer>();
@@ -3783,6 +3784,68 @@ public sealed class LibreViesGame : MonoBehaviour
     private bool DansVillage(float x, float z)
     {
         return DistanceVillage(x, z) < VillageRadius;
+    }
+
+    // Vrai si un point (marge = rayon de la bete) touche un obstacle du monde.
+    // Les corps des betes et les maisons sont exclus (les maisons sont dans le village).
+    private bool PointDansObstacle(float x, float z, float marge)
+    {
+        for (int i = 0; i < obstacles.Count; i++)
+        {
+            Obstacle c = obstacles[i];
+            if (c == null || !c.Actif || c.EstMonstre || c.Batiment != null) continue;
+            if (c.Cercle)
+            {
+                float dx = x - c.X, dz = z - c.Z, rr = c.Rayon + marge;
+                if (dx * dx + dz * dz < rr * rr) return true;
+            }
+            else if (Mathf.Abs(x - c.X) < c.Largeur * 0.5f + marge && Mathf.Abs(z - c.Z) < c.Profondeur * 0.5f + marge)
+                return true;
+        }
+        return false;
+    }
+
+    // Ecrit la liste des obstacles dans jeu/serveur/obstacles.json (lu par mondeLV.py),
+    // pour que les monstres du serveur ne traversent pas les arbres, rochers, barrieres.
+    // Le dossier jeu/serveur est a cote du dossier jeu/game ou tourne le jeu.
+    private void ExporterObstaclesServeur()
+    {
+        try
+        {
+            string dossierJeu = Path.GetDirectoryName(Application.dataPath);
+            string dossierServeur = Path.GetFullPath(Path.Combine(dossierJeu ?? Application.dataPath, "..", "serveur"));
+            if (!Directory.Exists(dossierServeur))
+            {
+                Journal("obstacles : dossier serveur introuvable, export ignore");
+                return;
+            }
+            var culture = CultureInfo.InvariantCulture;
+            var json = new StringBuilder("{\"obstacles\":[");
+            int nombre = 0;
+            for (int i = 0; i < obstacles.Count; i++)
+            {
+                Obstacle o = obstacles[i];
+                if (o == null || !o.Actif || o.EstMonstre || o.Batiment != null) continue;
+                if (nombre > 0) json.Append(',');
+                if (o.Cercle)
+                    json.Append("{\"type\":\"cercle\",\"x\":").Append(o.X.ToString("0.###", culture))
+                        .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
+                        .Append(",\"rayon\":").Append(o.Rayon.ToString("0.###", culture)).Append('}');
+                else
+                    json.Append("{\"type\":\"boite\",\"x\":").Append(o.X.ToString("0.###", culture))
+                        .Append(",\"z\":").Append(o.Z.ToString("0.###", culture))
+                        .Append(",\"largeur\":").Append(o.Largeur.ToString("0.###", culture))
+                        .Append(",\"profondeur\":").Append(o.Profondeur.ToString("0.###", culture)).Append('}');
+                nombre++;
+            }
+            json.Append("]}");
+            File.WriteAllText(Path.Combine(dossierServeur, "obstacles.json"), json.ToString(), new UTF8Encoding(false));
+            Journal("obstacles : " + nombre + " exporte(s) vers jeu/serveur/obstacles.json");
+        }
+        catch (Exception erreur)
+        {
+            Journal("obstacles : export impossible : " + erreur.Message);
+        }
     }
 
     // Les betes restent hors de ce cercle (rayon du village + marge). Sans cette marge, elles
@@ -8108,6 +8171,7 @@ public sealed class LibreViesGame : MonoBehaviour
             float x = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
             float z = UnityEngine.Random.Range(-WorldSize + 6f, WorldSize - 6f);
             if (DansVillage(x, z) || ZoneEauInterditeMonstre(new Vector2(x, z))) continue;
+            if (PointDansObstacle(x, z, 0.4f)) continue;
             if (new Vector2(x - moi.x, z - moi.z).magnitude < 12f) continue;
             point = new Vector2(x, z);
             return true;
@@ -9556,6 +9620,7 @@ public sealed class LibreViesGame : MonoBehaviour
                 if (DistanceVillage(x, z) < VillageRadius + MargeVillageMonstres) continue;
                 Vector2 candidate = new Vector2(x, z);
                 if (ZoneEauInterditeMonstre(candidate)) continue;
+                if (PointDansObstacle(x, z, 0.4f)) continue;
                 float vide = DistanceMonstreLaPlusProche(candidate);
                 if (vide > meilleurVide)
                 {

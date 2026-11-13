@@ -62,3 +62,4 @@ __pycache__/
 
 # --- IA 3D (photo_vers_3d/LibreVies_IA_3D.py) : environnement, code TripoSR, modeles et sorties ---
 /photo_vers_3d/IA/
+jeu/serveur/obstacles.json

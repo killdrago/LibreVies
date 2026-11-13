@@ -4940,6 +4940,19 @@ Date : 12/11/2026 (horloge du bac a sable, UTC).
     A tester : regeneration d'une souris blessee ; poursuite apres fuite de plus
     de 10 s.
 
+8.68 MAJ 79 - INSTALLATION AUTO DE PYMYSQL ET OBSTACLES POUR LE MONDE SERVEUR
+================================================================================
+Date : 13/11/2026 (horloge du bac a sable, UTC).
+  - mondeLV.py installe pymysql avec pip s'il manque (assurer_pymysql).
+  - Le jeu ecrit jeu/serveur/obstacles.json au demarrage (ExporterObstaclesServeur) : arbres,
+    rochers, barrieres, cloture (cercles et boites), sans les corps des betes ni les maisons.
+    Dossier : jeu/game/../serveur (le jeu tourne dans jeu/game).
+  - mondeLV.py lit ce fichier (grille de 10 m) : les betes serveur ne traversent plus les
+    obstacles. Une bete deja dans un obstacle peut en sortir.
+  - Jeu : PointDansObstacle empeche d'apparaitre dans un obstacle (au depart et a la reapparition).
+  - Le fichier obstacles.json est ignore par git (genere).
+  - Non teste ; Unity non compile. Le controle syntaxe signale UTF8Encoding (faux positif :
+    using System.Text est present).
 8.67 MAJ 78 - UN SEUL PROGRAMME SERVEUR (mondeLV.py) ET MURS
 ================================================================================
 Date : 13/11/2026 (horloge du bac a sable, UTC).

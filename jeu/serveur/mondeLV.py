@@ -32,11 +32,27 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-try:
-    import pymysql
-except ImportError:
-    print("Module manquant : pip install pymysql")
-    sys.exit(1)
+pymysql = None  # importe dans assurer_pymysql()
+
+
+def assurer_pymysql():
+    """Importe pymysql ; s'il manque, l'installe automatiquement avec pip."""
+    global pymysql
+    try:
+        import pymysql as module
+    except ImportError:
+        import subprocess
+        print("pymysql absent : installation automatique (pip)...", flush=True)
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "pymysql"])
+        except (OSError, subprocess.CalledProcessError) as erreur:
+            print("Installation impossible : " + str(erreur))
+            print("Lancez a la main : python -m pip install pymysql")
+            sys.exit(1)
+        import importlib
+        importlib.invalidate_caches()
+        import pymysql as module
+    pymysql = module
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "config.php")
@@ -45,6 +61,10 @@ CONFIG = os.path.join(HERE, "config.php")
 IA_MODELE = os.environ.get("LIBREVIES_IA_MODELE", os.path.join(HERE, "IA"))
 IA_HOTE = os.environ.get("LIBREVIES_IA_HOTE", "127.0.0.1")
 IA_PORT = int(os.environ.get("LIBREVIES_IA_PORT", "8765"))
+
+OBSTACLES_FICHIER = os.path.join(HERE, "obstacles.json")   # ecrit par le jeu (ExporterObstaclesServeur)
+MARGE_OBSTACLE = 0.4          # rayon de la bete pour les obstacles
+TAILLE_CASE = 10.0            # grille de recherche des obstacles
 
 PAS_DU_MONDE = 0.5            # secondes entre deux tours de calcul
 RAYON_VILLAGE = 40.0          # cercle du village (LibreViesGame.cs : VillageRadius)
@@ -351,13 +371,80 @@ def zone_interdite(x, z):
     return False
 
 
+class Obstacles:
+    """Arbres, rochers, barrieres... lus dans obstacles.json, ranges par cases de 10 m."""
+
+    def __init__(self):
+        self.date = None
+        self.cases = {}
+        self.nombre = 0
+
+    def charger(self):
+        if not os.path.isfile(OBSTACLES_FICHIER):
+            if self.date != 0.0:
+                print("obstacles.json absent : lancez le jeu une fois sur ce PC (les monstres "
+                      "traverseront les obstacles en attendant).", flush=True)
+            self.date = 0.0
+            self.cases = {}
+            self.nombre = 0
+            return
+        date = os.path.getmtime(OBSTACLES_FICHIER)
+        if date == self.date:
+            return
+        with open(OBSTACLES_FICHIER, encoding="utf-8") as fichier:
+            donnees = json.load(fichier)
+        cases = {}
+        nombre = 0
+        for obstacle in donnees.get("obstacles", []):
+            x = float(obstacle["x"])
+            z = float(obstacle["z"])
+            if obstacle.get("type") == "cercle":
+                etendue = float(obstacle["rayon"])
+            else:
+                etendue = max(float(obstacle["largeur"]), float(obstacle["profondeur"])) * 0.5
+            etendue += MARGE_OBSTACLE
+            for i in range(int(math.floor((x - etendue) / TAILLE_CASE)), int(math.floor((x + etendue) / TAILLE_CASE)) + 1):
+                for k in range(int(math.floor((z - etendue) / TAILLE_CASE)), int(math.floor((z + etendue) / TAILLE_CASE)) + 1):
+                    cases.setdefault((i, k), []).append(obstacle)
+            nombre += 1
+        self.cases = cases
+        self.nombre = nombre
+        self.date = date
+        print("mondeLV : " + str(nombre) + " obstacle(s) charge(s)", flush=True)
+
+    def bloque(self, x, z):
+        cle = (int(math.floor(x / TAILLE_CASE)), int(math.floor(z / TAILLE_CASE)))
+        for obstacle in self.cases.get(cle, ()):
+            if obstacle.get("type") == "cercle":
+                rayon = float(obstacle["rayon"]) + MARGE_OBSTACLE
+                if (x - float(obstacle["x"])) ** 2 + (z - float(obstacle["z"])) ** 2 < rayon * rayon:
+                    return True
+            elif (abs(x - float(obstacle["x"])) < float(obstacle["largeur"]) * 0.5 + MARGE_OBSTACLE
+                  and abs(z - float(obstacle["z"])) < float(obstacle["profondeur"]) * 0.5 + MARGE_OBSTACLE):
+                return True
+        return False
+
+
+OBSTACLES = Obstacles()
+
+
+def pas_permis(x, z, nx, nz):
+    """Vrai si la bete peut aller de (x, z) vers (nx, nz)."""
+    if zone_interdite(nx, nz):
+        return False
+    # Une bete deja coincee dans un obstacle (pose a la main ou apparue dedans) peut en sortir.
+    if OBSTACLES.bloque(nx, nz) and not OBSTACLES.bloque(x, z):
+        return False
+    return True
+
+
 def point_libre_au_hasard(joueurs):
     """Point valide pour une réapparition, loin des joueurs si possible."""
     solution = None
     for _ in range(300):
         x = random.uniform(-LIMITE_CARTE, LIMITE_CARTE)
         z = random.uniform(-LIMITE_CARTE, LIMITE_CARTE)
-        if zone_interdite(x, z):
+        if zone_interdite(x, z) or OBSTACLES.bloque(x, z):
             continue
         solution = (x, z)
         if all(math.hypot(x - jx, z - jz) >= DISTANCE_MIN_JOUEUR_RESURRECTION for jx, jz in joueurs):
@@ -418,6 +505,7 @@ class Monde:
         # Commit en début de tour : sinon la lecture reste figée sur l'ancienne image de la base.
         self.connexion.commit()
         curseur = self.connexion.cursor()
+        OBSTACLES.charger()
 
         if maintenant >= self.prochaines_stats:
             self.lire_stats(curseur)
@@ -507,7 +595,7 @@ class Monde:
                 continue
 
             nx, nz = x + dx * pas, z + dz * pas
-            if zone_interdite(nx, nz):
+            if not pas_permis(x, z, nx, nz):
                 # Contournement : on essaie des virages de plus en plus grands.
                 trouve = False
                 for angle in (30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180):
@@ -515,7 +603,7 @@ class Monde:
                     s = math.sin(math.radians(angle))
                     ddx, ddz = dx * c - dz * s, dx * s + dz * c
                     tx, tz = x + ddx * pas, z + ddz * pas
-                    if not zone_interdite(tx, tz):
+                    if pas_permis(x, z, tx, tz):
                         dx, dz, nx, nz = ddx, ddz, tx, tz
                         trouve = True
                         break
@@ -551,6 +639,7 @@ class Monde:
 
 
 def main():
+    assurer_pymysql()
     config = lire_config()
     threading.Thread(target=demarrer_ia, daemon=True).start()
     monde = Monde(config)
