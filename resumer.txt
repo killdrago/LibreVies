@@ -4953,6 +4953,17 @@ Date : 13/11/2026 (horloge du bac a sable, UTC).
   - Le fichier obstacles.json est ignore par git (genere).
   - Non teste ; Unity non compile. Le controle syntaxe signale UTF8Encoding (faux positif :
     using System.Text est present).
+8.68c MAJ 83 - OBSTACLES EN TEMPS REEL ; MONSTRES SANS SACCADE
+  - ReconstruireObjetsMonde retire les anciens obstacles du monde (obstaclesMonde) avant de
+    recreer ceux des elements : un arbre retire disparait pour tout le monde.
+    Avant, ces obstacles s'accumulaient a chaque synchro.
+  - SynchroniserObstaclesServeur : renvoie la liste a la base au plus toutes les 1,5 s, quand elle
+    change (remplace l'envoi unique au demarrage).
+  - Monstres distants : vitesse estimee entre deux positions recues ; le monstre glisse vers
+    la position prolongee (max 0,6 s) au lieu de s'arreter entre deux envois du serveur.
+  - Limite : les clotures / barrieres ne passent pas par elementsMonde ; a verifier en jeu.
+  - Non teste ; Unity non compile.
+
 8.68 MAJ 82 - OBSTACLES DANS LA BASE (remplace obstacles.json)
   - Table monde_obstacle (mondeLV.sql, SQL dans le chat). forme, x, z, rayon, largeur, profondeur.
   - Action API declarer_obstacles (monde.php : traiter_declaration_obstacles) : remplace la liste.

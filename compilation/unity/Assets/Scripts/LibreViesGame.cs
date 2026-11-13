@@ -112,6 +112,10 @@ public sealed class LibreViesGame : MonoBehaviour
         new Vector2(82, -68), new Vector2(118, -108)
     };
     private readonly List<Obstacle> obstacles = new List<Obstacle>();
+    // Obstacles crees par les objets du monde (arbres, rochers...) : recrees a chaque synchro.
+    private readonly HashSet<Obstacle> obstaclesMonde = new HashSet<Obstacle>();
+    private bool obstaclesAEnvoyer = true;
+    private float prochainEnvoiObstacles;
     private readonly Dictionary<Transform, Obstacle> collisionsObjetsEdition =
         new Dictionary<Transform, Obstacle>();
     // Collisions supplementaires d'un objet (ex. bassin de la fontaine) : elles
@@ -717,6 +721,8 @@ public sealed class LibreViesGame : MonoBehaviour
         public bool MortServeur;       // mort selon le serveur
         public float MortLe;           // instant local (Time.time) de la mort recue du serveur
         public Vector3 CibleDistante;  // position recue du serveur (monstre non pilote)
+        public Vector3 VitesseDistante; // vitesse estimee entre les deux dernieres positions recues
+        public float DernierRecuLe;     // Time.time de la derniere position recue (changee)
         public float DernierEssaiRessurection;
         public float AttackCooldown;
         public float DernierCoup = -10f; // dernier coup donne par ce client (Time.time)
@@ -864,6 +870,7 @@ public sealed class LibreViesGame : MonoBehaviour
             screenAdjustEffect = gameCamera.gameObject.AddComponent<LibreViesScreenAdjust>();
         LoadOptions();
         obstacles.Clear();
+        obstaclesMonde.Clear();
         batiments.Clear();
         portails.Clear();
         gardes.Clear();
@@ -956,12 +963,12 @@ public sealed class LibreViesGame : MonoBehaviour
         // mise a jour en continu par le joueur qui pilote). Seules les betes absentes de la base
         // prennent une position tiree ici. La reinitialisation ne se fait qu'a la reconfiguration ADMIN.
         yield return DeclarerMonstresServeur();
-        yield return EnvoyerObstaclesServeur();
         intervalleSyncMonde = Mathf.Clamp(
             PlayerPrefs.GetFloat("LibreVies.IntervalleSyncMonde", 0.05f), 0.000001f, 10f);
         StartCoroutine(SurveillerMonde());
         StartCoroutine(SynchroniserPilotageMonstres());
         StartCoroutine(SynchroniserButin());
+        StartCoroutine(SynchroniserObstaclesServeur());
         ConstruireObjetsEdition();
         AppliquerMaisonsServeur(LibreViesCompte.Courant.MaisonsMonde);
         RafraichirZonesNommees();
@@ -1193,7 +1200,32 @@ public sealed class LibreViesGame : MonoBehaviour
     {
         if (racineMonde == null) racineMonde = new GameObject("Monde_Objets").transform;
         for (int i = racineMonde.childCount - 1; i >= 0; i--) Destroy(racineMonde.GetChild(i).gameObject);
-        for (int i = 0; i < elementsMonde.Count; i++) CreerObjetMonde(elementsMonde[i]);
+        // Les anciens obstacles du monde disparaissent (arbre retire par un autre joueur),
+        // puis on recree ceux de la liste actuelle.
+        obstacles.RemoveAll(o => obstaclesMonde.Contains(o));
+        obstaclesMonde.Clear();
+        for (int i = 0; i < elementsMonde.Count; i++)
+        {
+            int avant = obstacles.Count;
+            CreerObjetMonde(elementsMonde[i]);
+            for (int k = avant; k < obstacles.Count; k++) obstaclesMonde.Add(obstacles[k]);
+        }
+        // La liste envoyee a la base doit suivre : la synchro la renverra.
+        obstaclesAEnvoyer = true;
+    }
+
+    // Renvoie la liste des obstacles a la base quand elle change (au plus toutes les 1,5 s).
+    private System.Collections.IEnumerator SynchroniserObstaclesServeur()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (!obstaclesAEnvoyer || Time.time < prochainEnvoiObstacles) continue;
+            if (LibreViesCompte.Courant == null || !LibreViesCompte.Courant.Authentifie) continue;
+            obstaclesAEnvoyer = false;
+            prochainEnvoiObstacles = Time.time + 1.5f;
+            yield return EnvoyerObstaclesServeur();
+        }
     }
 
     private void CreerObjetMonde(ElementMonde element)
@@ -8105,7 +8137,19 @@ public sealed class LibreViesGame : MonoBehaviour
                 // la hausse n'est pas acceptee juste apres un coup donne ici.
                 ennemi.Hp = etat.pv;
             }
-            ennemi.CibleDistante = position;
+            Vector2 ecart2 = new Vector2(position.x - ennemi.CibleDistante.x, position.z - ennemi.CibleDistante.z);
+            if (ecart2.sqrMagnitude > 0.000001f)
+            {
+                float intervalle = Time.time - ennemi.DernierRecuLe;
+                if (ennemi.DernierRecuLe > 0f && intervalle > 0.02f)
+                {
+                    Vector3 vitesse = new Vector3(ecart2.x, 0f, ecart2.y) / intervalle;
+                    if (vitesse.magnitude > 4f) vitesse = vitesse.normalized * 4f;
+                    ennemi.VitesseDistante = vitesse;
+                }
+                ennemi.DernierRecuLe = Time.time;
+                ennemi.CibleDistante = position;
+            }
         }
     }
 
@@ -8134,16 +8178,18 @@ public sealed class LibreViesGame : MonoBehaviour
         return meilleure;
     }
 
-    // Monstre non pilote : il glisse vers la position recue du serveur.
+    // Monstre non pilote : il glisse en douceur vers la position recue du serveur, prolongee
+    // de sa vitesse estimee (le serveur n'envoie qu'une position toutes les 0,5 s environ).
     private void SuivreMonstreDistant(EnemyState ennemi, float dt)
     {
         Vector3 position = ennemi.Root.transform.position;
-        Vector3 cible = ennemi.CibleDistante;
+        float depuis = Mathf.Clamp(Time.time - ennemi.DernierRecuLe, 0f, 0.6f);
+        Vector3 cible = ennemi.CibleDistante + ennemi.VitesseDistante * depuis;
         Vector3 vers = cible - position;
         vers.y = 0f;
         float distance = vers.magnitude;
         if (distance > 12f) position = cible;
-        else if (distance > 0.02f) position = Vector3.MoveTowards(position, cible, Mathf.Max(2f, distance * 5f) * dt);
+        else if (distance > 0.02f) position = Vector3.Lerp(position, cible, 1f - Mathf.Exp(-dt * 10f));
         position.y = TerrainHeight(position.x, position.z);
         ennemi.Root.transform.position = position;
         if (distance > 0.05f)
